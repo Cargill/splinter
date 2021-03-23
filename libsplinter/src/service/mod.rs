@@ -47,7 +47,6 @@ pub mod validation;
 
 use std::any::Any;
 
-#[cfg(feature = "circuit-purge")]
 use crate::error::InternalError;
 
 pub use factory::ServiceFactory;
@@ -143,7 +142,6 @@ pub trait Service: Send {
     /// this must take a boxed Service instance).
     fn destroy(self: Box<Self>) -> Result<(), ServiceDestroyError>;
 
-    #[cfg(feature = "circuit-purge")]
     /// Purge any persistent state maintained by this service.
     fn purge(&mut self) -> Result<(), InternalError>;
 

@@ -14,27 +14,19 @@
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
-use std::convert::TryFrom;
-#[cfg(feature = "circuit-disband")]
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::iter::ExactSizeIterator;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
-use protobuf::Message;
-#[cfg(feature = "circuit-abandon")]
-use protobuf::RepeatedField;
+use protobuf::{Message, RepeatedField};
 
-use crate::admin::store;
-#[cfg(feature = "circuit-abandon")]
-use crate::admin::store::CircuitBuilder as StoreCircuitBuilder;
-#[cfg(feature = "circuit-purge")]
-use crate::admin::store::Service as StoreService;
 use crate::admin::store::{
-    AdminServiceStore, Circuit as StoreCircuit, CircuitNode, CircuitPredicate,
-    CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus, ProposalType,
-    ProposedNode, Vote, VoteRecordBuilder,
+    self, AdminServiceStore, Circuit as StoreCircuit, CircuitBuilder as StoreCircuitBuilder,
+    CircuitNode, CircuitPredicate, CircuitProposal as StoreProposal,
+    CircuitStatus as StoreCircuitStatus, ProposalType, ProposedNode, Service as StoreService, Vote,
+    VoteRecordBuilder,
 };
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
@@ -45,17 +37,13 @@ use crate::peer::{PeerManagerConnector, PeerRef};
 use crate::protocol::{
     ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION, CIRCUIT_PROTOCOL_VERSION,
 };
-#[cfg(feature = "circuit-abandon")]
-use crate::protos::admin::AbandonedCircuit;
-#[cfg(any(feature = "service-arg-validation", feature = "circuit-abandon"))]
-use crate::protos::admin::SplinterService;
 use crate::protos::admin::{
-    AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
+    AbandonedCircuit, AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header, CircuitProposal,
     CircuitProposalVote, CircuitProposalVote_Vote, CircuitProposal_ProposalType,
     Circuit_AuthorizationType, Circuit_CircuitStatus, Circuit_DurabilityType,
     Circuit_PersistenceType, Circuit_RouteType, MemberReady, ServiceProtocolVersionRequest,
-    SplinterNode,
+    SplinterNode, SplinterService,
 };
 use crate::service::error::ServiceError;
 #[cfg(feature = "service-arg-validation")]
@@ -366,75 +354,66 @@ impl AdminServiceShared {
                         // committing a new circuit proposal. For 0.4 compatibility, this is the
                         // default action as these proposals will not have the `circuit_status`
                         // field set.
-                        #[cfg(feature = "circuit-disband")]
-                        {
-                            if status == Circuit_CircuitStatus::DISBANDED {
-                                let store_circuit =
-                                    StoreCircuit::try_from(circuit_proposal.get_circuit_proposal())
-                                        .map_err(|err| {
-                                            AdminSharedError::SplinterStateError(format!(
+                        if status == Circuit_CircuitStatus::DISBANDED {
+                            let store_circuit =
+                                StoreCircuit::try_from(circuit_proposal.get_circuit_proposal())
+                                    .map_err(|err| {
+                                        AdminSharedError::SplinterStateError(format!(
                                             "Unable to convert proto Circuit to store Circuit: {}",
                                             err.to_string()
                                         ))
-                                        })?;
-
-                                if store_circuit.circuit_status() != &StoreCircuitStatus::Disbanded
-                                {
-                                    return Err(AdminSharedError::SplinterStateError(format!(
-                                        "Circuit should be disbanded: {}",
-                                        circuit_id
-                                    )));
-                                }
-                                // Updating the corresponding `active` circuit from the admin store
-                                // and then removing the corresponding `CircuitProposal` from the
-                                // disband request
-                                self.admin_store
-                                    .update_circuit(store_circuit.clone())
-                                    .map_err(|_| {
-                                        AdminSharedError::SplinterStateError(format!(
-                                            "Unable to update circuit {}",
-                                            circuit_id
-                                        ))
-                                    })
-                                    .and_then(|_| {
-                                        self.remove_proposal(store_circuit.circuit_id())
                                     })?;
 
-                                // send message about circuit disband proposal being accepted
-                                let circuit_proposal_proto =
-                                    messages::CircuitProposal::from_proto(circuit_proposal.clone())
-                                        .map_err(AdminSharedError::InvalidMessageFormat)?;
-                                let event = messages::AdminServiceEvent::ProposalAccepted((
-                                    circuit_proposal_proto,
-                                    circuit_proposal_context.signer_public_key.clone(),
-                                ));
-                                self.send_event(&mgmt_type, event);
-                                // send MEMBER_READY message to all other members' admin
-                                // services
-                                if let Some(ref network_sender) = self.network_sender {
-                                    let mut member_ready = MemberReady::new();
-                                    member_ready.set_circuit_id(circuit_id.to_string());
-                                    member_ready.set_member_node_id(self.node_id.clone());
-                                    let mut msg = AdminMessage::new();
-                                    msg.set_message_type(AdminMessage_Type::MEMBER_READY);
-                                    msg.set_member_ready(member_ready);
+                            if store_circuit.circuit_status() != &StoreCircuitStatus::Disbanded {
+                                return Err(AdminSharedError::SplinterStateError(format!(
+                                    "Circuit should be disbanded: {}",
+                                    circuit_id
+                                )));
+                            }
+                            // Updating the corresponding `active` circuit from the admin store
+                            // and then removing the corresponding `CircuitProposal` from the
+                            // disband request
+                            self.admin_store
+                                .update_circuit(store_circuit.clone())
+                                .map_err(|_| {
+                                    AdminSharedError::SplinterStateError(format!(
+                                        "Unable to update circuit {}",
+                                        circuit_id
+                                    ))
+                                })
+                                .and_then(|_| self.remove_proposal(store_circuit.circuit_id()))?;
 
-                                    let envelope_bytes =
-                                        msg.write_to_bytes().map_err(MarshallingError::from)?;
-                                    for member in store_circuit.members().iter() {
-                                        if member != &self.node_id {
-                                            network_sender
-                                                .send(&admin_service_id(member), &envelope_bytes)?;
-                                        }
+                            // send message about circuit disband proposal being accepted
+                            let circuit_proposal_proto =
+                                messages::CircuitProposal::from_proto(circuit_proposal.clone())
+                                    .map_err(AdminSharedError::InvalidMessageFormat)?;
+                            let event = messages::AdminServiceEvent::ProposalAccepted((
+                                circuit_proposal_proto,
+                                circuit_proposal_context.signer_public_key,
+                            ));
+                            self.send_event(&mgmt_type, event);
+                            // send MEMBER_READY message to all other members' admin
+                            // services
+                            if let Some(ref network_sender) = self.network_sender {
+                                let mut member_ready = MemberReady::new();
+                                member_ready.set_circuit_id(circuit_id.to_string());
+                                member_ready.set_member_node_id(self.node_id.clone());
+                                let mut msg = AdminMessage::new();
+                                msg.set_message_type(AdminMessage_Type::MEMBER_READY);
+                                msg.set_member_ready(member_ready);
+
+                                let envelope_bytes =
+                                    msg.write_to_bytes().map_err(MarshallingError::from)?;
+                                for member in store_circuit.members().iter() {
+                                    if member != &self.node_id {
+                                        network_sender
+                                            .send(&admin_service_id(member), &envelope_bytes)?;
                                     }
                                 }
-                                // add circuit as pending further service handling
-                                self.add_uninitialized_circuit(circuit_proposal.clone())?;
                             }
-                        }
-                        if status == Circuit_CircuitStatus::ACTIVE
-                            || status == Circuit_CircuitStatus::UNSET_CIRCUIT_STATUS
-                        {
+                            // add circuit as pending further service handling
+                            self.add_uninitialized_circuit(circuit_proposal.clone())?;
+                        } else {
                             // commit new circuit
                             self.admin_store.upgrade_proposal_to_circuit(circuit_id)?;
                             let circuit =
@@ -557,7 +536,6 @@ impl AdminServiceShared {
                                 info!("committed vote for circuit proposal {}", circuit_id);
                                 Ok(())
                             }
-                            #[cfg(feature = "circuit-disband")]
                             CircuitManagementPayload_Action::CIRCUIT_DISBAND_REQUEST => {
                                 self.add_proposal(circuit_proposal.clone())?;
                                 // notify registered application authorization handlers of the
@@ -772,7 +750,6 @@ impl AdminServiceShared {
                 self.current_consensus_verifiers = verifiers;
                 Ok((expected_hash, proto_circuit_proposal))
             }
-            #[cfg(feature = "circuit-disband")]
             CircuitManagementPayload_Action::CIRCUIT_DISBAND_REQUEST => {
                 debug!("Circuit disband request being processed");
                 let circuit_id = circuit_payload
@@ -907,7 +884,6 @@ impl AdminServiceShared {
         )
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Once a local `CircuitDisbandRequest` has been validated, the admin service may now proceed
     /// to communicating with the remote circuit members to propose the disband change.
     pub fn propose_disband(
@@ -933,7 +909,6 @@ impl AdminServiceShared {
         )
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Attempts to purge a circuit and the associated internal Splinter services
     fn purge_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
         // Verifying the circuit is able to be purged
@@ -973,7 +948,6 @@ impl AdminServiceShared {
         }
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Locally abandon a circuit. The circuit to be abandoned is first fetched from the admin
     /// store, to validate this circuit is available to be abandoned. Then, an `ABANDONED_CIRCUIT`
     /// message is sent to the remote circuit members. Finally, the circuit is abandoned by
@@ -1192,7 +1166,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Verify all members of the circuit to be disbanded are using a valid protocol version.
     /// If all circuit members have agreed on a protocol version, the disband payload is moved into
     /// the `pending_circuit_payloads` list for further processing. Otherwise, this payload is
@@ -1294,7 +1267,6 @@ impl AdminServiceShared {
 
                 self.propose_vote(payload, "local".to_string())
             }
-            #[cfg(feature = "circuit-disband")]
             CircuitManagementPayload_Action::CIRCUIT_DISBAND_REQUEST => {
                 let signer_public_key = header.get_requester();
                 let requester_node_id = header.get_requester_node_id();
@@ -1322,7 +1294,6 @@ impl AdminServiceShared {
                     "local".to_string(),
                 )
             }
-            #[cfg(feature = "circuit-purge")]
             CircuitManagementPayload_Action::CIRCUIT_PURGE_REQUEST => {
                 let signer_public_key = header.get_requester();
                 let requester_node_id = header.get_requester_node_id();
@@ -1339,7 +1310,6 @@ impl AdminServiceShared {
 
                 self.purge_circuit(circuit_id)
             }
-            #[cfg(feature = "circuit-abandon")]
             CircuitManagementPayload_Action::CIRCUIT_ABANDON => {
                 let signer_public_key = header.get_requester();
                 let requester_node_id = header.get_requester_node_id();
@@ -1427,76 +1397,70 @@ impl AdminServiceShared {
                 pending_members.push(node.get_node_id().to_string())
             }
             members.extend(create_request_members);
-        }
-
-        // If the `circuit-disband` feature is enabled, a `CircuitDisbandRequest` may be present
-        // in the payload. Therefore, the members are gathered from the admin store based on the
-        // provided circuit id.
-        #[cfg(feature = "circuit-disband")]
-        {
-            if payload.has_circuit_disband_request() {
-                // If the members list has already been updated, the payload was to create a
-                // new circuit.
-                if !members.is_empty() {
-                    return Err(ServiceError::UnableToHandleMessage(Box::new(
-                        AdminSharedError::ValidationFailed(
-                            "Invalid payload; has two requests".to_string(),
-                        ),
-                    )));
-                }
-                let circuit_id = payload.get_circuit_disband_request().get_circuit_id();
-                // If the proposed circuit is being disbanded, the circuit information must be
-                // gathered from the admin store, as the `CircuitDisbandRequest` only contains
-                // the `circuit_id`.
-                let circuit = self
-                    .admin_store
-                    .get_circuit(circuit_id)
-                    .map_err(|err| {
-                        ServiceError::UnableToHandleMessage(Box::new(
-                            AdminSharedError::ValidationFailed(format!(
-                                "error occurred when trying to get circuit {}",
-                                err
-                            )),
-                        ))
-                    })?
-                    .ok_or_else(|| {
-                        ServiceError::UnableToHandleMessage(Box::new(
-                            AdminSharedError::ValidationFailed(format!(
-                                "unable to get circuit {}",
-                                circuit_id
-                            )),
-                        ))
-                    })?;
-
-                // Collecting the node endpoints associated with the currently active version of the
-                // circuit proposed to be disbanded.
-                let node_ids = circuit.members().to_vec();
-                let disband_members = self
-                    .admin_store
-                    .list_nodes()
-                    .map_err(|err| {
-                        ServiceError::UnableToHandleMessage(Box::new(
-                            AdminSharedError::ValidationFailed(format!(
-                                "error occurred when trying to get circuit nodes {}",
-                                err
-                            )),
-                        ))
-                    })?
-                    .filter_map(|circuit_node| {
-                        if node_ids.contains(&circuit_node.node_id().to_string()) {
-                            return Some(
-                                messages::SplinterNode {
-                                    node_id: circuit_node.node_id().to_string(),
-                                    endpoints: circuit_node.endpoints().to_vec(),
-                                }
-                                .into_proto(),
-                            );
-                        }
-                        None
-                    })
-                    .collect::<Vec<SplinterNode>>();
-                members.extend(disband_members);
+        } else if payload.has_circuit_disband_request() {
+            // If a `CircuitDisbandRequest` is present in the payload, the members mut be gathered
+            // from the admin store based on the provided circuit id.
+            // If the members list has already been updated, the payload was to create a
+            // new circuit.
+            if !members.is_empty() {
+                return Err(ServiceError::UnableToHandleMessage(Box::new(
+                    AdminSharedError::ValidationFailed(
+                        "Invalid payload; has two requests".to_string(),
+                    ),
+                )));
             }
+            let circuit_id = payload.get_circuit_disband_request().get_circuit_id();
+            // If the proposed circuit is being disbanded, the circuit information must be
+            // gathered from the admin store, as the `CircuitDisbandRequest` only contains
+            // the `circuit_id`.
+            let circuit = self
+                .admin_store
+                .get_circuit(circuit_id)
+                .map_err(|err| {
+                    ServiceError::UnableToHandleMessage(Box::new(
+                        AdminSharedError::ValidationFailed(format!(
+                            "error occurred when trying to get circuit {}",
+                            err
+                        )),
+                    ))
+                })?
+                .ok_or_else(|| {
+                    ServiceError::UnableToHandleMessage(Box::new(
+                        AdminSharedError::ValidationFailed(format!(
+                            "unable to get circuit {}",
+                            circuit_id
+                        )),
+                    ))
+                })?;
+
+            // Collecting the node endpoints associated with the currently active version of the
+            // circuit proposed to be disbanded.
+            let node_ids = circuit.members().to_vec();
+            let disband_members = self
+                .admin_store
+                .list_nodes()
+                .map_err(|err| {
+                    ServiceError::UnableToHandleMessage(Box::new(
+                        AdminSharedError::ValidationFailed(format!(
+                            "error occurred when trying to get circuit nodes {}",
+                            err
+                        )),
+                    ))
+                })?
+                .filter_map(|circuit_node| {
+                    if node_ids.contains(&circuit_node.node_id().to_string()) {
+                        return Some(
+                            messages::SplinterNode {
+                                node_id: circuit_node.node_id().to_string(),
+                                endpoints: circuit_node.endpoints().to_vec(),
+                            }
+                            .into_proto(),
+                        );
+                    }
+                    None
+                })
+                .collect::<Vec<SplinterNode>>();
+            members.extend(disband_members);
         }
 
         if missing_protocol_ids.is_empty() {
@@ -1805,7 +1769,6 @@ impl AdminServiceShared {
         )?)
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Use the internal `admin_store`'s `remove_circuit` method
     pub fn remove_circuit(
         &mut self,
@@ -1855,11 +1818,7 @@ impl AdminServiceShared {
         // intended to disband a circuit and the associated services will need to be stopped. In
         // this case, the next step is to `cleanup_disbanded_circuit_if_members_ready`.
         if circuit_proposal_type == CircuitProposal_ProposalType::DISBAND {
-            #[cfg(feature = "circuit-disband")]
-            {
-                self.cleanup_disbanded_circuit_if_members_ready(&circuit_id)?;
-            }
-            Ok(())
+            self.cleanup_disbanded_circuit_if_members_ready(&circuit_id)
         } else {
             self.initialize_services_if_members_ready(&circuit_id)
         }
@@ -1913,7 +1872,6 @@ impl AdminServiceShared {
         // Move onto either initializing the services or stopping the services, depending on the
         // associated circuit proposal's type.
         match proposal_type {
-            #[cfg(feature = "circuit-disband")]
             ProposalType::Disband => self.cleanup_disbanded_circuit_if_members_ready(&circuit_id),
             _ => self.initialize_services_if_members_ready(circuit_id),
         }
@@ -2313,7 +2271,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Validates a `CircuitDisbandRequest` using the following:
     ///
     /// - Validate the protocol version used by the submitter node. Currently, disbanding is only
@@ -2410,7 +2367,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Validates a `CircuitPurgeRequest` using the following:
     ///
     /// - Validate the protocol version used by the requesting node. Currently, purging is only
@@ -2505,7 +2461,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Validate a `CircuitAbandon` payload by the following:
     ///
     /// - Validate the protocol version used by the submitter node. Currently, abandoning is only
@@ -2664,7 +2619,6 @@ impl AdminServiceShared {
         }
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Makes the `CircuitProposal` associated with a `CircuitDisbandRequest` based on information
     /// gathered from the currently active circuit that is specified in the disband request
     fn make_disband_request_circuit_proposal(
@@ -2772,7 +2726,6 @@ impl AdminServiceShared {
         Ok(circuit_proposal)
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Makes a `Circuit` and `StoreCircuit` with an `Abandoned` `circuit_status` to be used to
     /// update circuit state to reflect the abandoning change
     fn make_abandoned_circuit(
@@ -2909,7 +2862,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
     /// Stops all services that this node was running on the disbanded or abandoned circuit using
     /// the service orchestrator. This may not include all services if they are not supported
     /// locally. It is expected that some services will be stopped externally.
@@ -2957,7 +2909,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Purges all services that this node was running on the disbanded circuit using the service
     /// orchestrator. Destroying a service will also remove the service's state LMDB files.
     pub fn purge_services(
@@ -3014,7 +2965,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Verify all members are ready before cleaning up after the disbanded circuit, i.e. removing
     /// peer refs, removing the circuit from the routing table, and shutting down the circuit's
     /// associated services.
@@ -3136,7 +3086,6 @@ mod tests {
     };
 
     use crate::admin::service::AdminKeyVerifierError;
-    #[cfg(feature = "circuit-disband")]
     use crate::admin::store;
     use crate::admin::store::diesel::DieselAdminServiceStore;
     use crate::circuit::routing::memory::RoutingTable;
@@ -4990,7 +4939,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Tests that a circuit being disbanded is validated correctly
     ///
     /// 1. Set up `AdminServiceShared`
@@ -5048,7 +4996,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Tests that a circuit is unable to be disbanded when an invalid admin service protocol
     /// version is used. Currently, the disband functionality is not available for
     /// admin service protocol 1.
@@ -5108,7 +5055,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Tests that a circuit being disbanded is invalid if the circuit to be disbanded has an
     /// invalid circuit version.
     ///
@@ -5170,7 +5116,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Tests that a circuit being disbanded is invalid if the circuit to be disbanded does not
     /// exist in the admin store, indicating an invalid disband request.
     ///
@@ -5219,7 +5164,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Tests that a circuit being disbanded is invalid if the requester is not permitted for
     /// the node.
     ///
@@ -5278,7 +5222,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Tests that a circuit being disbanded is invalid if the requester is not permitted for
     /// the node.
     ///
@@ -5336,7 +5279,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-disband")]
     /// Tests that the payload submitted via `propose_disband` is moved to the admin service's
     /// payload lists as peers become fully peered, authorized and agree on a service protocol.
     ///
@@ -5478,7 +5420,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a circuit being purged is validated correctly
     ///
     /// 1. Set up `AdminServiceShared`
@@ -5536,7 +5477,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a circuit is unable to be purged when an invalid admin service protocol
     /// version is used. Currently, the purge functionality is not available for
     /// admin service protocol 1.
@@ -5594,7 +5534,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a circuit purge request is invalid if the circuit to be purged has an
     /// invalid circuit version. `CircuitPurgeRequest` requires that the circuit being purged is
     /// not an invalid version and verifies the status of the circuit being purged. As v1 circuits
@@ -5660,7 +5599,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a purge request is invalid if the circuit to be purged does not exist in the
     /// admin store, indicating an invalid purge request.
     ///
@@ -5709,7 +5647,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a purge request is invalid if the requester is not permitted for the node.
     ///
     /// 1. Set up `AdminServiceShared`
@@ -5767,7 +5704,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a purge request is invalid if the request doesn't come from the admin service's
     /// own node. The `CircuitPurgeRequest` is a local operation, other nodes should not be able
     /// to submit a purge request.
@@ -5827,7 +5763,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a circuit purge request is invalid if the circuit to be purged is still `Active`
     /// in the admin store. The `CircuitPurgeRequest` is only valid for circuits that have already
     /// been disbanded, a `circuit_status` of `Disbanded`.
@@ -5886,7 +5821,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a circuit is able to be purged using the `CircuitPurgeRequest`.
     ///
     /// 1. Set up `AdminServiceShared`
@@ -5968,7 +5902,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a circuit being abandoned is validated correctly
     ///
     /// 1. Set up `AdminServiceShared`
@@ -6025,7 +5958,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the circuit does not exist.
     ///
     /// 1. Set up `AdminServiceShared`
@@ -6069,7 +6001,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the circuit is not active.
     ///
     /// 1. Set up `AdminServiceShared`
@@ -6123,7 +6054,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the circuit is active, but
     /// has a circuit version less than the `CIRCUIT_PROTOCOL_VERSION`.
     ///
@@ -6178,7 +6108,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the request does not come
     /// from the local node.
     ///
@@ -6234,7 +6163,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the admin service used has
     /// an invalid protocol version.
     ///
@@ -6284,7 +6212,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the requester is not
     /// permitted for the admin service.
     ///
@@ -6339,7 +6266,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the requester is not
     /// permitted for the admin service.
     ///
@@ -6458,7 +6384,6 @@ mod tests {
         circuit
     }
 
-    #[cfg(feature = "circuit-disband")]
     pub fn setup_v1_test_circuit() -> Circuit {
         let mut service_a = SplinterService::new();
         service_a.set_service_id("0123".to_string());
@@ -6626,7 +6551,6 @@ mod tests {
         service
     }
 
-    #[cfg(any(feature = "circuit-disband", feature = "circuit-purge"))]
     fn store_circuit(version: i32, status: StoreCircuitStatus) -> StoreCircuit {
         store::CircuitBuilder::new()
             .with_circuit_id("01234-ABCDE")
@@ -6657,7 +6581,6 @@ mod tests {
             .expect("unable to build store Circuit")
     }
 
-    #[cfg(any(feature = "circuit-disband", feature = "circuit-purge"))]
     fn store_circuit_nodes() -> Vec<CircuitNode> {
         vec![
             store::CircuitNodeBuilder::new()

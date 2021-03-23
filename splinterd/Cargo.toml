@@ -121,12 +121,11 @@ authorization-handler-rbac = [
 biome-credentials = ["splinter/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management"]
 biome-profile = ["splinter/biome-profile", "splinter/oauth-profile"]
-circuit-abandon = ["splinter/circuit-abandon"]
-circuit-disband = ["splinter/circuit-disband"]
+circuit-abandon = []
+circuit-disband = []
 circuit-purge = [
   "health/circuit-purge",
   "scabbard/circuit-purge",
-  "splinter/circuit-purge",
 ]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]

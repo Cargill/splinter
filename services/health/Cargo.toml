@@ -44,4 +44,4 @@ experimental = [
 ]
 
 authorization = ["splinter/authorization"]
-circuit-purge = ["splinter/circuit-purge"]
+circuit-purge = []

@@ -385,6 +385,12 @@ impl Service for Scabbard {
             .map_err(|err| splinter::error::InternalError::from_source(Box::new(err)))
     }
 
+    #[cfg(not(feature = "circuit-purge"))]
+    fn purge(&mut self) -> Result<(), splinter::error::InternalError> {
+        info!("`circuit-purge` feature is not enabled for Scabbard service");
+        Ok(())
+    }
+
     fn handle_message(
         &self,
         message_bytes: &[u8],
