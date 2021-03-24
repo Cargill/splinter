@@ -53,6 +53,18 @@ pub(in crate::admin) fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, 
         node_a.node_id(),
         node_info,
         &*node_a.admin_signer().clone_box(),
+        &vec![
+            node_a
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get first node's public key")
+                .as_hex(),
+            node_b
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get second node's public key")
+                .as_hex(),
+        ],
     );
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
@@ -188,6 +200,23 @@ pub(in crate::admin) fn commit_3_party_circuit(
         node_a.node_id(),
         node_info,
         &*node_a.admin_signer().clone_box(),
+        &vec![
+            node_a
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get first node's public key")
+                .as_hex(),
+            node_b
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get second node's public key")
+                .as_hex(),
+            node_c
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get third node's public key")
+                .as_hex(),
+        ],
     );
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a

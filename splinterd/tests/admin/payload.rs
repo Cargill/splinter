@@ -41,13 +41,14 @@ pub(in crate::admin) fn make_create_circuit_payload(
     requester: &str,
     node_info: HashMap<String, Vec<String>>,
     signer: &dyn Signer,
+    admin_keys: &[String],
 ) -> Vec<u8> {
-    // Get the public key to create the `CircuitCreateRequest` and to also set the `requester`
-    // field of the `CircuitManagementPayload` header
+    // Get the public key to set the `requester` field of the `CircuitManagementPayload` header
     let public_key = signer
         .public_key()
-        .expect("Unable to get signer's public key");
-    let circuit_request = setup_circuit(circuit_id, node_info, &public_key.as_hex());
+        .expect("Unable to get signer's public key")
+        .into_bytes();
+    let circuit_request = setup_circuit(circuit_id, node_info, admin_keys);
     let serialized_action = circuit_request
         .write_to_bytes()
         .expect("Unable to serialize `CircuitCreateRequest`");
@@ -56,7 +57,7 @@ pub(in crate::admin) fn make_create_circuit_payload(
 
     let mut header = CircuitManagementPayload_Header::new();
     header.set_action(CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
-    header.set_requester(public_key.into_bytes());
+    header.set_requester(public_key);
     header.set_payload_sha512(hashed_bytes.to_vec());
     header.set_requester_node_id(requester.to_string());
 
@@ -171,7 +172,7 @@ pub(in crate::admin) fn make_circuit_disband_payload(
 fn setup_circuit(
     circuit_id: &str,
     node_info: HashMap<String, Vec<String>>,
-    public_key: &str,
+    admin_keys: &[String],
 ) -> CircuitCreateRequest {
     // The services require the service IDs from its peer services, which will be generated
     // after the node information is iterated over and the `SplinterServiceBuilder` is created
@@ -200,7 +201,10 @@ fn setup_circuit(
                 .with_arguments(
                     vec![
                         ("peer_services".to_string(), format!("{:?}", peer_services)),
-                        ("admin_keys".to_string(), format!("{:?}", vec![public_key])),
+                        (
+                            "admin_keys".to_string(),
+                            format!("{:?}", admin_keys.to_vec()),
+                        ),
                     ]
                     .as_ref(),
                 )
