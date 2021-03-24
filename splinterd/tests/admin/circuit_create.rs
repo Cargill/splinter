@@ -129,6 +129,11 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
         node_a.node_id(),
         node_info,
         &*node_a.admin_signer().clone_box(),
+        &vec![node_a
+            .admin_signer()
+            .public_key()
+            .expect("Unable to get first node's public key")
+            .as_hex()],
     );
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
@@ -258,6 +263,11 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
         node_a.node_id(),
         node_info,
         &*node_a.admin_signer().clone_box(),
+        &vec![node_a
+            .admin_signer()
+            .public_key()
+            .expect("Unable to get first node's public key")
+            .as_hex()],
     );
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
