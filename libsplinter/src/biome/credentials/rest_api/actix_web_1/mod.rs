@@ -71,54 +71,48 @@ impl BiomeCredentialsRestResourceProvider {
 
 impl RestResourceProvider for BiomeCredentialsRestResourceProvider {
     fn resources(&self) -> Vec<Resource> {
-        let mut resources = Vec::new();
-
-        resources.push(user::make_list_route(self.credentials_store.clone()));
-        resources.push(verify::make_verify_route(
-            self.credentials_store.clone(),
-            self.credentials_config.clone(),
-            self.token_secret_manager.clone(),
-        ));
-        resources.push(login::make_login_route(
-            self.credentials_store.clone(),
-            self.refresh_token_store.clone(),
-            self.credentials_config.clone(),
-            Arc::new(AccessTokenIssuer::new(
+        vec![
+            user::make_list_route(self.credentials_store.clone()),
+            verify::make_verify_route(
+                self.credentials_store.clone(),
+                self.credentials_config.clone(),
+                self.token_secret_manager.clone(),
+            ),
+            login::make_login_route(
+                self.credentials_store.clone(),
+                self.refresh_token_store.clone(),
+                self.credentials_config.clone(),
+                Arc::new(AccessTokenIssuer::new(
+                    self.token_secret_manager.clone(),
+                    self.refresh_token_secret_manager.clone(),
+                )),
+            ),
+            token::make_token_route(
+                self.refresh_token_store.clone(),
                 self.token_secret_manager.clone(),
                 self.refresh_token_secret_manager.clone(),
-            )),
-        ));
-        resources.push(token::make_token_route(
-            self.refresh_token_store.clone(),
-            self.token_secret_manager.clone(),
-            self.refresh_token_secret_manager.clone(),
-            Arc::new(AccessTokenIssuer::new(
+                Arc::new(AccessTokenIssuer::new(
+                    self.token_secret_manager.clone(),
+                    self.refresh_token_secret_manager.clone(),
+                )),
+                self.credentials_config.clone(),
+            ),
+            logout::make_logout_route(
+                self.refresh_token_store.clone(),
                 self.token_secret_manager.clone(),
-                self.refresh_token_secret_manager.clone(),
-            )),
-            self.credentials_config.clone(),
-        ));
-        resources.push(logout::make_logout_route(
-            self.refresh_token_store.clone(),
-            self.token_secret_manager.clone(),
-            self.credentials_config.clone(),
-        ));
-
-        resources.push(register::make_register_route(
-            self.credentials_store.clone(),
-            self.credentials_config.clone(),
-        ));
-
-        #[cfg(feature = "biome-key-management")]
-        {
-            resources.push(user::make_user_routes(
+                self.credentials_config.clone(),
+            ),
+            register::make_register_route(
+                self.credentials_store.clone(),
+                self.credentials_config.clone(),
+            ),
+            #[cfg(feature = "biome-key-management")]
+            user::make_user_routes(
                 self.credentials_config.clone(),
                 self.credentials_store.clone(),
                 self.key_store.clone(),
-            ));
-        }
-
-        resources
+            ),
+        ]
     }
 }
 
