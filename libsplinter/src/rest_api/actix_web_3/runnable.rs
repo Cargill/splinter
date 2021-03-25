@@ -50,6 +50,6 @@ impl RunnableRestApi {
             BindConfig::Http(url) => (url, None),
         };
 
-        Ok(RestApi::new(bind_url, acceptor_opt, resource_providers)?)
+        RestApi::new(bind_url, acceptor_opt, resource_providers)
     }
 }

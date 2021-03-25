@@ -250,7 +250,7 @@ impl TryFrom<&ProposedCircuit> for Vec<ProposedServiceModel> {
     type Error = AdminServiceStoreError;
 
     fn try_from(proposed_circuit: &ProposedCircuit) -> Result<Self, Self::Error> {
-        Ok(proposed_circuit
+        proposed_circuit
             .roster()
             .iter()
             .enumerate()
@@ -267,7 +267,7 @@ impl TryFrom<&ProposedCircuit> for Vec<ProposedServiceModel> {
                     })?,
                 })
             })
-            .collect::<Result<Vec<ProposedServiceModel>, AdminServiceStoreError>>()?)
+            .collect::<Result<Vec<ProposedServiceModel>, AdminServiceStoreError>>()
     }
 }
 
