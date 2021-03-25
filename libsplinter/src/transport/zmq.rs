@@ -122,9 +122,9 @@ impl TryFrom<Vec<u8>> for MessageType {
     }
 }
 
-impl Into<Vec<u8>> for MessageType {
-    fn into(self) -> Vec<u8> {
-        match self {
+impl From<MessageType> for Vec<u8> {
+    fn from(msg_type: MessageType) -> Self {
+        match msg_type {
             MessageType::RequestConnection => "CONNECT".into(),
             MessageType::ConnectionAccepted => "CONNECTION_ACCEPTED".into(),
             MessageType::RequestData => "REQUEST_DATA".into(),
