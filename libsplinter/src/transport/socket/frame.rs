@@ -180,7 +180,7 @@ impl<'a> FrameRef<'a> {
             }
         }
 
-        let mut buffer = &self.data[..];
+        let mut buffer = self.data;
         while !buffer.is_empty() {
             match writer.write(buffer) {
                 Ok(0) => {
