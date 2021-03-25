@@ -67,9 +67,9 @@ macro_rules! id_type {
             }
         }
 
-        impl Into<Vec<u8>> for $type {
-            fn into(self) -> Vec<u8> {
-                self.0
+        impl From<$type> for Vec<u8> {
+            fn from(val: $type) -> Self {
+                val.0
             }
         }
     };
@@ -111,14 +111,14 @@ impl From<ProposalProto> for Proposal {
     }
 }
 
-impl Into<ProposalProto> for Proposal {
-    fn into(self) -> ProposalProto {
+impl From<Proposal> for ProposalProto {
+    fn from(proposal: Proposal) -> Self {
         let mut msg = ProposalProto::new();
-        msg.set_id(self.id.into());
-        msg.set_previous_id(self.previous_id.into());
-        msg.set_proposal_height(self.proposal_height);
-        msg.set_summary(self.summary);
-        msg.set_consensus_data(self.consensus_data);
+        msg.set_id(proposal.id.into());
+        msg.set_previous_id(proposal.previous_id.into());
+        msg.set_proposal_height(proposal.proposal_height);
+        msg.set_summary(proposal.summary);
+        msg.set_consensus_data(proposal.consensus_data);
         msg
     }
 }
@@ -223,12 +223,12 @@ impl From<ConsensusMessageProto> for ConsensusMessage {
     }
 }
 
-impl Into<ConsensusMessageProto> for ConsensusMessage {
-    fn into(self) -> ConsensusMessageProto {
-        let mut msg = ConsensusMessageProto::new();
-        msg.set_message(self.message);
-        msg.set_origin_id(self.origin_id.into());
-        msg
+impl From<ConsensusMessage> for ConsensusMessageProto {
+    fn from(msg: ConsensusMessage) -> Self {
+        let mut proto = ConsensusMessageProto::new();
+        proto.set_message(msg.message);
+        proto.set_origin_id(msg.origin_id.into());
+        proto
     }
 }
 
