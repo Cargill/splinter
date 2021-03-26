@@ -43,7 +43,7 @@ below.
 
     **Note:** To run Gameroom with experimental features enabled, set an
     environment variable in your shell before running the command above. For
-    example: `export 'CARGO_ARGS=-- --features experimental'`. To go back to
+    example: `export 'CARGO_ARGS= --features experimental'`. To go back to
     building with default features, unset the environment variable:
     `unset CARGO_ARGS`
 
