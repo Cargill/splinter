@@ -511,8 +511,8 @@ fn handle_skip(
 
 // create all certificates and keys from scratch
 fn create_all_certs(
-    cert_path: &PathBuf,
-    private_cert_path: &PathBuf,
+    cert_path: &Path,
+    private_cert_path: &Path,
     server_common_name: &str,
     #[cfg(feature = "https-certs")] rest_api_common_name: &str,
 ) -> Result<(), CliError> {
@@ -556,10 +556,7 @@ fn create_all_certs(
 }
 
 // Generate Certificate Authority keys and certificate.
-fn write_ca(
-    cert_path: &PathBuf,
-    private_cert_path: &PathBuf,
-) -> Result<(PKey<Private>, X509), CliError> {
+fn write_ca(cert_path: &Path, private_cert_path: &Path) -> Result<(PKey<Private>, X509), CliError> {
     let (ca_key, ca_cert) = make_ca_cert()?;
 
     write_file(cert_path, CA_CERT, &ca_cert.to_pem()?)?;
@@ -575,8 +572,8 @@ fn write_ca(
 
 // Generate server keys and certificate.
 fn write_cert_and_key(
-    cert_path: &PathBuf,
-    private_cert_path: &PathBuf,
+    cert_path: &Path,
+    private_cert_path: &Path,
     ca_key: &PKey<Private>,
     ca_cert: &X509,
     cert_name: &str,
@@ -679,8 +676,8 @@ fn make_ca_signed_cert(
 
 /// write the a file to a temp file name and then rename to final filename
 /// this will guarantee that the final file will ony ever contain valid data
-fn write_file(path_buf: &PathBuf, file_name: &str, bytes: &[u8]) -> Result<(), CliError> {
-    let temp_path_buf = path_buf.join(format!(".{}.new", file_name));
+fn write_file(path: &Path, file_name: &str, bytes: &[u8]) -> Result<(), CliError> {
+    let temp_path_buf = path.join(format!(".{}.new", file_name));
     let temp_path = {
         if let Some(path) = temp_path_buf.to_str() {
             path.to_string()
@@ -691,7 +688,7 @@ fn write_file(path_buf: &PathBuf, file_name: &str, bytes: &[u8]) -> Result<(), C
         }
     };
 
-    let final_path_buf = path_buf.join(file_name);
+    let final_path_buf = path.join(file_name);
     let final_path = {
         if let Some(path) = final_path_buf.to_str() {
             path.to_string()
@@ -711,8 +708,7 @@ fn write_file(path_buf: &PathBuf, file_name: &str, bytes: &[u8]) -> Result<(), C
     file.write_all(bytes)?;
 
     // change permissions
-    let dir = path_buf.as_path();
-    let dir_info = metadata(dir).map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+    let dir_info = metadata(path).map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
     #[cfg(not(target_os = "linux"))]
     let (dir_uid, dir_gid) = (dir_info.uid(), dir_info.gid());
     #[cfg(target_os = "linux")]
@@ -753,7 +749,7 @@ fn get_ca_key(key_path: &Path) -> Result<PKey<Private>, CliError> {
 }
 
 // helper function to log what files will be written
-fn log_writing(cert_path: &PathBuf, private_cert_path: &PathBuf) -> Result<(), CliError> {
+fn log_writing(cert_path: &Path, private_cert_path: &Path) -> Result<(), CliError> {
     info!("Writing file: {}/{}", absolute_path(cert_path)?, CA_CERT);
     info!(
         "Writing file: {}/{}",
@@ -800,7 +796,7 @@ fn log_writing(cert_path: &PathBuf, private_cert_path: &PathBuf) -> Result<(), C
 }
 
 // helper function to log what files will be overwritten
-fn log_overwriting(cert_path: &PathBuf, private_cert_path: &PathBuf) -> Result<(), CliError> {
+fn log_overwriting(cert_path: &Path, private_cert_path: &Path) -> Result<(), CliError> {
     info!(
         "Overwriting file: {}/{}",
         absolute_path(cert_path)?,

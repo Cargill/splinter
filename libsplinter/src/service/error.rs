@@ -14,7 +14,7 @@
 
 //! Errors that can occur in a service and service processor
 use std::error::Error;
-use std::io::Error as IOError;
+use std::io::Error as IoError;
 
 use protobuf::error::ProtobufError;
 
@@ -301,7 +301,7 @@ pub enum ServiceProcessorError {
     /// Returned if an error is detected while processing requests
     ProcessError(String, Box<dyn Error + Send>),
     /// Returned if an IO error is detected while processing requests
-    IOError(IOError),
+    IoError(IoError),
     /// Returned if an error is detected when trying to shutdown
     ShutdownError(String),
 }
@@ -311,7 +311,7 @@ impl Error for ServiceProcessorError {
         match self {
             ServiceProcessorError::AddServiceError(_) => None,
             ServiceProcessorError::ProcessError(_, err) => Some(&**err),
-            ServiceProcessorError::IOError(err) => Some(err),
+            ServiceProcessorError::IoError(err) => Some(err),
             ServiceProcessorError::ShutdownError(_) => None,
         }
     }
@@ -326,7 +326,7 @@ impl std::fmt::Display for ServiceProcessorError {
             ServiceProcessorError::ProcessError(ref ctx, ref err) => {
                 write!(f, "error processing message: {} ({})", ctx, err)
             }
-            ServiceProcessorError::IOError(ref err) => {
+            ServiceProcessorError::IoError(ref err) => {
                 write!(f, "io error processing message {}", err)
             }
             ServiceProcessorError::ShutdownError(ref err) => {
@@ -336,8 +336,8 @@ impl std::fmt::Display for ServiceProcessorError {
     }
 }
 
-impl From<IOError> for ServiceProcessorError {
-    fn from(error: IOError) -> Self {
-        ServiceProcessorError::IOError(error)
+impl From<IoError> for ServiceProcessorError {
+    fn from(error: IoError) -> Self {
+        ServiceProcessorError::IoError(error)
     }
 }

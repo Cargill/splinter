@@ -118,13 +118,13 @@ impl CircuitTemplateManager {
                 let pattern_string = template_path.to_str().ok_or_else(|| {
                     CircuitTemplateError::new(&String::from("Template path is not valid UTF-8"))
                 })?;
-                Ok(glob(pattern_string).map_err(|_| {
+                glob(pattern_string).map_err(|_| {
                     CircuitTemplateError::new(&format!(
                         "Cannot query path {:?} for pattern: {}",
                         path,
                         template_path.display()
                     ))
-                })?)
+                })
             })
             .collect::<Result<Vec<_>, CircuitTemplateError>>()?
             .into_iter()

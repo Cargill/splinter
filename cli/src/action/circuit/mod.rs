@@ -853,13 +853,15 @@ fn list_circuits(
         .build()?;
 
     let circuits = client.list_circuits(member_filter, status_filter)?;
-    let mut data = Vec::new();
-    data.push(vec![
-        "ID".to_string(),
-        "NAME".to_string(),
-        "MANAGEMENT".to_string(),
-        "MEMBERS".to_string(),
-    ]);
+    let mut data = vec![
+        // Header
+        vec![
+            "ID".to_string(),
+            "NAME".to_string(),
+            "MANAGEMENT".to_string(),
+            "MEMBERS".to_string(),
+        ],
+    ];
     circuits.data.iter().for_each(|circuit| {
         let members = circuit.members.join(";");
         let display_name = {
@@ -1028,15 +1030,17 @@ fn list_proposals(
         .build()?;
 
     let proposals = client.list_proposals(management_type_filter, member_filter)?;
-    let mut data = Vec::new();
-    data.push(vec![
-        "ID".to_string(),
-        "NAME".to_string(),
-        "MANAGEMENT".to_string(),
-        "MEMBERS".to_string(),
-        "COMMENTS".to_string(),
-        "PROPOSAL_TYPE".to_string(),
-    ]);
+    let mut data = vec![
+        // header
+        vec![
+            "ID".to_string(),
+            "NAME".to_string(),
+            "MANAGEMENT".to_string(),
+            "MEMBERS".to_string(),
+            "COMMENTS".to_string(),
+            "PROPOSAL_TYPE".to_string(),
+        ],
+    ];
     proposals.data.iter().for_each(|proposal| {
         let display_name = {
             if format == "csv" {

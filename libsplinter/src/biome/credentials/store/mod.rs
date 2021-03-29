@@ -289,12 +289,12 @@ where
 }
 
 #[cfg(feature = "diesel")]
-impl Into<NewCredentialsModel> for Credentials {
-    fn into(self) -> NewCredentialsModel {
-        NewCredentialsModel {
-            user_id: self.user_id,
-            username: self.username,
-            password: self.password,
+impl From<Credentials> for NewCredentialsModel {
+    fn from(creds: Credentials) -> Self {
+        Self {
+            user_id: creds.user_id,
+            username: creds.username,
+            password: creds.password,
         }
     }
 }

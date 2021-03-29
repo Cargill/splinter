@@ -33,7 +33,7 @@ use crate::application_metadata::ApplicationMetadataError;
 
 #[derive(Debug)]
 pub enum AppAuthHandlerError {
-    IOError(std::io::Error),
+    IoError(std::io::Error),
     InvalidMessageError(String),
     DatabaseError(String),
     ReactorError(events::ReactorError),
@@ -47,7 +47,7 @@ pub enum AppAuthHandlerError {
 impl Error for AppAuthHandlerError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            AppAuthHandlerError::IOError(err) => Some(err),
+            AppAuthHandlerError::IoError(err) => Some(err),
             AppAuthHandlerError::InvalidMessageError(_) => None,
             AppAuthHandlerError::DatabaseError(_) => None,
             AppAuthHandlerError::ReactorError(err) => Some(err),
@@ -63,7 +63,7 @@ impl Error for AppAuthHandlerError {
 impl fmt::Display for AppAuthHandlerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AppAuthHandlerError::IOError(msg) => write!(f, "An I/O error occurred: {}", msg),
+            AppAuthHandlerError::IoError(msg) => write!(f, "An I/O error occurred: {}", msg),
             AppAuthHandlerError::InvalidMessageError(msg) => {
                 write!(f, "The client received an invalid message: {}", msg)
             }
@@ -96,7 +96,7 @@ impl fmt::Display for AppAuthHandlerError {
 
 impl From<std::io::Error> for AppAuthHandlerError {
     fn from(err: std::io::Error) -> AppAuthHandlerError {
-        AppAuthHandlerError::IOError(err)
+        AppAuthHandlerError::IoError(err)
     }
 }
 

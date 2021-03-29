@@ -27,7 +27,7 @@ use crate::biome::key_management::Key;
 use operations::update_keys_and_password::KeyStoreUpdateKeysAndPasswordOperation as _;
 use operations::{
     fetch_key::KeyStoreFetchKeyOperation as _, insert_key::KeyStoreInsertKeyOperation as _,
-    list_keys::KeyStoreListKeysOperation as _, list_keys::KeyStoreListKeysWithUserIDOperation as _,
+    list_keys::KeyStoreListKeysOperation as _, list_keys::KeyStoreListKeysWithUserIdOperation as _,
     remove_key::KeyStoreRemoveKeyOperation as _, update_key::KeyStoreUpdateKeyOperation as _,
     KeyStoreOperations,
 };

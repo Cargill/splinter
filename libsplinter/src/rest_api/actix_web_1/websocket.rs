@@ -39,9 +39,9 @@ impl From<(HttpRequest, web::Payload)> for Request {
     }
 }
 
-impl Into<(HttpRequest, web::Payload)> for Request {
-    fn into(self) -> (HttpRequest, web::Payload) {
-        (self.0, self.1)
+impl From<Request> for (HttpRequest, web::Payload) {
+    fn from(req: Request) -> Self {
+        (req.0, req.1)
     }
 }
 

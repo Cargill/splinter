@@ -242,11 +242,12 @@ impl SplinterDaemon {
             service_listener.endpoint()
         );
 
-        let mut internal_service_listeners = vec![];
-        internal_service_listeners.push(transport.listen("inproc://admin-service")?);
-        internal_service_listeners.push(transport.listen("inproc://orchestator")?);
-        #[cfg(feature = "health-service")]
-        internal_service_listeners.push(transport.listen("inproc://health_service")?);
+        let internal_service_listeners = vec![
+            transport.listen("inproc://admin-service")?,
+            transport.listen("inproc://orchestator")?,
+            #[cfg(feature = "health-service")]
+            transport.listen("inproc://health_service")?,
+        ];
 
         info!("Starting SpinterNode with ID {}", self.node_id);
         let authorization_manager =
@@ -524,9 +525,10 @@ impl SplinterDaemon {
             // Allowing unused_mut because authorization_handlers must be mutable if
             // `authorization-handler-allow-keys` or `auth-handler-maintenance` are enabled
             #[allow(unused_mut)]
-            let mut authorization_handlers = vec![];
-            #[cfg(feature = "authorization-handler-allow-keys")]
-            authorization_handlers.push(create_allow_keys_authorization_handler(&self.config_dir)?);
+            let mut authorization_handlers = vec![
+                #[cfg(feature = "authorization-handler-allow-keys")]
+                create_allow_keys_authorization_handler(&self.config_dir)?,
+            ];
 
             #[cfg(feature = "authorization-handler-rbac")]
             let rbac_store = store_factory.get_role_based_authorization_store();
@@ -605,12 +607,13 @@ impl SplinterDaemon {
             }
         }
 
-        let mut auth_configs = vec![];
-
-        // Add Cylinder JWT as an auth provider
-        auth_configs.push(AuthConfig::Cylinder {
-            verifier: Secp256k1Context::new().new_verifier(),
-        });
+        #[allow(unused_mut)]
+        let mut auth_configs = vec![
+            // Add Cylinder JWT as an auth provider
+            AuthConfig::Cylinder {
+                verifier: Secp256k1Context::new().new_verifier(),
+            },
+        ];
 
         // Add Biome credentials as an auth provider if it's enabled
         #[cfg(feature = "biome-credentials")]

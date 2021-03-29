@@ -47,11 +47,11 @@ where
     }
 }
 
-pub(in crate::biome::key_management) trait KeyStoreListKeysWithUserIDOperation {
+pub(in crate::biome::key_management) trait KeyStoreListKeysWithUserIdOperation {
     fn list_keys_with_user_id(&self, user_id: &str) -> Result<Vec<Key>, KeyStoreError>;
 }
 
-impl<'a, C> KeyStoreListKeysWithUserIDOperation for KeyStoreOperations<'a, C>
+impl<'a, C> KeyStoreListKeysWithUserIdOperation for KeyStoreOperations<'a, C>
 where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,

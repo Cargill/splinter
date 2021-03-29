@@ -17,6 +17,8 @@ use std::convert::TryFrom;
 use std::fmt;
 #[cfg(feature = "circuit-purge")]
 use std::fs;
+use std::path::Path;
+#[cfg(feature = "circuit-purge")]
 use std::path::PathBuf;
 use std::sync::{
     mpsc::{channel, Receiver, RecvTimeoutError, Sender},
@@ -83,9 +85,9 @@ pub struct ScabbardState {
 
 impl ScabbardState {
     pub fn new(
-        state_db_path: &PathBuf,
+        state_db_path: &Path,
         state_db_size: usize,
-        receipt_db_path: &PathBuf,
+        receipt_db_path: &Path,
         receipt_db_size: usize,
         admin_keys: Vec<String>,
     ) -> Result<Self, ScabbardStateError> {
@@ -96,8 +98,8 @@ impl ScabbardState {
         let state_db_file = state_db_path.to_path_buf();
         #[cfg(feature = "circuit-purge")]
         let receipt_db_file = receipt_db_path.to_path_buf();
-        let state_db_path = state_db_path.as_path().with_extension("lmdb");
-        let receipt_db_path = receipt_db_path.as_path().with_extension("lmdb");
+        let state_db_path = state_db_path.with_extension("lmdb");
+        let receipt_db_path = receipt_db_path.with_extension("lmdb");
         let db = Box::new(LmdbDatabase::new(
             LmdbContext::new(&state_db_path, indexes.len(), Some(state_db_size))?,
             &indexes,
