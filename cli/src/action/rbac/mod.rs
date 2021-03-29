@@ -18,11 +18,9 @@ mod roles;
 use clap::ArgMatches;
 
 use crate::action::api::{SplinterRestClient, SplinterRestClientBuilder};
-use crate::action::{
-    create_cylinder_jwt_auth, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV,
-};
+use crate::action::{DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
 use crate::error::CliError;
-use crate::signing::load_signer;
+use crate::signing::{create_cylinder_jwt_auth, load_signer};
 
 pub use assignments::{
     CreateAssignmentAction, DeleteAssignmentAction, ListAssignmentsAction, ShowAssignmentAction,

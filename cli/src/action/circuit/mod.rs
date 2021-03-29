@@ -30,7 +30,7 @@ use splinter::admin::messages::{CircuitStatus, CreateCircuit, SplinterService};
 use splinter::protocol::CIRCUIT_PROTOCOL_VERSION;
 
 use crate::error::CliError;
-use crate::signing::load_signer;
+use crate::signing::{create_cylinder_jwt_auth, load_signer};
 #[cfg(feature = "circuit-template")]
 use crate::template::CircuitTemplate;
 
@@ -39,8 +39,6 @@ use super::{
     msg_from_io_error, print_table, Action, DEFAULT_SPLINTER_REST_API_URL,
     SPLINTER_REST_API_URL_ENV,
 };
-
-use super::create_cylinder_jwt_auth;
 
 use api::{CircuitServiceSlice, CircuitSlice};
 pub(crate) use builder::CreateCircuitMessageBuilder;

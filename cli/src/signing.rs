@@ -15,8 +15,8 @@
 use std::{env, path::Path};
 
 use cylinder::{
-    current_user_key_name, current_user_search_path, load_key, load_key_from_path,
-    secp256k1::Secp256k1Context, Context, PrivateKey, Signer,
+    current_user_key_name, current_user_search_path, jwt::JsonWebTokenBuilder, load_key,
+    load_key_from_path, secp256k1::Secp256k1Context, Context, PrivateKey, Signer,
 };
 
 use crate::error::CliError;
@@ -81,4 +81,12 @@ fn load_private_key(key_name: Option<&str>) -> Result<PrivateKey, CliError> {
 
 pub fn load_signer(key_name: Option<&str>) -> Result<Box<dyn Signer>, CliError> {
     Ok(Secp256k1Context::new().new_signer(load_private_key(key_name)?))
+}
+
+pub fn create_cylinder_jwt_auth(signer: Box<dyn Signer>) -> Result<String, CliError> {
+    let encoded_token = JsonWebTokenBuilder::new()
+        .build(&*signer)
+        .map_err(|err| CliError::ActionError(format!("failed to build json web token: {}", err)))?;
+
+    Ok(format!("Bearer Cylinder:{}", encoded_token))
 }

@@ -36,7 +36,6 @@ use std::io::{Error as IoError, ErrorKind};
 use std::path::Path;
 
 use clap::ArgMatches;
-use cylinder::{jwt::JsonWebTokenBuilder, Signer};
 
 use super::error::CliError;
 
@@ -110,14 +109,6 @@ fn msg_from_io_error(err: IoError) -> String {
         ErrorKind::InvalidData => "Invalid data".into(),
         _ => "Unknown I/O error".into(),
     }
-}
-
-fn create_cylinder_jwt_auth(signer: Box<dyn Signer>) -> Result<String, CliError> {
-    let encoded_token = JsonWebTokenBuilder::new()
-        .build(&*signer)
-        .map_err(|err| CliError::ActionError(format!("failed to build json web token: {}", err)))?;
-
-    Ok(format!("Bearer Cylinder:{}", encoded_token))
 }
 
 // Takes a vec of vecs of strings. The first vec should include the title of the columns.
