@@ -50,6 +50,9 @@ use transact::contract::archive::{default_scar_path, SmartContractArchive};
 use error::CliError;
 use signing::{create_cylinder_jwt_auth, load_signer};
 
+const DEFAULT_SPLINTER_REST_API_URL: &str = "http://127.0.0.1:8080";
+const SPLINTER_REST_API_URL_ENV: &str = "SPLINTER_REST_API_URL";
+
 fn main() {
     if let Err(e) = run() {
         error!("ERROR: {}", e);
@@ -108,8 +111,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -133,8 +135,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -165,8 +166,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -230,8 +230,7 @@ fn run() -> Result<(), CliError> {
                         .help("URL to the scabbard REST API")
                         .short("U")
                         .long("url")
-                        .takes_value(true)
-                        .default_value("http://localhost:8080"),
+                        .takes_value(true),
                     Arg::with_name("service-id")
                         .long_help(
                             "Fully-qualified service ID of the scabbard service (must be of the \
@@ -277,8 +276,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -320,8 +318,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -356,8 +353,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -411,8 +407,7 @@ fn run() -> Result<(), CliError> {
                         .help("URL to the scabbard REST API")
                         .short("U")
                         .long("url")
-                        .takes_value(true)
-                        .default_value("http://localhost:8080"),
+                        .takes_value(true),
                     Arg::with_name("service-id")
                         .long_help(
                             "Fully-qualified service ID of the scabbard service (must be of the \
@@ -458,8 +453,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -501,8 +495,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -537,8 +530,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -567,8 +559,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -620,8 +611,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -665,8 +655,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -704,8 +693,7 @@ fn run() -> Result<(), CliError> {
                                 .help("URL to the scabbard REST API")
                                 .short("U")
                                 .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
+                                .takes_value(true),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -737,12 +725,16 @@ fn run() -> Result<(), CliError> {
     match matches.subcommand() {
         ("contract", Some(matches)) => match matches.subcommand() {
             ("upload", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
@@ -789,12 +781,16 @@ fn run() -> Result<(), CliError> {
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("list", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer)?)
                     .build()?;
 
@@ -847,12 +843,16 @@ fn run() -> Result<(), CliError> {
                 Ok(())
             }
             ("show", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer)?)
                     .build()?;
 
@@ -898,7 +898,11 @@ fn run() -> Result<(), CliError> {
             _ => Err(CliError::InvalidSubcommand),
         },
         ("exec", Some(matches)) => {
-            let url = matches.value_of("url").expect("default not set for --url");
+            let url = matches
+                .value_of("url")
+                .map(ToOwned::to_owned)
+                .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
             let full_service_id = matches
                 .value_of("service-id")
@@ -916,7 +920,7 @@ fn run() -> Result<(), CliError> {
             let signer = load_signer(matches.value_of("key"))?;
 
             let client = ReqwestScabbardClientBuilder::new()
-                .with_url(url)
+                .with_url(&url)
                 .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                 .build()?;
 
@@ -959,7 +963,11 @@ fn run() -> Result<(), CliError> {
         }
         ("ns", Some(matches)) => match matches.subcommand() {
             ("create", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -977,7 +985,7 @@ fn run() -> Result<(), CliError> {
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
@@ -1001,7 +1009,11 @@ fn run() -> Result<(), CliError> {
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("update", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1019,7 +1031,7 @@ fn run() -> Result<(), CliError> {
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
@@ -1043,7 +1055,11 @@ fn run() -> Result<(), CliError> {
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("delete", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1061,7 +1077,7 @@ fn run() -> Result<(), CliError> {
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
@@ -1081,7 +1097,11 @@ fn run() -> Result<(), CliError> {
             _ => Err(CliError::InvalidSubcommand),
         },
         ("perm", Some(matches)) => {
-            let url = matches.value_of("url").expect("default not set for --url");
+            let url = matches
+                .value_of("url")
+                .map(ToOwned::to_owned)
+                .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
             let full_service_id = matches
                 .value_of("service-id")
@@ -1099,7 +1119,7 @@ fn run() -> Result<(), CliError> {
             let signer = load_signer(matches.value_of("key"))?;
 
             let client = ReqwestScabbardClientBuilder::new()
-                .with_url(url)
+                .with_url(&url)
                 .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                 .build()?;
 
@@ -1135,7 +1155,11 @@ fn run() -> Result<(), CliError> {
         }
         ("cr", Some(matches)) => match matches.subcommand() {
             ("create", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1153,7 +1177,7 @@ fn run() -> Result<(), CliError> {
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
@@ -1177,7 +1201,11 @@ fn run() -> Result<(), CliError> {
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("update", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1195,7 +1223,7 @@ fn run() -> Result<(), CliError> {
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
@@ -1219,7 +1247,11 @@ fn run() -> Result<(), CliError> {
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("delete", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1237,7 +1269,7 @@ fn run() -> Result<(), CliError> {
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
@@ -1258,7 +1290,11 @@ fn run() -> Result<(), CliError> {
         },
         ("sp", Some(matches)) => match matches.subcommand() {
             ("create", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1276,7 +1312,7 @@ fn run() -> Result<(), CliError> {
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
@@ -1303,7 +1339,11 @@ fn run() -> Result<(), CliError> {
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("update", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1321,7 +1361,7 @@ fn run() -> Result<(), CliError> {
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
@@ -1348,7 +1388,11 @@ fn run() -> Result<(), CliError> {
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("delete", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1366,7 +1410,7 @@ fn run() -> Result<(), CliError> {
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
@@ -1391,12 +1435,16 @@ fn run() -> Result<(), CliError> {
         },
         ("state", Some(matches)) => match matches.subcommand() {
             ("root", Some(matches)) => {
-                let url = matches.value_of("url").expect("default not set for --url");
+                let url = matches
+                    .value_of("url")
+                    .map(ToOwned::to_owned)
+                    .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                    .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
                 let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
-                    .with_url(url)
+                    .with_url(&url)
                     .with_auth(&create_cylinder_jwt_auth(signer)?)
                     .build()?;
 
