@@ -13,7 +13,7 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 
-FROM ubuntu:bionic as swagger_downloader
+FROM ubuntu:focal as swagger_downloader
 
 RUN apt-get update \
   && apt-get install -y -q \

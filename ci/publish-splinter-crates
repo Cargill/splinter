@@ -20,7 +20,7 @@
 # docker build -f ci/publish-splinter-crates -t publish-splinter-crates ci/
 # docker run --rm -v $(pwd):/project/splinter -e CARGO_CRED=%CREDVALUE% publish-splinter-crates
 
-FROM ubuntu:bionic
+FROM ubuntu:focal
 
 RUN apt-get update \
  && apt-get install -y \

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM splintercommunity/splinter-dev:v7 as BUILDER
+FROM splintercommunity/splinter-dev:v8 as BUILDER
 
 # Copy over splinter files
 COPY Cargo.toml /build/Cargo.toml
@@ -77,7 +77,7 @@ WORKDIR /tmp
 RUN git rev-parse HEAD > /commit-hash
 
 # -------------=== gameroomd docker build ===-------------
-FROM ubuntu:bionic
+FROM ubuntu:focal
 
 ARG CARGO_ARGS
 RUN echo "CARGO_ARGS = '$CARGO_ARGS'" > CARGO_ARGS

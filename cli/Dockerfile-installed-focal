@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM splintercommunity/splinter-dev:v7 as BUILDER
+FROM splintercommunity/splinter-dev:v8 as BUILDER
 
 ENV SPLINTER_FORCE_PANDOC=true
 
@@ -55,7 +55,7 @@ RUN git rev-parse HEAD > /commit-hash
 
 # -------------=== splinter cli docker build ===-------------
 
-FROM ubuntu:bionic
+FROM ubuntu:focal
 
 ARG CARGO_ARGS
 RUN echo "CARGO_ARGS = '$CARGO_ARGS'" > CARGO_ARGS
