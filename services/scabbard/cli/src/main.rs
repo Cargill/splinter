@@ -16,7 +16,7 @@
 extern crate log;
 
 mod error;
-mod key;
+mod signing;
 
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -48,7 +48,7 @@ use scabbard::client::{ReqwestScabbardClientBuilder, ScabbardClient, ServiceId};
 use transact::contract::archive::{default_scar_path, SmartContractArchive};
 
 use error::CliError;
-use key::create_cylinder_jwt_auth;
+use signing::{create_cylinder_jwt_auth, load_signer};
 
 fn main() {
     if let Err(e) = run() {
@@ -103,7 +103,6 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .short("k")
                                 .long("key")
-                                .required(true)
                                 .takes_value(true),
                             Arg::with_name("url")
                                 .help("URL to the scabbard REST API")
@@ -226,7 +225,6 @@ fn run() -> Result<(), CliError> {
                         )
                         .short("k")
                         .long("key")
-                        .required(true)
                         .takes_value(true),
                     Arg::with_name("url")
                         .help("URL to the scabbard REST API")
@@ -274,7 +272,6 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .short("k")
                                 .long("key")
-                                .required(true)
                                 .takes_value(true),
                             Arg::with_name("url")
                                 .help("URL to the scabbard REST API")
@@ -318,7 +315,6 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .short("k")
                                 .long("key")
-                                .required(true)
                                 .takes_value(true),
                             Arg::with_name("url")
                                 .help("URL to the scabbard REST API")
@@ -355,7 +351,6 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .short("k")
                                 .long("key")
-                                .required(true)
                                 .takes_value(true),
                             Arg::with_name("url")
                                 .help("URL to the scabbard REST API")
@@ -411,7 +406,6 @@ fn run() -> Result<(), CliError> {
                         )
                         .short("k")
                         .long("key")
-                        .required(true)
                         .takes_value(true),
                     Arg::with_name("url")
                         .help("URL to the scabbard REST API")
@@ -459,7 +453,6 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .short("k")
                                 .long("key")
-                                .required(true)
                                 .takes_value(true),
                             Arg::with_name("url")
                                 .help("URL to the scabbard REST API")
@@ -503,7 +496,6 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .short("k")
                                 .long("key")
-                                .required(true)
                                 .takes_value(true),
                             Arg::with_name("url")
                                 .help("URL to the scabbard REST API")
@@ -540,7 +532,6 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .short("k")
                                 .long("key")
-                                .required(true)
                                 .takes_value(true),
                             Arg::with_name("url")
                                 .help("URL to the scabbard REST API")
@@ -624,7 +615,6 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .short("k")
                                 .long("key")
-                                .required(true)
                                 .takes_value(true),
                             Arg::with_name("url")
                                 .help("URL to the scabbard REST API")
@@ -670,7 +660,6 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .short("k")
                                 .long("key")
-                                .required(true)
                                 .takes_value(true),
                             Arg::with_name("url")
                                 .help("URL to the scabbard REST API")
@@ -710,7 +699,6 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .short("k")
                                 .long("key")
-                                .required(true)
                                 .takes_value(true),
                             Arg::with_name("url")
                                 .help("URL to the scabbard REST API")
@@ -750,13 +738,12 @@ fn run() -> Result<(), CliError> {
         ("contract", Some(matches)) => match matches.subcommand() {
             ("upload", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
+
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
                 let full_service_id = matches
@@ -771,8 +758,6 @@ fn run() -> Result<(), CliError> {
                     .map_err(|_| {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
-
-                let signer = key::load_signer(key)?;
 
                 let scar = matches
                     .value_of("scar")
@@ -805,13 +790,12 @@ fn run() -> Result<(), CliError> {
             }
             ("list", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
+
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer)?)
                     .build()?;
 
                 let full_service_id = matches
@@ -864,13 +848,12 @@ fn run() -> Result<(), CliError> {
             }
             ("show", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
+
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer)?)
                     .build()?;
 
                 let full_service_id = matches
@@ -930,14 +913,11 @@ fn run() -> Result<(), CliError> {
                     CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                 })?;
 
-            let key = matches
-                .value_of("key")
-                .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-            let signer = key::load_signer(key)?;
+            let signer = load_signer(matches.value_of("key"))?;
 
             let client = ReqwestScabbardClientBuilder::new()
                 .with_url(url)
-                .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                 .build()?;
 
             let contract = matches
@@ -994,14 +974,11 @@ fn run() -> Result<(), CliError> {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
 
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-                let signer = key::load_signer(key)?;
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
                 let namespace = matches
@@ -1039,14 +1016,11 @@ fn run() -> Result<(), CliError> {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
 
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-                let signer = key::load_signer(key)?;
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
                 let namespace = matches
@@ -1084,14 +1058,11 @@ fn run() -> Result<(), CliError> {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
 
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-                let signer = key::load_signer(key)?;
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
                 let namespace = matches
@@ -1125,14 +1096,11 @@ fn run() -> Result<(), CliError> {
                     CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                 })?;
 
-            let key = matches
-                .value_of("key")
-                .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-            let signer = key::load_signer(key)?;
+            let signer = load_signer(matches.value_of("key"))?;
 
             let client = ReqwestScabbardClientBuilder::new()
                 .with_url(url)
-                .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                 .build()?;
 
             let namespace = matches
@@ -1182,14 +1150,11 @@ fn run() -> Result<(), CliError> {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
 
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-                let signer = key::load_signer(key)?;
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
                 let name = matches
@@ -1227,14 +1192,11 @@ fn run() -> Result<(), CliError> {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
 
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-                let signer = key::load_signer(key)?;
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
                 let name = matches
@@ -1272,14 +1234,11 @@ fn run() -> Result<(), CliError> {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
 
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-                let signer = key::load_signer(key)?;
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
                 let name = matches
@@ -1314,14 +1273,11 @@ fn run() -> Result<(), CliError> {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
 
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-                let signer = key::load_signer(key)?;
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
                 let org_id = matches
@@ -1362,14 +1318,11 @@ fn run() -> Result<(), CliError> {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
 
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-                let signer = key::load_signer(key)?;
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
                 let org_id = matches
@@ -1410,14 +1363,11 @@ fn run() -> Result<(), CliError> {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
 
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
-                let signer = key::load_signer(key)?;
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer.clone())?)
                     .build()?;
 
                 let org_id = matches
@@ -1442,13 +1392,12 @@ fn run() -> Result<(), CliError> {
         ("state", Some(matches)) => match matches.subcommand() {
             ("root", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
+
+                let signer = load_signer(matches.value_of("key"))?;
 
                 let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
-                    .with_auth(&create_cylinder_jwt_auth(Some(key))?)
+                    .with_auth(&create_cylinder_jwt_auth(signer)?)
                     .build()?;
 
                 let full_service_id = matches
