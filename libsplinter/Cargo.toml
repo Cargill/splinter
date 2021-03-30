@@ -110,6 +110,7 @@ experimental = [
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "biome-client",
+    "biome-client-reqwest",
     "biome-notifications",
     "biome-profile",
     "client-reqwest",
@@ -135,6 +136,7 @@ authorization = ["rest-api"]
 authorization-handler-rbac = ["authorization"]
 biome = []
 biome-client = ["biome"]
+biome-client-reqwest = ["biome", "reqwest"]
 biome-credentials = ["bcrypt", "biome"]
 biome-key-management = ["biome"]
 biome-notifications = ["biome"]
