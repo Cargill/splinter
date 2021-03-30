@@ -24,6 +24,15 @@ crates := '\
     examples/gameroom/cli \
     '
 
+crates_quick := '\
+    libsplinter \
+    splinterd \
+    cli \
+    services/scabbard/cli \
+    services/scabbard/libscabbard \
+    services/health \
+    '
+
 features := '\
     --features=experimental \
     --features=stable \
@@ -99,6 +108,41 @@ lint-client:
     set -e
     cd examples/gameroom/gameroom-app
     npm run lint
+
+qbuild:
+    #!/usr/bin/env sh
+    set -e
+    for crate in $(echo {{crates_quick}})
+    do
+        cmd="cargo build --manifest-path=$crate/Cargo.toml $BUILD_MODE --features=experimental"
+        echo "\033[1m$cmd\033[0m"
+        $cmd
+    done
+    echo "\n\033[92mBuild Success\033[0m\n"
+
+qlint:
+    #!/usr/bin/env sh
+    set -e
+    echo "\033[1mcargo fmt -- --check\033[0m"
+    cargo fmt -- --check
+    for crate in $(echo {{crates_quick}})
+    do
+        cmd="cargo clippy --manifest-path=$crate/Cargo.toml --features=experimental -- -D warnings"
+        echo "\033[1m$cmd\033[0m"
+        $cmd
+    done
+    echo "\n\033[92mLint Success\033[0m\n"
+
+qtest:
+    #!/usr/bin/env sh
+    set -e
+    for crate in $(echo {{crates_quick}})
+    do
+        cmd="cargo test --manifest-path=$crate/Cargo.toml --features=experimental"
+        echo "\033[1m$cmd\033[0m"
+        $cmd
+    done
+    echo "\n\033[92mTest Success\033[0m\n"
 
 test:
     #!/usr/bin/env sh
