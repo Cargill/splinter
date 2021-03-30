@@ -70,6 +70,14 @@ struct TomlConfig {
     oauth_openid_auth_params: Option<Vec<(String, String)>>,
     #[cfg(feature = "oauth")]
     oauth_openid_scopes: Option<Vec<String>>,
+    #[cfg(feature = "metrics")]
+    metrics_db: Option<String>,
+    #[cfg(feature = "metrics")]
+    metrics_url: Option<String>,
+    #[cfg(feature = "metrics")]
+    metrics_username: Option<String>,
+    #[cfg(feature = "metrics")]
+    metrics_password: Option<String>,
 
     // Deprecated values
     cert_dir: Option<String>,
@@ -179,6 +187,15 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 .with_oauth_openid_url(self.toml_config.oauth_openid_url)
                 .with_oauth_openid_auth_params(self.toml_config.oauth_openid_auth_params)
                 .with_oauth_openid_scopes(self.toml_config.oauth_openid_scopes);
+        }
+
+        #[cfg(feature = "metrics")]
+        {
+            partial_config = partial_config
+                .with_metrics_db(self.toml_config.metrics_db)
+                .with_metrics_url(self.toml_config.metrics_url)
+                .with_metrics_username(self.toml_config.metrics_username)
+                .with_metrics_password(self.toml_config.metrics_password)
         }
 
         // deprecated values, only set if the current value was not set

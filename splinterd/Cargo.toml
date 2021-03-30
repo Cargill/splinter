@@ -99,6 +99,7 @@ experimental = [
     "circuit-purge",
     "health-service",
     "https-bind",
+    "metrics",
     "node",
     "oauth",
     "service-arg-validation",
@@ -131,6 +132,7 @@ database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
 health-service = ["health"]
 https-bind = ["splinter/https-bind"]
+metrics = ["splinter/metrics"]
 node = [
     "scabbard/client-reqwest",
     "scabbard/factory-builder",

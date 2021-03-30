@@ -171,6 +171,15 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 )
         }
 
+        #[cfg(feature = "metrics")]
+        {
+            partial_config = partial_config
+                .with_metrics_db(self.matches.value_of("metrics_db").map(String::from))
+                .with_metrics_url(self.matches.value_of("metrics_url").map(String::from))
+                .with_metrics_username(self.matches.value_of("metrics_username").map(String::from))
+                .with_metrics_password(self.matches.value_of("metrics_password").map(String::from))
+        }
+
         Ok(partial_config)
     }
 }

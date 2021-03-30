@@ -35,6 +35,14 @@ const OAUTH_CLIENT_SECRET_ENV: &str = "OAUTH_CLIENT_SECRET";
 const OAUTH_REDIRECT_URL_ENV: &str = "OAUTH_REDIRECT_URL";
 #[cfg(feature = "oauth")]
 const OAUTH_OPENID_URL_ENV: &str = "OAUTH_OPENID_URL";
+#[cfg(feature = "metrics")]
+const METRICS_DB_ENV: &str = "SPLINTER_METRICS_DB";
+#[cfg(feature = "metrics")]
+const METRICS_URL_ENV: &str = "SPLINTER_METRICS_URL";
+#[cfg(feature = "metrics")]
+const METRICS_USERNAME_ENV: &str = "SPLINTER_METRICS_USERNAME";
+#[cfg(feature = "metrics")]
+const METRICS_PASSWORD_ENV: &str = "SPLINTER_METRICS_PASSWORD";
 
 pub struct EnvPartialConfigBuilder;
 
@@ -115,6 +123,15 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
                 .with_oauth_client_secret(env::var(OAUTH_CLIENT_SECRET_ENV).ok())
                 .with_oauth_redirect_url(env::var(OAUTH_REDIRECT_URL_ENV).ok())
                 .with_oauth_openid_url(env::var(OAUTH_OPENID_URL_ENV).ok());
+        }
+
+        #[cfg(feature = "metrics")]
+        {
+            config = config
+                .with_metrics_db(env::var(METRICS_DB_ENV).ok())
+                .with_metrics_url(env::var(METRICS_URL_ENV).ok())
+                .with_metrics_username(env::var(METRICS_USERNAME_ENV).ok())
+                .with_metrics_password(env::var(METRICS_PASSWORD_ENV).ok())
         }
 
         Ok(config)
