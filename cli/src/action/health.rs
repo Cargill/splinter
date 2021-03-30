@@ -17,9 +17,8 @@ use reqwest::{blocking::Client, StatusCode};
 use serde_json::Value;
 
 use crate::error::CliError;
-use crate::signing::load_signer;
+use crate::signing::{create_cylinder_jwt_auth, load_signer};
 
-use super::create_cylinder_jwt_auth;
 use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
 
 pub struct StatusAction;

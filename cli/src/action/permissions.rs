@@ -16,11 +16,11 @@
 use clap::ArgMatches;
 
 use crate::error::CliError;
-use crate::signing::load_signer;
+use crate::signing::{create_cylinder_jwt_auth, load_signer};
 
 use super::{
-    api::SplinterRestClientBuilder, create_cylinder_jwt_auth, print_table, Action,
-    DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV,
+    api::SplinterRestClientBuilder, print_table, Action, DEFAULT_SPLINTER_REST_API_URL,
+    SPLINTER_REST_API_URL_ENV,
 };
 
 pub struct ListAction;

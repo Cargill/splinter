@@ -26,12 +26,10 @@ use std::path::Path;
 use crate::error::CliError;
 #[cfg(feature = "registry")]
 use crate::registry::api::RegistryNode;
-use crate::signing::load_signer;
+use crate::signing::{create_cylinder_jwt_auth, load_signer};
 
 use super::api::SplinterRestClientBuilder;
 use super::{msg_from_io_error, Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
-
-use super::create_cylinder_jwt_auth;
 
 const DEFAULT_OUTPUT_FILE: &str = "./nodes.yaml";
 

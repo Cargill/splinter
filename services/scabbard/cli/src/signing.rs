@@ -24,23 +24,27 @@ use crate::error::CliError;
 fn load_private_key(key_name: Option<&str>) -> Result<PrivateKey, CliError> {
     let private_key = if let Some(key_name) = key_name {
         if key_name.contains('/') {
-            load_key_from_path(Path::new(key_name))
-                .map_err(|err| CliError::ActionError(err.to_string()))?
+            load_key_from_path(Path::new(key_name)).map_err(|err| CliError::ActionError {
+                context: err.to_string(),
+                source: None,
+            })?
         } else {
             let path = &current_user_search_path();
             load_key(key_name, path)
-                .map_err(|err| CliError::ActionError(err.to_string()))?
-                .ok_or_else(|| {
-                    CliError::ActionError({
-                        format!(
-                            "No signing key found in {}. Either specify the --key argument or \
+                .map_err(|err| CliError::ActionError {
+                    context: err.to_string(),
+                    source: None,
+                })?
+                .ok_or_else(|| CliError::ActionError {
+                    context: format!(
+                        "No signing key found in {}. Either specify the --key argument or \
                             generate the default key via splinter keygen",
-                            path.iter()
-                                .map(|path| path.as_path().display().to_string())
-                                .collect::<Vec<String>>()
-                                .join(":")
-                        )
-                    })
+                        path.iter()
+                            .map(|path| path.as_path().display().to_string())
+                            .collect::<Vec<String>>()
+                            .join(":")
+                    ),
+                    source: None,
                 })?
         }
     } else {
@@ -61,18 +65,20 @@ fn load_private_key(key_name: Option<&str>) -> Result<PrivateKey, CliError> {
             }
         };
         load_key(&current_user_key_name(), &path)
-            .map_err(|err| CliError::ActionError(err.to_string()))?
-            .ok_or_else(|| {
-                CliError::ActionError({
-                    format!(
-                        "No signing key found in {}. Either specify the --key argument or \
+            .map_err(|err| CliError::ActionError {
+                context: err.to_string(),
+                source: None,
+            })?
+            .ok_or_else(|| CliError::ActionError {
+                context: format!(
+                    "No signing key found in {}. Either specify the --key argument or \
                         generate the default key via splinter keygen",
-                        path.iter()
-                            .map(|path| path.as_path().display().to_string())
-                            .collect::<Vec<String>>()
-                            .join(":")
-                    )
-                })
+                    path.iter()
+                        .map(|path| path.as_path().display().to_string())
+                        .collect::<Vec<String>>()
+                        .join(":")
+                ),
+                source: None,
             })?
     };
 
@@ -84,9 +90,13 @@ pub fn load_signer(key_name: Option<&str>) -> Result<Box<dyn Signer>, CliError> 
 }
 
 pub fn create_cylinder_jwt_auth(signer: Box<dyn Signer>) -> Result<String, CliError> {
-    let encoded_token = JsonWebTokenBuilder::new()
-        .build(&*signer)
-        .map_err(|err| CliError::ActionError(format!("failed to build json web token: {}", err)))?;
+    let encoded_token =
+        JsonWebTokenBuilder::new()
+            .build(&*signer)
+            .map_err(|err| CliError::ActionError {
+                context: format!("failed to build json web token: {}", err),
+                source: None,
+            })?;
 
     Ok(format!("Bearer Cylinder:{}", encoded_token))
 }
