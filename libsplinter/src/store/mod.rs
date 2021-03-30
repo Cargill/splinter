@@ -95,6 +95,12 @@ pub fn create_store_factory(
         }
         #[cfg(feature = "sqlite")]
         ConnectionUri::Sqlite(conn_str) => {
+            if (conn_str != ":memory:") && !std::path::Path::new(&conn_str).exists() {
+                return Err(InternalError::with_message(format!(
+                    "Database file '{}' does not exist",
+                    conn_str
+                )));
+            }
             let connection_manager =
                 ConnectionManager::<diesel::sqlite::SqliteConnection>::new(&conn_str);
             let mut pool_builder =
