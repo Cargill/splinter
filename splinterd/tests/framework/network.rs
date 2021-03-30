@@ -27,6 +27,7 @@ pub struct Network {
     default_rest_api_variant: RestApiVariant,
     nodes: Vec<Node>,
     temp_dirs: HashMap<String, TempDir>,
+    external_registries: Option<Vec<String>>,
 }
 
 impl Network {
@@ -35,6 +36,7 @@ impl Network {
             default_rest_api_variant: RestApiVariant::ActixWeb1,
             nodes: Vec::new(),
             temp_dirs: HashMap::new(),
+            external_registries: None,
         }
     }
 
@@ -57,6 +59,7 @@ impl Network {
                         .build()?,
                 )
                 .with_admin_signer(signer)
+                .with_external_registries(self.external_registries.clone())
                 .build()?
                 .run()?;
 
@@ -91,6 +94,11 @@ impl Network {
 
     pub fn with_default_rest_api_variant(mut self, variant: RestApiVariant) -> Self {
         self.default_rest_api_variant = variant;
+        self
+    }
+
+    pub fn with_external_registries(mut self, files: Vec<String>) -> Self {
+        self.external_registries = Some(files);
         self
     }
 

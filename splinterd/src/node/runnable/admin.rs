@@ -24,6 +24,7 @@ use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
 use splinter::orchestrator::ServiceOrchestratorBuilder;
 use splinter::peer::PeerManagerConnector;
+use splinter::registry::{LocalYamlRegistry, RegistryReader, UnifiedRegistry};
 use splinter::rest_api::actix_web_1::RestResourceProvider as _;
 use splinter::service::ServiceProcessorBuilder;
 use splinter::store::StoreFactory;
@@ -40,6 +41,7 @@ pub struct RunnableAdminSubsystem {
     pub service_transport: InprocTransport,
     pub admin_service_verifier: Box<dyn Verifier>,
     pub scabbard_service_factory: Option<ScabbardFactory>,
+    pub registries: Option<Vec<String>>,
 }
 
 impl RunnableAdminSubsystem {
@@ -51,7 +53,47 @@ impl RunnableAdminSubsystem {
         let mut service_transport = self.service_transport;
         let routing_writer = self.routing_writer;
 
-        let registry = store_factory.get_registry_store();
+        let mut registry = store_factory.get_registry_store();
+
+        if let Some(external_registries) = self.registries {
+            let read_only_registries = external_registries
+                .iter()
+                .map(|registry| {
+                    let mut iter = registry.splitn(2, "://");
+                    match (iter.next(), iter.next()) {
+                        (Some(scheme), Some(path)) => match scheme {
+                            "file" => {
+                                debug!(
+                                    "Attempting to add local read-only registry from file: {}",
+                                    path
+                                );
+                                match LocalYamlRegistry::new(path) {
+                                    Ok(registry) => {
+                                        Ok(Box::new(registry) as Box<dyn RegistryReader>)
+                                    }
+                                    Err(err) => Err(InternalError::from_source_with_message(
+                                        Box::new(err),
+                                        format!(
+                                            "Failed to add read-only LocalYamlRegistry '{}'",
+                                            path
+                                        ),
+                                    )),
+                                }
+                            }
+                            _ => Err(InternalError::with_message(format!(
+                                "Invalid registry provided ({}): must be valid 'file://' URI",
+                                registry
+                            ))),
+                        },
+                        (Some(_), None) => Err(InternalError::with_message(
+                            "Failed to parse registry argument: no URI scheme provided".to_string(),
+                        )),
+                        _ => unreachable!(), // splitn always returns at least one item
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            registry = Box::new(UnifiedRegistry::new(registry, read_only_registries));
+        }
 
         let orchestrator_connection = service_transport
             .connect("inproc://orchestator")
