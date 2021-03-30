@@ -90,7 +90,7 @@ clean:
 clean-metrics:
     docker-compose -f docker/metrics/docker-compose.yaml down -v
 
-lint:
+lint: lint-ignore
     #!/usr/bin/env sh
     set -e
     echo "\033[1mcargo fmt -- --check\033[0m"
@@ -111,6 +111,12 @@ lint-client:
     set -e
     cd examples/gameroom/gameroom-app
     npm run lint
+
+lint-ignore:
+    #!/usr/bin/env sh
+    set -e
+    diff -u .dockerignore .gitignore
+    echo "\n\033[92mLint Ignore Files Success\033[0m\n"
 
 metrics:
     docker-compose -f docker/metrics/docker-compose.yaml down;
