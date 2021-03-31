@@ -293,7 +293,11 @@ impl fmt::Display for CircuitSlice {
                                 Err(_) => display_string += &format!("              {}\n", value),
                             };
                         } else {
-                            display_string += &format!("              {}\n", value);
+                            let values =
+                                value.split(',').map(String::from).collect::<Vec<String>>();
+                            for value in values {
+                                display_string += &format!("              {}\n", value);
+                            }
                         }
                     }
                 }
@@ -392,7 +396,11 @@ impl fmt::Display for ProposalSlice {
                                 Err(_) => display_string += &format!("                {}\n", value),
                             };
                         } else {
-                            display_string += &format!("                {}\n", value);
+                            let values =
+                                value.split(',').map(String::from).collect::<Vec<String>>();
+                            for value in values {
+                                display_string += &format!("              {}\n", value);
+                            }
                         }
                     }
                 }
