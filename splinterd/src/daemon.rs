@@ -434,9 +434,9 @@ impl SplinterDaemon {
         let mut orchestrator = ServiceOrchestratorBuilder::new()
             .with_connection(orchestrator_connection)
             .with_service_factory(Box::new(ScabbardFactory::new(
+                Some(self.state_dir.to_string()),
                 None,
-                None,
-                None,
+                Some(self.state_dir.to_string()),
                 None,
                 Box::new(signing_context),
             )))
