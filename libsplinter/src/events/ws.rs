@@ -273,6 +273,10 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
             .on_error
             .clone()
             .unwrap_or_else(|| Arc::new(|_, _| Ok(())));
+        let on_stream_error = self
+            .on_error
+            .clone()
+            .unwrap_or_else(|| Arc::new(|_, _| Ok(())));
 
         let mut context_timeout = context.clone();
         let timeout = self.timeout;
@@ -459,7 +463,13 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
                                 } else {
                                     match status {
                                         ConnectionStatus::Open => future::ok(true),
-                                        ConnectionStatus::UnexpectedClose(_original_error) => {
+                                        ConnectionStatus::UnexpectedClose(original_error) => {
+                                            if let Err(err) =
+                                                on_stream_error(original_error, context.clone())
+                                            {
+                                                error!("Failed to call on_error: {}", err);
+                                            }
+
                                             if let Err(err) = context.try_reconnect() {
                                                 error!("Context returned an error  {}", err);
                                             }
