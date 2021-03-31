@@ -463,12 +463,15 @@ fn parse_service_argument(service_argument: &str) -> Result<(String, (String, St
         )));
     }
 
-    let value = argument_iter.next().ok_or_else(|| {
-        CliError::ActionError(format!(
-            "Missing value in service argument '{}::{}'",
-            service_id, key,
-        ))
-    })?;
+    let value = argument_iter
+        .next()
+        .ok_or_else(|| {
+            CliError::ActionError(format!(
+                "Missing value in service argument '{}::{}'",
+                service_id, key,
+            ))
+        })?
+        .to_string();
     if value.is_empty() {
         return Err(CliError::ActionError(format!(
             "Empty value detected in service argument '{}::{}'",
@@ -476,7 +479,7 @@ fn parse_service_argument(service_argument: &str) -> Result<(String, (String, St
         )));
     }
 
-    Ok((service_id, (key, format!("{:?}", vec![value]))))
+    Ok((service_id, (key, value)))
 }
 
 fn parse_service_type_argument(service_type: &str) -> Result<(String, String), CliError> {
