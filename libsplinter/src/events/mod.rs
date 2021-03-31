@@ -17,5 +17,5 @@ mod reactor;
 mod ws;
 
 pub use error::{ParseError, ReactorError, WebSocketError};
-pub use reactor::{Igniter, Reactor};
+pub use reactor::{Igniter, Reactor, ReactorShutdownSignaler};
 pub use ws::{ParseBytes, WebSocketClient, WsResponse};
