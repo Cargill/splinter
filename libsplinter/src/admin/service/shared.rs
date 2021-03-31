@@ -1829,7 +1829,7 @@ impl AdminServiceShared {
     /// voted for. If the proposal type is `Create`, the vote submitted pertains to creating a
     /// circuit so the services must be initialized if all members are now ready. If the proposal
     /// type is disband, the vote submitted pertains to disbanding a circuit so the services
-    /// must be stopped if all members are now ready if the `circuit-disband` feature is enabled.
+    /// must be stopped if all members are now ready.
     pub fn add_ready_member(
         &mut self,
         circuit_id: &str,
