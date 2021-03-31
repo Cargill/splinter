@@ -14,7 +14,13 @@
 
 //! Traits and resources useful for communicating with Splinter Biome as a client.
 
+#[cfg(feature = "biome-client-reqwest")]
+mod reqwest;
+
 use crate::error::InternalError;
+
+#[cfg(feature = "biome-client-reqwest")]
+pub use self::reqwest::ReqwestBiomeClient;
 
 /// Biome `Credentials` holds information specific to a Biome user.
 #[derive(Debug)]
