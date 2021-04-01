@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::InternalError;
 
+#[cfg(feature = "client-reqwest")]
 pub use self::reqwest::ReqwestAdminServiceClient;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
