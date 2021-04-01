@@ -36,7 +36,7 @@ pub struct Role {
 }
 
 impl Role {
-    /// Returns the role's id.
+    /// Returns the role's ID.
     pub fn id(&self) -> &str {
         &self.id
     }

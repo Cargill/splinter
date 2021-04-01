@@ -499,7 +499,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                     .value_name("circuit-id")
                     .takes_value(true)
                     .required(true)
-                    .help("ID of the proposed circuit"),
+                    .help("ID of the circuit to be disbanded"),
             ),
     );
 
