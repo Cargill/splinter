@@ -156,15 +156,16 @@ impl ServiceArgValidator for ScabbardArgValidator {
         let admin_keys_str = args
             .get("admin_keys")
             .ok_or_else(|| ServiceArgValidationError("admin_keys argument not provided".into()))?;
-        let admin_keys: Vec<String> = serde_json::from_str(admin_keys_str).map_err(|err| {
+
+        let admin_keys = parse_list(admin_keys_str).map_err(|err| {
             ServiceArgValidationError(format!("failed to parse admin_keys list: {}", err,))
         })?;
 
         for key in admin_keys {
             let key_bytes = parse_hex(&key).map_err(|_| {
                 ServiceArgValidationError(format!(
-                    "{} is not a valid hex-formatted public key",
-                    key
+                    "{:?} is not a valid hex-formatted public key",
+                    key,
                 ))
             })?;
 
@@ -206,7 +207,8 @@ impl ServiceFactory for ScabbardFactory {
         let peer_services_str = args.get("peer_services").ok_or_else(|| {
             FactoryCreateError::InvalidArguments("peer_services argument not provided".into())
         })?;
-        let peer_services = serde_json::from_str::<Vec<_>>(peer_services_str)
+
+        let peer_services = parse_list(peer_services_str)
             .map_err(|err| {
                 FactoryCreateError::InvalidArguments(format!(
                     "failed to parse peer_services list: {}",
@@ -215,12 +217,14 @@ impl ServiceFactory for ScabbardFactory {
             })?
             .into_iter()
             .collect::<HashSet<String>>();
+
         let state_db_dir = Path::new(&self.state_db_dir);
         let receipt_db_dir = Path::new(&self.receipt_db_dir);
         let admin_keys_str = args.get("admin_keys").ok_or_else(|| {
             FactoryCreateError::InvalidArguments("admin_keys argument not provided".into())
         })?;
-        let admin_keys = serde_json::from_str(admin_keys_str).map_err(|err| {
+
+        let admin_keys = parse_list(admin_keys_str).map_err(|err| {
             FactoryCreateError::InvalidArguments(format!(
                 "failed to parse admin_keys list: {}",
                 err,
@@ -297,6 +301,19 @@ impl ServiceFactory for ScabbardFactory {
     }
 }
 
+/// Parse a service argument into a list. Check if the argument is in json or csv format
+/// and return the list of strings. An error is returned if json fmt cannot be parsed.
+fn parse_list(values_list: &str) -> Result<Vec<String>, String> {
+    if values_list.starts_with('[') {
+        serde_json::from_str(values_list).map_err(|err| err.to_string())
+    } else {
+        Ok(values_list
+            .split(',')
+            .map(String::from)
+            .collect::<Vec<String>>())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,6 +335,25 @@ mod tests {
             .downcast_ref::<Scabbard>()
             .expect("failed to downcast Service to Scabbard");
         assert_eq!(&scabbard.service_id, "0");
+        assert_eq!(&scabbard.circuit_id, "1");
+    }
+
+    /// Verify that the scabbard factory produces a valid `Scabbard` instance if the service
+    /// arguments are commo seperated instead of json fmt.
+    #[test]
+    fn create_successful_no_json() {
+        let factory = get_factory();
+
+        let service = factory
+            .create("2".into(), "", "1", get_mock_args_no_json())
+            .expect("failed to create service");
+        assert_eq!(service.service_id(), "2");
+
+        let scabbard = (&*service)
+            .as_any()
+            .downcast_ref::<Scabbard>()
+            .expect("failed to downcast Service to Scabbard");
+        assert_eq!(&scabbard.service_id, "2");
         assert_eq!(&scabbard.circuit_id, "1");
     }
 
@@ -388,6 +424,13 @@ mod tests {
             "admin_keys".into(),
             serde_json::to_string(&admin_keys).expect("failed to serialize admin_keys"),
         );
+        args
+    }
+
+    fn get_mock_args_no_json() -> HashMap<String, String> {
+        let mut args = HashMap::new();
+        args.insert("peer_services".into(), "0,1,3".into());
+        args.insert("admin_keys".into(), "".into());
         args
     }
 }
