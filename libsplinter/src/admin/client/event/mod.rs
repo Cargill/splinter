@@ -15,10 +15,17 @@
 //! Client traits to receive AdminServiceEvents.
 
 mod error;
+#[cfg(feature = "admin-service-event-client-actix-web-client")]
+mod ws;
 
 use super::ProposalSlice;
 
 pub use error::NextEventError;
+#[cfg(feature = "admin-service-event-client-actix-web-client")]
+pub use ws::actix_web_client::{
+    AwcAdminServiceEventClient, AwcAdminServiceEventClientBuilder,
+    RunnableAwcAdminServiceEventClient,
+};
 
 /// A public key for the private key that signed an admin proposal.
 #[derive(Clone, PartialEq)]
