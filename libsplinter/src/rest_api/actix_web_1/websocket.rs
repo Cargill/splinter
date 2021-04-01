@@ -151,7 +151,7 @@ impl<T: Serialize + Debug + 'static> StreamHandler<MessageWrapper<T>, ()>
         match msg {
             MessageWrapper::Message(msg) => {
                 debug!("Received a message: {:?}", msg);
-                match serde_json::to_string(&msg) {
+                match serde_json::to_string_pretty(&msg) {
                     Ok(text) => ctx.text(text),
                     Err(err) => {
                         debug!("Failed to serialize payload: {:?}", err);

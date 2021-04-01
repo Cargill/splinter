@@ -106,6 +106,7 @@ experimental = [
     "stable",
     # The following features are experimental:
     "admin-service-client",
+    "admin-service-event-client",
     "authorization-handler-allow-keys",
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
@@ -130,6 +131,7 @@ benchmark = []
 
 admin-service = []
 admin-service-client = ["admin-service"]
+admin-service-event-client = ["admin-service-client" ]
 authorization-handler-allow-keys = ["authorization"]
 authorization-handler-maintenance = ["authorization"]
 authorization = ["rest-api"]
