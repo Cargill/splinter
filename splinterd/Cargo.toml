@@ -145,6 +145,8 @@ node = [
     "splinter/rest-api-actix-web-3",
     "splinter/registry-client",
     "splinter/registry-client-reqwest",
+    "splinter/biome-client",
+    "splinter/biome-client-reqwest",
 ]
 oauth = [
     "splinter/oauth"
