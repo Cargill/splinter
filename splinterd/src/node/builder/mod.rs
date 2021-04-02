@@ -35,7 +35,7 @@ use splinter::store::StoreFactory;
 
 use super::{RunnableNode, RunnableNodeRestApiVariant, ScabbardConfig};
 
-use self::admin::AdminSubsystemBuilder;
+use self::admin::{AdminServiceEventClientVariant, AdminSubsystemBuilder};
 use self::network::NetworkSubsystemBuilder;
 
 /// An enumeration of the REST API backend variants.
@@ -120,6 +120,17 @@ impl NodeBuilder {
         self.admin_subsystem_builder = self
             .admin_subsystem_builder
             .with_store_factory(store_factory);
+        self
+    }
+
+    pub fn with_admin_service_event_client_variant(
+        mut self,
+        admin_service_event_client_variant: AdminServiceEventClientVariant,
+    ) -> Self {
+        self.admin_subsystem_builder = self
+            .admin_subsystem_builder
+            .with_admin_service_event_client_variant(admin_service_event_client_variant);
+
         self
     }
 

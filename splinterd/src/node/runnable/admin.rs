@@ -22,6 +22,7 @@ use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::AdminServiceBuilder;
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
+use splinter::events::Reactor;
 use splinter::orchestrator::ServiceOrchestratorBuilder;
 use splinter::peer::PeerManagerConnector;
 use splinter::registry::{LocalYamlRegistry, RegistryReader, UnifiedRegistry};
@@ -30,7 +31,8 @@ use splinter::service::ServiceProcessorBuilder;
 use splinter::store::StoreFactory;
 use splinter::transport::{inproc::InprocTransport, Transport};
 
-use crate::node::running::admin::AdminSubsystem;
+use crate::node::builder::admin::AdminServiceEventClientVariant;
+use crate::node::running::admin::{self as running_admin, AdminSubsystem};
 
 pub struct RunnableAdminSubsystem {
     pub node_id: String,
@@ -42,6 +44,7 @@ pub struct RunnableAdminSubsystem {
     pub admin_service_verifier: Box<dyn Verifier>,
     pub scabbard_service_factory: Option<ScabbardFactory>,
     pub registries: Option<Vec<String>>,
+    pub admin_service_event_client_variant: AdminServiceEventClientVariant,
 }
 
 impl RunnableAdminSubsystem {
@@ -161,11 +164,19 @@ impl RunnableAdminSubsystem {
             .start()
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
+        let running_admin_service_event_client_variant =
+            match self.admin_service_event_client_variant {
+                AdminServiceEventClientVariant::ActixWebClient => {
+                    running_admin::AdminServiceEventClientVariant::ActixWebClient(Reactor::new())
+                }
+            };
+
         Ok(AdminSubsystem {
             registry_writer: registry.clone_box_as_writer(),
             admin_service_shutdown,
             actix1_resources,
             store_factory,
+            admin_service_event_client_variant: running_admin_service_event_client_variant,
         })
     }
 }
