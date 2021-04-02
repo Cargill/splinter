@@ -51,6 +51,8 @@ use submit::submit_batches;
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+const DEFAULT_REST_API_ENDPOINT: &str = "http://localhost:8008/";
+
 fn run() -> Result<(), CliError> {
     // Below, unwrap() is used on required arguments, since they will always
     // contain a value (and lack of value is should cause a panic). unwrap()
@@ -229,7 +231,7 @@ fn upload(upload_matches: &clap::ArgMatches) -> Result<(String, u64), CliError> 
     let key_name = upload_matches.value_of("key");
     let url = upload_matches
         .value_of("url")
-        .unwrap_or("http://localhost:8008/");
+        .unwrap_or(DEFAULT_REST_API_ENDPOINT);
     let wasm_name = upload_matches.value_of("wasm");
 
     let wait = match value_t!(upload_matches, "wait", u64) {
@@ -250,7 +252,7 @@ fn execute(exec_matches: &clap::ArgMatches) -> Result<(String, u64), CliError> {
     let key_name = exec_matches.value_of("key");
     let url = exec_matches
         .value_of("url")
-        .unwrap_or("http://localhost:8008/");
+        .unwrap_or(DEFAULT_REST_API_ENDPOINT);
 
     let wait = match value_t!(exec_matches, "wait", u64) {
         Ok(wait) => wait,
@@ -309,7 +311,7 @@ fn namespace_registry(ns_matches: &clap::ArgMatches) -> Result<(String, u64), Cl
 
     let url = ns_matches
         .value_of("url")
-        .unwrap_or("http://localhost:8008/");
+        .unwrap_or(DEFAULT_REST_API_ENDPOINT);
 
     let wait = match value_t!(ns_matches, "wait", u64) {
         Ok(wait) => wait,
@@ -379,7 +381,7 @@ fn namespace_permission(perm_matches: &clap::ArgMatches) -> Result<(String, u64)
     let key_name = perm_matches.value_of("key");
     let url = perm_matches
         .value_of("url")
-        .unwrap_or("http://localhost:8008/");
+        .unwrap_or(DEFAULT_REST_API_ENDPOINT);
 
     let wait = match value_t!(perm_matches, "wait", u64) {
         Ok(wait) => wait,
@@ -431,7 +433,7 @@ fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), Cli
 
     let url = cr_matches
         .value_of("url")
-        .unwrap_or("http://localhost:8008/");
+        .unwrap_or(DEFAULT_REST_API_ENDPOINT);
 
     let wait = value_t!(cr_matches, "wait", u64).unwrap_or(0);
 
@@ -491,7 +493,7 @@ fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), Cli
 fn smart_permission(sp_matches: &clap::ArgMatches) -> Result<(String, u64), CliError> {
     let url = sp_matches
         .value_of("url")
-        .unwrap_or("http://localhost:8008/");
+        .unwrap_or(DEFAULT_REST_API_ENDPOINT);
 
     let wait = match value_t!(sp_matches, "wait", u64) {
         Ok(wait) => wait,
@@ -571,7 +573,7 @@ fn smart_permission(sp_matches: &clap::ArgMatches) -> Result<(String, u64), CliE
 fn contract(contract_matches: &clap::ArgMatches) -> Result<(), CliError> {
     match contract_matches.subcommand() {
         ("list", Some(matches)) => {
-            let url = matches.value_of("url").unwrap_or("http://localhost:8008/");
+            let url = matches.value_of("url").unwrap_or(DEFAULT_REST_API_ENDPOINT);
 
             let format = matches
                 .value_of("format")
@@ -623,7 +625,7 @@ fn contract(contract_matches: &clap::ArgMatches) -> Result<(), CliError> {
             Ok(())
         }
         ("show", Some(matches)) => {
-            let url = matches.value_of("url").unwrap_or("http://localhost:8008/");
+            let url = matches.value_of("url").unwrap_or(DEFAULT_REST_API_ENDPOINT);
 
             let contract = matches
                 .value_of("contract")
