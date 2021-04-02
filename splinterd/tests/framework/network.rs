@@ -127,6 +127,56 @@ impl Network {
             )),
         }
     }
+
+    pub fn start(mut self, index: usize) -> Result<Network, InternalError> {
+        let node = match self.nodes.remove(index) {
+            NetworkNode::RunnableNode(runnable_node) => runnable_node.run()?,
+            NetworkNode::Node(_) => {
+                return Err(InternalError::with_message(
+                    "node is already running".to_string(),
+                ))
+            }
+        };
+
+        let registry_writer = node.registry_writer();
+
+        // Update the registry
+        registry_writer
+            .update_node(
+                RegistryNode::builder(node.node_id().to_string())
+                    .with_display_name(node.node_id().to_string())
+                    .with_endpoints(node.network_endpoints().to_vec())
+                    .with_key(
+                        node.admin_signer()
+                            .clone_box()
+                            .public_key()
+                            .map_err(|e| InternalError::from_source(Box::new(e)))?
+                            .as_hex(),
+                    )
+                    .build()
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?,
+            )
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        self.nodes.insert(index, NetworkNode::Node(node));
+
+        Ok(self)
+    }
+
+    pub fn stop(mut self, index: usize) -> Result<Network, InternalError> {
+        let runnable_node = match self.nodes.remove(index) {
+            NetworkNode::Node(node) => node.stop()?,
+            NetworkNode::RunnableNode(_) => {
+                return Err(InternalError::with_message(
+                    "node is already stopped".to_string(),
+                ))
+            }
+        };
+        self.nodes
+            .insert(index, NetworkNode::RunnableNode(runnable_node));
+
+        Ok(self)
+    }
 }
 
 impl ShutdownHandle for Network {
