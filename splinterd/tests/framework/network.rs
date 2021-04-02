@@ -20,14 +20,19 @@ use cylinder::{secp256k1::Secp256k1Context, Context};
 use splinter::error::{InternalError, InvalidArgumentError};
 use splinter::registry::Node as RegistryNode;
 use splinter::threading::lifecycle::ShutdownHandle;
-use splinterd::node::{Node, NodeBuilder, RestApiVariant, ScabbardConfigBuilder};
+use splinterd::node::{Node, NodeBuilder, RestApiVariant, RunnableNode, ScabbardConfigBuilder};
 use tempdir::TempDir;
 
 pub struct Network {
     default_rest_api_variant: RestApiVariant,
-    nodes: Vec<Node>,
+    nodes: Vec<NetworkNode>,
     temp_dirs: HashMap<String, TempDir>,
     external_registries: Option<Vec<String>>,
+}
+
+pub enum NetworkNode {
+    Node(Node),
+    RunnableNode(RunnableNode),
 }
 
 impl Network {
@@ -70,22 +75,27 @@ impl Network {
             ));
 
             self.temp_dirs.insert(node.node_id().to_string(), temp_dir);
-            self.nodes.push(node);
+            self.nodes.push(NetworkNode::Node(node));
         }
 
         for node in &self.nodes {
-            let registry_writer = node.registry_writer();
-            for (node_id, pub_key, endpoints) in &registry_info {
-                registry_writer
-                    .add_node(
-                        RegistryNode::builder(node_id)
-                            .with_display_name(node_id)
-                            .with_endpoints(endpoints.to_vec())
-                            .with_key(pub_key.as_hex())
-                            .build()
-                            .map_err(|e| InternalError::from_source(Box::new(e)))?,
-                    )
-                    .map_err(|e| InternalError::from_source(Box::new(e)))?;
+            match node {
+                NetworkNode::Node(node) => {
+                    let registry_writer = node.registry_writer();
+                    for (node_id, pub_key, endpoints) in &registry_info {
+                        registry_writer
+                            .add_node(
+                                RegistryNode::builder(node_id)
+                                    .with_display_name(node_id)
+                                    .with_endpoints(endpoints.to_vec())
+                                    .with_key(pub_key.as_hex())
+                                    .build()
+                                    .map_err(|e| InternalError::from_source(Box::new(e)))?,
+                            )
+                            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+                    }
+                }
+                _ => unreachable!(), // a new network will only contain running nodes
             }
         }
 
@@ -104,7 +114,13 @@ impl Network {
 
     pub fn node(&self, n: usize) -> Result<&Node, InvalidArgumentError> {
         match self.nodes.get(n) {
-            Some(node) => Ok(node),
+            Some(network_node) => match network_node {
+                NetworkNode::Node(node) => Ok(node),
+                NetworkNode::RunnableNode(_) => Err(InvalidArgumentError::new(
+                    "n".to_string(),
+                    "node is stopped".to_string(),
+                )),
+            },
             None => Err(InvalidArgumentError::new(
                 "n".to_string(),
                 "out of range".to_string(),
@@ -116,13 +132,19 @@ impl Network {
 impl ShutdownHandle for Network {
     fn signal_shutdown(&mut self) {
         for node in &mut self.nodes {
-            node.signal_shutdown()
+            match node {
+                NetworkNode::Node(node) => node.signal_shutdown(),
+                NetworkNode::RunnableNode(_) => (),
+            }
         }
     }
 
     fn wait_for_shutdown(self) -> Result<(), InternalError> {
         for node in self.nodes.into_iter() {
-            node.wait_for_shutdown()?;
+            match node {
+                NetworkNode::Node(node) => node.wait_for_shutdown()?,
+                NetworkNode::RunnableNode(_) => (),
+            }
         }
 
         Ok(())
