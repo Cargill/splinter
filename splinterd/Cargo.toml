@@ -132,6 +132,8 @@ database-sqlite = ["splinter/sqlite"]
 health-service = ["health"]
 https-bind = ["splinter/https-bind"]
 node = [
+    "authorization",
+    "https-bind",
     "scabbard/client-reqwest",
     "scabbard/factory-builder",
     "splinter/admin-service-client",
