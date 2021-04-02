@@ -18,6 +18,7 @@ use splinter::error::InternalError;
 use splinter::registry::RegistryWriter;
 use splinter::rest_api::actix_web_1::Resource as Actix1Resource;
 use splinter::service::ServiceProcessorShutdownHandle;
+use splinter::store::StoreFactory;
 use splinter::threading::lifecycle::ShutdownHandle;
 
 /// A running admin subsystem.
@@ -25,6 +26,7 @@ pub struct AdminSubsystem {
     pub(crate) registry_writer: Box<dyn RegistryWriter>,
     pub(crate) admin_service_shutdown: ServiceProcessorShutdownHandle,
     pub(crate) actix1_resources: Vec<Actix1Resource>,
+    pub(crate) store_factory: Box<dyn StoreFactory>,
 }
 
 impl AdminSubsystem {
