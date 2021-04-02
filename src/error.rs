@@ -16,9 +16,10 @@ use std::borrow::Borrow;
 use std::error::Error as StdError;
 
 use sabre_sdk::protocol::payload::{ActionBuildError, SabrePayloadBuildError};
+use sabre_sdk::protos::ProtoConversionError;
 use transact::{
     protocol::{batch::BatchBuildError, transaction::TransactionBuildError},
-    protos::ProtoConversionError,
+    protos::ProtoConversionError as TransactProtoConversionError,
 };
 
 #[derive(Debug)]
@@ -31,6 +32,7 @@ pub enum CliError {
     HyperError(hyper::Error),
     ProtocolBuildError(Box<dyn StdError>),
     ProtoConversionError(ProtoConversionError),
+    TransactProtoConversionError(TransactProtoConversionError),
 }
 
 impl StdError for CliError {
@@ -42,6 +44,7 @@ impl StdError for CliError {
             CliError::HyperError(err) => Some(err),
             CliError::ProtocolBuildError(ref err) => Some(err.borrow()),
             CliError::ProtoConversionError(err) => Some(err),
+            CliError::TransactProtoConversionError(err) => Some(err),
         }
     }
 }
@@ -55,6 +58,9 @@ impl std::fmt::Display for CliError {
             CliError::HyperError(ref err) => write!(f, "HyperError: {}", err),
             CliError::ProtocolBuildError(ref err) => write!(f, "Protocol Error: {}", err),
             CliError::ProtoConversionError(ref err) => write!(f, "Proto Conversion Error: {}", err),
+            CliError::TransactProtoConversionError(ref err) => {
+                write!(f, "Transact Proto Conversion Error: {}", err)
+            }
         }
     }
 }
@@ -74,6 +80,12 @@ impl From<hyper::Error> for CliError {
 impl From<ProtoConversionError> for CliError {
     fn from(e: ProtoConversionError) -> Self {
         CliError::ProtoConversionError(e)
+    }
+}
+
+impl From<TransactProtoConversionError> for CliError {
+    fn from(e: TransactProtoConversionError) -> Self {
+        CliError::TransactProtoConversionError(e)
     }
 }
 
