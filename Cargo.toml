@@ -9,6 +9,7 @@ name = "sabre"
 path = "src/main.rs"
 
 [dependencies]
+base64 = "0.13"
 clap = "2"
 cylinder = "0.2"
 dirs = "2"

@@ -19,6 +19,7 @@ extern crate serde_derive;
 
 mod error;
 mod key;
+mod state;
 mod submit;
 mod upload;
 
@@ -27,6 +28,7 @@ use std::io::{prelude::*, BufReader};
 use std::path::Path;
 use std::time::Instant;
 
+use clap::{AppSettings, Arg, SubCommand};
 use sabre_sdk::protocol::payload::{
     CreateContractRegistryActionBuilder, CreateNamespaceRegistryActionBuilder,
     CreateNamespaceRegistryPermissionActionBuilder, CreateSmartPermissionActionBuilder,
@@ -35,6 +37,12 @@ use sabre_sdk::protocol::payload::{
     ExecuteContractActionBuilder, UpdateContractRegistryOwnersActionBuilder,
     UpdateNamespaceRegistryOwnersActionBuilder, UpdateSmartPermissionActionBuilder,
 };
+use sabre_sdk::protocol::{
+    compute_contract_address,
+    state::{ContractList, ContractRegistryList},
+    CONTRACT_REGISTRY_ADDRESS_PREFIX,
+};
+use sabre_sdk::protos::FromBytes;
 
 use error::CliError;
 use key::new_signer;
@@ -49,7 +57,7 @@ fn run() -> Result<(), CliError> {
     // is also used on get_matches() because SubcommandRequiredElseHelp will
     // ensure a value.
 
-    let matches = clap_app!(myapp =>
+    let app = clap_app!(myapp =>
         (name: APP_NAME)
         (version: VERSION)
         (about: "Sawtooth Sabre CLI")
@@ -131,38 +139,86 @@ fn run() -> Result<(), CliError> {
                 (@arg key: -k --key +takes_value "Signing key name")
             )
         )
-    ).get_matches();
+    );
 
-    let (batch_link, mut wait) = if let Some(upload_matches) = matches.subcommand_matches("upload")
-    {
-        upload(upload_matches)?
-    } else if let Some(exec_matches) = matches.subcommand_matches("exec") {
-        execute(exec_matches)?
-    } else if let Some(ns_matches) = matches.subcommand_matches("ns") {
-        namespace_registry(ns_matches)?
-    } else if let Some(perm_matches) = matches.subcommand_matches("perm") {
-        namespace_permission(perm_matches)?
-    } else if let Some(cr_matches) = matches.subcommand_matches("cr") {
-        contract_registry(cr_matches)?
-    } else if let Some(sp_matches) = matches.subcommand_matches("sp") {
-        smart_permission(sp_matches)?
+    let app = app.subcommand(
+        SubCommand::with_name("contract")
+            .about("List or show a Sabre smart contract")
+            .setting(AppSettings::SubcommandRequiredElseHelp)
+            .subcommand(
+                SubCommand::with_name("list")
+                    .about("List all registered Sabre smart contracts")
+                    .args(&[
+                        Arg::with_name("url")
+                            .help("URL to the Sawtooth REST API")
+                            .short("U")
+                            .long("url")
+                            .takes_value(true),
+                        Arg::with_name("format")
+                            .help("Format to display list of smart contracts in")
+                            .short("f")
+                            .long("format")
+                            .takes_value(true)
+                            .possible_values(&["human", "csv"])
+                            .default_value("human"),
+                    ]),
+            )
+            .subcommand(
+                SubCommand::with_name("show")
+                    .about("Show details about a registered Sabre smart contract")
+                    .args(&[
+                        Arg::with_name("url")
+                            .help("URL to the Sawtooth REST API")
+                            .short("U")
+                            .long("url")
+                            .takes_value(true),
+                        Arg::with_name("contract")
+                            .help(
+                                "Name and version of the smart contract in the form \
+                                     'name:version'",
+                            )
+                            .takes_value(true)
+                            .required(true),
+                    ]),
+            ),
+    );
+
+    let matches = app.get_matches();
+
+    if let Some(contract_matches) = matches.subcommand_matches("contract") {
+        contract(contract_matches)?
     } else {
-        return Err(CliError::UserError("Subcommand required".into()));
-    };
+        let (batch_link, mut wait) =
+            if let Some(upload_matches) = matches.subcommand_matches("upload") {
+                upload(upload_matches)?
+            } else if let Some(exec_matches) = matches.subcommand_matches("exec") {
+                execute(exec_matches)?
+            } else if let Some(ns_matches) = matches.subcommand_matches("ns") {
+                namespace_registry(ns_matches)?
+            } else if let Some(perm_matches) = matches.subcommand_matches("perm") {
+                namespace_permission(perm_matches)?
+            } else if let Some(cr_matches) = matches.subcommand_matches("cr") {
+                contract_registry(cr_matches)?
+            } else if let Some(sp_matches) = matches.subcommand_matches("sp") {
+                smart_permission(sp_matches)?
+            } else {
+                return Err(CliError::UserError("Subcommand required".into()));
+            };
 
-    if wait > 0 {
-        let response_body = loop {
-            let time = Instant::now();
-            let status_response = submit::wait_for_batch(&batch_link, wait)?;
+        if wait > 0 {
+            let response_body = loop {
+                let time = Instant::now();
+                let status_response = submit::wait_for_batch(&batch_link, wait)?;
 
-            wait = wait.saturating_sub(time.elapsed().as_secs());
+                wait = wait.saturating_sub(time.elapsed().as_secs());
 
-            if wait == 0 || status_response.is_finished() {
-                break status_response;
-            }
-        };
+                if wait == 0 || status_response.is_finished() {
+                    break status_response;
+                }
+            };
 
-        println!("Response Body:\n{}", response_body);
+            println!("Response Body:\n{}", response_body);
+        }
     }
 
     Ok(())
@@ -510,6 +566,155 @@ fn smart_permission(sp_matches: &clap::ArgMatches) -> Result<(String, u64), CliE
     };
 
     Ok((batch_link, wait))
+}
+
+fn contract(contract_matches: &clap::ArgMatches) -> Result<(), CliError> {
+    match contract_matches.subcommand() {
+        ("list", Some(matches)) => {
+            let url = matches.value_of("url").unwrap_or("http://localhost:8008/");
+
+            let format = matches
+                .value_of("format")
+                .expect("default not set for --format");
+
+            let registries = state::get_state_with_prefix(url, &CONTRACT_REGISTRY_ADDRESS_PREFIX)?
+                .into_iter()
+                .map(|entry| {
+                    base64::decode(entry.data)
+                        .map_err(|_| CliError::UserError("Unable to decode state".into()))
+                        .and_then(|bytes| {
+                            ContractRegistryList::from_bytes(&bytes)
+                                .map_err(CliError::ProtoConversionError)
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let mut data = vec![
+                // Headers
+                vec![
+                    "NAME".to_string(),
+                    "VERSIONS".to_string(),
+                    "OWNERS".to_string(),
+                ],
+            ];
+            for registry_list in registries {
+                for registry in registry_list.registries() {
+                    let name = registry.name().to_string();
+                    let versions = registry
+                        .versions()
+                        .iter()
+                        .map(|version| version.version().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let owners = registry.owners().join(", ");
+
+                    data.push(vec![name, versions, owners]);
+                }
+            }
+
+            if format == "csv" {
+                for row in data {
+                    println!("{}", row.join(","))
+                }
+            } else {
+                print_table(data);
+            }
+
+            Ok(())
+        }
+        ("show", Some(matches)) => {
+            let url = matches.value_of("url").unwrap_or("http://localhost:8008/");
+
+            let contract = matches
+                .value_of("contract")
+                .ok_or_else(|| CliError::UserError("Missing contract".into()))?;
+
+            let (name, version) = parse_name_version(contract).ok_or_else(|| {
+                CliError::UserError("--contract must be of the form 'name:version'".into())
+            })?;
+
+            let address = to_hex(&compute_contract_address(name, version).map_err(|err| {
+                CliError::UserError(format!("Unable to get contract address: {}", err))
+            })?);
+
+            let contract_bytes = state::get_state_with_prefix(url, &address)?
+                .get(0)
+                .cloned()
+                .ok_or_else(|| CliError::UserError(format!("contract '{}' not found", contract)))?;
+
+            let contract_list = ContractList::from_bytes(
+                &base64::decode(contract_bytes.data)
+                    .map_err(|_| CliError::UserError("Unable to decode state".into()))?,
+            )?;
+            let contract = contract_list
+                .contracts()
+                .get(0)
+                .ok_or_else(|| CliError::UserError("contract list is empty".into()))?;
+
+            println!("{} {}", contract.name(), contract.version());
+            println!("  inputs:");
+            for input in contract.inputs() {
+                println!("  - {}", input);
+            }
+            println!("  outputs:");
+            for output in contract.outputs() {
+                println!("  - {}", output);
+            }
+            println!("  creator: {}", contract.creator());
+
+            Ok(())
+        }
+        _ => Err(CliError::UserError("Invalid Subcommand".into())),
+    }
+}
+
+// Takes a vec of vecs of strings. The first vec should include the title of the columns.
+// The max length of each column is calculated and is used as the column with when printing the
+// table.
+fn print_table(table: Vec<Vec<String>>) {
+    let mut max_lengths = Vec::new();
+
+    // find the max lengths of the columns
+    for row in table.iter() {
+        for (i, col) in row.iter().enumerate() {
+            if let Some(length) = max_lengths.get_mut(i) {
+                if col.len() > *length {
+                    *length = col.len()
+                }
+            } else {
+                max_lengths.push(col.len())
+            }
+        }
+    }
+
+    // print each row with correct column size
+    for row in table.iter() {
+        let mut col_string = String::from("");
+        for (i, len) in max_lengths.iter().enumerate() {
+            if let Some(value) = row.get(i) {
+                col_string += &format!("{}{} ", value, " ".repeat(*len - value.len()),);
+            } else {
+                col_string += &" ".repeat(*len);
+            }
+        }
+        println!("{}", col_string);
+    }
+}
+
+/// Attempts to parse the given string as "name:version" and return the two values.
+fn parse_name_version(name_version_string: &str) -> Option<(&str, &str)> {
+    match name_version_string.splitn(2, ':').collect::<Vec<_>>() {
+        v if v.len() == 2 => Some((v[0], v[1])),
+        _ => None,
+    }
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn load_bytes_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, CliError> {
