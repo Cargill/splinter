@@ -94,3 +94,40 @@ pub trait AdminServiceEventClient {
     /// This should block until an event is available.
     fn next_event(&self) -> Result<AdminServiceEvent, NextEventError>;
 }
+
+impl AdminServiceEventClient for Box<dyn AdminServiceEventClient> {
+    fn try_next_event(&self) -> Result<Option<AdminServiceEvent>, NextEventError> {
+        (**self).try_next_event()
+    }
+
+    fn next_event(&self) -> Result<AdminServiceEvent, NextEventError> {
+        (**self).next_event()
+    }
+}
+
+pub struct BlockingAdminServiceEventIterator<T>
+where
+    T: AdminServiceEventClient,
+{
+    client: T,
+}
+
+impl<T> BlockingAdminServiceEventIterator<T>
+where
+    T: AdminServiceEventClient,
+{
+    pub fn new(client: T) -> BlockingAdminServiceEventIterator<T> {
+        Self { client }
+    }
+}
+
+impl<T> Iterator for BlockingAdminServiceEventIterator<T>
+where
+    T: AdminServiceEventClient,
+{
+    type Item = AdminServiceEvent;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.client.next_event().ok()
+    }
+}
