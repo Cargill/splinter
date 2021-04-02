@@ -31,6 +31,8 @@ use splinter::rest_api::actix_web_1::RestApiShutdownHandle;
 use splinter::rest_api::actix_web_3::RestApi;
 use splinter::threading::lifecycle::ShutdownHandle;
 
+use super::{running::admin::AdminSubsystem, NodeBuilder, RestApiVariant, RunnableNode};
+
 pub(super) enum NodeRestApiVariant {
     ActixWeb1(RestApiShutdownHandle, JoinHandle<()>),
     ActixWeb3(RestApi),
@@ -89,6 +91,58 @@ impl Node {
             format!("http://localhost:{}", self.rest_api_port),
             "foo".to_string(),
         ))
+    }
+
+    pub fn stop(mut self) -> Result<RunnableNode, InternalError> {
+        self.signal_shutdown();
+
+        let Node {
+            admin_signer,
+            admin_subsystem,
+            rest_api_variant,
+            node_id,
+            rest_api_port,
+            mut network_subsystem,
+        } = self;
+
+        let rest_api_variant = match rest_api_variant {
+            // shutdown node
+            NodeRestApiVariant::ActixWeb1(shutdown_handle, join_handle) => {
+                shutdown_handle
+                    .shutdown()
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?;
+                join_handle.join().map_err(|_| {
+                    InternalError::with_message(
+                        "REST API thread panicked, join() failed".to_string(),
+                    )
+                })?;
+
+                RestApiVariant::ActixWeb1
+            }
+            NodeRestApiVariant::ActixWeb3(rest_api) => {
+                rest_api
+                    .wait_for_shutdown()
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+                RestApiVariant::ActixWeb3
+            }
+        };
+
+        let AdminSubsystem { store_factory, .. } = admin_subsystem;
+
+        // shutdown admin subsystem and network subsystem
+        admin_subsystem.admin_service_shutdown.wait_for_shutdown()?;
+        network_subsystem.signal_shutdown();
+        network_subsystem.wait_for_shutdown()?;
+
+        // create a runnable node from the node data
+        NodeBuilder::new()
+            .with_node_id(node_id)
+            .with_rest_api_variant(rest_api_variant)
+            .with_admin_signer(admin_signer.to_owned())
+            .with_rest_api_port(rest_api_port.into())
+            .with_store_factory(store_factory)
+            .build()
     }
 }
 
