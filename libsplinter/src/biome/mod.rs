@@ -25,6 +25,9 @@
 //!
 //! User Notifications: API to create and manage user notifications.
 
+#[cfg(feature = "biome-client")]
+pub mod client;
+
 #[cfg(feature = "biome-credentials")]
 pub mod credentials;
 
