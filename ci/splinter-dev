@@ -94,23 +94,23 @@ COPY examples/gameroom/database/Cargo.toml \
      /build/examples/gameroom/database/Cargo.toml
 
 # Do release builds for each Cargo.toml
-RUN find ./*/ -name 'Cargo.toml' -exec \
-    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --features=experimental ' \;
+RUN find ./*/ -name 'Cargo.toml' | \
+    xargs -I '{}' sh -c "echo 'Building {}'; cargo build --tests --release --manifest-path {} --features=experimental"
 
-RUN find ./*/ -name 'Cargo.toml' -exec \
-    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --features=stable ' \;
+RUN find ./*/ -name 'Cargo.toml' | \
+    xargs -I '{}' sh -c "echo 'Building {}'; cargo build --tests --release --manifest-path {} --features=stable"
 
-RUN find ./*/ -name 'Cargo.toml' -exec \
-    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --features=default ' \;
+RUN find ./*/ -name 'Cargo.toml' | \
+    xargs -I '{}' sh -c "echo 'Building {}'; cargo build --tests --release --manifest-path {} --features=default"
 
-RUN find ./*/ -name 'Cargo.toml' -exec \
-    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --no-default-features ' \;
+RUN find ./*/ -name 'Cargo.toml' | \
+    xargs -I '{}' sh -c "echo 'Building {}'; cargo build --tests --release --manifest-path {} --no-default-features"
 
 # Clean up built files
-RUN find target/release/ -name '*gameroom*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
-RUN find target/release/ -name '*health*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
-RUN find target/release/ -name '*scabbard*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
-RUN find target/release/ -name '*splinter*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
+RUN find target/release -path target/release/.fingerprint -prune -false -o -name '*gameroom*' | xargs -I '{}' rm -rf '{}'
+RUN find target/release -path target/release/.fingerprint -prune -false -o -name '*health*' | xargs -I '{}' rm -rf '{}'
+RUN find target/release -path target/release/.fingerprint -prune -false -o -name '*scabbard*' | xargs -I '{}' rm -rf '{}'
+RUN find target/release -path target/release/.fingerprint -prune -false -o -name '*splinter*' | xargs -I '{}' rm -rf '{}'
 
 # Clean up leftover files
 RUN find . -name 'Cargo.toml' -exec \
