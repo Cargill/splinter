@@ -1648,6 +1648,43 @@ impl AdminServiceShared {
         service_id: &str,
         protocol: u32,
     ) -> Result<(), AdminSharedError> {
+        // Update any unpeered payloads that this service might be a member of
+        let mut unpeered_payloads = std::mem::replace(&mut self.unpeered_payloads, vec![]);
+        for pending_protocol_payload in unpeered_payloads.iter_mut() {
+            match protocol {
+                0 => {
+                    if pending_protocol_payload
+                        .missing_protocol_ids
+                        .iter()
+                        .any(|missing_protocol_id| missing_protocol_id == service_id)
+                    {
+                        warn!(
+                            "Dropping circuit request including service {}, \
+                             due to protocol mismatch",
+                            service_id
+                        );
+                        pending_protocol_payload.missing_protocol_ids.clear();
+                    }
+                }
+                _ => {
+                    debug!(
+                        "Agreed with {} to use protocol version {}",
+                        service_id, protocol
+                    );
+                    pending_protocol_payload
+                        .missing_protocol_ids
+                        .retain(|missing_protocol_id| missing_protocol_id != service_id);
+                }
+            }
+        }
+
+        // Failed peers are those that have had the missing protocol ids cleared, so we remove them.
+        unpeered_payloads
+            .retain(|pending_payload| !pending_payload.missing_protocol_ids.is_empty());
+
+        self.unpeered_payloads = unpeered_payloads;
+
+        // update the fully peered but pending protocol payloads.
         let mut pending_protocol_payloads =
             std::mem::replace(&mut self.pending_protocol_payloads, vec![]);
         for pending_protocol_payload in pending_protocol_payloads.iter_mut() {
