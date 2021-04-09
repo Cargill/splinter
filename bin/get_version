@@ -73,6 +73,9 @@ def version(default):
             version = os.environ['VERSION']
     else:
         version = default + "-dev1"
+    if 'CARGO_ARGS' in os.environ:
+        if "experimental" in os.environ['CARGO_ARGS']:
+            version = version + "-experimental"
     return version
 
 
