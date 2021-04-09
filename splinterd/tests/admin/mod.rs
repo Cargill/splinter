@@ -18,5 +18,6 @@ mod circuit_commit;
 mod circuit_create;
 mod circuit_disband;
 mod circuit_list;
+mod node_lifecycle;
 mod payload;
 mod registry;

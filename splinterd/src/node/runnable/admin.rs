@@ -165,6 +165,7 @@ impl RunnableAdminSubsystem {
             registry_writer: registry.clone_box_as_writer(),
             admin_service_shutdown,
             actix1_resources,
+            store_factory,
         })
     }
 }
