@@ -707,11 +707,11 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "oauth")]
-    /// Adds an `with_oauth_openid_url` value to the `PartialConfig` object.
+    /// Adds an `oauth_openid_url` value to the `PartialConfig` object.
     ///
     /// # Arguments
     ///
-    /// * `with_oauth_openid_url` - Add OAuth OpenID URL to the REST API OAuth configuration
+    /// * `oauth_openid_url` - Add OAuth OpenID URL to the REST API OAuth configuration
     ///
     pub fn with_oauth_openid_url(mut self, oauth_openid_url: Option<String>) -> Self {
         self.oauth_openid_url = oauth_openid_url;
@@ -719,7 +719,7 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "oauth")]
-    /// Adds an `with_oauth_openid_auth_params` value to the `PartialConfig` object.
+    /// Adds an `oauth_openid_auth_params` value to the `PartialConfig` object.
     ///
     /// # Arguments
     ///
@@ -735,7 +735,7 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "oauth")]
-    /// Adds an `with_oauth_openid_scopes` value to the `PartialConfig` object.
+    /// Adds an `oauth_openid_scopes` value to the `PartialConfig` object.
     ///
     /// # Arguments
     ///
