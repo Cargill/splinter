@@ -132,7 +132,7 @@ database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
 health-service = ["health"]
 https-bind = ["splinter/https-bind"]
-metrics = ["splinter/metrics"]
+metrics = ["splinter/metrics", "scabbard/metrics"]
 node = [
     "scabbard/client-reqwest",
     "scabbard/factory-builder",

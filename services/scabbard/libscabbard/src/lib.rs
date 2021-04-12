@@ -21,6 +21,15 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
+#[cfg(feature = "metrics")]
+#[macro_use]
+extern crate metrics;
+
+// pull in `no-op` metric macros if `metrics` is not enabled
+#[cfg(not(feature = "metrics"))]
+#[macro_use]
+extern crate splinter;
+
 #[cfg(feature = "client")]
 pub mod client;
 mod hex;

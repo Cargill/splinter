@@ -71,6 +71,9 @@ impl ScabbardShared {
         )
         .expect("String -> PeerId -> String conversion should not fail");
 
+        // initialize pending_batches metric
+        gauge!("splinter.scabbard.pending_batches", 0);
+
         ScabbardShared {
             batch_queue,
             network_sender,
@@ -93,11 +96,25 @@ impl ScabbardShared {
     }
 
     pub fn add_batch_to_queue(&mut self, batch: BatchPair) {
-        self.batch_queue.push_back(batch)
+        self.batch_queue.push_back(batch);
+        gauge!(
+            "splinter.scabbard.pending_batches",
+            self.batch_queue.len() as i64
+        );
     }
 
     pub fn pop_batch_from_queue(&mut self) -> Option<BatchPair> {
-        self.batch_queue.pop_front()
+        let batch = self.batch_queue.pop_front();
+
+        // if the batch is some, the length of pending batches has changed
+        if batch.is_some() {
+            gauge!(
+                "splinter.scabbard.pending_batches",
+                self.batch_queue.len() as i64
+            );
+        }
+
+        batch
     }
 
     pub fn network_sender(&self) -> Option<&dyn ServiceNetworkSender> {
