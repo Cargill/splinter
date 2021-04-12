@@ -88,6 +88,14 @@ pub struct Config {
     #[cfg(feature = "oauth")]
     oauth_openid_scopes: Option<(Vec<String>, ConfigSource)>,
     strict_ref_counts: (bool, ConfigSource),
+    #[cfg(feature = "metrics")]
+    metrics_db: Option<(String, ConfigSource)>,
+    #[cfg(feature = "metrics")]
+    metrics_url: Option<(String, ConfigSource)>,
+    #[cfg(feature = "metrics")]
+    metrics_username: Option<(String, ConfigSource)>,
+    #[cfg(feature = "metrics")]
+    metrics_password: Option<(String, ConfigSource)>,
 }
 
 impl Config {
@@ -291,6 +299,42 @@ impl Config {
         self.strict_ref_counts.0
     }
 
+    #[cfg(feature = "metrics")]
+    pub fn metrics_db(&self) -> Option<&str> {
+        if let Some((db, _)) = &self.metrics_db {
+            Some(db)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_url(&self) -> Option<&str> {
+        if let Some((url, _)) = &self.metrics_url {
+            Some(url)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_username(&self) -> Option<&str> {
+        if let Some((username, _)) = &self.metrics_username {
+            Some(username)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_password(&self) -> Option<&str> {
+        if let Some((password, _)) = &self.metrics_password {
+            Some(password)
+        } else {
+            None
+        }
+    }
+
     pub fn config_dir_source(&self) -> &ConfigSource {
         &self.config_dir.1
     }
@@ -489,6 +533,42 @@ impl Config {
 
     fn strict_ref_counts_source(&self) -> &ConfigSource {
         &self.strict_ref_counts.1
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_db_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.metrics_db {
+            Some(source)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_url_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.metrics_url {
+            Some(source)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_username_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.metrics_username {
+            Some(source)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_password_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.metrics_password {
+            Some(source)
+        } else {
+            None
+        }
     }
 
     #[allow(clippy::cognitive_complexity)]
@@ -694,6 +774,31 @@ impl Config {
             self.strict_ref_counts(),
             self.strict_ref_counts_source()
         );
+        #[cfg(feature = "metrics")]
+        {
+            if let (Some(db), Some(source)) = (self.metrics_db(), self.metrics_db_source()) {
+                debug!("Config: metrics_db: {:?} (source: {:?})", db, source,);
+            }
+
+            if let (Some(url), Some(source)) = (self.metrics_url(), self.metrics_url_source()) {
+                debug!("Config: metrics_url: {:?} (source: {:?})", url, source,);
+            }
+
+            if let (Some(username), Some(source)) =
+                (self.metrics_username(), self.metrics_username_source())
+            {
+                debug!(
+                    "Config: metrics_username: {:?} (source: {:?})",
+                    username, source,
+                );
+            }
+
+            if let (Some(_), Some(source)) =
+                (self.metrics_password(), self.metrics_password_source())
+            {
+                debug!("Config: metrics_password: <HIDDEN> (source: {:?})", source,);
+            }
+        }
     }
 
     #[cfg(feature = "rest-api-cors")]

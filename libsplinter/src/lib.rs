@@ -74,6 +74,8 @@ pub mod events;
 mod hex;
 pub mod keys;
 pub mod mesh;
+#[cfg(feature = "metrics")]
+pub mod metrics;
 pub mod migrations;
 pub mod network;
 #[cfg(feature = "oauth")]

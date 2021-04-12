@@ -81,6 +81,14 @@ pub struct PartialConfig {
     #[cfg(feature = "oauth")]
     oauth_openid_scopes: Option<Vec<String>>,
     strict_ref_counts: Option<bool>,
+    #[cfg(feature = "metrics")]
+    metrics_db: Option<String>,
+    #[cfg(feature = "metrics")]
+    metrics_url: Option<String>,
+    #[cfg(feature = "metrics")]
+    metrics_username: Option<String>,
+    #[cfg(feature = "metrics")]
+    metrics_password: Option<String>,
 }
 
 impl PartialConfig {
@@ -136,6 +144,14 @@ impl PartialConfig {
             #[cfg(feature = "oauth")]
             oauth_openid_scopes: None,
             strict_ref_counts: None,
+            #[cfg(feature = "metrics")]
+            metrics_db: None,
+            #[cfg(feature = "metrics")]
+            metrics_url: None,
+            #[cfg(feature = "metrics")]
+            metrics_username: None,
+            #[cfg(feature = "metrics")]
+            metrics_password: None,
         }
     }
 
@@ -297,6 +313,26 @@ impl PartialConfig {
 
     pub fn strict_ref_counts(&self) -> Option<bool> {
         self.strict_ref_counts
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_db(&self) -> Option<String> {
+        self.metrics_db.clone()
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_url(&self) -> Option<String> {
+        self.metrics_url.clone()
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_username(&self) -> Option<String> {
+        self.metrics_username.clone()
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics_password(&self) -> Option<String> {
+        self.metrics_password.clone()
     }
 
     /// Adds a `config_dir` value to the `PartialConfig` object.
@@ -718,6 +754,56 @@ impl PartialConfig {
     ///
     pub fn with_strict_ref_counts(mut self, strict_ref_counts: Option<bool>) -> Self {
         self.strict_ref_counts = strict_ref_counts;
+        self
+    }
+
+    #[cfg(feature = "metrics")]
+    /// Adds an `metrics_db` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `metrics_db` - Add the name of the InfluxDB database used for metrics
+    ///
+    pub fn with_metrics_db(mut self, metrics_db: Option<String>) -> Self {
+        self.metrics_db = metrics_db;
+        self
+    }
+
+    #[cfg(feature = "metrics")]
+    /// Adds an `metrics_url` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `metrics_url` - Add the URL of the InfluxDB database used for metrics
+    ///
+    pub fn with_metrics_url(mut self, metrics_url: Option<String>) -> Self {
+        self.metrics_url = metrics_url;
+        self
+    }
+
+    #[cfg(feature = "metrics")]
+    /// Adds an `metrics_username` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `metrics_username` - Add the username for authorization with the InfluxDB database used
+    ///    for metrics
+    ///
+    pub fn with_metrics_username(mut self, metrics_username: Option<String>) -> Self {
+        self.metrics_username = metrics_username;
+        self
+    }
+
+    #[cfg(feature = "metrics")]
+    /// Adds an `metrics_password` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `metrics_password` - Add the password for authorization with the InfluxDB database used
+    ///    for metrics
+    ///
+    pub fn with_metrics_password(mut self, metrics_password: Option<String>) -> Self {
+        self.metrics_password = metrics_password;
         self
     }
 }

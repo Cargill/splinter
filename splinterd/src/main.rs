@@ -28,6 +28,8 @@ mod transport;
 use flexi_logger::{style, DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
 use rand::{thread_rng, Rng};
+#[cfg(feature = "metrics")]
+use splinter::metrics::influx::InfluxRecorder;
 
 use crate::config::{
     ClapPartialConfigBuilder, Config, ConfigBuilder, ConfigError, DefaultPartialConfigBuilder,
@@ -412,6 +414,33 @@ fn main() {
                 .multiple(true),
         );
 
+    #[cfg(feature = "metrics")]
+    let app = app
+        .arg(
+            Arg::with_name("metrics_db")
+                .long("metrics-db")
+                .long_help("The name of the InfluxDB database for metrics collection")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("metrics_url")
+                .long("metrics-url")
+                .long_help("The URL to connect the InfluxDB database for metrics collection")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("metrics_username")
+                .long("metrics-username")
+                .long_help("The username used for authorization with the InfluxDB")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("metrics_password")
+                .long("metrics-password")
+                .long_help("The password used for authorization with the InfluxDB")
+                .takes_value(true),
+        );
+
     let matches = app.get_matches();
 
     let log_level = match matches.occurrences_of("verbose") {
@@ -440,6 +469,37 @@ fn main() {
     }
 }
 
+#[cfg(feature = "metrics")]
+fn setup_metrics_recorder(config: &Config) -> Result<(), UserError> {
+    let metrics_configured = config.metrics_db().is_some()
+        || config.metrics_url().is_some()
+        || config.metrics_username().is_some()
+        || config.metrics_password().is_some();
+
+    if metrics_configured {
+        let metrics_db = config.metrics_db().ok_or_else(|| {
+            UserError::MissingArgument("missing metrics db provider configuration".into())
+        })?;
+
+        let metrics_url = config.metrics_url().ok_or_else(|| {
+            UserError::MissingArgument("missing metrics url provider configuration".into())
+        })?;
+
+        let metrics_username = config.metrics_username().ok_or_else(|| {
+            UserError::MissingArgument("missing metrics username provider configuration".into())
+        })?;
+
+        let metrics_password = config.metrics_password().ok_or_else(|| {
+            UserError::MissingArgument("missing metrics password provider configuration".into())
+        })?;
+
+        InfluxRecorder::init(metrics_url, metrics_db, metrics_username, metrics_password)
+            .map_err(UserError::MetricsError)?
+    }
+
+    Ok(())
+}
+
 fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     // get provided config file or search default location
     let config_file = matches
@@ -464,6 +524,10 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
             }
         }
     }
+
+    // set up metric recorder as soon as possilbe
+    #[cfg(feature = "metrics")]
+    setup_metrics_recorder(&config)?;
 
     let transport = build_transport(&config)?;
 

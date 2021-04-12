@@ -16,6 +16,8 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 
+#[cfg(feature = "metrics")]
+use splinter::error::InternalError;
 use splinter::transport::socket::TlsInitError;
 
 use crate::config::ConfigError;
@@ -35,6 +37,8 @@ pub enum UserError {
         context: String,
         source: Option<Box<dyn Error>>,
     },
+    #[cfg(feature = "metrics")]
+    MetricsError(InternalError),
 }
 
 impl UserError {
@@ -74,6 +78,8 @@ impl Error for UserError {
                     None
                 }
             }
+            #[cfg(feature = "metrics")]
+            UserError::MetricsError(err) => Some(err),
         }
     }
 }
@@ -101,6 +107,8 @@ impl fmt::Display for UserError {
                     f.write_str(&context)
                 }
             }
+            #[cfg(feature = "metrics")]
+            UserError::MetricsError(msg) => write!(f, "{}", msg),
         }
     }
 }

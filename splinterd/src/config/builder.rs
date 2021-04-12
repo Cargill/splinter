@@ -409,6 +409,36 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("strict_ref_counts".to_string()))?,
+            #[cfg(feature = "metrics")]
+            metrics_db: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.metrics_db() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }),
+            #[cfg(feature = "metrics")]
+            metrics_url: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.metrics_url() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }),
+            #[cfg(feature = "metrics")]
+            metrics_username: self.partial_configs.iter().find_map(|p| {
+                match p.metrics_username() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }
+            }),
+            #[cfg(feature = "metrics")]
+            metrics_password: self.partial_configs.iter().find_map(|p| {
+                match p.metrics_password() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }
+            }),
         })
     }
 }
