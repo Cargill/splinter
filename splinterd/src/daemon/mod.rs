@@ -84,8 +84,6 @@ use splinter::rest_api::auth::authorization::rbac::{
 use splinter::rest_api::auth::authorization::AuthorizationHandler;
 #[cfg(feature = "authorization")]
 use splinter::rest_api::auth::authorization::Permission;
-#[cfg(feature = "oauth")]
-use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{
     AuthConfig, Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
 };
@@ -137,19 +135,7 @@ pub struct SplinterDaemon {
     #[cfg(feature = "biome-credentials")]
     enable_biome_credentials: bool,
     #[cfg(feature = "oauth")]
-    oauth_provider: Option<String>,
-    #[cfg(feature = "oauth")]
-    oauth_client_id: Option<String>,
-    #[cfg(feature = "oauth")]
-    oauth_client_secret: Option<String>,
-    #[cfg(feature = "oauth")]
-    oauth_redirect_url: Option<String>,
-    #[cfg(feature = "oauth")]
-    oauth_openid_url: Option<String>,
-    #[cfg(feature = "oauth")]
-    oauth_openid_auth_params: Option<Vec<(String, String)>>,
-    #[cfg(feature = "oauth")]
-    oauth_openid_scopes: Option<Vec<String>>,
+    oauth_config: Option<oauth::PartialOAuthConfig>,
     heartbeat: u64,
     strict_ref_counts: bool,
 }
@@ -651,70 +637,11 @@ impl SplinterDaemon {
 
         #[cfg(feature = "oauth")]
         {
-            // Handle OAuth config. If no OAuth config values are provided, just skip this;
-            // otherwise, require that all are set.
-            let any_oauth_args_provided = self.oauth_provider.is_some()
-                || self.oauth_client_id.is_some()
-                || self.oauth_client_secret.is_some()
-                || self.oauth_redirect_url.is_some();
-            if any_oauth_args_provided {
-                let oauth_provider = self.oauth_provider.as_deref().ok_or_else(|| {
-                    StartError::RestApiError("missing OAuth provider configuration".into())
-                })?;
-                let client_id = self.oauth_client_id.clone().ok_or_else(|| {
-                    StartError::RestApiError("missing OAuth client ID configuration".into())
-                })?;
-                let client_secret = self.oauth_client_secret.clone().ok_or_else(|| {
-                    StartError::RestApiError("missing OAuth client secret configuration".into())
-                })?;
-                let redirect_url = self.oauth_redirect_url.clone().ok_or_else(|| {
-                    StartError::RestApiError("missing OAuth redirect URL configuration".into())
-                })?;
-                let oauth_config = match oauth_provider {
-                    "azure" => OAuthConfig::Azure {
-                        client_id,
-                        client_secret,
-                        redirect_url,
-                        oauth_openid_url: self.oauth_openid_url.clone().ok_or_else(|| {
-                            StartError::RestApiError(
-                                "missing OAuth OpenID discovery document URL configuration".into(),
-                            )
-                        })?,
-                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
-                    },
-                    "github" => OAuthConfig::GitHub {
-                        client_id,
-                        client_secret,
-                        redirect_url,
-                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
-                    },
-                    "google" => OAuthConfig::Google {
-                        client_id,
-                        client_secret,
-                        redirect_url,
-                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
-                    },
-                    "openid" => OAuthConfig::OpenId {
-                        client_id,
-                        client_secret,
-                        redirect_url,
-                        oauth_openid_url: self.oauth_openid_url.clone().ok_or_else(|| {
-                            StartError::RestApiError(
-                                "missing OAuth OpenID discovery document URL configuration".into(),
-                            )
-                        })?,
-                        auth_params: self.oauth_openid_auth_params.clone(),
-                        scopes: self.oauth_openid_scopes.clone(),
-                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
-                    },
-                    other_provider => {
-                        return Err(StartError::RestApiError(format!(
-                            "invalid OAuth provider: {}",
-                            other_provider
-                        )))
-                    }
-                };
-
+            let oauth_config = self
+                .oauth_config
+                .take()
+                .map(|runnable_config| runnable_config.into_oauth_config(&*store_factory));
+            if let Some(oauth_config) = oauth_config {
                 auth_configs.push(AuthConfig::OAuth {
                     oauth_config,
                     oauth_user_session_store: store_factory.get_biome_oauth_user_session_store(),
@@ -1024,19 +951,7 @@ pub struct SplinterDaemonBuilder {
     #[cfg(feature = "biome-credentials")]
     enable_biome_credentials: Option<bool>,
     #[cfg(feature = "oauth")]
-    oauth_provider: Option<String>,
-    #[cfg(feature = "oauth")]
-    oauth_client_id: Option<String>,
-    #[cfg(feature = "oauth")]
-    oauth_client_secret: Option<String>,
-    #[cfg(feature = "oauth")]
-    oauth_redirect_url: Option<String>,
-    #[cfg(feature = "oauth")]
-    oauth_openid_url: Option<String>,
-    #[cfg(feature = "oauth")]
-    oauth_openid_auth_params: Option<Vec<(String, String)>>,
-    #[cfg(feature = "oauth")]
-    oauth_openid_scopes: Option<Vec<String>>,
+    oauth_config_builder: oauth::OAuthConfigBuilder,
     strict_ref_counts: Option<bool>,
 }
 
@@ -1153,43 +1068,45 @@ impl SplinterDaemonBuilder {
 
     #[cfg(feature = "oauth")]
     pub fn with_oauth_provider(mut self, value: Option<String>) -> Self {
-        self.oauth_provider = value;
+        self.oauth_config_builder = self.oauth_config_builder.with_oauth_provider(value);
         self
     }
 
     #[cfg(feature = "oauth")]
     pub fn with_oauth_client_id(mut self, value: Option<String>) -> Self {
-        self.oauth_client_id = value;
+        self.oauth_config_builder = self.oauth_config_builder.with_oauth_client_id(value);
         self
     }
 
     #[cfg(feature = "oauth")]
     pub fn with_oauth_client_secret(mut self, value: Option<String>) -> Self {
-        self.oauth_client_secret = value;
+        self.oauth_config_builder = self.oauth_config_builder.with_oauth_client_secret(value);
         self
     }
 
     #[cfg(feature = "oauth")]
     pub fn with_oauth_redirect_url(mut self, value: Option<String>) -> Self {
-        self.oauth_redirect_url = value;
+        self.oauth_config_builder = self.oauth_config_builder.with_oauth_redirect_url(value);
         self
     }
 
     #[cfg(feature = "oauth")]
     pub fn with_oauth_openid_url(mut self, value: Option<String>) -> Self {
-        self.oauth_openid_url = value;
+        self.oauth_config_builder = self.oauth_config_builder.with_oauth_openid_url(value);
         self
     }
 
     #[cfg(feature = "oauth")]
     pub fn with_oauth_openid_auth_params(mut self, value: Option<Vec<(String, String)>>) -> Self {
-        self.oauth_openid_auth_params = value;
+        self.oauth_config_builder = self
+            .oauth_config_builder
+            .with_oauth_openid_auth_params(value);
         self
     }
 
     #[cfg(feature = "oauth")]
     pub fn with_oauth_openid_scopes(mut self, value: Option<Vec<String>>) -> Self {
-        self.oauth_openid_scopes = value;
+        self.oauth_config_builder = self.oauth_config_builder.with_oauth_openid_scopes(value);
         self
     }
 
@@ -1303,19 +1220,10 @@ impl SplinterDaemonBuilder {
             #[cfg(feature = "biome-credentials")]
             enable_biome_credentials,
             #[cfg(feature = "oauth")]
-            oauth_provider: self.oauth_provider,
-            #[cfg(feature = "oauth")]
-            oauth_client_id: self.oauth_client_id,
-            #[cfg(feature = "oauth")]
-            oauth_client_secret: self.oauth_client_secret,
-            #[cfg(feature = "oauth")]
-            oauth_redirect_url: self.oauth_redirect_url,
-            #[cfg(feature = "oauth")]
-            oauth_openid_url: self.oauth_openid_url,
-            #[cfg(feature = "oauth")]
-            oauth_openid_auth_params: self.oauth_openid_auth_params,
-            #[cfg(feature = "oauth")]
-            oauth_openid_scopes: self.oauth_openid_scopes,
+            oauth_config: self
+                .oauth_config_builder
+                .build()
+                .map_err(CreateError::InvalidStateError)?,
             heartbeat,
             strict_ref_counts,
         })

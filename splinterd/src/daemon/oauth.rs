@@ -18,7 +18,7 @@ use splinter::error::InvalidStateError;
 use splinter::rest_api::OAuthConfig;
 use splinter::store::StoreFactory;
 
-enum RunnableOAuthProvider {
+enum PartialOAuthProvider {
     Azure {
         oauth_openid_url: String,
     },
@@ -31,38 +31,41 @@ enum RunnableOAuthProvider {
     },
 }
 
-/// A configured, but not fully runnable OAuth configuration.
-pub struct RunnableOAuthConfig {
+/// A partially configured OAuth configuration.
+///
+/// This configuration includes all of the String configuration values and the provider-specific
+/// information, but does not have any stores require to fully run the OAuth authorization system.
+pub struct PartialOAuthConfig {
     client_id: String,
     client_secret: String,
     redirect_url: String,
-    provider: RunnableOAuthProvider,
+    provider: PartialOAuthProvider,
 }
 
-impl RunnableOAuthConfig {
+impl PartialOAuthConfig {
     /// Convert this runnable config into an OAuthConfig using the provided store factory.
     pub fn into_oauth_config(self, store_factory: &dyn StoreFactory) -> OAuthConfig {
         match self.provider {
-            RunnableOAuthProvider::Azure { oauth_openid_url } => OAuthConfig::Azure {
+            PartialOAuthProvider::Azure { oauth_openid_url } => OAuthConfig::Azure {
                 client_id: self.client_id,
                 client_secret: self.client_secret,
                 redirect_url: self.redirect_url,
                 oauth_openid_url,
                 inflight_request_store: store_factory.get_oauth_inflight_request_store(),
             },
-            RunnableOAuthProvider::Github => OAuthConfig::GitHub {
+            PartialOAuthProvider::Github => OAuthConfig::GitHub {
                 client_id: self.client_id,
                 client_secret: self.client_secret,
                 redirect_url: self.redirect_url,
                 inflight_request_store: store_factory.get_oauth_inflight_request_store(),
             },
-            RunnableOAuthProvider::Google => OAuthConfig::Google {
+            PartialOAuthProvider::Google => OAuthConfig::Google {
                 client_id: self.client_id,
                 client_secret: self.client_secret,
                 redirect_url: self.redirect_url,
                 inflight_request_store: store_factory.get_oauth_inflight_request_store(),
             },
-            RunnableOAuthProvider::OpenId {
+            PartialOAuthProvider::OpenId {
                 oauth_openid_url,
                 auth_params,
                 scopes,
@@ -151,11 +154,11 @@ impl OAuthConfigBuilder {
         self
     }
 
-    /// Builds the RunnableOAuthConfig.
+    /// Builds the PartialOAuthConfig.
     ///
     /// # Returns
     ///
-    /// Returns `Some(RunnableOAuthConfig)` if the oauth provider, client ID, client secret and
+    /// Returns `Some(PartialOAuthConfig)` if the oauth provider, client ID, client secret and
     /// redirect URL fields are all provided with a `Some` value. Otherwise, returns `None`.
     ///
     /// # Errors
@@ -163,7 +166,7 @@ impl OAuthConfigBuilder {
     /// Returns an `InvalidStateError` if there are missing fields required for a particular
     /// provider or any one (but not all) of the oauth provider, client ID, client secret and
     /// redirect URL fields are not provided.
-    pub fn build(self) -> Result<Option<RunnableOAuthConfig>, InvalidStateError> {
+    pub fn build(self) -> Result<Option<PartialOAuthConfig>, InvalidStateError> {
         let any_oauth_args_provided = self.oauth_provider.is_some()
             || self.oauth_client_id.is_some()
             || self.oauth_client_secret.is_some()
@@ -182,16 +185,16 @@ impl OAuthConfigBuilder {
                 InvalidStateError::with_message("missing OAuth redirect URL configuration".into())
             })?;
             let provider = match oauth_provider {
-                "azure" => RunnableOAuthProvider::Azure {
+                "azure" => PartialOAuthProvider::Azure {
                     oauth_openid_url: self.oauth_openid_url.clone().ok_or_else(|| {
                         InvalidStateError::with_message(
                             "missing OAuth OpenID discovery document URL configuration".into(),
                         )
                     })?,
                 },
-                "github" => RunnableOAuthProvider::Github,
-                "google" => RunnableOAuthProvider::Google,
-                "openid" => RunnableOAuthProvider::OpenId {
+                "github" => PartialOAuthProvider::Github,
+                "google" => PartialOAuthProvider::Google,
+                "openid" => PartialOAuthProvider::OpenId {
                     oauth_openid_url: self.oauth_openid_url.clone().ok_or_else(|| {
                         InvalidStateError::with_message(
                             "missing OAuth OpenID discovery document URL configuration".into(),
@@ -208,7 +211,7 @@ impl OAuthConfigBuilder {
                 }
             };
 
-            Ok(Some(RunnableOAuthConfig {
+            Ok(Some(PartialOAuthConfig {
                 client_id,
                 client_secret,
                 redirect_url,
