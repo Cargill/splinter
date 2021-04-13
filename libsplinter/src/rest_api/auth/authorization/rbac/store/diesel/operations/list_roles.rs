@@ -19,7 +19,7 @@ use diesel::prelude::*;
 use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::{RoleModel, RolePermissionModel},
-        schema::roles,
+        schema::rbac_roles,
     },
     Role, RoleBasedAuthorizationStoreError,
 };
@@ -42,7 +42,7 @@ where
     ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError> {
         self.conn
             .transaction::<Box<dyn ExactSizeIterator<Item = Role>>, _, _>(|| {
-                let roles = roles::table.load::<RoleModel>(self.conn)?;
+                let roles = rbac_roles::table.load::<RoleModel>(self.conn)?;
 
                 let perms = RolePermissionModel::belonging_to(&roles)
                     .load::<RolePermissionModel>(self.conn)?

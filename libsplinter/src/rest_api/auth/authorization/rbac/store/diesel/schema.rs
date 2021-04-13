@@ -13,24 +13,24 @@
 // limitations under the License.
 
 table! {
-   roles (id) {
+   rbac_roles (id) {
         id -> Text,
         display_name -> Text,
     }
 }
 
 table! {
-    role_permissions (role_id, permission) {
+    rbac_role_permissions (role_id, permission) {
         role_id -> Text,
         permission -> Text,
     }
 }
 
-joinable!(role_permissions -> roles (role_id));
-allow_tables_to_appear_in_same_query!(roles, role_permissions);
+joinable!(rbac_role_permissions -> rbac_roles (role_id));
+allow_tables_to_appear_in_same_query!(rbac_roles, rbac_role_permissions);
 
 table! {
-    identities (identity) {
+    rbac_identities (identity) {
         identity -> Text,
         identity_type ->
             // the macro output can't find this type if it isn't fully qualified.
@@ -39,7 +39,7 @@ table! {
 }
 
 table! {
-    assignments (identity, role_id) {
+    rbac_assignments (identity, role_id) {
         identity -> Text,
         role_id -> Text,
     }

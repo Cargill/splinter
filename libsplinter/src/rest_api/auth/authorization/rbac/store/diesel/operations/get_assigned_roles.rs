@@ -22,7 +22,7 @@ use crate::rest_api::auth::authorization::rbac::store::{
             AssignmentModel, IdentityModel, IdentityModelType, IdentityModelTypeMapping, RoleModel,
             RolePermissionModel,
         },
-        schema::{identities, roles},
+        schema::{rbac_identities, rbac_roles},
     },
     Identity, Role, RoleBasedAuthorizationStoreError,
 };
@@ -55,8 +55,8 @@ where
         };
         self.conn
             .transaction::<Box<dyn ExactSizeIterator<Item = Role>>, _, _>(|| {
-                let identities = identities::table
-                    .filter(identities::identity.eq(search_identity))
+                let identities = rbac_identities::table
+                    .filter(rbac_identities::identity.eq(search_identity))
                     .load::<IdentityModel>(self.conn)?;
 
                 let role_ids = AssignmentModel::belonging_to(&identities)
@@ -65,8 +65,8 @@ where
                     .map(|assignment| assignment.role_id)
                     .collect::<Vec<_>>();
 
-                let roles = roles::table
-                    .filter(roles::id.eq_any(role_ids))
+                let roles = rbac_roles::table
+                    .filter(rbac_roles::id.eq_any(role_ids))
                     .load::<RoleModel>(self.conn)?;
 
                 let perms = RolePermissionModel::belonging_to(&roles)

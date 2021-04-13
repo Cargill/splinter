@@ -21,7 +21,7 @@ use crate::error::{ConstraintViolationError, ConstraintViolationType};
 use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::{AssignmentModel, IdentityModel},
-        schema::{assignments, identities},
+        schema::{rbac_assignments, rbac_identities},
     },
     Assignment, RoleBasedAuthorizationStoreError,
 };
@@ -45,11 +45,11 @@ impl<'a> RoleBasedAuthorizationStoreUpdateAssignment
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
         let (identity, roles): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
         self.conn.transaction::<_, _, _>(|| {
-            let count = identities::table
+            let count = rbac_identities::table
                 .filter(
-                    identities::identity
+                    rbac_identities::identity
                         .eq(&identity.identity)
-                        .and(identities::identity_type.eq(identity.identity_type)),
+                        .and(rbac_identities::identity_type.eq(identity.identity_type)),
                 )
                 .count()
                 .get_result::<i64>(self.conn)?;
@@ -62,10 +62,12 @@ impl<'a> RoleBasedAuthorizationStoreUpdateAssignment
                 ));
             }
 
-            delete(assignments::table.filter(assignments::identity.eq(&identity.identity)))
-                .execute(self.conn)?;
+            delete(
+                rbac_assignments::table.filter(rbac_assignments::identity.eq(&identity.identity)),
+            )
+            .execute(self.conn)?;
 
-            insert_into(assignments::table)
+            insert_into(rbac_assignments::table)
                 .values(roles)
                 .execute(self.conn)?;
 
@@ -84,11 +86,11 @@ impl<'a> RoleBasedAuthorizationStoreUpdateAssignment
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
         let (identity, roles): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
         self.conn.transaction::<_, _, _>(|| {
-            let count = identities::table
+            let count = rbac_identities::table
                 .filter(
-                    identities::identity
+                    rbac_identities::identity
                         .eq(&identity.identity)
-                        .and(identities::identity_type.eq(identity.identity_type)),
+                        .and(rbac_identities::identity_type.eq(identity.identity_type)),
                 )
                 .count()
                 .get_result::<i64>(self.conn)?;
@@ -101,10 +103,12 @@ impl<'a> RoleBasedAuthorizationStoreUpdateAssignment
                 ));
             }
 
-            delete(assignments::table.filter(assignments::identity.eq(&identity.identity)))
-                .execute(self.conn)?;
+            delete(
+                rbac_assignments::table.filter(rbac_assignments::identity.eq(&identity.identity)),
+            )
+            .execute(self.conn)?;
 
-            insert_into(assignments::table)
+            insert_into(rbac_assignments::table)
                 .values(roles)
                 .execute(self.conn)?;
 

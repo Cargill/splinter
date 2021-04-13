@@ -19,7 +19,7 @@ use diesel::prelude::*;
 use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::{AssignmentModel, IdentityModel, IdentityModelType, IdentityModelTypeMapping},
-        schema::identities,
+        schema::rbac_identities,
     },
     Assignment, Identity, RoleBasedAuthorizationStoreError,
 };
@@ -51,8 +51,8 @@ where
             Identity::User(ref user_id) => user_id,
         };
         self.conn.transaction(|| {
-            let identities = identities::table
-                .filter(identities::identity.eq(search_identity))
+            let identities = rbac_identities::table
+                .filter(rbac_identities::identity.eq(search_identity))
                 .load::<IdentityModel>(self.conn)?;
 
             let assignments = AssignmentModel::belonging_to(&identities)

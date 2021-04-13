@@ -17,7 +17,7 @@ use diesel::{dsl::insert_into, prelude::*};
 use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::{AssignmentModel, IdentityModel},
-        schema::{assignments, identities},
+        schema::{rbac_assignments, rbac_identities},
     },
     Assignment, RoleBasedAuthorizationStoreError,
 };
@@ -41,11 +41,11 @@ impl<'a> RoleBasedAuthorizationStoreAddAssignment
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
         let (identity, assignments): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
         self.conn.transaction::<_, _, _>(|| {
-            insert_into(identities::table)
+            insert_into(rbac_identities::table)
                 .values(identity)
                 .execute(self.conn)?;
 
-            insert_into(assignments::table)
+            insert_into(rbac_assignments::table)
                 .values(assignments)
                 .execute(self.conn)?;
 
@@ -64,11 +64,11 @@ impl<'a> RoleBasedAuthorizationStoreAddAssignment
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
         let (identity, assignments): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
         self.conn.transaction::<_, _, _>(|| {
-            insert_into(identities::table)
+            insert_into(rbac_identities::table)
                 .values(identity)
                 .execute(self.conn)?;
 
-            insert_into(assignments::table)
+            insert_into(rbac_assignments::table)
                 .values(assignments)
                 .execute(self.conn)?;
 
