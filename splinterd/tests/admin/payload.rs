@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides functionality for building `CircuitManagmentPayload`s, used in the admin service
+//! Provides functionality for building `CircuitManagementPayload`s, used in the admin service
 //! integration tests.
 
 use std::collections::HashMap;
@@ -71,9 +71,8 @@ pub(in crate::admin) fn make_create_circuit_payload(
     payload.set_circuit_create_request(circuit_request);
     payload
         .set_header(Message::write_to_bytes(&header).expect("Unable to serialize payload header"));
-
     // Return the bytes of the payload
-    Message::write_to_bytes(&payload).expect("Unable to serialize `CircuitManagmentPayload`")
+    Message::write_to_bytes(&payload).expect("Unable to serialize `CircuitManagementPayload`")
 }
 
 /// Makes the `CircuitProposalVote` payload to either accept or reject the proposal (based on
@@ -156,7 +155,7 @@ pub(in crate::admin) fn make_circuit_disband_payload(
     payload.set_signature(
         signer
             .sign(&payload.header)
-            .expect("Unable to sign `CircuitManagmentPayload` header")
+            .expect("Unable to sign `CircuitManagementPayload` header")
             .take_bytes(),
     );
     payload.set_circuit_disband_request(disband_request);
@@ -200,7 +199,7 @@ pub(in crate::admin) fn make_circuit_abandon_payload(
     payload.set_signature(
         signer
             .sign(&payload.header)
-            .expect("Unable to sign `CircuitManagmentPayload` header")
+            .expect("Unable to sign `CircuitManagementPayload` header")
             .take_bytes(),
     );
     payload.set_circuit_abandon(circuit_abandon);
