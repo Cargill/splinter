@@ -276,7 +276,7 @@ fn setup_circuit(
         .with_persistence(&PersistenceType::Any)
         .with_durability(&DurabilityType::NoDurability)
         .with_routes(&RouteType::Any)
-        .with_circuit_management_type("test_circuit")
+        .with_circuit_management_type(&format!("test_circuit_{}", &circuit_id))
         .with_application_metadata(b"test_data")
         .with_comments("test circuit")
         .with_display_name("test_circuit")
