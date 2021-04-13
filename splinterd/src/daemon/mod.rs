@@ -46,6 +46,8 @@ use splinter::circuit::handlers::{
 };
 use splinter::circuit::routing::{memory::RoutingTable, RoutingTableReader, RoutingTableWriter};
 use splinter::error::InternalError;
+#[cfg(feature = "oauth")]
+use splinter::error::InvalidStateError;
 use splinter::keys::insecure::AllowAllKeyPermissionManager;
 use splinter::mesh::Mesh;
 use splinter::network::auth::AuthorizationManager;
@@ -1543,14 +1545,26 @@ fn create_allow_keys_authorization_handler(
 #[derive(Debug)]
 pub enum CreateError {
     MissingRequiredField(String),
+    #[cfg(feature = "oauth")]
+    InvalidStateError(InvalidStateError),
 }
 
-impl Error for CreateError {}
+impl Error for CreateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            CreateError::MissingRequiredField(_) => None,
+            #[cfg(feature = "oauth")]
+            CreateError::InvalidStateError(err) => Some(err),
+        }
+    }
+}
 
 impl fmt::Display for CreateError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             CreateError::MissingRequiredField(msg) => write!(f, "missing required field: {}", msg),
+            #[cfg(feature = "oauth")]
+            CreateError::InvalidStateError(err) => f.write_str(&err.to_string()),
         }
     }
 }
