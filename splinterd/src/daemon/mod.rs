@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "oauth")]
+mod oauth;
+
 #[cfg(feature = "service-arg-validation")]
 use std::collections::HashMap;
 use std::error::Error;
