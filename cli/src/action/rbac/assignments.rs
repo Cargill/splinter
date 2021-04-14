@@ -80,12 +80,22 @@ impl Action for CreateAssignmentAction {
             .map(|s| s.to_owned())
             .collect();
 
-        new_client(&arg_matches)?.create_assignment(
-            AssignmentBuilder::default()
-                .with_identity(identity)
-                .with_roles(roles)
-                .build()?,
-        )
+        let assignment = AssignmentBuilder::default()
+            .with_identity(identity.clone())
+            .with_roles(roles)
+            .build()?;
+        let client = new_client(&arg_matches)?;
+        if !is_dry_run(&arg_matches) {
+            client.create_assignment(assignment)
+        } else if client.get_assignment(&identity)?.is_some() {
+            let (id_value, id_type) = identity.parts();
+            Err(CliError::ActionError(format!(
+                "An assignment for {} {} already exists",
+                id_type, id_value
+            )))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -139,6 +149,8 @@ impl Action for UpdateAssignmentAction {
             .map(|args| args.is_present("force"))
             .unwrap_or(false);
 
+        let dry_run = is_dry_run(&arg_matches);
+
         let roles_to_add = arg_matches
             .and_then(|args| args.values_of("add_role"))
             .map(|vals| vals.map(|s| s.to_owned()).collect())
@@ -164,6 +176,7 @@ impl Action for UpdateAssignmentAction {
             roles_to_add,
             role_removal,
             force,
+            dry_run,
         )
     }
 }
@@ -179,6 +192,7 @@ fn update_assignment(
     roles_to_add: Vec<String>,
     role_removal: RoleRemoval,
     force: bool,
+    is_dry_run: bool,
 ) -> Result<(), CliError> {
     let assignment = client.get_assignment(&identity)?.ok_or_else(|| {
         let (id_value, id_type) = identity.parts();
@@ -233,12 +247,16 @@ fn update_assignment(
         }
     };
 
-    client.update_assignment(
-        AssignmentUpdateBuilder::default()
-            .with_identity(identity)
-            .with_roles(Some(roles))
-            .build()?,
-    )
+    let updated_assignment = AssignmentUpdateBuilder::default()
+        .with_identity(identity)
+        .with_roles(Some(roles))
+        .build()?;
+
+    if !is_dry_run {
+        client.update_assignment(updated_assignment)
+    } else {
+        Ok(())
+    }
 }
 
 pub struct DeleteAssignmentAction;
@@ -246,7 +264,11 @@ pub struct DeleteAssignmentAction;
 impl Action for DeleteAssignmentAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let identity = get_identity_arg(&arg_matches)?;
-        new_client(&arg_matches)?.delete_assignment(&identity)
+        if !is_dry_run(&arg_matches) {
+            new_client(&arg_matches)?.delete_assignment(&identity)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -278,4 +300,10 @@ fn get_identity_arg<'a>(arg_matches: &Option<&ArgMatches<'a>>) -> Result<Identit
     Err(CliError::ActionError(
         "Must specify either key or user identity".into(),
     ))
+}
+
+fn is_dry_run<'a>(arg_matches: &Option<&ArgMatches<'a>>) -> bool {
+    arg_matches
+        .map(|args| args.is_present("dry_run"))
+        .unwrap_or(false)
 }

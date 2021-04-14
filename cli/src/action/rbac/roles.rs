@@ -114,13 +114,23 @@ impl Action for CreateRoleAction {
             .map(|s| s.to_owned())
             .collect();
 
-        new_client(&arg_matches)?.create_role(
-            RoleBuilder::default()
-                .with_role_id(role_id.into())
-                .with_display_name(display_name.into())
-                .with_permissions(permissions)
-                .build()?,
-        )
+        let role = RoleBuilder::default()
+            .with_role_id(role_id.into())
+            .with_display_name(display_name.into())
+            .with_permissions(permissions)
+            .build()?;
+
+        let client = new_client(&arg_matches)?;
+        if !is_dry_run(&arg_matches) {
+            client.create_role(role)
+        } else if client.get_role(role_id)?.is_some() {
+            Err(CliError::ActionError(format!(
+                "A Role with ID {} already exists",
+                role_id
+            )))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -166,6 +176,7 @@ impl Action for UpdateRoleAction {
             permissions_to_add,
             permission_removal,
             force,
+            is_dry_run(&arg_matches),
         )
     }
 }
@@ -182,6 +193,7 @@ fn update_role(
     permissions_to_add: Vec<String>,
     permission_removal: PermissionRemoval,
     force: bool,
+    is_dry_run: bool,
 ) -> Result<(), CliError> {
     let role = client
         .get_role(role_id)?
@@ -232,13 +244,17 @@ fn update_role(
         }
     };
 
-    client.update_role(
-        RoleUpdateBuilder::default()
-            .with_role_id(role_id.into())
-            .with_display_name(display_name)
-            .with_permissions(Some(permissions))
-            .build()?,
-    )
+    let updated_role = RoleUpdateBuilder::default()
+        .with_role_id(role_id.into())
+        .with_display_name(display_name)
+        .with_permissions(Some(permissions))
+        .build()?;
+
+    if !is_dry_run {
+        client.update_role(updated_role)
+    } else {
+        Ok(())
+    }
 }
 
 pub struct DeleteRoleAction;
@@ -249,6 +265,16 @@ impl Action for DeleteRoleAction {
             .and_then(|args| args.value_of("role_id"))
             .ok_or_else(|| CliError::ActionError("A role ID must be specified".into()))?;
 
-        new_client(&arg_matches)?.delete_role(role_id)
+        if !is_dry_run(&arg_matches) {
+            new_client(&arg_matches)?.delete_role(role_id)
+        } else {
+            Ok(())
+        }
     }
+}
+
+fn is_dry_run<'a>(arg_matches: &Option<&ArgMatches<'a>>) -> bool {
+    arg_matches
+        .map(|args| args.is_present("dry_run"))
+        .unwrap_or(false)
 }
