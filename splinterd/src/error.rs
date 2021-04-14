@@ -26,6 +26,7 @@ use crate::daemon::StartError;
 #[derive(Debug)]
 pub enum UserError {
     TransportError(GetTransportError),
+    #[cfg(feature = "metrics")]
     MissingArgument(String),
     InvalidArgument(String),
     ConfigError(ConfigError),
@@ -61,6 +62,7 @@ impl Error for UserError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             UserError::TransportError(err) => Some(err),
+            #[cfg(feature = "metrics")]
             UserError::MissingArgument(_) => None,
             UserError::InvalidArgument(_) => None,
             UserError::ConfigError(err) => Some(err),
@@ -88,6 +90,7 @@ impl fmt::Display for UserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             UserError::TransportError(err) => write!(f, "unable to get transport: {}", err),
+            #[cfg(feature = "metrics")]
             UserError::MissingArgument(msg) => write!(f, "missing required argument: {}", msg),
             UserError::InvalidArgument(msg) => write!(f, "required argument is invalid: {}", msg),
             UserError::ConfigError(msg) => {
