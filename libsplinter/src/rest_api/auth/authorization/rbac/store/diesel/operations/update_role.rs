@@ -21,7 +21,7 @@ use crate::error::{ConstraintViolationError, ConstraintViolationType};
 use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::{RoleModel, RolePermissionModel},
-        schema::{role_permissions, roles},
+        schema::{rbac_role_permissions, rbac_roles},
     },
     Role, RoleBasedAuthorizationStoreError,
 };
@@ -40,8 +40,8 @@ impl<'a> RoleBasedAuthorizationStoreUpdateRole
         let (role, permissions): (RoleModel, Vec<RolePermissionModel>) = role.into();
 
         self.conn.transaction::<_, _, _>(|| {
-            let updated = update(roles::table.find(&role.id))
-                .set(roles::display_name.eq(&role.display_name))
+            let updated = update(rbac_roles::table.find(&role.id))
+                .set(rbac_roles::display_name.eq(&role.display_name))
                 .execute(self.conn)?;
 
             if updated == 0 {
@@ -52,10 +52,12 @@ impl<'a> RoleBasedAuthorizationStoreUpdateRole
                 ));
             }
 
-            delete(role_permissions::table.filter(role_permissions::role_id.eq(&role.id)))
-                .execute(self.conn)?;
+            delete(
+                rbac_role_permissions::table.filter(rbac_role_permissions::role_id.eq(&role.id)),
+            )
+            .execute(self.conn)?;
 
-            insert_into(role_permissions::table)
+            insert_into(rbac_role_permissions::table)
                 .values(permissions)
                 .execute(self.conn)?;
 
@@ -72,8 +74,8 @@ impl<'a> RoleBasedAuthorizationStoreUpdateRole
         let (role, permissions): (RoleModel, Vec<RolePermissionModel>) = role.into();
 
         self.conn.transaction::<_, _, _>(|| {
-            let updated = update(roles::table.find(&role.id))
-                .set(roles::display_name.eq(&role.display_name))
+            let updated = update(rbac_roles::table.find(&role.id))
+                .set(rbac_roles::display_name.eq(&role.display_name))
                 .execute(self.conn)?;
 
             if updated == 0 {
@@ -84,10 +86,12 @@ impl<'a> RoleBasedAuthorizationStoreUpdateRole
                 ));
             }
 
-            delete(role_permissions::table.filter(role_permissions::role_id.eq(&role.id)))
-                .execute(self.conn)?;
+            delete(
+                rbac_role_permissions::table.filter(rbac_role_permissions::role_id.eq(&role.id)),
+            )
+            .execute(self.conn)?;
 
-            insert_into(role_permissions::table)
+            insert_into(rbac_role_permissions::table)
                 .values(permissions)
                 .execute(self.conn)?;
 

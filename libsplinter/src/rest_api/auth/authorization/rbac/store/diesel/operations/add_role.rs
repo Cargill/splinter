@@ -17,7 +17,7 @@ use diesel::{dsl::insert_into, prelude::*};
 use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::{RoleModel, RolePermissionModel},
-        schema::{role_permissions, roles},
+        schema::{rbac_role_permissions, rbac_roles},
     },
     Role, RoleBasedAuthorizationStoreError,
 };
@@ -36,9 +36,11 @@ impl<'a> RoleBasedAuthorizationStoreAddRole
         let (role, permissions): (RoleModel, Vec<RolePermissionModel>) = role.into();
 
         self.conn.transaction::<_, _, _>(|| {
-            insert_into(roles::table).values(role).execute(self.conn)?;
+            insert_into(rbac_roles::table)
+                .values(role)
+                .execute(self.conn)?;
 
-            insert_into(role_permissions::table)
+            insert_into(rbac_role_permissions::table)
                 .values(permissions)
                 .execute(self.conn)?;
 
@@ -54,9 +56,11 @@ impl<'a> RoleBasedAuthorizationStoreAddRole
     fn add_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
         let (role, permissions): (RoleModel, Vec<RolePermissionModel>) = role.into();
         self.conn.transaction::<_, _, _>(|| {
-            insert_into(roles::table).values(role).execute(self.conn)?;
+            insert_into(rbac_roles::table)
+                .values(role)
+                .execute(self.conn)?;
 
-            insert_into(role_permissions::table)
+            insert_into(rbac_role_permissions::table)
                 .values(permissions)
                 .execute(self.conn)?;
 

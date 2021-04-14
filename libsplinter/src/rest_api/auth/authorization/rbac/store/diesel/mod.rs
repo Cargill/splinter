@@ -695,8 +695,8 @@ mod tests {
         // verify that the permissions have been removed (in a block, so the connection is dropped)
         {
             let connection = pool.get().expect("Unable to get connection");
-            let perms = schema::role_permissions::table
-                .filter(schema::role_permissions::role_id.eq("test-role"))
+            let perms = schema::rbac_role_permissions::table
+                .filter(schema::rbac_role_permissions::role_id.eq("test-role"))
                 .load::<models::RolePermissionModel>(&*connection)
                 .expect("Unable to load permissions");
             assert!(perms.is_empty());
@@ -1086,8 +1086,8 @@ mod tests {
         // verify that the assignments have been removed (in a block, so the connection is dropped)
         {
             let connection = pool.get().expect("Unable to get connection");
-            let perms = schema::assignments::table
-                .filter(schema::assignments::identity.eq("some-user-id"))
+            let perms = schema::rbac_assignments::table
+                .filter(schema::rbac_assignments::identity.eq("some-user-id"))
                 .load::<models::RolePermissionModel>(&*connection)
                 .expect("Unable to load permissions");
             assert!(perms.is_empty());

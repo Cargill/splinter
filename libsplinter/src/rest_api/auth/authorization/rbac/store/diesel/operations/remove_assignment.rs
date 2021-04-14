@@ -17,7 +17,7 @@ use diesel::{dsl::delete, prelude::*};
 use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::IdentityModelTypeMapping,
-        schema::{assignments, identities},
+        schema::{rbac_assignments, rbac_identities},
     },
     Identity, RoleBasedAuthorizationStoreError,
 };
@@ -47,9 +47,9 @@ where
             Identity::User(ref user_id) => user_id,
         };
         self.conn.transaction::<_, _, _>(|| {
-            delete(assignments::table.filter(assignments::identity.eq(search_identity)))
+            delete(rbac_assignments::table.filter(rbac_assignments::identity.eq(search_identity)))
                 .execute(self.conn)?;
-            delete(identities::table.filter(identities::identity.eq(search_identity)))
+            delete(rbac_identities::table.filter(rbac_identities::identity.eq(search_identity)))
                 .execute(self.conn)?;
 
             Ok(())

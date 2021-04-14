@@ -35,10 +35,10 @@ use diesel::pg::Pg;
 #[cfg(feature = "sqlite")]
 use diesel::sqlite::Sqlite;
 
-use super::schema::{assignments, identities, role_permissions, roles};
+use super::schema::{rbac_assignments, rbac_identities, rbac_role_permissions, rbac_roles};
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable)]
-#[table_name = "roles"]
+#[table_name = "rbac_roles"]
 #[primary_key(id)]
 pub(super) struct RoleModel {
     pub id: String,
@@ -46,7 +46,7 @@ pub(super) struct RoleModel {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable)]
-#[table_name = "role_permissions"]
+#[table_name = "rbac_role_permissions"]
 #[belongs_to(RoleModel, foreign_key = "role_id")]
 #[primary_key(role_id, permission)]
 pub(super) struct RolePermissionModel {
@@ -207,7 +207,7 @@ impl HasSqlType<IdentityModelTypeMapping> for Sqlite {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable)]
-#[table_name = "identities"]
+#[table_name = "rbac_identities"]
 #[primary_key(identity)]
 pub(super) struct IdentityModel {
     pub identity: String,
@@ -215,7 +215,7 @@ pub(super) struct IdentityModel {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable)]
-#[table_name = "assignments"]
+#[table_name = "rbac_assignments"]
 #[belongs_to(IdentityModel, foreign_key = "identity")]
 #[primary_key(identity, role_id)]
 pub(super) struct AssignmentModel {

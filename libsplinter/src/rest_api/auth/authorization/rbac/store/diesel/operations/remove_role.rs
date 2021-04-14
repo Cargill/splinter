@@ -15,7 +15,7 @@
 use diesel::{dsl::delete, prelude::*};
 
 use crate::rest_api::auth::authorization::rbac::store::{
-    diesel::schema::{role_permissions, roles},
+    diesel::schema::{rbac_role_permissions, rbac_roles},
     RoleBasedAuthorizationStoreError,
 };
 
@@ -32,10 +32,10 @@ where
 {
     fn remove_role(&self, role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            delete(role_permissions::table.filter(role_permissions::role_id.eq(role_id)))
+            delete(rbac_role_permissions::table.filter(rbac_role_permissions::role_id.eq(role_id)))
                 .execute(self.conn)?;
 
-            delete(roles::table.filter(roles::id.eq(role_id))).execute(self.conn)?;
+            delete(rbac_roles::table.filter(rbac_roles::id.eq(role_id))).execute(self.conn)?;
 
             Ok(())
         })
