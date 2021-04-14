@@ -242,7 +242,7 @@ impl SplinterRestClient {
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
-    pub fn get_role(&self, role_id: &str) -> Result<Role, CliError> {
+    pub fn get_role(&self, role_id: &str) -> Result<Option<Role>, CliError> {
         rbac::roles::get_role(&self.url, &self.auth, role_id)
     }
 

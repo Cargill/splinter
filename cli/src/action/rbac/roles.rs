@@ -68,7 +68,9 @@ impl Action for ShowRoleAction {
             .and_then(|args| args.value_of("role_id"))
             .ok_or_else(|| CliError::ActionError("A role ID must be specified".into()))?;
 
-        let role = new_client(&arg_matches)?.get_role(role_id)?;
+        let role = new_client(&arg_matches)?
+            .get_role(role_id)?
+            .ok_or_else(|| CliError::ActionError(format!("Role {} does not exist", role_id)))?;
 
         match format {
             "json" => println!(
@@ -181,7 +183,9 @@ fn update_role(
     permission_removal: PermissionRemoval,
     force: bool,
 ) -> Result<(), CliError> {
-    let role = client.get_role(role_id)?;
+    let role = client
+        .get_role(role_id)?
+        .ok_or_else(|| CliError::ActionError(format!("Role {} does not exist", role_id)))?;
 
     let permissions = match permission_removal {
         PermissionRemoval::RemoveAll => {
