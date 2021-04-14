@@ -99,7 +99,15 @@ impl Action for ShowAssignmentAction {
 
         let identity = get_identity_arg(&arg_matches)?;
 
-        let assignment = new_client(&arg_matches)?.get_assignment(&identity)?;
+        let assignment = new_client(&arg_matches)?
+            .get_assignment(&identity)?
+            .ok_or_else(|| {
+                let (id_value, id_type) = identity.parts();
+                CliError::ActionError(format!(
+                    "Authorized identity {} {} does not exist",
+                    id_type, id_value,
+                ))
+            })?;
 
         match format {
             "json" => println!(
@@ -172,7 +180,13 @@ fn update_assignment(
     role_removal: RoleRemoval,
     force: bool,
 ) -> Result<(), CliError> {
-    let assignment = client.get_assignment(&identity)?;
+    let assignment = client.get_assignment(&identity)?.ok_or_else(|| {
+        let (id_value, id_type) = identity.parts();
+        CliError::ActionError(format!(
+            "Authorized identity {} {} does not exist",
+            id_type, id_value,
+        ))
+    })?;
 
     let roles = match role_removal {
         RoleRemoval::RemoveAll => {
