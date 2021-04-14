@@ -1,5 +1,41 @@
 # Release Notes
 
+## Changes in Splinter 0.4.2
+
+### Highlights
+* Splinter signing code has been removed and replaced with
+  [cylinder](https://crates.io/crates/cylinder). This was required for
+  updating to the new version of Sabre.
+* Scabbard and Gameroom have been updated to use Sabre v0.7. This will allow
+  sabre to handle 0.5, 0.6 and 1 family versions, making splinter 0.4 work with
+  0.6.
+
+### libsplinter
+* Replaces the `libsplinter::signing` module with use of the `cylinder` crate.
+  This change removes the `sawtooth-sdk` dependency as well as the
+  `sawtooth-signing-compat` feature.
+* Pin protobuf version to 2.18 due to deprecations in 2.19.
+
+### splinter CLI
+* Update CLI man page 'SEE ALSO' link to point the
+  [Splinter website](https://www.splinter.dev/docs/0.4/)
+* Update CLI signing code to use cylinder. Replaces the use of the
+  `splinter::signing` module with the cylinder crate.
+
+### scabbard
+* Update scabbard to use cylinder. Replaces the use of the `splinter::signing`
+  module with the cylinder.
+* Update sabre version to 0.7.
+
+### scabbard CLI
+* Update CLI signing code to use cylinder. Replaces the use of the
+  `splinter::signing` module with the cylinder.
+
+### gameroom
+* Update sabre version to 0.7.
+* Replace the use of sawtooth-sdk with transact-sdk-javascript in the
+  gameroom-app.
+
 ## Changes in Splinter 0.4.1
 
 ### Highlights
