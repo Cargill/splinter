@@ -36,6 +36,10 @@ use crate::admin::store::{AdminServiceEvent, EventIter};
 use operations::add_circuit::AdminServiceStoreAddCircuitOperation as _;
 use operations::add_event::AdminServiceStoreAddEventOperation as _;
 use operations::add_proposal::AdminServiceStoreAddProposalOperation as _;
+#[cfg(feature = "admin-service-count")]
+use operations::count_circuits::AdminServiceStoreCountCircuitsOperation as _;
+#[cfg(feature = "admin-service-count")]
+use operations::count_proposals::AdminServiceStoreCountProposalsOperation as _;
 use operations::get_circuit::AdminServiceStoreFetchCircuitOperation as _;
 use operations::get_node::AdminServiceStoreFetchNodeOperation as _;
 use operations::get_proposal::AdminServiceStoreFetchProposalOperation as _;
@@ -115,6 +119,14 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_proposals(predicates)
     }
 
+    #[cfg(feature = "admin-service-count")]
+    fn count_proposals(
+        &self,
+        predicates: &[CircuitPredicate],
+    ) -> Result<u32, AdminServiceStoreError> {
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).count_proposals(predicates)
+    }
+
     fn add_circuit(
         &self,
         circuit: Circuit,
@@ -140,6 +152,14 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         predicates: &[CircuitPredicate],
     ) -> Result<Box<dyn ExactSizeIterator<Item = Circuit>>, AdminServiceStoreError> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_circuits(predicates)
+    }
+
+    #[cfg(feature = "admin-service-count")]
+    fn count_circuits(
+        &self,
+        predicates: &[CircuitPredicate],
+    ) -> Result<u32, AdminServiceStoreError> {
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).count_circuits(predicates)
     }
 
     fn upgrade_proposal_to_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
@@ -224,6 +244,14 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_proposals(predicates)
     }
 
+    #[cfg(feature = "admin-service-count")]
+    fn count_proposals(
+        &self,
+        predicates: &[CircuitPredicate],
+    ) -> Result<u32, AdminServiceStoreError> {
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).count_proposals(predicates)
+    }
+
     fn add_circuit(
         &self,
         circuit: Circuit,
@@ -249,6 +277,14 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         predicates: &[CircuitPredicate],
     ) -> Result<Box<dyn ExactSizeIterator<Item = Circuit>>, AdminServiceStoreError> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_circuits(predicates)
+    }
+
+    #[cfg(feature = "admin-service-count")]
+    fn count_circuits(
+        &self,
+        predicates: &[CircuitPredicate],
+    ) -> Result<u32, AdminServiceStoreError> {
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).count_circuits(predicates)
     }
 
     fn upgrade_proposal_to_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
@@ -431,6 +467,77 @@ pub mod tests {
             .expect("Unable to list proposals with members include predicate");
 
         assert_eq!(proposals.len(), 2);
+    }
+
+    /// Verify that count_proposals works correctly
+    ///
+    /// 1. Run sqlite migrations
+    /// 2. Create DieselAdminServiceStore
+    /// 3. Create a proposal
+    /// 4. Add proposal to store
+    /// 5. Count Proposals in the store with no predicates, validate correct number is returned
+    /// 6. Count Proposals in the store with management type predicate, validate correct number is
+    ///    returned
+    /// 7. Count Proposals in the store with member predicate, validate correct number is
+    ///    returned
+    /// 8. Count Proposal from store with mismatching management type predicate, validate 0 is
+    ///    returned
+    #[test]
+    #[cfg(feature = "admin-service-count")]
+    fn test_count_proposals() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselAdminServiceStore::new(pool);
+
+        let proposal = create_proposal();
+
+        store
+            .add_proposal(proposal.clone())
+            .expect("Unable to add circuit proposal");
+
+        // test no predicates
+        assert_eq!(
+            store
+                .count_proposals(&vec![])
+                .expect("Unable to list proposals"),
+            1,
+        );
+
+        // test management type predicate
+        assert_eq!(
+            store
+                .count_proposals(&vec![CircuitPredicate::ManagementTypeEq(
+                    "gameroom".to_string(),
+                )])
+                .expect("Unable to list proposals"),
+            1,
+        );
+
+        let extra_proposal = create_extra_proposal();
+
+        store
+            .add_proposal(extra_proposal.clone())
+            .expect("Unable to add circuit proposal");
+
+        // test member type predicate
+        assert_eq!(
+            store
+                .count_proposals(&vec![CircuitPredicate::MembersInclude(vec![
+                    "gumbo-node-000".to_string(),
+                ])])
+                .expect("Unable to list proposals"),
+            1,
+        );
+
+        // test bad management type predicate
+        assert_eq!(
+            store
+                .count_proposals(&vec![CircuitPredicate::ManagementTypeEq(
+                    "arcade".to_string(),
+                )])
+                .expect("Unable to list proposals"),
+            0,
+        );
     }
 
     /// Verify that a proposal can be removed from the store
@@ -746,6 +853,122 @@ pub mod tests {
             .expect("Unable to list circuits");
 
         assert_eq!(circuits.len(), 2);
+    }
+
+    /// Verify that count_circuits works correctly
+    ///
+    /// 1. Run sqlite migrations
+    /// 2. Create DieselAdminServiceStore
+    /// 3. Create a circuit and nodes
+    /// 4. Add circuit to store
+    /// 5. Count circuits from store with no predicates, validated correct number is returned
+    /// 6. Count circuits from store with management type predicate, validated correct number is
+    ///    returned
+    /// 7. Count circuits from store with member predicate, validated correct number is returned
+    /// 8. Count circuits from store with mismatching management type predicate, validated 0 is
+    ///    returned
+    /// 9. Add a `Disbanded` circuit to the store
+    /// 10. Count circuits from store with no circuit status predicate, validate that the correct
+    ///     number of `Active` circuits are returned
+    /// 11. Count circuits with the `CircuitStatus::Disbanded` circuit status predicate, validate
+    ///     that the correct number of `Disbanded` circuits are returned
+    /// 12. Count circuits with the `CircuitStatus::Abandoned` circuit status predicate, validate
+    ///     that the correct number of `Abandoned` circuits are returned
+    #[test]
+    #[cfg(feature = "admin-service-count")]
+    fn test_count_circuits() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselAdminServiceStore::new(pool);
+
+        let circuit = create_circuit("WBKLF-BBBBB", CircuitStatus::Active);
+        let nodes = create_nodes();
+
+        let extra_circuit = create_extra_circuit("WBKLF-CCCCC");
+        let extra_nodes = create_extra_nodes();
+
+        store
+            .add_circuit(circuit.clone(), nodes.clone())
+            .expect("Unable to add circuit");
+
+        // test no predicates
+        assert_eq!(
+            store
+                .count_circuits(&vec![])
+                .expect("Unable to list circuits"),
+            1
+        );
+
+        // test management type predicate
+        assert_eq!(
+            store
+                .count_circuits(&vec![CircuitPredicate::ManagementTypeEq(
+                    "gameroom".to_string(),
+                )])
+                .expect("Unable to list circuits"),
+            1
+        );
+
+        // test bad management type predicate
+        assert_eq!(
+            store
+                .count_circuits(&vec![CircuitPredicate::ManagementTypeEq(
+                    "arcade".to_string(),
+                )])
+                .expect("Unable to list circuits"),
+            0
+        );
+
+        store
+            .add_circuit(extra_circuit.clone(), extra_nodes)
+            .expect("Unable to add circuit");
+
+        // test members type predicate
+        assert_eq!(
+            store
+                .count_circuits(&vec![CircuitPredicate::MembersInclude(vec![
+                    "gumbo-node-000".to_string(),
+                ])])
+                .expect("Unable to list circuits"),
+            1
+        );
+
+        // test circuit status predicate
+
+        // Add a `Disbanded` circuit
+        let disbanded_circuit = create_circuit("WBKLF-DDDDD", CircuitStatus::Disbanded);
+        store
+            .add_circuit(disbanded_circuit.clone(), nodes.clone())
+            .expect("Unable to add disbanded circuit");
+
+        // Return count of circuits with no predicates, this should by default only return
+        // the count of `Active` circuits
+        assert_eq!(
+            store
+                .count_circuits(&vec![])
+                .expect("Unable to list circuits"),
+            2
+        );
+
+        // Return count of circuits with the `CircuitStatus(CircuitStatus::Disbanded)` predicate
+        assert_eq!(
+            store
+                .count_circuits(&vec![CircuitPredicate::CircuitStatus(
+                    CircuitStatus::Disbanded,
+                )])
+                .expect("Unable to list circuits"),
+            1
+        );
+
+        // Return count of circuits with the `CircuitStatus(CircuitStatus::Abandoned)` predicate
+        assert_eq!(
+            store
+                .count_circuits(&vec![CircuitPredicate::CircuitStatus(
+                    CircuitStatus::Abandoned,
+                )])
+                .expect("Unable to list circuits"),
+            0
+        );
     }
 
     /// Verify that a circuit can be removed from the store

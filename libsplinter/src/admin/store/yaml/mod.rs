@@ -652,6 +652,44 @@ impl AdminServiceStore for YamlAdminServiceStore {
         Ok(Box::new(proposals.into_iter()))
     }
 
+    /// Returns the count of proposals in the store
+    ///
+    /// # Arguments
+    ///
+    /// * `predicates` - A list of predicates to be applied before counting the proposals.
+    ///    This enables getting the count of proposals with specific management types and members.
+    #[cfg(feature = "admin-service-count")]
+    fn count_proposals(
+        &self,
+        predicates: &[CircuitPredicate],
+    ) -> Result<u32, AdminServiceStoreError> {
+        let mut proposals: Vec<CircuitProposal> = self
+            .state
+            .lock()
+            .map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
+            })?
+            .proposal_state
+            .proposals
+            .iter()
+            .map(|(_, proposal)| proposal.clone())
+            .collect::<Vec<CircuitProposal>>();
+
+        proposals.retain(|proposal| {
+            predicates
+                .iter()
+                .all(|predicate| predicate.apply_to_proposals(proposal))
+        });
+
+        u32::try_from(proposals.len()).map_err(|_| {
+            AdminServiceStoreError::InternalError(InternalError::with_message(
+                "The number of proposals is larger than the max u32".to_string(),
+            ))
+        })
+    }
+
     /// Adds a circuit to the underlying storage. Also includes the associated Services and
     /// Nodes
     ///
@@ -849,6 +887,44 @@ impl AdminServiceStore for YamlAdminServiceStore {
         });
 
         Ok(Box::new(circuits.into_iter()))
+    }
+
+    /// Returns the count of circuits in the store
+    ///
+    /// # Arguments
+    ///
+    /// * `predicates` - A list of predicates to be applied before counting the circuits.
+    ///    This enables getting the count of circuits with specific management types and members.
+    #[cfg(feature = "admin-service-count")]
+    fn count_circuits(
+        &self,
+        predicates: &[CircuitPredicate],
+    ) -> Result<u32, AdminServiceStoreError> {
+        let mut circuits: Vec<Circuit> = self
+            .state
+            .lock()
+            .map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
+            })?
+            .circuit_state
+            .circuits
+            .iter()
+            .map(|(_, circuit)| circuit.clone())
+            .collect();
+
+        circuits.retain(|circuit| {
+            predicates
+                .iter()
+                .all(|predicate| predicate.apply_to_circuit(circuit))
+        });
+
+        u32::try_from(circuits.len()).map_err(|_| {
+            AdminServiceStoreError::InternalError(InternalError::with_message(
+                "The number of circuits is larger than the max u32".to_string(),
+            ))
+        })
     }
 
     /// Adds a circuit to the underlying storage based on the proposal that is already in state..
