@@ -260,30 +260,6 @@ impl RestApiBuilder {
             authorization_handlers: self.authorization_handlers,
         })
     }
-
-    /// Builds the `RestApi` without requiring any security configuration
-    #[cfg(test)]
-    pub fn build_insecure(self) -> Result<RestApi, RestApiServerError> {
-        let bind = self
-            .bind
-            .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
-
-        let bind = match bind {
-            #[cfg(feature = "https-bind")]
-            BindConfig::Https { bind, .. } => BindConfig::Http(bind),
-            insecure @ BindConfig::Http(_) => insecure,
-        };
-
-        Ok(RestApi {
-            bind,
-            resources: self.resources,
-            #[cfg(feature = "rest-api-cors")]
-            whitelist: self.whitelist,
-            identity_providers: vec![],
-            #[cfg(feature = "authorization")]
-            authorization_handlers: vec![],
-        })
-    }
 }
 
 #[cfg(test)]
@@ -349,6 +325,31 @@ mod test {
         /// `Box<dyn IdentityProvider>` calls this method.
         fn clone_box(&self) -> Box<dyn IdentityProvider> {
             Box::new(self.clone())
+        }
+    }
+
+    impl RestApiBuilder {
+        /// Builds the `RestApi` without requiring any security configuration
+        pub fn build_insecure(self) -> Result<RestApi, RestApiServerError> {
+            let bind = self
+                .bind
+                .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
+
+            let bind = match bind {
+                #[cfg(feature = "https-bind")]
+                BindConfig::Https { bind, .. } => BindConfig::Http(bind),
+                insecure @ BindConfig::Http(_) => insecure,
+            };
+
+            Ok(RestApi {
+                bind,
+                resources: self.resources,
+                #[cfg(feature = "rest-api-cors")]
+                whitelist: self.whitelist,
+                identity_providers: vec![],
+                #[cfg(feature = "authorization")]
+                authorization_handlers: vec![],
+            })
         }
     }
 }
