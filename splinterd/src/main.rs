@@ -512,6 +512,14 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     let config = create_config(config_file_path, matches.clone())?;
 
+    let state_dir = config.state_dir();
+    if !Path::new(&state_dir).is_dir() {
+        return Err(UserError::DaemonError {
+            context: format!("state directory {} does not exist", state_dir),
+            source: None,
+        });
+    }
+
     if config.no_tls() {
         for network_endpoint in config.network_endpoints() {
             if network_endpoint.starts_with("tcps://") {
