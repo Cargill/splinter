@@ -15,6 +15,8 @@
 //! Traits and implementations useful for communicating with the Splinter admin service as
 //! a client.
 
+#[cfg(feature = "admin-service-event-client")]
+pub mod event;
 #[cfg(feature = "client-reqwest")]
 mod reqwest;
 
@@ -24,6 +26,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::InternalError;
 
+#[cfg(feature = "client-reqwest")]
 pub use self::reqwest::ReqwestAdminServiceClient;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

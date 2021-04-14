@@ -74,7 +74,7 @@ use tokio::prelude::*;
 use crate::events::{Igniter, ParseError, WebSocketError};
 
 type OnErrorHandle<T> =
-    dyn Fn(&WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static;
+    dyn Fn(WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static;
 
 const MAX_FRAME_SIZE: usize = 10_000_000;
 const DEFAULT_RECONNECT: bool = false;
@@ -241,7 +241,7 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
     /// Websocket or to reestablish the connection if appropriate.
     pub fn on_error<F>(&mut self, on_error: F)
     where
-        F: Fn(&WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static,
+        F: Fn(WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static,
     {
         self.on_error = Some(Arc::new(on_error));
     }
@@ -270,6 +270,10 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
             .unwrap_or_else(|| Arc::new(|_| WsResponse::Empty));
         let on_message = self.on_message.clone();
         let on_error = self
+            .on_error
+            .clone()
+            .unwrap_or_else(|| Arc::new(|_, _| Ok(())));
+        let on_stream_error = self
             .on_error
             .clone()
             .unwrap_or_else(|| Arc::new(|_, _| Ok(())));
@@ -307,7 +311,7 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
                     if res.status() != StatusCode::SWITCHING_PROTOCOLS {
                         error!("The server didn't upgrade: {}", res.status());
                         if let Err(err) = on_error(
-                            &WebSocketError::ConnectError(format!(
+                            WebSocketError::ConnectError(format!(
                             "Received status code {:?} while attempting to establish a connection"
                         , res.status())),
                             connection_failed_context,
@@ -459,7 +463,13 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
                                 } else {
                                     match status {
                                         ConnectionStatus::Open => future::ok(true),
-                                        ConnectionStatus::UnexpectedClose(_original_error) => {
+                                        ConnectionStatus::UnexpectedClose(original_error) => {
+                                            if let Err(err) =
+                                                on_stream_error(original_error, context.clone())
+                                            {
+                                                error!("Failed to call on_error: {}", err);
+                                            }
+
                                             if let Err(err) = context.try_reconnect() {
                                                 error!("Context returned an error  {}", err);
                                             }
@@ -610,7 +620,7 @@ impl<T: ParseBytes<T> + 'static> Context<T> {
 
             self.reset_wait();
             self.reset_reconnect_count();
-            on_error(&error_message, self.clone())
+            on_error(error_message, self.clone())
         }
     }
 

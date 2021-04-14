@@ -134,9 +134,13 @@ health-service = ["health"]
 https-bind = ["splinter/https-bind"]
 metrics = ["splinter/metrics"]
 node = [
+    "authorization",
+    "https-bind",
     "scabbard/client-reqwest",
     "scabbard/factory-builder",
     "splinter/admin-service-client",
+    "splinter/admin-service-event-client",
+    "splinter/admin-service-event-client-actix-web-client",
     "splinter/client-reqwest",
     "splinter/rest-api-actix-web-3",
     "splinter/registry-client",

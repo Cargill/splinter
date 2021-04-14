@@ -29,7 +29,12 @@ use crate::node::runnable::admin::RunnableAdminSubsystem;
 
 const DEFAULT_ADMIN_TIMEOUT: Duration = Duration::from_secs(30);
 
-#[derive(Default)]
+/// An enumeration of the AdminServiceEventClient backend variants.
+#[derive(Clone, Copy, Debug)]
+pub enum AdminServiceEventClientVariant {
+    ActixWebClient,
+}
+
 pub struct AdminSubsystemBuilder {
     node_id: Option<String>,
     admin_timeout: Option<Duration>,
@@ -40,11 +45,23 @@ pub struct AdminSubsystemBuilder {
     signing_context: Option<Box<dyn Context>>,
     scabbard_config: Option<ScabbardConfig>,
     registries: Option<Vec<String>>,
+    admin_service_event_client_variant: AdminServiceEventClientVariant,
 }
 
 impl AdminSubsystemBuilder {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            node_id: None,
+            admin_timeout: None,
+            store_factory: None,
+            peer_connector: None,
+            routing_writer: None,
+            service_transport: None,
+            signing_context: None,
+            scabbard_config: None,
+            registries: None,
+            admin_service_event_client_variant: AdminServiceEventClientVariant::ActixWebClient,
+        }
     }
 
     /// Specifies the id for the node. Defaults to a random node id.
@@ -101,6 +118,15 @@ impl AdminSubsystemBuilder {
         self
     }
 
+    /// Specifies the admin_service_event_client_variant.
+    pub fn with_admin_service_event_client_variant(
+        mut self,
+        admin_service_event_client_variant: AdminServiceEventClientVariant,
+    ) -> Self {
+        self.admin_service_event_client_variant = admin_service_event_client_variant;
+        self
+    }
+
     pub fn build(mut self) -> Result<RunnableAdminSubsystem, InternalError> {
         let node_id = self.node_id.take().ok_or_else(|| {
             InternalError::with_message("Cannot build AdminSubsystem without a node id".to_string())
@@ -154,6 +180,7 @@ impl AdminSubsystemBuilder {
             .transpose()?;
 
         let registries = self.registries;
+        let admin_service_event_client_variant = self.admin_service_event_client_variant;
 
         Ok(RunnableAdminSubsystem {
             node_id,
@@ -165,6 +192,7 @@ impl AdminSubsystemBuilder {
             admin_service_verifier,
             scabbard_service_factory,
             registries,
+            admin_service_event_client_variant,
         })
     }
 }

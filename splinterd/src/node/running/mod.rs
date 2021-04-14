@@ -21,6 +21,7 @@ use std::thread::JoinHandle;
 
 use cylinder::Signer;
 use scabbard::client::{ReqwestScabbardClientBuilder, ScabbardClient};
+use splinter::admin::client::event::AdminServiceEventClient;
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::error::InternalError;
 use splinter::registry::{
@@ -74,6 +75,17 @@ impl Node {
             format!("http://localhost:{}", self.rest_api_port),
             "foo".to_string(),
         ))
+    }
+
+    pub fn admin_service_event_client(
+        &self,
+        event_type: &str,
+    ) -> Result<Box<dyn AdminServiceEventClient>, InternalError> {
+        self.admin_subsystem.admin_service_event_client(
+            format!("http://localhost:{}", self.rest_api_port),
+            "foo".to_string(),
+            event_type.to_string(),
+        )
     }
 
     pub fn scabbard_client(&self) -> Result<Box<dyn ScabbardClient>, InternalError> {
@@ -149,6 +161,7 @@ impl Node {
 impl ShutdownHandle for Node {
     fn signal_shutdown(&mut self) {
         self.admin_subsystem.signal_shutdown();
+
         if let NodeRestApiVariant::ActixWeb3(ref mut rest_api) = self.rest_api_variant {
             rest_api.signal_shutdown();
         }
