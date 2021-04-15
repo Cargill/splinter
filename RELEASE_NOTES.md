@@ -1,5 +1,397 @@
 # Release Notes
 
+## Changes in Splinter 0.5.1
+
+### Highlights
+
+* Fixed a Splinter daemon connection bug in tcp:// and tcps:// transports which
+  crashed the listener thread if remote disconnects occurred during protocol
+  negotiation.
+
+* The `scabbard` CLI man pages are now available. Please see the Splinter
+  Website (https://www.splinter.dev/docs/0.5/references/cli/#scabbard-cli) for
+  more information.
+
+* Splinter signing code has been removed and replaced with
+  [`cylinder`](https://crates.io/crates/cylinder). This was required for
+  updating to the new version of Sabre.
+
+* Scabbard and Gameroom have been updated to use Sabre v0.7. This will allow
+  sabre to handle 0.5, 0.6 and 1 family versions, making splinter 0.4 work with
+  0.5.
+
+* The Splinter circuit state is now owned by the Admin Service. The Splinter
+  daemon components, such as message dispatchers, now use an in memory
+  `RoutingTable`. The AdminService will rebuild the `RoutingTable` on restart.
+
+* Splinter state now supports SQLite and PostgreSQL backends. This update
+  requires that the newly stabilized `splinter database migrate` command is run
+  before starting up the Splinter daemon. For information see
+  [Configuring Splinter Daemon Database](https://www.splinter.dev/docs/0.5/howto/configure_database_storage.html) and
+  [Data Store Guidelines](https://www.splinter.dev/community/data_store_guidelines.html).
+  The following data stores are now supported
+      - circuits and proposals
+      - admin events
+      - biome
+      - registry
+
+* Stabilize `circuit-template` feature in libsplinter and the CLI. See
+  [Using Circuit Templates](https://www.splinter.dev/docs/0.5/howto/using_circuit_templates.html)
+  for more information
+
+* Adds the crate::error module. This error module will provide common reusable
+  errors for the library, reducing redundancy and inconsistency.
+
+* Circuits now include a human readable display name.
+
+* The ADMIN_PROTOCOL_VERSION has been increased to 2 to handle updates to the
+  Circuit and Proposal API. Use protocol version 1 for backwards compatibility.
+  The updates includes:
+    - Allowed nodes list is now node_id in services
+    - Circuits and Proposal now includes a display name, circuit status, and
+      circuit version
+    - Application metadata and comments are not optional in Proposals
+
+* Circuits can now be disbanded or abandoned and then purged.
+  - [Circuit Disband](https://www.splinter.dev/community/planning/circuit_disband.html)
+  - [Circuit Abandon](https://www.splinter.dev/community/planning/circuit_abandon.html)
+  - [Circuit Purge](https://www.splinter.dev/community/planning/circuit_purge.html)
+
+* An experimental integration testing framework has been added to splinterd.
+  This framework will enable the creation of integration tests that can be run
+  with the normal `cargo test command`.
+
+* Experimental support for two new authentication schemes: OAuth support
+  (including Azure, Github, Google, and OpenID) and CylinderJWT.
+
+* Experimental support for authorization, via a set of allowed keys and a
+  role-based access control system.
+
+### libsplinter
+* Implement Vec::from for ConnectionMatrixEnvelope. Using Vec::from is cleaner
+  than using the  ConnectionMatrixEnvelope::take_payload.
+
+* Remove the remaining deprecated Network structs. Several tests still relied
+  on the old Network implementation. The tests were updated to use Mesh or the
+  peer module so the deprecated structs could be removed.
+
+*  Add `PeerManagerBuilder` to make creating a `PeerManger` easier and reduce
+  errors by starting the background thread on build. The builder matches the
+  pattern of the `ConnectionManagerBuilder`.
+
+* Add `subscribe_sender`  to  `PeerManagerConnecter` which takes a Sender<T>
+  which can be used to get a PeerManagerNotification and adds the ability to
+  convert the notification to another type. This change updates the PeerManager
+  to match the ConnectionManager. Also adds `unsubscribe` to the connector
+  which allows a subscriber to no longer receive notifications.
+
+* Improve log messages around peer creation.
+
+* Adds missing Rust API documentation to the peer module.
+
+* Update frame negotiation to result in a handshake failure if the connection is
+  terminated mid-negotiation when using TCP or TLS.
+
+* Rewrite WsTransport in tungstenite and add SSL support. The websocket crate
+  had serious limitations which manifested when attempting to implement TLS
+  support. After more analysis, Tungstenite looks better overall, so  
+  re-implemented with that dependency instead. This is experimental behind the
+  `ws-transport` feature.
+
+* Clean up circuit template API:
+  - Remove '$()' from template argument names
+  - Reworks the `apply_rules` method so the organization makes it clear
+    which `rule` is creating the value.
+  - Remove "a:" and "r:" prefix to template arguments.
+  - Changes the `CircuitTemplate` `into_builders` method to `apply_to_builder`,
+    which takes in a `CreateCircuitBuilder` and applies the template rules using
+    the builder .with_* methods.
+
+* Add reader and writer traits for the routing table, as well as an in memory
+  implementation. The routing table will replace the splinterd uses of
+  SplinterState, most widely used in the Handlers for messages that are
+  dispatched.
+
+* Add RegistryStore with YAML, SQLite and PostgreSQL backend implementations.
+  This enables being able to config different backends for the registry. Before,
+  only YAML was supported.
+
+* Add AdminServiceStore with YAML, SQLite and PostgreSQL backend
+  implementations. This enables storing circuit and proposal state in SQLite and
+  PostgreSQL database while staying backward compatible with the 0.4 YAML state.
+
+* Update AdminService to use the AdminServiceStore for storing circuit and
+  proposal state. This also requires updating the AdminService to use a
+  RoutingTableWriter to update the RoutingTable for new circuits so that the
+  splinterd message handlers can properly route messages.
+
+*  Replace allowed_nodes list with node_id in service definitions. Only one
+  node ID is currently supported.
+
+* Replace auth with authorization_type in Circuit Update the AdminServiceStore
+  Circuit struct to have authorization_type instead of auth. This makes the use
+  of authorization_type consistent between Circuit and ProposedCircuit.
+
+* Replaces the `libsplinter::signing` module with use of the `cylinder`
+  crate. This change removes the `sawtooth-sdk` dependency as well as the
+  `sawtooth-signing-compat` feature.
+
+* Adds the crate::error module that provides common reusable errors for the
+  library, reducing redundancy and inconsistency. The included errors are:
+    - InternalError
+    - ConstraintViolationError
+    - InvalidStateError
+    - InvalidArgumentError
+    - ResourceTemporarilyUnavailableError
+
+* Guard all admin service code with an `admin-service` feature. The admin
+  service code is quite large and is not alway required. This feature is stable.
+
+* Move all migrations file to a top level location. Running migrations from
+  multiple locations can cause conflicts because there is only one table for
+  keeping track of what transactions have already been run in the database. That
+  conflict can be removed by having all migrations in one place and only
+  running them once.
+
+* Stabilize the "store-factory" features. This feature guarded the StoreFactory,
+  which is used to dynamically create the stores for the configured database
+  backend.
+
+* Add a separate protocol version for the AdminService. Before the admin
+  service used the same protocol version as the admin service REST API. However,
+  the REST API and the protobuf messages have different protocols and should be
+  treated as such.
+
+* Increase the AdminService protocol level to support handling new requests
+  that cannot be handled by v0.4 AdminService.
+
+* Replace the in memory only implementation of storing AdminServiceEvents with
+  storying the AdminServiceEvents in the AdminServiceStore. This fixes a bug
+  where the events were only stored in memory so they could not be retrieved
+  after a restart.
+
+* Use Message::parse_from_bytes instead of protobuf::parse_from_bytes. This
+  fixes a breaking change introduced by protobuf 2.19.
+
+* Add support to the AdminService for handling a CircuitDisband request.
+  Disbanded a circuit removes all networking support from the circuit while
+  maintaining the circuit state. This is the "friendly" approach for removing a
+  circuit that requires agreement from all members.
+
+* Add support to the AdminService for handling a CircuitAbandon request.
+  Abandoning a circuit is similar to disbanded but does not require agreement
+  from the other members of a circuit. This will result in broken circuit
+  functionality for the other members.
+
+* Add support to the AdminService for handling a CircuitPurge request. After a
+  circuit has been disbanded or abandoned, a  purge request will remove all
+  circuit state related to the circuit, including service state.
+
+* Add `purge` to the Service trait. `purge` will enable removing the services
+  associated datafiles when a circuit is purged.
+
+* Refactor authentication system to allow more supported authentication methods
+  beyond the provided Biome credentials
+
+* Add support for OAuth authentication
+
+* Add support for Cylinder JWT authentication
+
+* Add experimental permissions extensions to REST API Resource construction
+
+* Add experimental support for authorization via an allowed keys file.  All keys
+  placed in the file are allowed access to any permission-guarded REST API
+  routes. This authorization method is intended namely for system
+  administrators.
+
+* Add experimental support for authorization via role-based access control.
+  Users, by ID or public key, may be assigned roles which, in turn, are made up
+  of a set of permissions. This allows control over user access at a
+  finer-grained level than "allowed keys".
+
+* Add experimental support for maintenance mode authorization.  This mode set
+  sets the REST API in read-only mode for all role-based access control users.
+  While enabled, any write permissions are denied, but read permissions continue
+  to work as configured.  Maintenance mode has no effect on users authorized
+  via the allowed keys file.
+
+* Add experimental support for Splinter Metrics. This required implementing an
+  InfluxDB specific implementation of the Recorder trait from the
+  [metrics crate](https://crates.io/crates/metrics). This will enable us to gain
+  insight into the inner working of Splinter during load and performance
+  testing by adding metrics throughout the code. Several initial metrics were
+  added throughout the code.
+
+* Add experimental BiomeClient trait and an reqwest implementation.
+
+* Add `threading::lifecycle::ShutdownHandle`. Anything which runs a thread will
+  need to implement ShutdownHandle in the future, which will standardize
+  libsplinter's approach to shutdown (a.k.a. joining threads).
+
+* Implement ShutdownHandle trait for the following components (removing the old
+  shutdown pattern):
+    - ServiceProcessor
+    - Orchestrator
+    - PeerManager
+    - PeerInterconnect
+    - ConnectionManger
+    - Mesh
+    - RemoteYamlRegistry
+    - DispatchLoop
+
+* Replace `insert_node` with `add_node` and `update_node` in the registry.
+
+* Add experimental initial Actix Web 3 support. This adds the start of pieces
+  we need to easily standup and manage the REST API without any wrapper code
+  (such as the approach taken with the Actix Web 1 support). This includes
+  support for a RestApi struct and its lifecycle (RestApiBuilder ->
+  RunnbleRestApi -> RestApi -> shutdown).
+
+* Version 2PC and add v2 implementation. Moves the existing 2PC implementation
+  to a v1 submodule and creates a new v2 implementation that is not compatible
+  with v1. V2 disables custom verifiers and only allows the coordinator to
+  create proposals. This fixes several bugs found when running under scabbard
+  under load. The AdminService still requires v1.
+
+
+### splinter CLI
+
+*  Add man pages for all stable `scabbard` CLI commands
+
+* Update CLI man page 'SEE ALSO' link to point the Splinter website
+  https://www.splinter.dev/docs/0.5/
+
+* Update CLI signing code to use cylinder. Replaces the use of the
+  `splinter::signing` module with the cylinder crate.
+
+* Update `splinter database migrate`  to run migrations for both SQLite and
+  PostgreSQL.
+
+* The CLI has been updated to handle the updated circuit and proposals API
+  returned with ADMIN_PROTOCOL_VERSION 2.
+
+* Add `--compat=0.4` flag to `splinter circuit propose`. This flag enforces
+  that the circuit created by the proposal will be compatible with v0.4 of
+  Splinter.
+
+* Add experimental support to `splinter cert generate` to generate REST API
+  certificates for https.
+
+* Add experimental support to `splinter circuit` to disband, abandon, and
+  purge circuits.
+
+* Add experimental support for managing role-based access with the `splinter
+  role` and `splinter authid` subcommands.  The `role` subcommands may display,
+  create, update or delete roles. The `authid` subcommands may display, create,
+  update or delete user or key authorizations.
+
+* Fix a bug that enforced that all service arguments were wrapped in a Vec.
+  This made it impossible to provide arguments that were expected to be just a
+  string, such as scabbard "version"
+
+### splinterd
+
+* Update the daemon to use the `PeerMangerBuilder`.
+
+* Update accept thread to log errors and continue instead of exiting on an
+  AcceptError.
+
+*  Add wss:// handling support to the daemon If TLS is enabled, then create the
+  WsTransport using the same configuration as the socket-based TLS Transport.
+
+* Update the splinterd to use the store factory to configure all stores with
+  the database value provided by the config. This enables using a SQLite or
+  PostgreSQL database for circuit state, registry, biome, etc.. For backwards
+  compatibility `--storage` is hidden but still available and if `--storage
+  yaml` is provided the AdminService will use the YAML implementation of
+  AdminServiceStore.
+
+* Add experimental HTTPS support for the splinterd REST API.
+
+* Remove `--enable-biome` flag. Removes the `enable_biome` option for the
+  Splinter daemon. The inclusion of Biome is now a compile-time choice rather
+  than run-time. Previously, the `enable_biome` option was necessary to be able
+  to run splinterd without a database, but soon a database will always be
+  required for splinterd. For backwards compatibility, the `--enable-biome` CLI
+  flag is kept but marked as hidden.
+
+* Add experimental support for configuring metrics. If the `metrics` flag is
+  enabled the following flags are available that will be used to connect to a
+  running InfluxDB database:
+
+```
+--metrics-db <metrics_db>  The name of the InfluxDB database for metrics
+                           collection
+--metrics-password <metrics_password> The password used for authorization with
+                                      the InfluxDB
+--metrics-url <metrics_url>  The URL to connect the InfluxDB database for
+                             metrics collection
+--metrics-username <metrics_username> The username used for authorization with
+                                      the InfluxDB
+```
+
+* Add support for the use of the CylinderJWT authentication method
+
+* Add experimental use of the OAuth authentication method
+
+* Add experimental use of the "allowed keys" authorization method
+
+* Add experimental use of the role-based access control authorization method
+
+* Add experimental use of the maintenance mode authorization method
+
+
+### scabbard CLI
+
+* Update CLI signing code to use cylinder. Replaces the use of the
+  `splinter::signing` module with the cylinder.
+
+* Add scabbard support for SPLINTER_REST_API_URL This change modifies
+  scabbard's URL handling to match that of the splinter CLI command.
+
+### scabbard
+
+* Update scabbard to use cylinder. Replaces the use of the `splinter::signing`
+  module with the cylinder.
+
+* Update sabre version to 0.7.
+
+* Update the CLI to use the ScabbardClientBuilder.
+
+* Implement `Service.purge()` method so scabbard state can be removed when a
+  circuit is purged.
+
+* Add a version service argument that tells scabbard what version of 2PC to use.
+  v2 of 2PC fixes several bugs that were found while testing scabbard under
+  load. But for backwards compatibility the with v0.4 Splinter v1 2PC must
+  still be supported.
+
+* Use correct state directory for scabbard files This initializes the scabbard
+  service with the same state directory used for the rest of the daemon, instead
+  of using scabbard's default. This fixes a bug where the scabbard files were
+  always put in the default directory.
+
+* Update the scabbard service to handle CSV passed in as service argument.
+  Before the list of admin keys and peer services had to be decoded using json.
+  Now the arguments can be passed in as either JSON or CSV.
+
+* Add a builder for the ScabbardClient.
+
+### gameroom
+
+* Use the gameroom circuit template in Gameroom daemon. Updates the
+  `propose_gameroom` REST API endpoint function to use a CircuitCreateTemplate
+  to generate the CreateCircuit admin message used to propose a gameroom.
+
+* Update sabre version to 0.7.
+
+* Replace the use of sawtooth-sdk with transact-sdk-javascript in the
+  gameroom-app.
+
+### build
+
+* Dockerfiles have been updated from bionic to focal.
+
 ## Changes in Splinter 0.3.18
 
 ### Deprecations and Breaking Changes
