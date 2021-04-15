@@ -20,8 +20,15 @@ pub(super) mod network;
 use std::net::{Ipv4Addr, SocketAddr};
 
 use splinter::error::InternalError;
-use splinter::rest_api::actix_web_1::RestApi;
+use splinter::rest_api::actix_web_1::RestApiBuilder;
 use splinter::rest_api::actix_web_3::RunnableRestApi;
+use splinter::rest_api::{
+    auth::{
+        identity::{Identity, IdentityProvider},
+        AuthorizationHeader,
+    },
+    AuthConfig,
+};
 
 use super::builder::admin::AdminSubsystemBuilder;
 use super::{Node, NodeRestApiVariant};
@@ -29,7 +36,7 @@ use super::{Node, NodeRestApiVariant};
 use self::network::RunnableNetworkSubsystem;
 
 pub(super) enum RunnableNodeRestApiVariant {
-    ActixWeb1(RestApi),
+    ActixWeb1(RestApiBuilder),
     ActixWeb3(RunnableRestApi),
 }
 
@@ -55,6 +62,10 @@ impl RunnableNode {
             .build()?;
 
         let mut admin_subsystem = runnable_admin_subsystem.run()?;
+        let auth_configs = vec![AuthConfig::Custom {
+            resources: vec![],
+            identity_provider: Box::new(MockIdentityProvider),
+        }];
 
         let node_id = self.node_id;
 
@@ -62,6 +73,9 @@ impl RunnableNode {
             RunnableNodeRestApiVariant::ActixWeb1(rest_api) => {
                 let admin_resources = admin_subsystem.take_actix1_resources();
                 let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api
+                    .with_auth_configs(auth_configs)
+                    .build()
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?
                     .add_resources(admin_resources)
                     .run()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?;
@@ -132,5 +146,31 @@ impl RunnableNode {
             rest_api_port,
             node_id,
         })
+    }
+}
+
+#[derive(Clone)]
+struct MockIdentityProvider;
+
+impl IdentityProvider for MockIdentityProvider {
+    fn get_identity(
+        &self,
+        _authorization: &AuthorizationHeader,
+    ) -> Result<Option<Identity>, InternalError> {
+        Ok(Some(Identity::Custom("".into())))
+    }
+
+    /// Clones implementation for `IdentityProvider`. The implementation of the `Clone` trait for
+    /// `Box<dyn IdentityProvider>` calls this method.
+    ///
+    /// # Example
+    ///
+    ///```ignore
+    ///  fn clone_box(&self) -> Box<dyn IdentityProvider> {
+    ///     Box::new(self.clone())
+    ///  }
+    ///```
+    fn clone_box(&self) -> Box<dyn IdentityProvider> {
+        Box::new(self.clone())
     }
 }

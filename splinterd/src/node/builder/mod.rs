@@ -23,12 +23,11 @@ use std::time::Duration;
 use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 use rand::{thread_rng, Rng};
 use splinter::error::InternalError;
-use splinter::rest_api::actix_web_1::{AuthConfig, RestApiBuilder as RestApiBuilder1};
+use splinter::rest_api::actix_web_1::RestApiBuilder as RestApiBuilder1;
 use splinter::rest_api::actix_web_3::RestApiBuilder as RestApiBuilder3;
 use splinter::rest_api::auth::{
     authorization::{AuthorizationHandler, AuthorizationHandlerResult},
-    identity::{Identity, IdentityProvider},
-    AuthorizationHeader,
+    identity::Identity,
 };
 use splinter::rest_api::BindConfig;
 use splinter::store::StoreFactory;
@@ -194,21 +193,11 @@ impl NodeBuilder {
             .with_signing_context(Box::new(context));
 
         let rest_api_variant = match self.rest_api_variant {
-            RestApiVariant::ActixWeb1 => {
-                let auth_config = AuthConfig::Custom {
-                    resources: vec![],
-                    identity_provider: Box::new(MockIdentityProvider),
-                };
-
-                RunnableNodeRestApiVariant::ActixWeb1(
-                    RestApiBuilder1::new()
-                        .with_bind(BindConfig::Http(url))
-                        .with_auth_configs(vec![auth_config])
-                        .with_authorization_handlers(vec![Box::new(MockAuthorizationHandler)])
-                        .build()
-                        .map_err(|e| InternalError::from_source(Box::new(e)))?,
-                )
-            }
+            RestApiVariant::ActixWeb1 => RunnableNodeRestApiVariant::ActixWeb1(
+                RestApiBuilder1::new()
+                    .with_bind(BindConfig::Http(url))
+                    .with_authorization_handlers(vec![Box::new(MockAuthorizationHandler)]),
+            ),
             RestApiVariant::ActixWeb3 => RunnableNodeRestApiVariant::ActixWeb3(
                 RestApiBuilder3::new()
                     .with_bind(BindConfig::Http(url))
@@ -224,32 +213,6 @@ impl NodeBuilder {
             rest_api_variant,
             node_id,
         })
-    }
-}
-
-#[derive(Clone)]
-struct MockIdentityProvider;
-
-impl IdentityProvider for MockIdentityProvider {
-    fn get_identity(
-        &self,
-        _authorization: &AuthorizationHeader,
-    ) -> Result<Option<Identity>, InternalError> {
-        Ok(Some(Identity::Custom("".into())))
-    }
-
-    /// Clones implementation for `IdentityProvider`. The implementation of the `Clone` trait for
-    /// `Box<dyn IdentityProvider>` calls this method.
-    ///
-    /// # Example
-    ///
-    ///```ignore
-    ///  fn clone_box(&self) -> Box<dyn IdentityProvider> {
-    ///     Box::new(self.clone())
-    ///  }
-    ///```
-    fn clone_box(&self) -> Box<dyn IdentityProvider> {
-        Box::new(self.clone())
     }
 }
 
