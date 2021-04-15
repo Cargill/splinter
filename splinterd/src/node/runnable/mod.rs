@@ -15,21 +15,29 @@
 //! Contains the implementation of `RunnableNode`.
 
 pub(super) mod admin;
+pub(super) mod biome;
 pub(super) mod network;
 
 use std::net::{Ipv4Addr, SocketAddr};
 
 use splinter::error::InternalError;
-use splinter::rest_api::actix_web_1::RestApi;
+use splinter::rest_api::actix_web_1::RestApiBuilder;
 use splinter::rest_api::actix_web_3::RunnableRestApi;
+use splinter::rest_api::{
+    auth::{
+        identity::{Identity, IdentityProvider},
+        AuthorizationHeader,
+    },
+    AuthConfig,
+};
 
 use super::builder::admin::AdminSubsystemBuilder;
-use super::{Node, NodeRestApiVariant};
+use super::{BiomeResourceProvider, Node, NodeRestApiVariant};
 
 use self::network::RunnableNetworkSubsystem;
 
 pub(super) enum RunnableNodeRestApiVariant {
-    ActixWeb1(RestApi),
+    ActixWeb1(RestApiBuilder),
     ActixWeb3(RunnableRestApi),
 }
 
@@ -40,6 +48,7 @@ pub struct RunnableNode {
     pub(super) rest_api_variant: RunnableNodeRestApiVariant,
     pub(super) runnable_network_subsystem: RunnableNetworkSubsystem,
     pub(super) node_id: String,
+    pub(super) enable_biome: bool,
 }
 
 impl RunnableNode {
@@ -60,9 +69,29 @@ impl RunnableNode {
 
         let rest_api_variant = match self.rest_api_variant {
             RunnableNodeRestApiVariant::ActixWeb1(rest_api) => {
+                let mut auth_configs = vec![AuthConfig::Custom {
+                    resources: vec![],
+                    identity_provider: Box::new(MockIdentityProvider),
+                }];
+
                 let admin_resources = admin_subsystem.take_actix1_resources();
+                let mut biome_resources = vec![];
+
+                // Create the `Biome` resources if the node has biome enabled
+                if self.enable_biome {
+                    // Build the `BiomeResourceProvider` to allow the node to access `Biome` endpoints
+                    let mut biome_resource_provider =
+                        BiomeResourceProvider::new(&*admin_subsystem.store_factory)?;
+                    auth_configs.append(&mut biome_resource_provider.auth_configs);
+                    biome_resources.append(&mut biome_resource_provider.take_actix1_resources());
+                };
+
                 let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api
+                    .with_auth_configs(auth_configs)
+                    .build()
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?
                     .add_resources(admin_resources)
+                    .add_resources(biome_resources)
                     .run()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
@@ -132,5 +161,31 @@ impl RunnableNode {
             rest_api_port,
             node_id,
         })
+    }
+}
+
+#[derive(Clone)]
+struct MockIdentityProvider;
+
+impl IdentityProvider for MockIdentityProvider {
+    fn get_identity(
+        &self,
+        _authorization: &AuthorizationHeader,
+    ) -> Result<Option<Identity>, InternalError> {
+        Ok(Some(Identity::Custom("".into())))
+    }
+
+    /// Clones implementation for `IdentityProvider`. The implementation of the `Clone` trait for
+    /// `Box<dyn IdentityProvider>` calls this method.
+    ///
+    /// # Example
+    ///
+    ///```ignore
+    ///  fn clone_box(&self) -> Box<dyn IdentityProvider> {
+    ///     Box::new(self.clone())
+    ///  }
+    ///```
+    fn clone_box(&self) -> Box<dyn IdentityProvider> {
+        Box::new(self.clone())
     }
 }

@@ -20,6 +20,7 @@ mod running;
 
 pub use builder::scabbard::{ScabbardConfig, ScabbardConfigBuilder};
 pub use builder::{NodeBuilder, RestApiVariant};
+pub use runnable::biome::BiomeResourceProvider;
 pub use runnable::RunnableNode;
 use runnable::RunnableNodeRestApiVariant;
 pub use running::Node;
