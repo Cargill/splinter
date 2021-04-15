@@ -55,6 +55,7 @@ pub struct NodeBuilder {
     rest_api_variant: RestApiVariant,
     network_subsystem_builder: NetworkSubsystemBuilder,
     node_id: Option<String>,
+    enable_biome: bool,
 }
 
 impl Default for NodeBuilder {
@@ -73,6 +74,7 @@ impl NodeBuilder {
             rest_api_variant: RestApiVariant::ActixWeb1,
             network_subsystem_builder: NetworkSubsystemBuilder::new(),
             node_id: None,
+            enable_biome: false,
         }
     }
 
@@ -167,6 +169,12 @@ impl NodeBuilder {
         self
     }
 
+    /// Make Biome resources available on the network
+    pub fn with_biome_enabled(mut self) -> Self {
+        self.enable_biome = true;
+        self
+    }
+
     /// Builds the `RunnableNode` and consumes the `NodeBuilder`.
     pub fn build(mut self) -> Result<RunnableNode, InternalError> {
         let url = format!("127.0.0.1:{}", self.rest_api_port.take().unwrap_or(0),);
@@ -206,12 +214,15 @@ impl NodeBuilder {
             ),
         };
 
+        let enable_biome = self.enable_biome;
+
         Ok(RunnableNode {
             admin_signer,
             admin_subsystem_builder,
             runnable_network_subsystem,
             rest_api_variant,
             node_id,
+            enable_biome,
         })
     }
 }

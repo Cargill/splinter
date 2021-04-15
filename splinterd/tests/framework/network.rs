@@ -65,6 +65,7 @@ impl Network {
                 )
                 .with_admin_signer(signer)
                 .with_external_registries(self.external_registries.clone())
+                .with_biome_enabled()
                 .build()?
                 .run()?;
 

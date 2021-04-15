@@ -32,7 +32,7 @@ use splinter::rest_api::{
 };
 
 use super::builder::admin::AdminSubsystemBuilder;
-use super::{Node, NodeRestApiVariant};
+use super::{BiomeResourceProvider, Node, NodeRestApiVariant};
 
 use self::network::RunnableNetworkSubsystem;
 
@@ -48,6 +48,7 @@ pub struct RunnableNode {
     pub(super) rest_api_variant: RunnableNodeRestApiVariant,
     pub(super) runnable_network_subsystem: RunnableNetworkSubsystem,
     pub(super) node_id: String,
+    pub(super) enable_biome: bool,
 }
 
 impl RunnableNode {
@@ -63,21 +64,34 @@ impl RunnableNode {
             .build()?;
 
         let mut admin_subsystem = runnable_admin_subsystem.run()?;
-        let auth_configs = vec![AuthConfig::Custom {
-            resources: vec![],
-            identity_provider: Box::new(MockIdentityProvider),
-        }];
 
         let node_id = self.node_id;
 
         let rest_api_variant = match self.rest_api_variant {
             RunnableNodeRestApiVariant::ActixWeb1(rest_api) => {
+                let mut auth_configs = vec![AuthConfig::Custom {
+                    resources: vec![],
+                    identity_provider: Box::new(MockIdentityProvider),
+                }];
+
                 let admin_resources = admin_subsystem.take_actix1_resources();
+                let mut biome_resources = vec![];
+
+                // Create the `Biome` resources if the node has biome enabled
+                if self.enable_biome {
+                    // Build the `BiomeResourceProvider` to allow the node to access `Biome` endpoints
+                    let mut biome_resource_provider =
+                        BiomeResourceProvider::new(&*admin_subsystem.store_factory)?;
+                    auth_configs.append(&mut biome_resource_provider.auth_configs);
+                    biome_resources.append(&mut biome_resource_provider.take_actix1_resources());
+                };
+
                 let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api
                     .with_auth_configs(auth_configs)
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?
                     .add_resources(admin_resources)
+                    .add_resources(biome_resources)
                     .run()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
