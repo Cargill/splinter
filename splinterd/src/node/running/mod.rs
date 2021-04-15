@@ -23,6 +23,7 @@ use cylinder::Signer;
 use scabbard::client::{ReqwestScabbardClientBuilder, ScabbardClient};
 use splinter::admin::client::event::AdminServiceEventClient;
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
+use splinter::biome::client::{BiomeClient, ReqwestBiomeClient};
 use splinter::error::InternalError;
 use splinter::registry::{
     client::{RegistryClient, ReqwestRegistryClient},
@@ -155,6 +156,16 @@ impl Node {
             .with_rest_api_port(rest_api_port.into())
             .with_store_factory(store_factory)
             .build()
+    }
+
+    pub fn biome_client(self: &Node, auth: Option<&str>) -> Box<dyn BiomeClient> {
+        let mut biome_client =
+            ReqwestBiomeClient::new(format!("http://localhost:{}", self.rest_api_port));
+        if let Some(auth) = auth {
+            biome_client.add_auth(auth.to_string());
+        }
+
+        Box::new(biome_client)
     }
 }
 
