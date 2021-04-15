@@ -20,7 +20,7 @@ use crate::error::CliError;
 
 use super::{Pageable, RBAC_PROTOCOL_VERSION};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(tag = "identity_type", content = "identity")]
 #[serde(rename_all = "lowercase")]
 pub enum Identity {
