@@ -151,6 +151,9 @@ impl ScabbardState {
             .start()
             .map_err(|err| ScabbardStateError(format!("failed to start executor: {}", err)))?;
 
+        // initialize committed_batches metric
+        counter!("splinter.scabbard.committed_batches", 0);
+
         Ok(ScabbardState {
             db,
             context_manager,
@@ -341,7 +344,7 @@ impl ScabbardState {
                 }
 
                 self.batch_history.commit(&signature);
-
+                counter!("splinter.scabbard.committed_batches", 1);
                 Ok(())
             }
             None => Err(ScabbardStateError("no pending changes to commit".into())),

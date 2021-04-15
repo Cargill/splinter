@@ -29,6 +29,7 @@ actix-web = { version = "1.0", optional = true, default-features = false, featur
 cylinder = "0.2"
 futures = { version = "0.1", optional = true }
 log = "0.3.0"
+metrics = { version = "0.12", optional = true}
 openssl = "0.10"
 protobuf = "2.19"
 reqwest = { version = "0.10", optional = true, features = ["blocking", "json"] }
@@ -67,6 +68,7 @@ experimental = [
   # The following features are experimental:
   "circuit-purge",
   "factory-builder",
+  "metrics",
 ]
 
 authorization = ["splinter/authorization"]

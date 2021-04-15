@@ -68,6 +68,9 @@ impl PeerMap {
     ///
     /// * `initial_retry_frequency` - The value to set as the retry frequency for a new peer
     pub fn new(initial_retry_frequency: u64) -> Self {
+        // initialize peers metric
+        gauge!("splinter.peer_manager.peers", 0);
+
         PeerMap {
             peers: HashMap::new(),
             endpoints: HashMap::new(),
@@ -125,6 +128,8 @@ impl PeerMap {
         for endpoint in endpoints {
             self.endpoints.insert(endpoint, peer_id.clone());
         }
+
+        gauge!("splinter.peer_manager.peers", self.peers.len() as i64);
     }
 
     /// Removes a peer and its endpoints.
@@ -139,9 +144,10 @@ impl PeerMap {
             for endpoint in peer_metadata.endpoints.iter() {
                 self.endpoints.remove(endpoint);
             }
-
+            gauge!("splinter.peer_manager.peers", self.peers.len() as i64);
             Some(peer_metadata)
         } else {
+            gauge!("splinter.peer_manager.peers", self.peers.len() as i64);
             None
         }
     }

@@ -28,6 +28,13 @@ extern crate diesel;
 #[macro_use]
 #[cfg(feature = "diesel")]
 extern crate diesel_migrations;
+#[cfg(feature = "metrics")]
+#[macro_use]
+extern crate metrics_lib;
+
+// macros_use must come before any modules that make use of the macro
+#[macro_use]
+pub mod metrics;
 
 #[macro_export]
 macro_rules! rwlock_read_unwrap {
@@ -74,8 +81,6 @@ pub mod events;
 mod hex;
 pub mod keys;
 pub mod mesh;
-#[cfg(feature = "metrics")]
-pub mod metrics;
 pub mod migrations;
 pub mod network;
 #[cfg(feature = "oauth")]
