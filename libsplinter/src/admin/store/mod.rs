@@ -229,6 +229,18 @@ pub trait AdminServiceStore: Send + Sync {
         predicates: &[CircuitPredicate],
     ) -> Result<Box<dyn ExactSizeIterator<Item = CircuitProposal>>, AdminServiceStoreError>;
 
+    /// Returns the count of proposals in the store
+    ///
+    /// # Arguments
+    ///
+    /// * `predicates` - A list of predicates to be applied before counting the proposals.
+    ///    This enables getting the count of proposals with specific management types and members.
+    #[cfg(feature = "admin-service-count")]
+    fn count_proposals(
+        &self,
+        predicates: &[CircuitPredicate],
+    ) -> Result<u32, AdminServiceStoreError>;
+
     /// Adds a circuit to the store along with the associated services and nodes
     ///
     /// # Arguments
@@ -275,6 +287,18 @@ pub trait AdminServiceStore: Send + Sync {
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<Box<dyn ExactSizeIterator<Item = Circuit>>, AdminServiceStoreError>;
+
+    /// Returns the count of circuits in the store
+    ///
+    /// # Arguments
+    ///
+    /// * `predicates` - A list of predicates to be applied before counting the circuits.
+    ///    This enables getting the count of circuits with specific management types and members.
+    #[cfg(feature = "admin-service-count")]
+    fn count_circuits(
+        &self,
+        predicates: &[CircuitPredicate],
+    ) -> Result<u32, AdminServiceStoreError>;
 
     /// Adds a circuit, along with the associated services and nodes, to the store based on the
     /// proposal that is already in state. The associated circuit proposal for the circuit ID is

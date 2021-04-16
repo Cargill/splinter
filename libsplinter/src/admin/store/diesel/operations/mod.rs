@@ -17,6 +17,10 @@
 pub(super) mod add_circuit;
 pub(super) mod add_event;
 pub(super) mod add_proposal;
+#[cfg(feature = "admin-service-count")]
+pub(super) mod count_circuits;
+#[cfg(feature = "admin-service-count")]
+pub(super) mod count_proposals;
 pub(super) mod get_circuit;
 pub(super) mod get_node;
 pub(super) mod get_proposal;
