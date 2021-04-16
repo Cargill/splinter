@@ -39,6 +39,256 @@
         "y": 0
       },
       "hiddenSeries": false,
+      "id": 46,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.7",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "previous"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "splinter.admin.proposals",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "A",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              }
+            ]
+          ],
+          "tags": []
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Pending Proposals",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "hiddenSeries": false,
+      "id": 44,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.3.7",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "previous"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "splinter.admin.circuits.active",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "A",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              }
+            ]
+          ],
+          "tags": []
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Active Circuits",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$DATASOURCE",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "hiddenSeries": false,
       "id": 42,
       "legend": {
         "avg": false,
@@ -161,7 +411,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 8
       },
       "hiddenSeries": false,
       "id": 40,
@@ -283,10 +533,10 @@
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 16
       },
       "hiddenSeries": false,
       "id": 38,
@@ -411,7 +661,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 8
+        "y": 16
       },
       "hiddenSeries": false,
       "id": 13,
@@ -632,7 +882,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 16
+        "y": 25
       },
       "hiddenSeries": false,
       "id": 2,
@@ -853,7 +1103,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 34
       },
       "hiddenSeries": false,
       "id": 11,
@@ -1080,7 +1330,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 41
       },
       "hiddenSeries": false,
       "id": 14,
@@ -1261,7 +1511,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 39
+        "y": 48
       },
       "hiddenSeries": false,
       "id": 15,
@@ -1464,7 +1714,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 39
+        "y": 48
       },
       "hiddenSeries": false,
       "id": 16,
@@ -1605,7 +1855,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 46
+        "y": 55
       },
       "hiddenSeries": false,
       "id": 17,
@@ -1740,7 +1990,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 46
+        "y": 55
       },
       "hiddenSeries": false,
       "id": 18,
@@ -1879,7 +2129,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 53
+        "y": 62
       },
       "hiddenSeries": false,
       "id": 19,
@@ -2019,7 +2269,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 60
+        "y": 69
       },
       "hiddenSeries": false,
       "id": 20,
@@ -2165,7 +2415,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 60
+        "y": 69
       },
       "hiddenSeries": false,
       "id": 36,
