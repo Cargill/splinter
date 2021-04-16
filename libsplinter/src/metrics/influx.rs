@@ -95,7 +95,7 @@ impl InfluxRecorder {
                     Some(MetricRequest::Counter { key, value, time }) => {
                         let counter = {
                             if let Some(mut counter) = counters.get_mut(&key) {
-                                counter.value += 1;
+                                counter.value += value;
                                 counter.time = time;
                                 counter.clone()
                             } else {
