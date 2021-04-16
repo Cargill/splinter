@@ -221,6 +221,17 @@ impl AdminService {
     ///
     /// Also adds peer references for members of the circuits and proposals.
     fn re_initialize_circuits(&self) -> Result<(), ServiceStartError> {
+        #[cfg(feature = "admin-service-count")]
+        self.admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .update_metrics()
+            .map_err(|err| {
+                ServiceStartError::Internal(format!("Unable to update metrics: {}", err))
+            })?;
+
         let mut active_circuits = vec![];
         let mut inactive_circuits = vec![];
         for circuit in self
