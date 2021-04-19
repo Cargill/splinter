@@ -16,7 +16,6 @@ use cylinder::Signer;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 use splinter::admin::messages::CreateCircuit;
-#[cfg(feature = "circuit-abandon")]
 use splinter::protos::admin::CircuitAbandon;
 use splinter::protos::admin::CircuitDisbandRequest;
 #[cfg(feature = "circuit-purge")]
@@ -28,11 +27,9 @@ use splinter::protos::admin::{
 
 use crate::error::CliError;
 
-#[cfg(feature = "circuit-abandon")]
-use super::AbandonedCircuit;
-use super::CircuitDisband;
 #[cfg(feature = "circuit-purge")]
 use super::CircuitPurge;
+use super::{AbandonedCircuit, CircuitDisband};
 use super::{CircuitVote, Vote};
 
 /// A circuit action that has a type and can be converted into a protobuf-serializable struct.
@@ -183,7 +180,6 @@ impl ApplyToEnvelope for CircuitPurgeRequest {
     }
 }
 
-#[cfg(feature = "circuit-abandon")]
 impl CircuitAction<CircuitAbandon> for AbandonedCircuit {
     fn action_type(&self) -> Action {
         Action::CIRCUIT_ABANDON
@@ -196,7 +192,6 @@ impl CircuitAction<CircuitAbandon> for AbandonedCircuit {
     }
 }
 
-#[cfg(feature = "circuit-abandon")]
 impl ApplyToEnvelope for CircuitAbandon {
     fn apply(self, circuit_management_payload: &mut CircuitManagementPayload) {
         circuit_management_payload.set_circuit_abandon(self);

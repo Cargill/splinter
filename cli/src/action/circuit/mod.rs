@@ -743,15 +743,12 @@ fn request_purge_circuit(
     }
 }
 
-#[cfg(feature = "circuit-abandon")]
 struct AbandonedCircuit {
     circuit_id: String,
 }
 
-#[cfg(feature = "circuit-abandon")]
 pub struct CircuitAbandonAction;
 
-#[cfg(feature = "circuit-abandon")]
 impl Action for CircuitAbandonAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
@@ -771,7 +768,6 @@ impl Action for CircuitAbandonAction {
     }
 }
 
-#[cfg(feature = "circuit-abandon")]
 fn request_abandon_circuit(
     url: &str,
     signer: Box<dyn Signer>,
