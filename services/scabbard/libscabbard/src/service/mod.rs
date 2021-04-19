@@ -374,7 +374,6 @@ impl Service for Scabbard {
         }
     }
 
-    #[cfg(feature = "circuit-purge")]
     fn purge(&mut self) -> Result<(), splinter::error::InternalError> {
         self.state
             .lock()
@@ -383,12 +382,6 @@ impl Service for Scabbard {
             })?
             .remove_db_files()
             .map_err(|err| splinter::error::InternalError::from_source(Box::new(err)))
-    }
-
-    #[cfg(not(feature = "circuit-purge"))]
-    fn purge(&mut self) -> Result<(), splinter::error::InternalError> {
-        info!("`circuit-purge` feature is not enabled for Scabbard service");
-        Ok(())
     }
 
     fn handle_message(
