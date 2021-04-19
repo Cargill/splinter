@@ -120,10 +120,7 @@ authorization-handler-rbac = [
 biome-credentials = ["splinter/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management"]
 biome-profile = ["splinter/biome-profile", "splinter/oauth-profile"]
-circuit-purge = [
-  "health/circuit-purge",
-  "scabbard/circuit-purge",
-]
+circuit-purge = []
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
 health-service = ["health"]
