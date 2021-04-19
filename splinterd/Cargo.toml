@@ -95,7 +95,6 @@ experimental = [
     "authorization-handler-rbac",
     "biome-profile",
     "circuit-abandon",
-    "circuit-disband",
     "circuit-purge",
     "health-service",
     "https-bind",
@@ -123,7 +122,6 @@ biome-credentials = ["splinter/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management"]
 biome-profile = ["splinter/biome-profile", "splinter/oauth-profile"]
 circuit-abandon = []
-circuit-disband = []
 circuit-purge = [
   "health/circuit-purge",
   "scabbard/circuit-purge",
