@@ -20,7 +20,7 @@ use crate::error::CliError;
 
 use super::{Pageable, RBAC_PROTOCOL_VERSION};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(tag = "identity_type", content = "identity")]
 #[serde(rename_all = "lowercase")]
 pub enum Identity {
@@ -192,7 +192,7 @@ pub fn get_assignment(
     base_url: &str,
     auth: &str,
     identity: &Identity,
-) -> Result<Assignment, CliError> {
+) -> Result<Option<Assignment>, CliError> {
     let (id_value, id_type) = identity.parts();
 
     Client::new()
@@ -212,18 +212,17 @@ pub fn get_assignment(
         .and_then(|res| {
             let status = res.status();
             if status.is_success() {
-                res.json::<AssignmentGet>().map_err(|_| {
-                    CliError::ActionError(
-                        "Request was successful, but received an invalid response".into(),
-                    )
-                })
+                res.json::<AssignmentGet>()
+                    .map_err(|_| {
+                        CliError::ActionError(
+                            "Request was successful, but received an invalid response".into(),
+                        )
+                    })
+                    .map(|wrapper| Some(wrapper.assignment))
             } else if status.as_u16() == 401 {
                 Err(CliError::ActionError("Not Authorized".into()))
             } else if status.as_u16() == 404 {
-                Err(CliError::ActionError(format!(
-                    "Authorized identity {} {} does not exist",
-                    id_type, id_value,
-                )))
+                Ok(None)
             } else {
                 let message = res
                     .json::<ServerError>()
@@ -242,7 +241,6 @@ pub fn get_assignment(
                 )))
             }
         })
-        .map(|wrapper| wrapper.assignment)
 }
 
 pub fn update_assignment(

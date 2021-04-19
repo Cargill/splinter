@@ -188,7 +188,7 @@ struct RoleGet {
     role: Role,
 }
 
-pub fn get_role(base_url: &str, auth: &str, role_id: &str) -> Result<Role, CliError> {
+pub fn get_role(base_url: &str, auth: &str, role_id: &str) -> Result<Option<Role>, CliError> {
     Client::new()
         .get(&format!("{}/authorization/roles/{}", base_url, role_id))
         .header("SplinterProtocolVersion", RBAC_PROTOCOL_VERSION)
@@ -198,18 +198,17 @@ pub fn get_role(base_url: &str, auth: &str, role_id: &str) -> Result<Role, CliEr
         .and_then(|res| {
             let status = res.status();
             if status.is_success() {
-                res.json::<RoleGet>().map_err(|_| {
-                    CliError::ActionError(
-                        "Request was successful, but received an invalid response".into(),
-                    )
-                })
+                res.json::<RoleGet>()
+                    .map_err(|_| {
+                        CliError::ActionError(
+                            "Request was successful, but received an invalid response".into(),
+                        )
+                    })
+                    .map(|wrapper| Some(wrapper.role))
             } else if status.as_u16() == 401 {
                 Err(CliError::ActionError("Not Authorized".into()))
             } else if status.as_u16() == 404 {
-                Err(CliError::ActionError(format!(
-                    "Role {} does not exist",
-                    role_id
-                )))
+                Ok(None)
             } else {
                 let message = res
                     .json::<ServerError>()
@@ -228,7 +227,6 @@ pub fn get_role(base_url: &str, auth: &str, role_id: &str) -> Result<Role, CliEr
                 )))
             }
         })
-        .map(|wrapper| wrapper.role)
 }
 
 pub fn create_role(base_url: &str, auth: &str, role: Role) -> Result<(), CliError> {

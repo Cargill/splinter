@@ -1093,6 +1093,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .takes_value(true)
                                 .value_name("ROLE ID")
                                 .help("ID of role to be created"),
+                        )
+                        .arg(
+                            Arg::with_name("dry_run")
+                                .long("dry-run")
+                                .short("n")
+                                .help("Validate the command without performing the role creation"),
                         ),
                 )
                 .subcommand(
@@ -1161,6 +1167,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .takes_value(true)
                                 .value_name("ROLE ID")
                                 .help("ID of role to be updated"),
+                        )
+                        .arg(
+                            Arg::with_name("dry_run")
+                                .long("dry-run")
+                                .short("n")
+                                .help("Validate the command without performing the role update"),
                         ),
                 )
                 .subcommand(
@@ -1187,6 +1199,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .takes_value(true)
                                 .value_name("ROLE ID")
                                 .help("ID of role to be deleted"),
+                        )
+                        .arg(
+                            Arg::with_name("dry_run")
+                                .long("dry-run")
+                                .short("n")
+                                .help("Validate the command without performing the role deletion"),
                         ),
                 ),
         ).subcommand(
@@ -1312,6 +1330,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .number_of_values(1)
                                 .required(true)
                                 .help("A role to be assigned to the provided identity"),
+                        )
+                        .arg(
+                            Arg::with_name("dry_run")
+                                .long("dry-run")
+                                .short("n")
+                                .help("Validate the command without authorizing the identity"),
                         ),
                 )
                 .subcommand(
@@ -1386,6 +1410,13 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                     identity",
                                 ),
                         )
+                        .arg(
+                            Arg::with_name("dry_run")
+                                .long("dry-run")
+                                .short("n")
+                                .help("Validate the command without updating the identity's \
+                                    authorizations"),
+                        ),
                 )
                 .subcommand(
                     SubCommand::with_name("delete")
@@ -1423,6 +1454,13 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .conflicts_with("id_key")
                                 .help("The user identity being deleted"),
                         )
+                        .arg(
+                            Arg::with_name("dry_run")
+                                .long("dry-run")
+                                .short("n")
+                                .help("Validate the command without deleting the identity's \
+                                    authorizations"),
+                        ),
                 )
         );
     }
