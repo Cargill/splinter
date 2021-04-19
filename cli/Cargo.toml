@@ -72,7 +72,6 @@ experimental = [
     "authorization-handler-rbac",
     "circuit-auth-type",
     "circuit-abandon",
-    "circuit-disband",
     "circuit-purge",
     "health",
     "https-certs",
@@ -84,7 +83,6 @@ authorization-handler-maintenance = []
 authorization-handler-rbac = []
 circuit-auth-type = []
 circuit-abandon = []
-circuit-disband = []
 circuit-purge = []
 circuit-template = ["splinter/circuit-template"]
 

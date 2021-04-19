@@ -18,7 +18,6 @@ use protobuf::Message;
 use splinter::admin::messages::CreateCircuit;
 #[cfg(feature = "circuit-abandon")]
 use splinter::protos::admin::CircuitAbandon;
-#[cfg(feature = "circuit-disband")]
 use splinter::protos::admin::CircuitDisbandRequest;
 #[cfg(feature = "circuit-purge")]
 use splinter::protos::admin::CircuitPurgeRequest;
@@ -31,7 +30,6 @@ use crate::error::CliError;
 
 #[cfg(feature = "circuit-abandon")]
 use super::AbandonedCircuit;
-#[cfg(feature = "circuit-disband")]
 use super::CircuitDisband;
 #[cfg(feature = "circuit-purge")]
 use super::CircuitPurge;
@@ -147,7 +145,6 @@ impl ApplyToEnvelope for CircuitProposalVote {
     }
 }
 
-#[cfg(feature = "circuit-disband")]
 impl CircuitAction<CircuitDisbandRequest> for CircuitDisband {
     fn action_type(&self) -> Action {
         Action::CIRCUIT_DISBAND_REQUEST
@@ -160,7 +157,6 @@ impl CircuitAction<CircuitDisbandRequest> for CircuitDisband {
     }
 }
 
-#[cfg(feature = "circuit-disband")]
 impl ApplyToEnvelope for CircuitDisbandRequest {
     fn apply(self, circuit_management_payload: &mut CircuitManagementPayload) {
         circuit_management_payload.set_circuit_disband_request(self);

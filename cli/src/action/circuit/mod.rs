@@ -626,15 +626,12 @@ fn vote_on_circuit_proposal(
     }
 }
 
-#[cfg(feature = "circuit-disband")]
 struct CircuitDisband {
     circuit_id: String,
 }
 
-#[cfg(feature = "circuit-disband")]
 pub struct CircuitDisbandAction;
 
-#[cfg(feature = "circuit-disband")]
 impl Action for CircuitDisbandAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
@@ -654,7 +651,6 @@ impl Action for CircuitDisbandAction {
     }
 }
 
-#[cfg(feature = "circuit-disband")]
 fn propose_circuit_disband(
     url: &str,
     signer: Box<dyn Signer>,
