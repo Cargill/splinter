@@ -78,6 +78,7 @@ default = [
     "biome-key-management",
     "database-postgres",
     "database-sqlite",
+    "oauth",
 ]
 
 stable = [
@@ -101,7 +102,6 @@ experimental = [
     "https-bind",
     "metrics",
     "node",
-    "oauth",
     "service-arg-validation",
     "service-endpoint",
     "ws-transport",
