@@ -678,15 +678,12 @@ fn propose_circuit_disband(
     }
 }
 
-#[cfg(feature = "circuit-purge")]
 struct CircuitPurge {
     circuit_id: String,
 }
 
-#[cfg(feature = "circuit-purge")]
 pub struct CircuitPurgeAction;
 
-#[cfg(feature = "circuit-purge")]
 impl Action for CircuitPurgeAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
@@ -706,7 +703,6 @@ impl Action for CircuitPurgeAction {
     }
 }
 
-#[cfg(feature = "circuit-purge")]
 fn request_purge_circuit(
     url: &str,
     signer: Box<dyn Signer>,
