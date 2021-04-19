@@ -17,12 +17,19 @@
 
 /splinterd/target
 /splinterd/Cargo.lock
+/splinterd/packaging/man/*.1
+
+/messaging/src/protos
+/messaging/target
+/messaging/Cargo.lock
 
 /cli/target
 /cli/Cargo.lock
+/cli/packaging/man/*.1
 
 /services/scabbard/cli/target
 /services/scabbard/cli/Cargo.lock
+/services/scabbard/cli/packaging/man/*.1
 
 /services/scabbard/libscabbard/target
 /services/scabbard/libscabbard/Cargo.lock
@@ -37,5 +44,15 @@
 /examples/gameroom/gameroom-app/dist
 /examples/gameroom/gameroom-app/package-lock.json
 
+/examples/gameroom/gameroom-app/src/compiled_protos.json
+
+/services/scabbard/cli/packaging/man/*.1
+
+/tests/Cargo.lock
+/tests/target
+
 /target
 /Cargo.lock
+
+# editor
+**/.vscode
