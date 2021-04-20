@@ -72,9 +72,7 @@ fn create_config(_toml_path: Option<&str>, _matches: ArgMatches) -> Result<Confi
     let default_config = DefaultPartialConfigBuilder::new().build()?;
     builder = builder.with_partial_config(default_config);
 
-    builder
-        .build()
-        .map_err(|e| UserError::MissingArgument(e.to_string()))
+    builder.build().map_err(UserError::ConfigError)
 }
 
 // Checks whether there is a saved node_id file. If there is, the config node_id must match
@@ -513,6 +511,14 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     };
 
     let config = create_config(config_file_path, matches.clone())?;
+
+    let state_dir = config.state_dir();
+    if !Path::new(&state_dir).is_dir() {
+        return Err(UserError::DaemonError {
+            context: format!("state directory {} does not exist", state_dir),
+            source: None,
+        });
+    }
 
     if config.no_tls() {
         for network_endpoint in config.network_endpoints() {
