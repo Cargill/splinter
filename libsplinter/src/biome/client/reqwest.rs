@@ -206,10 +206,10 @@ impl BiomeClient for ReqwestBiomeClient {
     /// Returns a new access token for the Biome user, based on the supplied refresh token
     fn get_new_access_token(&self, refresh_token: &str) -> Result<String, InternalError> {
         let request = Client::new()
-            .patch(&format!("{}/biome/token", self.url))
+            .post(&format!("{}/biome/token", self.url))
             .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?)
-            .json(&json!({ "refresh_token": refresh_token }));
+            .json(&json!({ "token": refresh_token }));
 
         let response = request.send();
 
@@ -223,11 +223,14 @@ impl BiomeClient for ReqwestBiomeClient {
             .and_then(|res| {
                 let status = res.status();
                 if status.is_success() {
-                    res.json::<String>().map_err(|_| {
-                        InternalError::with_message(
-                            "Request was successful, but received an invalid response".into(),
-                        )
-                    })
+                    Ok(res
+                        .json::<ClientAccessToken>()
+                        .map_err(|_| {
+                            InternalError::with_message(
+                                "Request was successful, but received an invalid response".into(),
+                            )
+                        })?
+                        .token)
                 } else {
                     let message = res
                         .json::<ServerError>()
@@ -904,6 +907,12 @@ pub struct ClientAuthorization {
     pub user_id: String,
     pub token: String,
     pub refresh_token: String,
+}
+
+/// Information pertaining to a user's active session, returned by Biome when a user logs in.
+#[derive(Debug, Deserialize)]
+pub struct ClientAccessToken {
+    pub token: String,
 }
 
 impl From<ClientAuthorization> for Authorization {

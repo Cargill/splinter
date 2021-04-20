@@ -170,9 +170,14 @@ struct MockIdentityProvider;
 impl IdentityProvider for MockIdentityProvider {
     fn get_identity(
         &self,
-        _authorization: &AuthorizationHeader,
+        authorization: &AuthorizationHeader,
     ) -> Result<Option<Identity>, InternalError> {
-        Ok(Some(Identity::Custom("".into())))
+        match authorization {
+            AuthorizationHeader::Custom(_) => Ok(Some(Identity::Custom("".into()))),
+            _ => Err(InternalError::with_message(
+                "`Authorization` belongs to external IdentityProvider".into(),
+            )),
+        }
     }
 
     /// Clones implementation for `IdentityProvider`. The implementation of the `Clone` trait for
