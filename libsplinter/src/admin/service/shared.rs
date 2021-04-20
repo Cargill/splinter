@@ -383,6 +383,9 @@ impl AdminServiceShared {
                                 })
                                 .and_then(|_| self.remove_proposal(store_circuit.circuit_id()))?;
 
+                            #[cfg(feature = "admin-service-count")]
+                            self.update_metrics()?;
+
                             // send message about circuit disband proposal being accepted
                             let circuit_proposal_proto =
                                 messages::CircuitProposal::from_proto(circuit_proposal.clone())
@@ -416,6 +419,10 @@ impl AdminServiceShared {
                         } else {
                             // commit new circuit
                             self.admin_store.upgrade_proposal_to_circuit(circuit_id)?;
+
+                            #[cfg(feature = "admin-service-count")]
+                            self.update_metrics()?;
+
                             let circuit =
                                 self.admin_store.get_circuit(circuit_id)?.ok_or_else(|| {
                                     AdminSharedError::SplinterStateError(format!(
@@ -504,6 +511,8 @@ impl AdminServiceShared {
                         match action {
                             CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST => {
                                 self.add_proposal(circuit_proposal.clone())?;
+                                #[cfg(feature = "admin-service-count")]
+                                self.update_metrics()?;
                                 // notify registered application authorization handlers of the
                                 // committed circuit proposal
                                 let event = messages::AdminServiceEvent::ProposalSubmitted(
@@ -522,6 +531,8 @@ impl AdminServiceShared {
 
                             CircuitManagementPayload_Action::CIRCUIT_PROPOSAL_VOTE => {
                                 self.update_proposal(circuit_proposal.clone())?;
+                                #[cfg(feature = "admin-service-count")]
+                                self.update_metrics()?;
                                 // notify registered application authorization handlers of the
                                 // committed circuit proposal
                                 let circuit_proposal_proto =
@@ -538,6 +549,8 @@ impl AdminServiceShared {
                             }
                             CircuitManagementPayload_Action::CIRCUIT_DISBAND_REQUEST => {
                                 self.add_proposal(circuit_proposal.clone())?;
+                                #[cfg(feature = "admin-service-count")]
+                                self.update_metrics()?;
                                 // notify registered application authorization handlers of the
                                 // committed disband circuit proposal
                                 let event = messages::AdminServiceEvent::ProposalSubmitted(
@@ -562,6 +575,8 @@ impl AdminServiceShared {
                     CircuitProposalStatus::Rejected => {
                         // remove circuit
                         let proposal = self.remove_proposal(&circuit_id)?;
+                        #[cfg(feature = "admin-service-count")]
+                        self.update_metrics()?;
                         if let Some(proposal) = proposal {
                             for member in proposal.circuit().members().iter() {
                                 self.remove_peer_ref(member.node_id());
@@ -909,6 +924,20 @@ impl AdminServiceShared {
         )
     }
 
+    #[cfg(feature = "admin-service-count")]
+    pub fn update_metrics(&self) -> Result<(), AdminSharedError> {
+        // initialize circuit and proposal metrics
+        gauge!(
+            "splinter.admin.circuits.active",
+            self.admin_store.count_circuits(&[])? as i64
+        );
+        gauge!(
+            "splinter.admin.proposals",
+            self.admin_store.count_proposals(&[])? as i64
+        );
+        Ok(())
+    }
+
     /// Attempts to purge a circuit and the associated internal Splinter services
     fn purge_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
         // Verifying the circuit is able to be purged
@@ -1004,6 +1033,16 @@ impl AdminServiceShared {
                     format!("Unable to update circuit {}", circuit_id),
                 )))
             })?;
+
+        #[cfg(feature = "admin-service-count")]
+        gauge!(
+            "splinter.admin.circuits.active",
+            self.admin_store.count_circuits(&[]).map_err(|_| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                    String::from("Unable to get count of circuits"),
+                )))
+            })? as i64
+        );
 
         // The circuit is able to be abandoned, so we will proceed with removing the circuit's
         // networking functionality for this node.
