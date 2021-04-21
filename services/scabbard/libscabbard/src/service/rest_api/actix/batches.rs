@@ -68,6 +68,21 @@ pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
                             }
                         };
 
+                        #[cfg(feature = "back-pressure")]
+                        match scabbard.accepting_batches() {
+                            Ok(true) => (),
+                            Ok(false) => {
+                                warn!("Rejecting submitted batch, too many pending batches");
+                                return HttpResponse::TooManyRequests().into_future();
+                            }
+                            Err(err) => {
+                                error!("Failed to add batches: {}", err);
+                                return HttpResponse::InternalServerError()
+                                    .json(ErrorResponse::internal_error())
+                                    .into_future();
+                            }
+                        };
+
                         match scabbard.add_batches(batches) {
                             Ok(Some(link)) => HttpResponse::Accepted()
                                 .json(BatchLinkResponse::from(link.as_str()))

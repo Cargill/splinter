@@ -67,7 +67,7 @@ const SERVICE_TYPE: &str = "scabbard";
 const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
 /// Specifies the version of scabbard to use.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum ScabbardVersion {
     V1,
     V2,
@@ -130,6 +130,8 @@ impl Scabbard {
             peer_services,
             service_id.clone(),
             signature_verifier,
+            #[cfg(feature = "back-pressure")]
+            version,
         );
 
         let (state_db_path, receipt_db_path) =
@@ -188,6 +190,20 @@ impl Scabbard {
             .to_string())
     }
 
+    /// Get whether the service is currently accepting batches
+    #[cfg(feature = "back-pressure")]
+    pub fn accepting_batches(&self) -> Result<bool, ScabbardError> {
+        let shared = self
+            .shared
+            .lock()
+            .map_err(|_| ScabbardError::LockPoisoned)?;
+
+        match self.version {
+            ScabbardVersion::V1 => Ok(true),
+            ScabbardVersion::V2 => Ok(shared.accepting_batches()),
+        }
+    }
+
     pub fn add_batches(&self, batches: Vec<BatchPair>) -> Result<Option<String>, ScabbardError> {
         let mut shared = self
             .shared
@@ -210,10 +226,10 @@ impl Scabbard {
                 link.push_str(&format!("{},", batch.batch().header_signature()));
 
                 match self.version {
-                    ScabbardVersion::V1 => shared.add_batch_to_queue(batch),
+                    ScabbardVersion::V1 => shared.add_batch_to_queue(batch)?,
                     ScabbardVersion::V2 => {
                         if shared.is_coordinator() {
-                            shared.add_batch_to_queue(batch);
+                            shared.add_batch_to_queue(batch)?;
                         } else {
                             let batch_bytes = batch
                                 .into_bytes()
@@ -438,7 +454,9 @@ impl Service for Scabbard {
                                 BatchPair::from_bytes(message.get_new_batch()).map_err(|err| {
                                     ServiceError::UnableToHandleMessage(Box::new(err))
                                 })?;
-                            shared.add_batch_to_queue(batch);
+                            shared.add_batch_to_queue(batch).map_err(|err| {
+                                ServiceError::UnableToHandleMessage(Box::new(err))
+                            })?;
                         } else {
                             warn!("Ignoring new batch; this service is not the coordinator");
                         }
@@ -447,7 +465,45 @@ impl Service for Scabbard {
 
                 Ok(())
             }
-            ScabbardMessage_Type::UNSET => Err(ServiceError::InvalidMessageFormat(Box::new(
+            #[cfg(feature = "back-pressure")]
+            ScabbardMessage_Type::TOO_MANY_REQUESTS => {
+                match self.version {
+                    ScabbardVersion::V1 => {
+                        warn!("Scabbard V1 does not accept TOO_MANY_REQUESTS messages");
+                    }
+                    ScabbardVersion::V2 => {
+                        let mut shared = self.shared.lock().map_err(|_| {
+                            ServiceError::PoisonedLock("shared lock poisoned".into())
+                        })?;
+                        if shared.is_coordinator() {
+                            warn!("Ignoring too many requests message, not from the coordinator");
+                        } else {
+                            shared.set_accepting_batches(false);
+                        }
+                    }
+                }
+                Ok(())
+            }
+            #[cfg(feature = "back-pressure")]
+            ScabbardMessage_Type::ACCEPTING_REQUESTS => {
+                match self.version {
+                    ScabbardVersion::V1 => {
+                        warn!("Scabbard V1 does not accept ACCEPTING_REQUESTS messages");
+                    }
+                    ScabbardVersion::V2 => {
+                        let mut shared = self.shared.lock().map_err(|_| {
+                            ServiceError::PoisonedLock("shared lock poisoned".into())
+                        })?;
+                        if shared.is_coordinator() {
+                            warn!("Ignoring accepting requests message, not from the coordinator");
+                        } else {
+                            shared.set_accepting_batches(true);
+                        }
+                    }
+                }
+                Ok(())
+            }
+            _ => Err(ServiceError::InvalidMessageFormat(Box::new(
                 ScabbardError::MessageTypeUnset,
             ))),
         }
