@@ -29,7 +29,7 @@ use protobuf::Message;
 
 use crate::channel;
 use crate::error::InternalError;
-use crate::mesh::{Envelope, Mesh, RecvTimeoutError as MeshRecvTimeoutError};
+use crate::mesh::{Envelope, Mesh, RecvTimeoutError as MeshRecvTimeoutError, SendError};
 use crate::network::reply::InboundRouter;
 use crate::protos::circuit::{
     AdminDirectMessage, CircuitDirectMessage, CircuitError, CircuitMessage, CircuitMessageType,
@@ -620,9 +620,12 @@ fn run_outgoing_loop(
         };
 
         // Send message to splinter node
-        outgoing_mesh
-            .send(Envelope::new(mesh_id.to_string(), message_bytes))
-            .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
+        match outgoing_mesh.send(Envelope::new(mesh_id.to_string(), message_bytes)) {
+            Ok(()) => (),
+            // drop message if it cannot be sent because the queue is full
+            Err(SendError::Full(_)) => error!("Unable to send outgoing message, queue full"),
+            Err(err) => return Err(OrchestratorError::Internal(Box::new(err))),
+        }
     }
     Ok(())
 }
