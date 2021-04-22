@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 
 pub use error::UserProfileStoreError;
 
+/// Represents a user profile used to display user information
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Profile {
     user_id: String,
@@ -71,6 +72,8 @@ impl Profile {
 }
 
 /// Builder for profile.
+///
+/// user_id and subject are required
 #[derive(Default)]
 pub struct ProfileBuilder {
     user_id: Option<String>,
@@ -88,48 +91,84 @@ impl ProfileBuilder {
     }
 
     /// Sets the user_id for the profile
+    ///
+    /// This is a required field for the final Profile struct
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id` - a unique identifier for the user the profile belongs to
     pub fn with_user_id(mut self, user_id: String) -> ProfileBuilder {
         self.user_id = Some(user_id);
         self
     }
 
     /// Sets the subject for the profile
+    ///
+    /// This is a required field for the final Profile struct
+    ///
+    /// # Arguments
+    ///
+    /// * `subject` - the subject id for the account that provided the profile information
     pub fn with_subject(mut self, subject: String) -> ProfileBuilder {
         self.subject = Some(subject);
         self
     }
 
     /// Sets the name for the profile
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - the name of the user the profile belongs to
     pub fn with_name(mut self, name: Option<String>) -> ProfileBuilder {
         self.name = name;
         self
     }
 
     /// Sets the given name for the profile
+    ///
+    /// # Arguments
+    ///
+    /// * `given_name` - the given name of the user the profile belongs to
     pub fn with_given_name(mut self, given_name: Option<String>) -> ProfileBuilder {
         self.given_name = given_name;
         self
     }
 
     /// Sets the family name for the profile
+    ///
+    /// # Arguments
+    ///
+    /// * `family_name` - the family name of the user the profile belongs to
     pub fn with_family_name(mut self, family_name: Option<String>) -> ProfileBuilder {
         self.family_name = family_name;
         self
     }
 
     /// Sets the email for the profile
+    ///
+    /// # Arguments
+    ///
+    /// * `email` - the user's email address associated with the account
     pub fn with_email(mut self, email: Option<String>) -> ProfileBuilder {
         self.email = email;
         self
     }
 
     /// Sets the picture for the profile
+    ///
+    /// # Arguments
+    ///
+    /// * `picture` - the user's profile picture associated with the account
     pub fn with_picture(mut self, picture: Option<String>) -> ProfileBuilder {
         self.picture = picture;
         self
     }
 
     /// Builds the profile
+    ///
+    /// # Errors
+    ///
+    /// Returns an `InvalidStateError` if `user_id` or `subject` are missing
     pub fn build(self) -> Result<Profile, InvalidStateError> {
         Ok(Profile {
             user_id: self.user_id.ok_or_else(|| {
