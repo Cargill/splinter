@@ -21,7 +21,9 @@ use std::thread::JoinHandle;
 
 use cylinder::Signer;
 use scabbard::client::{ReqwestScabbardClientBuilder, ScabbardClient};
-use splinter::admin::client::event::AdminServiceEventClient;
+use splinter::admin::client::event::{
+    AdminServiceEvent, AdminServiceEventClient, EventQuery, WaitForError,
+};
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::biome::client::{BiomeClient, ReqwestBiomeClient};
 use splinter::error::InternalError;
@@ -32,6 +34,7 @@ use splinter::registry::{
 use splinter::rest_api::actix_web_1::RestApiShutdownHandle;
 use splinter::rest_api::actix_web_3::RestApi;
 use splinter::threading::lifecycle::ShutdownHandle;
+use std::time::Duration;
 
 use super::{running::admin::AdminSubsystem, NodeBuilder, RestApiVariant, RunnableNode};
 
@@ -48,6 +51,7 @@ pub struct Node {
     pub(super) rest_api_port: u16,
     pub(super) network_subsystem: network::NetworkSubsystem,
     pub(super) node_id: String,
+    pub(super) admin_service_event_client: Box<dyn AdminServiceEventClient>,
 }
 
 impl Node {
@@ -116,6 +120,7 @@ impl Node {
             node_id,
             rest_api_port,
             mut network_subsystem,
+            admin_service_event_client: _,
         } = self;
 
         let rest_api_variant = match rest_api_variant {
@@ -166,6 +171,24 @@ impl Node {
         }
 
         Box::new(biome_client)
+    }
+
+    pub fn wait_for(
+        self: &Node,
+        event_query: EventQuery,
+        timeout: Duration,
+    ) -> Result<AdminServiceEvent, WaitForError> {
+        self.admin_service_event_client
+            .wait_for(event_query, timeout)
+    }
+
+    pub fn wait_for_filter<T: Fn(&AdminServiceEvent) -> bool>(
+        self: &Node,
+        event_filter: T,
+        timeout: Duration,
+    ) -> Result<AdminServiceEvent, WaitForError> {
+        self.admin_service_event_client
+            .wait_for_filter(&event_filter, timeout)
     }
 }
 

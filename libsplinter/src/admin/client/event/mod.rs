@@ -19,8 +19,11 @@ mod error;
 mod ws;
 
 use super::ProposalSlice;
+use std::cmp;
+use std::thread;
+use std::time::{Duration, Instant};
 
-pub use error::NextEventError;
+pub use error::{NextEventError, WaitForError};
 #[cfg(feature = "admin-service-event-client-actix-web-client")]
 pub use ws::actix_web_client::{
     AwcAdminServiceEventClient, AwcAdminServiceEventClientBuilder,
@@ -79,6 +82,54 @@ impl AdminServiceEvent {
     }
 }
 
+/// EventQuery represents common event types that can be queried for
+pub enum EventQuery<'a> {
+    ProposalSubmitted { circuit_id: &'a str },
+    ProposalVote { circuit_id: &'a str, key: PublicKey },
+    ProposalAccepted { circuit_id: &'a str, key: PublicKey },
+    ProposalRejected { circuit_id: &'a str, key: PublicKey },
+    CircuitReady { circuit_id: &'a str },
+    CircuitDisbanded { circuit_id: &'a str },
+}
+
+impl<'a> EventQuery<'a> {
+    /// Transform the EventQuery into an event filter
+    fn filter(self) -> impl Fn(&AdminServiceEvent) -> bool + 'a {
+        move |event: &AdminServiceEvent| match &self {
+            EventQuery::ProposalSubmitted { circuit_id } => {
+                event.event_type() == &EventType::ProposalSubmitted
+                    && &event.proposal().circuit_id == circuit_id
+            }
+            EventQuery::ProposalVote { circuit_id, key } => match event.event_type() {
+                EventType::ProposalVote { requester } => {
+                    requester == key && &event.proposal().circuit_id == circuit_id
+                }
+                _ => false,
+            },
+            EventQuery::ProposalAccepted { circuit_id, key } => match event.event_type() {
+                EventType::ProposalAccepted { requester } => {
+                    requester == key && &event.proposal().circuit_id == circuit_id
+                }
+                _ => false,
+            },
+            EventQuery::ProposalRejected { circuit_id, key } => match event.event_type() {
+                EventType::ProposalRejected { requester } => {
+                    requester == key && &event.proposal().circuit_id == circuit_id
+                }
+                _ => false,
+            },
+            EventQuery::CircuitReady { circuit_id } => {
+                event.event_type() == &EventType::CircuitReady
+                    && &event.proposal().circuit_id == circuit_id
+            }
+            EventQuery::CircuitDisbanded { circuit_id } => {
+                event.event_type() == &EventType::CircuitDisbanded
+                    && &event.proposal().circuit_id == circuit_id
+            }
+        }
+    }
+}
+
 /// An admin service event client will provide events as they are returned from an admin service.
 ///
 /// It provides two methods, a blocking method and a non-blocking method, depending on the caller's
@@ -93,6 +144,49 @@ pub trait AdminServiceEventClient {
     ///
     /// This should block until an event is available.
     fn next_event(&self) -> Result<AdminServiceEvent, NextEventError>;
+
+    /// Wait for the given event specified by the filter, until a timeout
+    ///
+    /// This should block until an event is available.
+    fn wait_for_filter(
+        &self,
+        event_filter: &dyn Fn(&AdminServiceEvent) -> bool,
+        timeout: Duration,
+    ) -> Result<AdminServiceEvent, WaitForError> {
+        let start = Instant::now();
+        let poll_rate = Duration::from_millis(100);
+
+        loop {
+            if let Some(event) = self
+                .try_next_event()
+                .map_err(WaitForError::NextEventError)?
+            {
+                if event_filter(&event) {
+                    return Ok(event);
+                }
+            }
+
+            let elapsed = start.elapsed();
+            if timeout < elapsed {
+                return Err(WaitForError::TimeoutError);
+            }
+
+            let timeleft = timeout - elapsed;
+            let sleep_duration = cmp::min(timeleft, poll_rate);
+            thread::sleep(sleep_duration);
+        }
+    }
+
+    /// Wait for the given event until a timeout
+    ///
+    /// This should block until an event is available.
+    fn wait_for(
+        &self,
+        event_query: EventQuery,
+        timeout: Duration,
+    ) -> Result<AdminServiceEvent, WaitForError> {
+        self.wait_for_filter(&event_query.filter(), timeout)
+    }
 }
 
 impl AdminServiceEventClient for Box<dyn AdminServiceEventClient> {
