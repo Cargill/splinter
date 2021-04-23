@@ -1562,6 +1562,7 @@ impl AdminServiceShared {
         }
     }
 
+    #[cfg(not(feature = "admin-service-event-subscriber-glob"))]
     pub fn get_events_since(
         &self,
         since_event_id: &i64,
@@ -1574,6 +1575,29 @@ impl AdminServiceShared {
                 *since_event_id,
             )
             .map_err(|err| AdminSharedError::UnableToAddSubscriber(err.to_string()))?;
+        Ok(Events {
+            inner: Box::new(events),
+        })
+    }
+
+    #[cfg(feature = "admin-service-event-subscriber-glob")]
+    pub fn get_events_since(
+        &self,
+        since_event_id: &i64,
+        circuit_management_type: &str,
+    ) -> Result<Events, AdminSharedError> {
+        let events = if circuit_management_type == "*" {
+            self.event_store
+                .list_events_since(*since_event_id)
+                .map_err(|err| AdminSharedError::UnableToAddSubscriber(err.to_string()))?
+        } else {
+            self.event_store
+                .list_events_by_management_type_since(
+                    circuit_management_type.to_string(),
+                    *since_event_id,
+                )
+                .map_err(|err| AdminSharedError::UnableToAddSubscriber(err.to_string()))?
+        };
         Ok(Events {
             inner: Box::new(events),
         })
