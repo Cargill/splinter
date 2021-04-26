@@ -187,6 +187,7 @@ message CircuitManagementPayload {
          CIRCUIT_DISBAND_REQUEST = 8;
          CIRCUIT_PURGE_REQUEST = 9;
          CIRCUIT_ABANDON = 10;
+         PROPOSAL_REMOVE_REQUEST = 11;
     }
 
     message Header {
@@ -219,6 +220,7 @@ message CircuitManagementPayload {
     CircuitDisbandRequest circuit_disband_request = 10;
     CircuitPurgeRequest circuit_purge_request = 11;
     CircuitAbandon circuit_abandon = 12;
+    ProposalRemoveRequest proposal_remove_request = 13;
 }
 
 message CircuitProposalVote {
@@ -300,6 +302,11 @@ message CircuitPurgeRequest {
 }
 
 message CircuitAbandon {
+    // The unique circuit name
+    string circuit_id = 1;
+}
+
+message ProposalRemoveRequest {
     // The unique circuit name
     string circuit_id = 1;
 }
