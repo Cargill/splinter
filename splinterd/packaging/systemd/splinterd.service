@@ -14,7 +14,7 @@
 
 [Unit]
 Description=Splinter Daemon
-After=network.target
+After=network-online.target
 
 [Service]
 User=splinterd
