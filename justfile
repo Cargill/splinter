@@ -92,6 +92,11 @@ clean:
 clean-metrics:
     docker-compose -f docker/metrics/docker-compose.yaml down -v
 
+copy-env:
+    #!/usr/bin/env sh
+    set -e
+    find . -name .env | xargs -I '{}' sh -c "echo 'Copying to {}'; rsync .env {}"
+
 lint: lint-ignore
     #!/usr/bin/env sh
     set -e
