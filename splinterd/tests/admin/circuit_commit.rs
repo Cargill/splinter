@@ -42,10 +42,10 @@ pub(in crate::admin) fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, 
     let node_b_admin_pubkey = admin_pubkey(node_b);
 
     let node_a_event_client = node_a
-        .admin_service_event_client("test_circuit")
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
     let node_b_event_client = node_b
-        .admin_service_event_client("test_circuit")
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
 
     let circuit_payload_bytes = make_create_circuit_payload(
@@ -53,6 +53,18 @@ pub(in crate::admin) fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, 
         node_a.node_id(),
         node_info,
         &*node_a.admin_signer().clone_box(),
+        &vec![
+            node_a
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get first node's public key")
+                .as_hex(),
+            node_b
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get second node's public key")
+                .as_hex(),
+        ],
     );
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
@@ -173,13 +185,13 @@ pub(in crate::admin) fn commit_3_party_circuit(
     let node_c_admin_pubkey = admin_pubkey(node_c);
 
     let node_a_event_client = node_a
-        .admin_service_event_client("test_circuit")
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
     let node_b_event_client = node_b
-        .admin_service_event_client("test_circuit")
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
     let node_c_event_client = node_b
-        .admin_service_event_client("test_circuit")
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
 
     // Create the `CircuitManagementPayload` to be sent to a node
@@ -188,6 +200,23 @@ pub(in crate::admin) fn commit_3_party_circuit(
         node_a.node_id(),
         node_info,
         &*node_a.admin_signer().clone_box(),
+        &vec![
+            node_a
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get first node's public key")
+                .as_hex(),
+            node_b
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get second node's public key")
+                .as_hex(),
+            node_c
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get third node's public key")
+                .as_hex(),
+        ],
     );
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a

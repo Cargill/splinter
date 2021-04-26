@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides functionality for building `CircuitManagmentPayload`s, used in the admin service
+//! Provides functionality for building `CircuitManagementPayload`s, used in the admin service
 //! integration tests.
 
 use std::collections::HashMap;
@@ -21,15 +21,18 @@ use cylinder::Signer;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 
+use sabre_sdk::protocol::payload::CreateContractRegistryActionBuilder;
 use splinter::admin::client::ProposalSlice;
 use splinter::admin::messages::{
     AuthorizationType, CircuitProposalVote, CreateCircuitBuilder, DurabilityType, PersistenceType,
     RouteType, SplinterNode, SplinterNodeBuilder, SplinterService, SplinterServiceBuilder, Vote,
 };
+use splinter::error::InternalError;
 use splinter::protos::admin::{
-    CircuitCreateRequest, CircuitDisbandRequest, CircuitManagementPayload,
+    CircuitAbandon, CircuitCreateRequest, CircuitDisbandRequest, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header,
 };
+use transact::protocol::batch::Batch;
 
 /// Makes the `CircuitManagementPayload` to create a circuit and returns the bytes of this
 /// payload
@@ -38,13 +41,14 @@ pub(in crate::admin) fn make_create_circuit_payload(
     requester: &str,
     node_info: HashMap<String, Vec<String>>,
     signer: &dyn Signer,
+    admin_keys: &[String],
 ) -> Vec<u8> {
-    // Get the public key to create the `CircuitCreateRequest` and to also set the `requester`
-    // field of the `CircuitManagementPayload` header
+    // Get the public key to set the `requester` field of the `CircuitManagementPayload` header
     let public_key = signer
         .public_key()
-        .expect("Unable to get signer's public key");
-    let circuit_request = setup_circuit(circuit_id, node_info, &public_key.as_hex());
+        .expect("Unable to get signer's public key")
+        .into_bytes();
+    let circuit_request = setup_circuit(circuit_id, node_info, admin_keys);
     let serialized_action = circuit_request
         .write_to_bytes()
         .expect("Unable to serialize `CircuitCreateRequest`");
@@ -53,7 +57,7 @@ pub(in crate::admin) fn make_create_circuit_payload(
 
     let mut header = CircuitManagementPayload_Header::new();
     header.set_action(CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
-    header.set_requester(public_key.into_bytes());
+    header.set_requester(public_key);
     header.set_payload_sha512(hashed_bytes.to_vec());
     header.set_requester_node_id(requester.to_string());
 
@@ -67,9 +71,8 @@ pub(in crate::admin) fn make_create_circuit_payload(
     payload.set_circuit_create_request(circuit_request);
     payload
         .set_header(Message::write_to_bytes(&header).expect("Unable to serialize payload header"));
-
     // Return the bytes of the payload
-    Message::write_to_bytes(&payload).expect("Unable to serialize `CircuitManagmentPayload`")
+    Message::write_to_bytes(&payload).expect("Unable to serialize `CircuitManagementPayload`")
 }
 
 /// Makes the `CircuitProposalVote` payload to either accept or reject the proposal (based on
@@ -152,7 +155,7 @@ pub(in crate::admin) fn make_circuit_disband_payload(
     payload.set_signature(
         signer
             .sign(&payload.header)
-            .expect("Unable to sign `CircuitManagmentPayload` header")
+            .expect("Unable to sign `CircuitManagementPayload` header")
             .take_bytes(),
     );
     payload.set_circuit_disband_request(disband_request);
@@ -164,11 +167,55 @@ pub(in crate::admin) fn make_circuit_disband_payload(
         .expect("Unable to get bytes from `CircuitDisbandRequest` payload")
 }
 
+/// Makes the `CircuitManagementPayload` to abandon a circuit and returns the bytes of this
+/// payload
+pub(in crate::admin) fn make_circuit_abandon_payload(
+    circuit_id: &str,
+    requester_node_id: &str,
+    signer: &dyn Signer,
+) -> Vec<u8> {
+    // Get the public key to create the `CircuitAbandon` and to also set the `requester`
+    // field of the `CircuitManagementPayload` header
+    let public_key = signer
+        .public_key()
+        .expect("Unable to get signer's public key")
+        .into_bytes();
+    let mut circuit_abandon = CircuitAbandon::new();
+    circuit_abandon.set_circuit_id(circuit_id.to_string());
+
+    let serialized_action = circuit_abandon
+        .write_to_bytes()
+        .expect("Unable to serialize `CircuitAbandon`");
+    let hashed_bytes = hash(MessageDigest::sha512(), &serialized_action)
+        .expect("Unable to hash `CircuitAbandon` bytes");
+
+    let mut header = CircuitManagementPayload_Header::new();
+    header.set_action(CircuitManagementPayload_Action::CIRCUIT_ABANDON);
+    header.set_requester(public_key);
+    header.set_payload_sha512(hashed_bytes.to_vec());
+    header.set_requester_node_id(requester_node_id.to_string());
+
+    let mut payload = CircuitManagementPayload::new();
+    payload.set_signature(
+        signer
+            .sign(&payload.header)
+            .expect("Unable to sign `CircuitManagementPayload` header")
+            .take_bytes(),
+    );
+    payload.set_circuit_abandon(circuit_abandon);
+    payload
+        .set_header(Message::write_to_bytes(&header).expect("Unable to serialize payload header"));
+    // Return the bytes of the payload
+    payload
+        .write_to_bytes()
+        .expect("Unable to get bytes from `CircuitAbandon` payload")
+}
+
 /// Creates the `CircuitCreateRequest` for the `CircuitManagementPayload` to propose a circuit
 fn setup_circuit(
     circuit_id: &str,
     node_info: HashMap<String, Vec<String>>,
-    public_key: &str,
+    admin_keys: &[String],
 ) -> CircuitCreateRequest {
     // The services require the service IDs from its peer services, which will be generated
     // after the node information is iterated over and the `SplinterServiceBuilder` is created
@@ -197,7 +244,10 @@ fn setup_circuit(
                 .with_arguments(
                     vec![
                         ("peer_services".to_string(), format!("{:?}", peer_services)),
-                        ("admin_keys".to_string(), format!("{:?}", vec![public_key])),
+                        (
+                            "admin_keys".to_string(),
+                            format!("{:?}", admin_keys.to_vec()),
+                        ),
                     ]
                     .as_ref(),
                 )
@@ -225,7 +275,7 @@ fn setup_circuit(
         .with_persistence(&PersistenceType::Any)
         .with_durability(&DurabilityType::NoDurability)
         .with_routes(&RouteType::Any)
-        .with_circuit_management_type("test_circuit")
+        .with_circuit_management_type(&format!("test_circuit_{}", &circuit_id))
         .with_application_metadata(b"test_data")
         .with_comments("test circuit")
         .with_display_name("test_circuit")
@@ -235,4 +285,26 @@ fn setup_circuit(
     create_circuit_message
         .into_proto()
         .expect("Unable to get proto from `CreateCircuit`")
+}
+
+/// Create the bytes of a `CreateContractRegistryAction` batch
+pub(in crate::admin) fn make_create_contract_registry_batch(
+    name: &str,
+    signer: &dyn Signer,
+) -> Result<Batch, InternalError> {
+    let owners = vec![signer
+        .public_key()
+        .expect("Unable to get signer's public key")
+        .as_hex()];
+    CreateContractRegistryActionBuilder::new()
+        .with_name(name.into())
+        .with_owners(owners)
+        .into_payload_builder()
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .into_transaction_builder(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .into_batch_builder(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .build(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))
 }

@@ -123,21 +123,25 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
     ]
     .into_iter()
     .collect::<HashMap<String, Vec<String>>>();
+    let circuit_id = "ABCDE-01234";
 
     let node_a_event_client = node_a
-        .admin_service_event_client("test_circuit")
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
     let node_b_event_client = node_b
-        .admin_service_event_client("test_circuit")
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
-
-    let circuit_id = "ABCDE-01234";
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes = make_create_circuit_payload(
         &circuit_id,
         node_a.node_id(),
         node_info,
         &*node_a.admin_signer().clone_box(),
+        &vec![node_a
+            .admin_signer()
+            .public_key()
+            .expect("Unable to get first node's public key")
+            .as_hex()],
     );
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
@@ -254,24 +258,29 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     ]
     .into_iter()
     .collect::<HashMap<String, Vec<String>>>();
+    let circuit_id = "ABCDE-01234";
 
     let node_a_event_client = node_a
-        .admin_service_event_client("test_circuit")
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
     let node_b_event_client = node_b
-        .admin_service_event_client("test_circuit")
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
     let node_c_event_client = node_b
-        .admin_service_event_client("test_circuit")
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
 
-    let circuit_id = "ABCDE-01234";
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes = make_create_circuit_payload(
         &circuit_id,
         node_a.node_id(),
         node_info,
         &*node_a.admin_signer().clone_box(),
+        &vec![node_a
+            .admin_signer()
+            .public_key()
+            .expect("Unable to get first node's public key")
+            .as_hex()],
     );
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a

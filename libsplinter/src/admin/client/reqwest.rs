@@ -84,7 +84,11 @@ impl AdminServiceClient for ReqwestAdminServiceClient {
     fn list_circuits(&self, filter: Option<&str>) -> Result<CircuitListSlice, InternalError> {
         let mut url = format!("{}/admin/circuits?limit={}", self.url, PAGING_LIMIT);
         if let Some(filter) = filter {
-            url = format!("{}&filter={}", &url, &filter);
+            if filter.starts_with("status") {
+                url = format!("{}&{}", &url, &filter);
+            } else {
+                url = format!("{}&filter={}", &url, &filter);
+            }
         }
 
         let request = Client::new()
