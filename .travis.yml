@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+language: python
+
 services:
   - docker
 
@@ -31,6 +33,7 @@ before_install:
   - chmod +x docker-compose
   - sudo mv docker-compose /usr/local/bin
   - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+  - pip3 install travis-wait-improved
 addons:
   apt:
     packages:
@@ -50,7 +53,7 @@ jobs:
       before_script:
         - set -e
       script:
-        - travis_wait 120 just ci-test
+        - travis-wait-improved --timeout 120m just ci-test
     - stage: Run Splinter/Gameroom Unit Tests
       before_script:
         - set -e
