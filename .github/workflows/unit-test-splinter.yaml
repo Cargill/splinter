@@ -1,0 +1,19 @@
+name: Unit Test Splinter
+
+on:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  unit_test_splinter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Unit Test Splinter
+        run: just ci-test

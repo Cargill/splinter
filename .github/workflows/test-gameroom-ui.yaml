@@ -1,0 +1,19 @@
+name: Test Gameroom UI
+
+on:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  gameroom_ui_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Gameroom UI Tests
+        run: just ci-test-gameroom-ui

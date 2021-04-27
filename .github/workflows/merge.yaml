@@ -1,0 +1,64 @@
+name: Merge
+
+on:
+  push:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+
+  lint_gameroom_client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Lint Gameroom Client
+        run: just ci-lint-client
+
+  lint_splinter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Run Lint/Clippy on Splinter
+        run: just ci-lint-splinter
+
+  unit_test_splinter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Unit Test Splinter
+        run: just ci-test
+
+  gameroom_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Gameroom Tests
+        run: just ci-test-gameroom
+
+  gameroom_ui_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Gameroom UI Tests
+        run: just ci-test-gameroom-ui
