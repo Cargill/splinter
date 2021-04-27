@@ -523,30 +523,38 @@ pub mod tests {
             let envelope = Envelope::new("test_id".to_string(), message_bytes);
             mesh2.send(envelope).expect("Unable to send message");
 
-            // Verify mesh received the same network echo back
-            let envelope = mesh2.recv().expect("Cannot receive message");
-            let mut network_msg: ComponentMessage = Message::parse_from_bytes(&envelope.payload())
-                .expect("Cannot parse ComponentMessage");
-
-            if network_msg.get_message_type() == ComponentMessageType::COMPONENT_HEARTBEAT {
-                // try to get the service message
+            let mut err = Some("Did not receive message".to_string());
+            for _attempt in 0..10 {
+                // Verify mesh received the same network echo back
                 let envelope = mesh2.recv().expect("Cannot receive message");
-                network_msg = Message::parse_from_bytes(&envelope.payload())
+                let network_msg: ComponentMessage = Message::parse_from_bytes(&envelope.payload())
                     .expect("Cannot parse ComponentMessage");
+
+                match network_msg.get_message_type() {
+                    // ignore heartbeats
+                    ComponentMessageType::COMPONENT_HEARTBEAT => (),
+                    ComponentMessageType::SERVICE => {
+                        let echo: service::ServiceProcessorMessage =
+                            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
+
+                        assert_eq!(echo.get_payload().to_vec(), b"test_retrieve".to_vec());
+                        err = None;
+                        break;
+                    }
+                    _ => {
+                        err = Some(format!(
+                            "Unexpected message type {:?}",
+                            network_msg.get_message_type()
+                        ));
+                    }
+                }
             }
-
-            assert_eq!(
-                network_msg.get_message_type(),
-                ComponentMessageType::SERVICE
-            );
-
-            let echo: service::ServiceProcessorMessage =
-                Message::parse_from_bytes(network_msg.get_payload()).unwrap();
-
-            assert_eq!(echo.get_payload().to_vec(), b"test_retrieve".to_vec());
 
             mesh2.signal_shutdown();
             mesh2.wait_for_shutdown().expect("Unable to shutdown mesh");
+            if let Some(err) = err {
+                panic!("{}", err);
+            }
         });
         let (dispatcher_sender, dispatcher_receiver) = dispatch_channel();
         let interconnect = ServiceInterconnectBuilder::new()
