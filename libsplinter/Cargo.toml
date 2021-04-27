@@ -125,6 +125,7 @@ experimental = [
     "https-bind",
     "metrics",
     "oauth-profile",
+    "proposal-removal",
     "registry-client",
     "registry-client-reqwest",
     "rest-api-actix-web-3",
@@ -166,6 +167,7 @@ memory = ["sqlite"]
 metrics = ["chrono", "futures-0-3", "influxdb", "metrics-lib", "tokio-0-2"]
 oauth = ["biome", "oauth2", "reqwest", "rest-api"]
 postgres = ["diesel/postgres", "diesel_migrations"]
+proposal-removal = []
 registry = []
 registry-client = ["registry"]
 registry-client-reqwest = ["registry-client", "reqwest"]
