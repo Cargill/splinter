@@ -17,36 +17,67 @@
 
 #[macro_export]
 macro_rules! shutdown {
-    ($($handle:expr),*) => {
-        {
-            use splinter::error::InternalError;
-            use splinter::threading::lifecycle::ShutdownHandle;
-           $(
-                $handle.signal_shutdown();
-           )*
-            let mut errors = vec![];
+    ($handle:expr) => {{
+        use std::sync::mpsc;
+        use std::thread;
+        use std::time::Duration;
 
-           $(
-                if let Err(err) = $handle.wait_for_shutdown() {
-                    errors.push(err);
-                }
-           )*
+        use splinter::error::InternalError;
+        use splinter::threading::lifecycle::ShutdownHandle;
 
-            match errors.len() {
-                0 => Ok(()),
-                1 => Err(errors.remove(0)),
-                _ => Err(InternalError::with_message(
-                        format!(
-                        "Multiple errors occurred during shutdown: {}",
-                        errors
-                            .into_iter()
-                            .map(|e| e.to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                        )
-                   )
-                ),
+        let (tx, rx) = mpsc::channel();
+
+        let timeout_tx = tx.clone();
+
+        let timeout = match std::env::var("SPLINTER_TEST_SHUTDOWN_TIMEOUT_SECS") {
+            Ok(v) => Duration::from_secs(v.parse().unwrap()),
+            Err(_) => Duration::from_secs(120),
+        };
+
+        thread::spawn(move || {
+            thread::sleep(timeout);
+            if timeout_tx
+                .send(Some(format!(
+                    "shutdown did not complete after {} seconds",
+                    timeout.as_secs()
+                )))
+                .is_err()
+            {
+                // ignore, the shutdown probably completed.
             }
+        });
+
+        struct UnsafeSender<T>(T);
+        unsafe impl<T> Send for UnsafeSender<T> {}
+
+        let handle = UnsafeSender($handle);
+
+        let sh_join = thread::spawn(move || {
+            let mut error = None;
+            let UnsafeSender(mut sh) = handle;
+
+            sh.signal_shutdown();
+
+            if let Err(err) = sh.wait_for_shutdown() {
+                error = Some(err.to_string());
+            }
+
+            // Send None that all handles have been successfully "waited for".
+            tx.send(None).unwrap();
+
+            error
+        });
+
+        if let Some(msg) = rx.recv().unwrap() {
+            panic!("{}", msg);
         }
-    };
+
+        let error = sh_join.join().unwrap();
+
+        if let Some(err) = error {
+            Err(InternalError::with_message(err))
+        } else {
+            Ok(())
+        }
+    }};
 }
