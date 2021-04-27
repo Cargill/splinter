@@ -84,6 +84,8 @@ ci-test:
 
 ci-test-gameroom: test-gameroom
 
+ci-test-gameroom-ui: test-gameroom-ui
+
 clean:
     cargo clean
 
@@ -180,4 +182,11 @@ test-gameroom:
     set -e
     docker-compose -f examples/gameroom/tests/docker-compose.yaml build
     docker-compose -f examples/gameroom/tests/docker-compose.yaml up \
+    --abort-on-container-exit
+
+test-gameroom-ui:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f examples/gameroom/tests/cypress/docker-compose.yaml build
+    docker-compose -f examples/gameroom/tests/cypress/docker-compose.yaml up \
     --abort-on-container-exit
