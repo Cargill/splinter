@@ -19,7 +19,7 @@ use std::time::Duration;
 use cylinder::Verifier;
 use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
-use splinter::admin::service::AdminServiceBuilder;
+use splinter::admin::service::{AdminCommands, AdminServiceBuilder, AdminServiceStatus};
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
 use splinter::events::Reactor;
@@ -33,6 +33,10 @@ use splinter::transport::{inproc::InprocTransport, Transport};
 
 use crate::node::builder::admin::AdminServiceEventClientVariant;
 use crate::node::running::admin::{self as running_admin, AdminSubsystem};
+
+// These multiplied will max out at 5 min
+const MAX_STARTUP_WAIT_MILLIS: u64 = 500;
+const MAX_STARTUP_WAIT_ATTEMPTS: u64 = 600;
 
 pub struct RunnableAdminSubsystem {
     pub node_id: String,
@@ -141,6 +145,8 @@ impl RunnableAdminSubsystem {
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
+        let commands = admin_service.commands();
+
         let mut actix1_resources = vec![];
 
         actix1_resources.append(&mut admin_service.resources());
@@ -170,6 +176,25 @@ impl RunnableAdminSubsystem {
                     running_admin::AdminServiceEventClientVariant::ActixWebClient(Reactor::new())
                 }
             };
+
+        let mut attempts = 0..MAX_STARTUP_WAIT_ATTEMPTS;
+
+        loop {
+            let status = commands
+                .admin_service_status()
+                .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+            if status == AdminServiceStatus::Running {
+                break;
+            }
+            if attempts.next().is_none() {
+                return Err(InternalError::with_message(format!(
+                    "Admin service has completely started after {} secs",
+                    (MAX_STARTUP_WAIT_MILLIS * MAX_STARTUP_WAIT_ATTEMPTS) / 1000
+                )));
+            }
+            std::thread::sleep(Duration::from_millis(MAX_STARTUP_WAIT_MILLIS))
+        }
 
         Ok(AdminSubsystem {
             registry_writer: registry.clone_box_as_writer(),
