@@ -56,7 +56,7 @@ use crate::framework::network::Network;
 #[test]
 pub fn test_2_party_circuit_abandon() {
     // Start a 2-node network
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(2)
         .expect("Unable to start 2-node ActixWeb1 network");
@@ -259,7 +259,7 @@ pub fn test_2_party_circuit_abandon() {
 #[ignore]
 pub fn test_3_party_circuit_abandon() {
     // Start a 2-node network
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(3)
         .expect("Unable to start 3-node ActixWeb1 network");

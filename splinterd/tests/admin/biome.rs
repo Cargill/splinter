@@ -43,7 +43,7 @@ use crate::framework::network::Network;
 /// 11. Shutdown the network
 fn test_biome_credentials() {
     // Start a single-node network
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(1)
         .expect("Unable to start single node ActixWeb1 network");
@@ -128,7 +128,7 @@ fn test_biome_credentials() {
 /// 11. Shutdown the network
 fn test_biome_key_management() {
     // Start a single-node network
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(1)
         .expect("Unable to start single node ActixWeb1 network");
@@ -254,7 +254,7 @@ fn test_biome_key_management() {
 /// 11. Shutdown the network
 fn test_biome_user_management() {
     // Start a single-node network
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(1)
         .expect("Unable to start single node ActixWeb1 network");

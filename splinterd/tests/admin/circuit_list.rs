@@ -22,7 +22,7 @@ use crate::framework::network::Network;
 /// Creates a single node network and confirms that the admin service's REST API is available
 /// by listing circuits (which will be empty).
 fn single_node_network(rest_api_variant: RestApiVariant) {
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(rest_api_variant)
         .add_nodes_with_defaults(1)
         .unwrap();
@@ -40,7 +40,7 @@ fn single_node_network(rest_api_variant: RestApiVariant) {
 /// Creates a multi-node network and confirms that the admin service's REST API is available
 /// by listing circuits (which will be empty).
 fn multi_node_network(rest_api_variant: RestApiVariant) {
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(rest_api_variant)
         .add_nodes_with_defaults(3)
         .unwrap();

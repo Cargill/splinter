@@ -33,7 +33,7 @@ use crate::framework::network::Network;
 #[test]
 pub fn test_registry_creation() {
     // Start a single node network
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(1)
         .expect("Unable to start single node ActixWeb1 network");
@@ -96,7 +96,7 @@ pub fn test_registry_creation() {
 #[test]
 pub fn test_registry_add_node() {
     // Start a two node network
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(2)
         .expect("Unable to start single node ActixWeb1 network");
@@ -177,7 +177,7 @@ pub fn test_registry_add_node() {
 #[test]
 pub fn test_registry_update_node() {
     // Start two node network
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(2)
         .expect("Unable to start single node ActixWeb1 network");
@@ -273,7 +273,7 @@ pub fn test_registry_update_node() {
 #[test]
 pub fn test_registry_delete_node() {
     // Start three node network
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(3)
         .expect("Unable to start single node ActixWeb1 network");
@@ -362,7 +362,7 @@ pub fn test_registry_delete_node() {
 #[test]
 pub fn test_registry_list_nodes_filter() {
     // Start single node network
-    let mut network = Network::new()
+    let network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(1)
         .expect("Unable to start single node ActixWeb1 network");
