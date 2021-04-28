@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use mio::{Evented, Registration, SetReadiness};
-use mio::{Poll, PollOpt, Ready, Token};
+use mio::Evented;
+use mio_extras::channel as mio_channel;
 
 use std::collections::HashMap;
 use std::io::{self, ErrorKind};
@@ -153,108 +153,38 @@ impl Connection for InprocConnection {
     }
 
     fn evented(&self) -> &dyn Evented {
-        &self.pair
+        &self.pair.incoming
     }
 }
 
 struct Pair<T> {
-    outgoing: Arc<Mutex<Vec<T>>>,
-    incoming: Arc<Mutex<Vec<T>>>,
-    set: Arc<Mutex<SetReadiness>>,
-    other_set: Arc<Mutex<SetReadiness>>,
-    registration: Registration,
+    outgoing: mio_channel::Sender<T>,
+    incoming: mio_channel::Receiver<T>,
 }
 
 impl<T> Pair<T> {
     fn new() -> (Self, Self) {
-        let queue1 = Arc::new(Mutex::new(Vec::new()));
-        let queue2 = Arc::new(Mutex::new(Vec::new()));
-
-        let (registration1, set_readiness1) = Registration::new2();
-        let (registration2, set_readiness2) = Registration::new2();
-
-        let set_readiness1 = Arc::new(Mutex::new(set_readiness1));
-        let set_readiness2 = Arc::new(Mutex::new(set_readiness2));
+        let (tx1, rx1) = mio_channel::channel();
+        let (tx2, rx2) = mio_channel::channel();
 
         (
             Pair {
-                outgoing: Arc::clone(&queue1),
-                incoming: Arc::clone(&queue2),
-                set: Arc::clone(&set_readiness1),
-                other_set: Arc::clone(&set_readiness2),
-                registration: registration1,
+                outgoing: tx1,
+                incoming: rx2,
             },
             Pair {
-                outgoing: queue2,
-                incoming: queue1,
-                set: set_readiness2,
-                other_set: set_readiness1,
-                registration: registration2,
+                outgoing: tx2,
+                incoming: rx1,
             },
         )
     }
 
     fn send(&self, t: T) {
-        let mut outgoing = self.outgoing.lock().unwrap();
-        let set = self.set.lock().unwrap();
-        let other_set = self.other_set.lock().unwrap();
-        outgoing.insert(0, t);
-        other_set
-            .set_readiness(other_set.readiness() | Ready::readable())
-            .unwrap();
-        set.set_readiness(set.readiness() | Ready::writable())
-            .unwrap();
+        self.outgoing.send(t).ok();
     }
 
     fn recv(&self) -> Option<T> {
-        let mut incoming = self.incoming.lock().unwrap();
-        let set = self.set.lock().unwrap();
-        if incoming.len() < 1 {
-            set.set_readiness(set.readiness() - Ready::readable())
-                .unwrap();
-        } else {
-            set.set_readiness(set.readiness() | Ready::readable())
-                .unwrap();
-        }
-        incoming.pop()
-    }
-}
-
-impl<T> Evented for Pair<T> {
-    fn register(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        match self.registration.register(poll, token, interest, opts) {
-            Ok(()) => {
-                let set = self.set.lock().unwrap();
-                set.set_readiness(set.readiness() | Ready::writable())
-            }
-            Err(err) => Err(err),
-        }
-    }
-
-    fn reregister(
-        &self,
-        poll: &Poll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        match self.registration.reregister(poll, token, interest, opts) {
-            Ok(()) => {
-                let set = self.set.lock().unwrap();
-                set.set_readiness(set.readiness() | Ready::writable())
-            }
-            Err(err) => Err(err),
-        }
-    }
-
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        poll.deregister(&self.registration)
+        self.incoming.try_recv().ok()
     }
 }
 
