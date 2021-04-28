@@ -6456,6 +6456,7 @@ mod tests {
         circuit.set_comments("test circuit".to_string());
         circuit.set_display_name("test_display".into());
         circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
+        circuit.set_circuit_version(2);
 
         circuit
     }
