@@ -6498,13 +6498,15 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    /// Tests that a request to abandon a circuit returns an error if the requester is not
-    /// permitted for the admin service.
+    /// Tests that a request to abandon a circuit is completed successfully, resulting in the
+    /// updated circuit status.
     ///
     /// 1. Set up `AdminServiceShared`
-    /// 2. Add a `Active` circuit to the admin store
-    /// 3. Call `validate_abandon_circuit` with the circuit and requester info
-    /// 4. Validate the call to `validate_abandon_circuit` returns an error
+    /// 2. Add an `Active` circuit to the admin store
+    /// 3. Create a `CircuitAbandon` message
+    /// 4. Submit the `CircuitAbandon` request to the node's admin service
+    /// 5. Fetch the circuit that was abandoned in the previous step
+    /// 6. Validate the returned circuit has a `circuit_status` of `Abandoned`
     #[test]
     fn test_abandon_circuit() {
         let store = setup_admin_service_store();
