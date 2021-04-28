@@ -17,7 +17,7 @@ use futures::{Future, IntoFuture};
 
 #[cfg(feature = "authorization")]
 use crate::admin::rest_api::CIRCUIT_WRITE_PERMISSION;
-use crate::admin::service::{AdminCommands, AdminServiceError};
+use crate::admin::service::{AdminCommands, AdminServiceError, AdminServiceStatus};
 use crate::protocol;
 use crate::protos::admin::CircuitManagementPayload;
 use crate::rest_api::actix_web_1::{into_protobuf, Method, ProtocolVersionRangeGuard, Resource};
@@ -34,6 +34,17 @@ pub fn make_submit_route<A: AdminCommands + Clone + 'static>(admin_commands: A) 
     {
         resource.add_method(Method::Post, CIRCUIT_WRITE_PERMISSION, move |_, payload| {
             let admin_commands = admin_commands.clone();
+
+            let status = if let Ok(status) = admin_commands.admin_service_status() {
+                status
+            } else {
+                return Box::new(HttpResponse::InternalServerError().finish().into_future());
+            };
+            if status != AdminServiceStatus::Running {
+                warn!("Admin service is not running");
+                return Box::new(HttpResponse::ServiceUnavailable().finish().into_future());
+            }
+
             Box::new(
                 into_protobuf::<CircuitManagementPayload>(payload).and_then(move |payload| {
                     match admin_commands.submit_circuit_change(payload) {
@@ -68,6 +79,15 @@ pub fn make_submit_route<A: AdminCommands + Clone + 'static>(admin_commands: A) 
     {
         resource.add_method(Method::Post, move |_, payload| {
             let admin_commands = admin_commands.clone();
+            let status = if let Ok(status) = admin_commands.admin_service_status() {
+                status
+            } else {
+                return Box::new(HttpResponse::InternalServerError().finish().into_future());
+            };
+            if status != AdminServiceStatus::Running {
+                warn!("Admin service is not running");
+                return Box::new(HttpResponse::ServiceUnavailable().finish().into_future());
+            }
             Box::new(
                 into_protobuf::<CircuitManagementPayload>(payload).and_then(move |payload| {
                     match admin_commands.submit_circuit_change(payload) {
