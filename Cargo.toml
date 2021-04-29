@@ -36,8 +36,13 @@ clap = "2"
 ctrlc = { version = "3.0", optional = true }
 cylinder = { version = "0.2.2", features = ["jwt", "key-load"], optional = true }
 flexi_logger = "0.14"
+hex = { version = "0.3", optional = true }
 log = "0.4"
+protobuf = { version = "2.19", optional = true }
 rand = { version = "0.8", optional = true }
+reqwest = { version = "0.10", features = ["blocking"], optional = true}
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true}
 transact = {path = "../libtransact", features=["family-smallbank-workload"]}
 
 
@@ -53,10 +58,12 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "command",
     "playlist",
     "workload"
 ]
 
+command = ["cylinder", "hex", "protobuf", "reqwest", "serde", "serde_json"]
 playlist = ["cylinder"]
 workload = ["ctrlc", "cylinder", "rand"]
 
