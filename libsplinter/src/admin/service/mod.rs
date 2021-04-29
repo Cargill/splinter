@@ -220,31 +220,20 @@ impl AdminService {
     /// have already had this functionality removed through disbanding or abandoning.
     ///
     /// Also adds peer references for members of the circuits and proposals.
-    fn re_initialize_circuits(&self) -> Result<(), ServiceStartError> {
+    fn re_initialize_circuits(
+        &self,
+        admin_service_shared: &mut AdminServiceShared,
+    ) -> Result<(), ServiceStartError> {
         #[cfg(feature = "admin-service-count")]
-        self.admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .update_metrics()
-            .map_err(|err| {
-                ServiceStartError::Internal(format!("Unable to update metrics: {}", err))
-            })?;
+        admin_service_shared.update_metrics().map_err(|err| {
+            ServiceStartError::Internal(format!("Unable to update metrics: {}", err))
+        })?;
 
         let mut active_circuits = vec![];
         let mut inactive_circuits = vec![];
-        for circuit in self
-            .admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .get_circuits()
-            .map_err(|err| {
-                ServiceStartError::Internal(format!("Unable to get circuits: {}", err))
-            })?
-        {
+        for circuit in admin_service_shared.get_circuits().map_err(|err| {
+            ServiceStartError::Internal(format!("Unable to get circuits: {}", err))
+        })? {
             if circuit.circuit_status() == &store::CircuitStatus::Active {
                 active_circuits.push(circuit);
             } else {
@@ -252,12 +241,7 @@ impl AdminService {
             }
         }
 
-        let nodes = self
-            .admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
+        let nodes = admin_service_shared
             .get_nodes()
             .map_err(|err| ServiceStartError::Internal(format!("Unable to get nodes: {}", err)))?;
 
@@ -266,13 +250,7 @@ impl AdminService {
         })?;
         let mut peer_refs = vec![];
         // start all services of the supported types
-        let mut writer = self
-            .admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .routing_table_writer();
+        let mut writer = admin_service_shared.routing_table_writer();
 
         for circuit in active_circuits {
             let mut routing_members = vec![];
@@ -404,16 +382,9 @@ impl AdminService {
             }
         }
 
-        let proposals = self
-            .admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .get_proposals(&[])
-            .map_err(|err| {
-                ServiceStartError::Internal(format!("Unable to get circuit proposals: {}", err))
-            })?;
+        let proposals = admin_service_shared.get_proposals(&[]).map_err(|err| {
+            ServiceStartError::Internal(format!("Unable to get circuit proposals: {}", err))
+        })?;
 
         for proposal in proposals {
             // connect to all peers in the circuit proposal
@@ -432,12 +403,7 @@ impl AdminService {
             }
         }
 
-        self.admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .add_peer_refs(peer_refs);
+        admin_service_shared.add_peer_refs(peer_refs);
         Ok(())
     }
 }
@@ -460,14 +426,11 @@ impl Service for AdminService {
         }
 
         let network_sender = service_registry.connect(&self.service_id)?;
+        let mut admin_service_shared = self.admin_service_shared.lock().map_err(|_| {
+            ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+        })?;
 
-        {
-            let mut admin_service_shared = self.admin_service_shared.lock().map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?;
-
-            admin_service_shared.set_network_sender(Some(network_sender));
-        }
+        admin_service_shared.set_network_sender(Some(network_sender));
 
         let (sender, receiver) = channel();
         let peer_subscriber_id = self
@@ -517,21 +480,11 @@ impl Service for AdminService {
 
         self.consensus = Some(consensus);
 
-        self.admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .set_proposal_sender(Some(proposal_sender));
+        admin_service_shared.set_proposal_sender(Some(proposal_sender));
 
-        self.re_initialize_circuits()?;
+        self.re_initialize_circuits(&mut admin_service_shared)?;
 
-        self.admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .change_status();
+        admin_service_shared.change_status();
 
         Ok(())
     }
@@ -549,26 +502,15 @@ impl Service for AdminService {
             .shutdown()
             .map_err(|err| ServiceStopError::Internal(Box::new(err)))?;
 
-        self.admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .remove_all_event_subscribers();
+        let mut admin_service_shared = self.admin_service_shared.lock().map_err(|_| {
+            ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
+        })?;
 
-        self.admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .change_status();
+        admin_service_shared.remove_all_event_subscribers();
 
-        self.admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .set_network_sender(None);
+        admin_service_shared.change_status();
+
+        admin_service_shared.set_network_sender(None);
 
         self.orchestrator
             .lock()
@@ -578,12 +520,7 @@ impl Service for AdminService {
             .shutdown_all_services()
             .map_err(|err| ServiceStopError::Internal(Box::new(err)))?;
 
-        self.admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .change_status();
+        admin_service_shared.change_status();
 
         if let Some((peer_subscriber_id, peer_notfication_join_handle)) =
             self.peer_notification_run_state.take()
