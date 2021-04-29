@@ -284,7 +284,7 @@ where
                     network_dispatcher_sender.clone(),
                     pending_incoming_sender,
                 ) {
-                    error!("Shutting down peer interconnect recevier: {}", err);
+                    error!("Shutting down peer interconnect receiver: {}", err);
                 }
             })
             .map_err(|err| {
