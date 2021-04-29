@@ -1,0 +1,19 @@
+name: Lint Gameroom Client
+
+on:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint_gameroom_client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Lint Gameroom Client
+        run: just ci-lint-client

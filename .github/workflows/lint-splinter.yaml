@@ -1,0 +1,19 @@
+name: Lint Splinter
+
+on:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint_splinter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Run Lint/Clippy on Splinter
+        run: just ci-lint-splinter

@@ -1,0 +1,21 @@
+name: Publish to Crates
+
+on:
+  workflow_run:
+    workflows: ["Merge"]
+    types:
+      - completed
+
+jobs:
+  publish_to_crates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      # Dockerhub publishing is handled by publish-docker-branch.yaml
+
+      - name: Publish release to crates
+        if: github.event_name == 'release'
+        run: ./ci/publish-crates
