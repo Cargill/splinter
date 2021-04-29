@@ -102,6 +102,9 @@ impl Reactor {
                 Turn::Continue => (),
             }
         }
+        if let Err(err) = self.pool.remove_all() {
+            error!("Failed to clean up mesh pool: {}", err);
+        }
     }
 
     fn turn(&mut self, events: &mut Events) -> Turn {
