@@ -800,6 +800,62 @@ fn request_abandon_circuit(
     }
 }
 
+#[cfg(feature = "proposal-removal")]
+struct RemoveProposal {
+    circuit_id: String,
+}
+
+#[cfg(feature = "proposal-removal")]
+pub struct RemoveProposalAction;
+
+#[cfg(feature = "proposal-removal")]
+impl Action for RemoveProposalAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
+        let url = args
+            .value_of("url")
+            .map(ToOwned::to_owned)
+            .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+            .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
+
+        let signer = load_signer(args.value_of("private_key_file"))?;
+
+        let circuit_id = args
+            .value_of("circuit_id")
+            .ok_or_else(|| CliError::ActionError("'circuit-id' argument is required".into()))?;
+
+        request_proposal_removal(&url, signer, circuit_id)
+    }
+}
+
+#[cfg(feature = "proposal-removal")]
+fn request_proposal_removal(
+    url: &str,
+    signer: Box<dyn Signer>,
+    circuit_id: &str,
+) -> Result<(), CliError> {
+    let client = SplinterRestClientBuilder::new()
+        .with_url(url.to_string())
+        .with_auth(create_cylinder_jwt_auth(signer.clone())?)
+        .build()?;
+
+    let requester_node = client.get_node_status()?.node_id;
+    let proposal = client.fetch_proposal(circuit_id)?;
+
+    if proposal.is_some() {
+        let remove_proposal = RemoveProposal {
+            circuit_id: circuit_id.into(),
+        };
+        let signed_payload = make_signed_payload(&requester_node, signer, remove_proposal)?;
+        client.submit_admin_payload(signed_payload)
+    } else {
+        Err(CliError::ActionError(format!(
+            "Proposal for circuit '{}' does not exist",
+            circuit_id
+        )))
+    }
+}
+
 pub struct CircuitListAction;
 
 impl Action for CircuitListAction {
