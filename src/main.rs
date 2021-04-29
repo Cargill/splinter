@@ -18,12 +18,14 @@ mod action;
 pub mod error;
 
 use clap::clap_app;
-#[cfg(any(feature = "workload", feature = "playlist"))]
+#[cfg(any(feature = "workload", feature = "playlist", feature = "command"))]
 use clap::{Arg, SubCommand};
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
 use std::ffi::OsString;
 
+#[cfg(feature = "command")]
+use crate::action::command;
 #[cfg(feature = "playlist")]
 use crate::action::playlist;
 #[cfg(feature = "workload")]
@@ -306,6 +308,102 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 ),
         );
     }
+    #[cfg(feature = "command")]
+    {
+        app = app.subcommand(
+            SubCommand::with_name("command")
+                .about("Interacts with the command family smart contract")
+                .subcommand(
+                    SubCommand::with_name("set-state")
+                        .about("Submits a sabre transaction to request a write of the state entry given")
+                        .arg(
+                            Arg::with_name("key")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Path to private key file"),
+                        )
+                        .arg(
+                            Arg::with_name("target")
+                                .long("target")
+                                .takes_value(true)
+                                .required(true)
+                                .help("Node URL to submit batch to"),
+                        )
+                        .arg(
+                            Arg::with_name("state-entry")
+                                .long("state-entry")
+                                .takes_value(true)
+                                .required(true)
+                                .multiple(true)
+                                .help(
+                                    "Key-value pair where the key is a state address and the \
+                                    value is the value to be set for that address (<address>:<value>)",
+                                ),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("get-state")
+                        .about("Submit a sabre transaction to request a read of the address given")
+                        .arg(
+                            Arg::with_name("key")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Path to private key file"),
+                        )
+                        .arg(
+                            Arg::with_name("target")
+                                .long("target")
+                                .takes_value(true)
+                                .required(true)
+                                .help("Node URL to submit batch to"),
+                        )
+                        .arg(
+                            Arg::with_name("address")
+                                .long("address")
+                                .takes_value(true)
+                                .required(true)
+                                .multiple(true)
+                                .help("State addresses of the state to be read"),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("show-state")
+                        .about("Make a request to the given target to get the value at the given address")
+                        .arg(
+                            Arg::with_name("key")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Path to private key file"),
+                        )
+                        .arg(
+                            Arg::with_name("target")
+                                .long("target")
+                                .takes_value(true)
+                                .required(true)
+                                .help("Node URL to make request to"),
+                        )
+                        .arg(
+                            Arg::with_name("address")
+                                .long("address")
+                                .takes_value(true)
+                                .required(true)
+                                .help("State addresses of the state value to be retrieved"),
+                        )
+                        .arg(
+                            Arg::with_name("text")
+                                .long("text")
+                                .short("t")
+                                .help("Attempt to display the state value bytes as an ascii string"),
+                        ),
+                ),
+        );
+    }
 
     let matches = app.get_matches_from_safe(args)?;
 
@@ -354,6 +452,17 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 .with_command("process", playlist::ProcessPlaylistAction)
                 .with_command("submit", playlist::SubmitPlaylistAction)
                 .with_command("batch", playlist::BatchPlaylistAction),
+        );
+    }
+
+    #[cfg(feature = "command")]
+    {
+        subcommands = subcommands.with_command(
+            "command",
+            SubcommandActions::new()
+                .with_command("set-state", command::CommandSetStateAction)
+                .with_command("get-state", command::CommandGetStateAction)
+                .with_command("show-state", command::CommandShowStateAction),
         );
     }
 
