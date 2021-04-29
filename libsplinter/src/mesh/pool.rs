@@ -118,7 +118,7 @@ impl Pool {
     pub fn register_external<E: Evented>(&mut self, evented: &E) -> Result<Token, io::Error> {
         let token = self.next_token();
         self.poll
-            .register(evented, token, Ready::readable(), PollOpt::level())?;
+            .register(evented, token, Ready::readable(), PollOpt::edge())?;
         Ok(token)
     }
 
