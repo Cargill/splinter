@@ -217,7 +217,7 @@ where
                     message_receiver,
                     service_msg_dispatcher_sender,
                 ) {
-                    error!("Shutting down service interconnect recevier: {}", err);
+                    error!("Shutting down service interconnect receiver: {}", err);
                 }
             })
             .map_err(|err| {
