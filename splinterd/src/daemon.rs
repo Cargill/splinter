@@ -1386,9 +1386,7 @@ fn create_registry(
     let read_only_registries = registries
         .iter()
         .filter_map(|registry| {
-            let (scheme, path) = parse_registry_arg(registry)
-                .map_err(|err| error!("Failed to parse registry argument: {}", err))
-                .ok()?;
+            let (scheme, path) = parse_registry_arg(registry);
 
             if scheme == "file" {
                 debug!(
@@ -1458,13 +1456,59 @@ fn create_registry(
     (unified_registry, registry_shutdown_handle)
 }
 
-fn parse_registry_arg(registry: &str) -> Result<(&str, &str), &str> {
+// Parses a registry argument, returning the uri scheme (defaulting to file) and remaining uri data
+fn parse_registry_arg(registry: &str) -> (&str, &str) {
     let mut iter = registry.splitn(2, "://");
-    let scheme = iter
-        .next()
-        .expect("str::split cannot return an empty iterator");
-    let path = iter.next().ok_or("No URI scheme provided")?;
-    Ok((scheme, path))
+    match (iter.next(), iter.next()) {
+        (Some(scheme), Some(data)) => (scheme, data),
+        (Some(path), None) => ("file", path),
+        _ => unreachable!(), // splitn will always return at least one item, and never a second item without a first
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_registry_arg() {
+        assert_eq!(
+            parse_registry_arg("registry.yaml"),
+            ("file", "registry.yaml")
+        );
+        assert_eq!(
+            parse_registry_arg("./registry.yaml"),
+            ("file", "./registry.yaml")
+        );
+        assert_eq!(
+            parse_registry_arg("/registry.yaml"),
+            ("file", "/registry.yaml")
+        );
+        assert_eq!(
+            parse_registry_arg("file://registry.yaml"),
+            ("file", "registry.yaml")
+        );
+        assert_eq!(
+            parse_registry_arg("file://./registry.yaml"),
+            ("file", "./registry.yaml")
+        );
+        assert_eq!(
+            parse_registry_arg("file:///registry.yaml"),
+            ("file", "/registry.yaml")
+        );
+        assert_eq!(
+            parse_registry_arg("file:///home/user/registry.yaml"),
+            ("file", "/home/user/registry.yaml")
+        );
+        assert_eq!(
+            parse_registry_arg("https://server/registry.yaml"),
+            ("https", "server/registry.yaml")
+        );
+        assert_eq!(
+            parse_registry_arg("http://server/registry.yaml"),
+            ("http", "server/registry.yaml")
+        );
+    }
 }
 
 #[derive(Default)]
