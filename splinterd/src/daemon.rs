@@ -1445,7 +1445,7 @@ fn create_registry(
                 }
             } else {
                 error!(
-                    "Invalid registry provided ({}): must be valid 'file://' URI",
+                    "Invalid registry URI scheme provided ({}): must be file, http, or https",
                     registry
                 );
                 None
