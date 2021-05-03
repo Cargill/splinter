@@ -337,6 +337,74 @@ impl Action for CommandGetStateAction {
     }
 }
 
+pub struct CommandShowStateAction;
+
+impl Action for CommandShowStateAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
+
+        let key_path = args
+            .value_of("key")
+            .ok_or_else(|| CliError::ActionError("'key' is required".into()))?;
+        let (auth, _) = create_cylinder_jwt_auth_signer_key(key_path)?;
+
+        let target = args
+            .value_of("target")
+            .ok_or_else(|| CliError::ActionError("'target' is required".into()))?;
+
+        let address = args
+            .value_of("address")
+            .ok_or_else(|| CliError::ActionError("'address' is required".into()))?;
+
+        Client::new()
+            .get(&format!("{}/state/{}", target, address))
+            .header("Authorization", auth)
+            .send()
+            .map_err(|err| {
+                CliError::ActionError(format!("Failed to send show state request: {}", err))
+            })
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    let state = res.json::<Vec<u8>>().map_err(|err| {
+                        CliError::ActionError(format!(
+                            "failed to deserialize response body: {}",
+                            err
+                        ))
+                    })?;
+                    if args.is_present("text") {
+                        let state_string = String::from_utf8(state).map_err(|err| {
+                            CliError::ActionError(format!(
+                                "Unable to convert state value bytes to string: {}",
+                                err
+                            ))
+                        })?;
+                        println!("{}", state_string);
+                    } else {
+                        println!("{:?}", state);
+                    }
+                    Ok(())
+                } else {
+                    let message = res
+                        .json::<ServerError>()
+                        .map_err(|_| {
+                            CliError::ActionError(format!(
+                                "Show state request failed with status code '{}', but \
+                                    error response was not valid",
+                                status
+                            ))
+                        })?
+                        .message;
+
+                    Err(CliError::ActionError(format!(
+                        "Failed to submit show state request: {}",
+                        message
+                    )))
+                }
+            })
+    }
+}
+
 fn parse_bytes_entry(bytes_entry: &str) -> Result<(String, Vec<u8>), CliError> {
     let mut parts = bytes_entry.splitn(2, ':');
     match (parts.next(), parts.next()) {
