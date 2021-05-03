@@ -13,17 +13,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "command")]
+pub mod command;
 #[cfg(feature = "playlist")]
 pub mod playlist;
 #[cfg(feature = "workload")]
 pub mod workload;
 
 use std::collections::HashMap;
-#[cfg(any(feature = "workload", feature = "playlist"))]
+#[cfg(any(feature = "workload", feature = "playlist", feature = "command"))]
 use std::path::Path;
 
 use clap::ArgMatches;
-#[cfg(any(feature = "workload", feature = "playlist"))]
+#[cfg(any(feature = "workload", feature = "playlist", feature = "command"))]
 use cylinder::{
     current_user_search_path, jwt::JsonWebTokenBuilder, load_key, load_key_from_path,
     secp256k1::Secp256k1Context, Context, Signer,
@@ -50,7 +52,7 @@ impl<'a> SubcommandActions<'a> {
         Self::default()
     }
 
-    #[cfg(any(feature = "playlist", feature = "workload"))]
+    #[cfg(any(feature = "playlist", feature = "workload", feature = "command"))]
     pub fn with_command<'action: 'a, A: Action + 'action>(
         mut self,
         command: &str,
@@ -76,7 +78,7 @@ impl<'s> Action for SubcommandActions<'s> {
     }
 }
 
-#[cfg(any(feature = "playlist", feature = "workload"))]
+#[cfg(any(feature = "playlist", feature = "workload", feature = "command"))]
 // build a signed json web token using the private key
 fn create_cylinder_jwt_auth_signer_key(
     key_name: &str,
