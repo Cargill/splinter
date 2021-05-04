@@ -128,8 +128,7 @@ pub async fn propose_gameroom(
 
     let scabbard_admin_keys = vec![gameroomd_data.get_ref().public_key.clone()];
 
-    let mut scabbard_args = vec![];
-    scabbard_args.push((
+    let scabbard_args = vec![(
         "admin_keys".into(),
         match serde_json::to_string(&scabbard_admin_keys) {
             Ok(s) => s,
@@ -138,7 +137,7 @@ pub async fn propose_gameroom(
                 return HttpResponse::InternalServerError().json(ErrorResponse::internal_error());
             }
         },
-    ));
+    )];
 
     let service_and_node_ids = members
         .iter()

@@ -802,12 +802,11 @@ fn run() -> Result<(), CliError> {
                     .map(|entry| ContractRegistryList::from_bytes(entry.value()))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let mut data = vec![];
-                data.push(vec![
+                let mut data = vec![vec![
                     "NAME".to_string(),
                     "VERSIONS".to_string(),
                     "OWNERS".to_string(),
-                ]);
+                ]];
                 for registry_list in registries {
                     for registry in registry_list.registries() {
                         let name = registry.name().to_string();

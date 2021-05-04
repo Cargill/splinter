@@ -28,11 +28,9 @@ use crate::error::GetTransportError;
 type SendableTransport = Box<dyn Transport + Send>;
 
 pub fn build_transport(config: &Config) -> Result<MultiTransport, GetTransportError> {
-    let mut transports: Vec<SendableTransport> = vec![];
-
     // add tcp transport
     // this will be default for endpoints without a prefix
-    transports.push(Box::new(TcpTransport::default()));
+    let mut transports: Vec<SendableTransport> = vec![Box::new(TcpTransport::default())];
 
     // add web socket transport
     #[cfg(feature = "ws-transport")]
