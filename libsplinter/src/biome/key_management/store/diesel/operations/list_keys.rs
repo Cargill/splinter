@@ -49,6 +49,7 @@ where
     }
 }
 
+#[allow(clippy::upper_case_acronyms)]
 pub(in crate::biome::key_management) trait KeyStoreListKeysWithUserIDOperation {
     fn list_keys_with_user_id(&self, user_id: &str) -> Result<Vec<Key>, KeyStoreError>;
 }

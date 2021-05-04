@@ -28,6 +28,7 @@ pub enum SplinterError {
     PrivateKeyNotFound,
     ProtobufError(ProtobufError),
     IoError(IoError),
+    #[allow(clippy::upper_case_acronyms)]
     TLSError(String),
     TransportSendError(SendError),
     ParseError(ParseError),

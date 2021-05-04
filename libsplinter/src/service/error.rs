@@ -301,6 +301,7 @@ pub enum ServiceProcessorError {
     /// Returned if an error is detected while processing requests
     ProcessError(String, Box<dyn Error + Send>),
     /// Returned if an IO error is detected while processing requests
+    #[allow(clippy::upper_case_acronyms)]
     IOError(IOError),
     /// Returned if an error is detected when trying to shutdown
     ShutdownError(String),

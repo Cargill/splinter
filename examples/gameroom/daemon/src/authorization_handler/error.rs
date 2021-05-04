@@ -33,6 +33,7 @@ use crate::application_metadata::ApplicationMetadataError;
 
 #[derive(Debug)]
 pub enum AppAuthHandlerError {
+    #[allow(clippy::upper_case_acronyms)]
     IOError(std::io::Error),
     InvalidMessageError(String),
     DatabaseError(String),
