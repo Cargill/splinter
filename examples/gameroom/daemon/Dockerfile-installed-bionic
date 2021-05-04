@@ -95,11 +95,11 @@ RUN apt-get update \
  && apt-get -f -y install
 
 # Fetch the XO smart contract
-RUN curl -OLsS https://build.sawtooth.me/job/Sawtooth-Hyperledger/job/sawtooth-sdk-rust/job/master/lastSuccessfulBuild/artifact/build/scar/*zip*/scar.zip
+RUN XO_LATEST=$(curl --silent https://files.splinter.dev/scar/index | grep ^xo_ | tail -1) \
+ && curl -OLsS https://files.splinter.dev/scar/$XO_LATEST
 
-RUN unzip -oj scar.zip \
- && tar -xvf xo_*.scar \
- && rm scar.zip xo_*.scar \
+RUN tar -xvf xo_*.scar \
+ && rm xo_*.scar \
  && mv xo-tp-rust.wasm /var/lib/gameroomd/xo-tp-rust.wasm
 
 CMD ["gameroomd"]
