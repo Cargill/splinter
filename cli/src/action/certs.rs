@@ -670,7 +670,7 @@ fn get_ca_key(key_path: &Path) -> Result<PKey<Private>, CliError> {
 }
 
 // helper function to log what files will be written
-fn log_writing(cert_path: &PathBuf, private_cert_path: &PathBuf) -> Result<(), CliError> {
+fn log_writing(cert_path: &Path, private_cert_path: &Path) -> Result<(), CliError> {
     info!("Writing file: {}/{}", absolute_path(cert_path)?, CA_CERT);
     info!(
         "Writing file: {}/{}",
@@ -703,7 +703,7 @@ fn log_writing(cert_path: &PathBuf, private_cert_path: &PathBuf) -> Result<(), C
 }
 
 // helper function to log what files will be overwritten
-fn log_overwriting(cert_path: &PathBuf, private_cert_path: &PathBuf) -> Result<(), CliError> {
+fn log_overwriting(cert_path: &Path, private_cert_path: &Path) -> Result<(), CliError> {
     info!(
         "Overwriting file: {}/{}",
         absolute_path(cert_path)?,
