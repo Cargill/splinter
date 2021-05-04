@@ -723,6 +723,7 @@ fn add_peer(
 }
 
 // Request a connection, the resulting connection will be treated as an InboundConnection
+#[allow(clippy::unnecessary_wraps)]
 fn add_unidentified(
     endpoint: String,
     connector: Connector,

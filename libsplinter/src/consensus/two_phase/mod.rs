@@ -595,7 +595,7 @@ impl TwoPhaseEngine {
         &mut self,
         network_sender: &dyn ConsensusNetworkSender,
         proposal_manager: &dyn ProposalManager,
-    ) -> Result<(), ConsensusEngineError> {
+    ) {
         if let State::Idle = self.state {
             if let Some(idx) = self
                 .proposal_backlog
@@ -619,8 +619,6 @@ impl TwoPhaseEngine {
                 }
             }
         }
-
-        Ok(())
     }
 }
 
@@ -664,9 +662,7 @@ impl ConsensusEngine for TwoPhaseEngine {
                 error!("Failed to handle backlogged verification request: {}", err);
             }
 
-            if let Err(err) = self.get_next_proposal(&*network_sender, &*proposal_manager) {
-                error!("Failed to get next proposal: {}", err);
-            }
+            self.get_next_proposal(&*network_sender, &*proposal_manager);
 
             // Get and handle a consensus message if there is one
             match consensus_messages.recv_timeout(message_timeout) {
