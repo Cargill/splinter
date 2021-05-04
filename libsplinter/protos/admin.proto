@@ -187,6 +187,7 @@ message CircuitManagementPayload {
          CIRCUIT_DISBAND_REQUEST = 8;
          CIRCUIT_PURGE_REQUEST = 9;
          CIRCUIT_ABANDON = 10;
+         PROPOSAL_REMOVE_REQUEST = 11;
     }
 
     message Header {
@@ -219,6 +220,7 @@ message CircuitManagementPayload {
     CircuitDisbandRequest circuit_disband_request = 10;
     CircuitPurgeRequest circuit_purge_request = 11;
     CircuitAbandon circuit_abandon = 12;
+    ProposalRemoveRequest proposal_remove_request = 13;
 }
 
 message CircuitProposalVote {
@@ -304,6 +306,11 @@ message CircuitAbandon {
     string circuit_id = 1;
 }
 
+message ProposalRemoveRequest {
+    // The unique circuit name
+    string circuit_id = 1;
+}
+
 message AdminMessage {
     enum Type {
         UNSET = 0;
@@ -311,6 +318,7 @@ message AdminMessage {
         PROPOSED_CIRCUIT = 2;
         MEMBER_READY = 3;
         ABANDONED_CIRCUIT = 4;
+        REMOVED_PROPOSAL = 5;
 
         SERVICE_PROTOCOL_VERSION_REQUEST = 100;
         SERVICE_PROTOCOL_VERSION_RESPONSE = 101;
@@ -322,6 +330,7 @@ message AdminMessage {
     ProposedCircuit proposed_circuit = 3;
     MemberReady member_ready = 4;
     AbandonedCircuit abandoned_circuit = 5;
+    RemovedProposal removed_proposal = 6;
 
     // Messages to agree on protocol version
     ServiceProtocolVersionRequest protocol_request = 100;
@@ -348,6 +357,11 @@ message AbandonedCircuit {
     // the circuit being abandoned
     string circuit_id = 1;
     string member_node_id = 2;
+}
+
+message RemovedProposal {
+    // the proposal being removed
+    string circuit_id = 1;
 }
 
 // This message is sent to a connection AdminService to agree upon protocol

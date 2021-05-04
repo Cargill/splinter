@@ -739,8 +739,23 @@ impl Service for AdminService {
                 );
                 Ok(())
             }
+            #[cfg(feature = "proposal-removal")]
+            AdminMessage_Type::REMOVED_PROPOSAL => {
+                let removed_proposal = admin_message.get_removed_proposal();
+                let circuit_id = removed_proposal.get_circuit_id();
+
+                warn!(
+                    "A prospective member has removed the proposal for circuit {}",
+                    circuit_id
+                );
+                Ok(())
+            }
             AdminMessage_Type::UNSET => Err(ServiceError::InvalidMessageFormat(Box::new(
                 AdminError::MessageTypeUnset,
+            ))),
+            #[cfg(not(feature = "proposal-removal"))]
+            _ => Err(ServiceError::InvalidMessageFormat(Box::new(
+                AdminError::MessageTypeUnhandled,
             ))),
         }
     }

@@ -37,6 +37,8 @@ use crate::peer::{PeerManagerConnector, PeerRef};
 use crate::protocol::{
     ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION, CIRCUIT_PROTOCOL_VERSION,
 };
+#[cfg(feature = "proposal-removal")]
+use crate::protos::admin::RemovedProposal;
 use crate::protos::admin::{
     AbandonedCircuit, AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header, CircuitProposal,
@@ -1070,6 +1072,68 @@ impl AdminServiceShared {
         Ok(())
     }
 
+    #[cfg(feature = "proposal-removal")]
+    /// Locally remove a Circuit Proposal that has been committed. A message is sent to the
+    /// circuit proposal members that the proposal is being removed locally. Once the proposal
+    /// has been removed from the admin store, the peer refs created for this proposal are also
+    /// removed.
+    fn request_proposal_removal(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
+        if let Some(proposal) = self
+            .get_proposal(&circuit_id)
+            .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
+        {
+            // send REMOVED_PROPOSAL message to all other members' admin services
+            if let Some(ref network_sender) = self.network_sender {
+                let mut removed_proposal = RemovedProposal::new();
+                removed_proposal.set_circuit_id(circuit_id.to_string());
+                let mut msg = AdminMessage::new();
+                msg.set_message_type(AdminMessage_Type::REMOVED_PROPOSAL);
+                msg.set_removed_proposal(removed_proposal);
+
+                let envelope_bytes = msg.write_to_bytes().map_err(|err| {
+                    ServiceError::UnableToHandleMessage(Box::new(MarshallingError::ProtobufError(
+                        err,
+                    )))
+                })?;
+                for member in proposal.circuit().members().iter() {
+                    if member.node_id() != self.node_id {
+                        network_sender
+                            .send(&admin_service_id(member.node_id()), &envelope_bytes)?;
+                    }
+                }
+            }
+
+            // Remove the proposal itself
+            self.remove_proposal(&circuit_id)
+                .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
+                .ok_or_else(|| {
+                    ServiceError::UnableToHandleMessage(Box::new(
+                        AdminSharedError::SplinterStateError(format!(
+                            "Unable to remove proposal for circuit {}, proposal does not exist",
+                            &circuit_id
+                        )),
+                    ))
+                })?;
+            // Update the metrics because the proposal has been removed for this node
+            #[cfg(feature = "admin-service-count")]
+            self.update_metrics()
+                .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+
+            // Remove the peer refs belonging to the removed proposal
+            for member in proposal.circuit().members() {
+                self.remove_peer_ref(member.node_id());
+            }
+            Ok(())
+        } else {
+            Err(ServiceError::UnableToHandleMessage(Box::new(
+                AdminSharedError::SplinterStateError(format!(
+                    "Unable to remove proposal for circuit {}, proposal does not exist",
+                    &circuit_id
+                )),
+            )))
+        }
+    }
+
     pub fn send_protocol_request(&mut self, node_id: &str) -> Result<(), ServiceError> {
         if self
             .service_protocols
@@ -1364,6 +1428,23 @@ impl AdminServiceShared {
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
                 self.abandon_circuit(circuit_id)
+            }
+            #[cfg(feature = "proposal-removal")]
+            CircuitManagementPayload_Action::PROPOSAL_REMOVE_REQUEST => {
+                let signer_public_key = header.get_requester();
+                let requester_node_id = header.get_requester_node_id();
+                let circuit_id = payload.get_proposal_remove_request().get_circuit_id();
+                debug!("received removal request for proposal {}", circuit_id);
+
+                self.validate_remove_proposal(
+                    circuit_id,
+                    signer_public_key,
+                    requester_node_id,
+                    ADMIN_SERVICE_PROTOCOL_VERSION,
+                )
+                .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+
+                self.request_proposal_removal(circuit_id)
             }
             CircuitManagementPayload_Action::ACTION_UNSET => {
                 Err(ServiceError::UnableToHandleMessage(Box::new(
@@ -2625,6 +2706,81 @@ impl AdminServiceShared {
                 "Attempting to abandon a circuit with version {}, must be {}",
                 stored_circuit.circuit_version(),
                 CIRCUIT_PROTOCOL_VERSION,
+            )));
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "proposal-removal")]
+    /// Validate a `ProposalRemoveRequest` payload by the following:
+    ///
+    /// - Validate the protocol version used by the submitter node. Currently, abandoning is only
+    ///   available to nodes using `ADMIN_SERVICE_PROTOCOL_VERSION` 2.
+    /// - Validate the requester is authorized to propose a change for the requesting node
+    /// - Validate the signer's public key is authorized for the requesting node
+    /// - Validate the proposal being abandoned exists
+    fn validate_remove_proposal(
+        &self,
+        circuit_id: &str,
+        signer_public_key: &[u8],
+        requester_node_id: &str,
+        protocol: u32,
+    ) -> Result<(), AdminSharedError> {
+        if protocol != ADMIN_SERVICE_PROTOCOL_VERSION {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Proposal Removal is not available for protocol version {}",
+                protocol
+            )));
+        }
+
+        if requester_node_id.is_empty() {
+            return Err(AdminSharedError::ValidationFailed(
+                "requester_node_id is empty".to_string(),
+            ));
+        }
+
+        if requester_node_id != self.node_id {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Unable to remove proposal from node {}: request came from node {}",
+                self.node_id, requester_node_id
+            )));
+        }
+
+        self.validate_key(signer_public_key)?;
+
+        if !self
+            .key_verifier
+            .is_permitted(requester_node_id, signer_public_key)?
+        {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "{} is not registered for the requester node {}",
+                to_hex(signer_public_key),
+                requester_node_id,
+            )));
+        }
+
+        self.key_permission_manager
+            .is_permitted(signer_public_key, PROPOSER_ROLE)
+            .map_err(|_| {
+                AdminSharedError::ValidationFailed(format!(
+                    "{} is not permitted to propose change for node {}",
+                    to_hex(signer_public_key),
+                    requester_node_id
+                ))
+            })?;
+        if let Some(proposal) = self.get_proposal(&circuit_id)? {
+            if proposal.circuit().circuit_version() < CIRCUIT_PROTOCOL_VERSION {
+                return Err(AdminSharedError::ValidationFailed(format!(
+                    "Attempting to remove a proposal with schema version {}, must be {}",
+                    proposal.circuit().circuit_version(),
+                    CIRCUIT_PROTOCOL_VERSION,
+                )));
+            }
+        } else {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Attempting to remove proposal for circuit {} that does not exist",
+                &circuit_id,
             )));
         }
 
@@ -6342,13 +6498,15 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    /// Tests that a request to abandon a circuit returns an error if the requester is not
-    /// permitted for the admin service.
+    /// Tests that a request to abandon a circuit is completed successfully, resulting in the
+    /// updated circuit status.
     ///
     /// 1. Set up `AdminServiceShared`
-    /// 2. Add a `Active` circuit to the admin store
-    /// 3. Call `validate_abandon_circuit` with the circuit and requester info
-    /// 4. Validate the call to `validate_abandon_circuit` returns an error
+    /// 2. Add an `Active` circuit to the admin store
+    /// 3. Create a `CircuitAbandon` message
+    /// 4. Submit the `CircuitAbandon` request to the node's admin service
+    /// 5. Fetch the circuit that was abandoned in the previous step
+    /// 6. Validate the returned circuit has a `circuit_status` of `Abandoned`
     #[test]
     fn test_abandon_circuit() {
         let store = setup_admin_service_store();
@@ -6421,6 +6579,398 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
+    #[cfg(feature = "proposal-removal")]
+    /// Tests that a request to remove a circuit proposal is validated correctly
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add the circuit proposal to be removed from the admin store
+    /// 3. Call `validate_remove_proposal` with a valid proposal and valid requester info
+    /// 4. Validate the call to `validate_remove_proposal` returns successfully
+    ///
+    /// This test verifies the `validate_remove_proposal` returns successfully given a valid
+    /// circuit proposal remove request.
+    #[test]
+    fn test_validate_remove_proposal_valid() {
+        let store = setup_admin_service_store();
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            event_store,
+        );
+        let store_proposal = StoreProposal::from_proto(setup_test_proposal(&setup_test_circuit()))
+            .expect("Unable to build CircuitProposal");
+        // Add the circuit proposal to be removed
+        admin_shared
+            .admin_store
+            .add_proposal(store_proposal)
+            .expect("Unable to add circuit proposal to store");
+
+        if let Err(err) = admin_shared.validate_remove_proposal(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been valid: {}", err);
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "proposal-removal")]
+    /// Tests that a request to remove a circuit proposal returns an error if the proposal does
+    /// not exist.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Call `validate_remove_proposal` with a circuit proposal and valid requester info
+    /// 3. Validate the call to `validate_remove_proposal` returns an error
+    #[test]
+    fn test_validate_remove_proposal_no_proposal() {
+        let store = setup_admin_service_store();
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            event_store,
+        );
+
+        if let Ok(()) = admin_shared.validate_remove_proposal(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because the circuit proposal does not exist");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "proposal-removal")]
+    /// Tests that a request to remove a circuit proposal returns an error if the circuit proposal
+    /// has a circuit version less than the `CIRCUIT_PROTOCOL_VERSION`.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a circuit proposal to be removed from the admin store, with a `ProposedCircuit` with
+    ///   `circuit_version` of 1
+    /// 3. Call `validate_remove_proposal` with the circuit and valid requester info
+    /// 4. Validate the call to `validate_remove_proposal` returns an error
+    #[test]
+    fn test_validate_remove_proposal_invalid_circuit_version() {
+        let store = setup_admin_service_store();
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            event_store,
+        );
+
+        let store_proposal =
+            StoreProposal::from_proto(setup_test_proposal(&setup_v1_test_circuit()))
+                .expect("Unable to build CircuitProposal");
+        // Add the circuit proposal to be removed
+        admin_shared
+            .admin_store
+            .add_proposal(store_proposal)
+            .expect("Unable to add circuit proposal to store");
+
+        if let Ok(()) = admin_shared.validate_remove_proposal(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because the circuit has an invalid version",);
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "proposal-removal")]
+    /// Tests that a request to remove a circuit proposal returns an error if the request does not
+    /// come from the local node.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a circuit proposal to the admin store.
+    /// 3. Call `validate_remove_proposal` with the proposal and requester info, specifying
+    ///     "node_b" as the `requester_node_id`
+    /// 4. Validate the call to `validate_remove_proposal` returns an error
+    #[test]
+    fn test_validate_remove_proposal_invalid_node_id() {
+        let store = setup_admin_service_store();
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            event_store,
+        );
+
+        let store_proposal = StoreProposal::from_proto(setup_test_proposal(&setup_test_circuit()))
+            .expect("Unable to build CircuitProposal");
+        // Add the circuit proposal to be removed
+        admin_shared
+            .admin_store
+            .add_proposal(store_proposal)
+            .expect("Unable to add circuit proposal to store");
+
+        if let Ok(()) = admin_shared.validate_remove_proposal(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_b",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because the request came from a remote node");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "proposal-removal")]
+    /// Tests that a request to remove a circuit proposal returns an error if the admin service
+    /// used has an invalid protocol version.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a circuit proposal to the admin store
+    /// 3. Call `validate_remove_proposal` with the circuit and requester info
+    /// 4. Validate the call to `validate_remove_proposal` returns an error
+    #[test]
+    fn test_validate_remove_proposal_invalid_protocol() {
+        let store = setup_admin_service_store();
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            event_store,
+        );
+
+        let store_proposal = StoreProposal::from_proto(setup_test_proposal(&setup_test_circuit()))
+            .expect("Unable to build CircuitProposal");
+        // Add the circuit proposal to be removed
+        admin_shared
+            .admin_store
+            .add_proposal(store_proposal)
+            .expect("Unable to add circuit proposal to store");
+
+        if let Ok(()) = admin_shared.validate_remove_proposal("01234-ABCDE", PUB_KEY, "node_a", 1) {
+            panic!("Should have been invalid because the protocol version is invalid");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "proposal-removal")]
+    /// Tests that a request to remove a circuit proposal returns an error if the requester is not
+    /// permitted for the admin service.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a circuit proposal to the admin store
+    /// 3. Call `validate_remove_proposal` with the circuit proposal and requester info
+    /// 4. Validate the call to `validate_remove_proposal` returns an error
+    #[test]
+    fn test_validate_remove_proposal_not_permitted() {
+        let store = setup_admin_service_store();
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::new(false)),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            event_store,
+        );
+
+        let store_proposal = StoreProposal::from_proto(setup_test_proposal(&setup_test_circuit()))
+            .expect("Unable to build CircuitProposal");
+        // Add the circuit proposal to be removed
+        admin_shared
+            .admin_store
+            .add_proposal(store_proposal)
+            .expect("Unable to add circuit proposal to store");
+
+        if let Ok(()) = admin_shared.validate_remove_proposal(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid due to requester node not being registered");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "proposal-removal")]
+    /// Tests that a `ProposalRemoveRequest` submitted to the admin service will result as expected,
+    /// removing the indicated circuit proposa.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a circuit proposal to the admin store
+    /// 3. Create a `ProposalRemoveRequest`, indicating the proposal added in the previous step
+    /// 4. Submit the `ProposalRemoveRequest` to the node's admin service
+    /// 5. Attempt to fetch the circuit proposal removed in the previous step
+    /// 6. Validate the value returned is `None`
+    #[test]
+    fn test_remove_proposal() {
+        let store = setup_admin_service_store();
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let context = Secp256k1Context::new();
+        let private_key = context.new_random_private_key();
+        let pub_key = context
+            .get_public_key(&private_key)
+            .expect("Unable to get corresponding public key");
+        let signer = context.new_signer(private_key);
+        let signature_verifier = context.new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let mut admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            event_store,
+        );
+
+        let store_proposal = StoreProposal::from_proto(setup_test_proposal(&setup_test_circuit()))
+            .expect("Unable to build CircuitProposal");
+        // Add the circuit proposal to be removed
+        admin_shared
+            .admin_store
+            .add_proposal(store_proposal)
+            .expect("Unable to add circuit proposal to store");
+
+        // Make `ProposalRemoveRequest` and corresponding payload
+        let mut remove_proposal = admin::ProposalRemoveRequest::new();
+        remove_proposal.set_circuit_id("01234-ABCDE".to_string());
+
+        let mut header = admin::CircuitManagementPayload_Header::new();
+        header.set_action(admin::CircuitManagementPayload_Action::PROPOSAL_REMOVE_REQUEST);
+        header.set_requester(pub_key.into_bytes());
+        header.set_requester_node_id("node_a".to_string());
+
+        let mut payload = admin::CircuitManagementPayload::new();
+        payload.set_header(protobuf::Message::write_to_bytes(&header).unwrap());
+        payload.set_signature(signer.sign(&payload.header).unwrap().take_bytes());
+        payload.set_proposal_remove_request(remove_proposal);
+
+        // Submit `ProposalRemoveRequest` payload
+        if let Err(err) = admin_shared.submit(payload) {
+            panic!("Should have been valid: {}", err);
+        }
+
+        let proposal_option = admin_shared
+            .admin_store
+            .get_proposal(&"01234-ABCDE".to_string())
+            .expect("Unable to get circuit proposal");
+        assert!(proposal_option.is_none());
+
+        shutdown(mesh, cm, pm);
+    }
+
     pub fn setup_test_circuit() -> Circuit {
         let mut service_a = SplinterService::new();
         service_a.set_service_id("0123".to_string());
@@ -6456,6 +7006,7 @@ mod tests {
         circuit.set_comments("test circuit".to_string());
         circuit.set_display_name("test_display".into());
         circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
+        circuit.set_circuit_version(2);
 
         circuit
     }
