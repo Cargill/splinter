@@ -15,7 +15,7 @@
 use mio::{Event, Events, Token};
 use mio_extras::channel as mio_channel;
 
-use std::sync::mpsc::TryRecvError;
+use std::sync::{mpsc::TryRecvError, Arc, Barrier};
 use std::thread;
 
 use crate::mesh::{
@@ -71,13 +71,25 @@ impl Reactor {
         let (ctrl_tx, ctrl_rx) = mio_channel::channel();
         let (incoming_tx, incoming_rx) = crossbeam_channel::bounded(incoming_capacity);
 
+        // A particular suspicious "TODO" in the mio-extra's channel implementation (see
+        // mio-extras/@f8c5df7 src/channel.rs, L286-287), there is a likely race condition
+        // surrounding items being put on a mio channel before it is registered.
+        //
+        // Taking inspiration from the mio tests (see mio/@642e56d test/test_custom_evented.rs),
+        // this is avoided by using a Barrier to have the spawning thread wait for the registration
+        // (within the Reactor constructor) complete, before continuing with the function.
+        let b1 = Arc::new(Barrier::new(2));
+        let b2 = b1.clone();
         thread::Builder::new()
             .name(String::from("mesh::Reactor"))
             .spawn(move || {
                 let mut reactor = Reactor::new(ctrl_rx, incoming_tx, outgoing_capacity);
+                b2.wait();
                 reactor.run();
             })
             .expect("Failed to spawn mesh::Reactor thread");
+
+        b1.wait();
 
         (Control::new(ctrl_tx), Incoming::new(incoming_rx))
     }
