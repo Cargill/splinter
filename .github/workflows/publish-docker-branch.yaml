@@ -12,7 +12,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v1
@@ -36,7 +36,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == '0-4'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v1
