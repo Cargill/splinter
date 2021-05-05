@@ -71,8 +71,7 @@ impl CircuitMessageHandler {
 #[cfg(test)]
 mod tests {
 
-    use std::sync::{Arc, RwLock};
-    use std::{thread, time};
+    use std::sync::mpsc::{channel, Sender};
 
     use super::*;
     use crate::network::dispatch::{DispatchLoopBuilder, Dispatcher};
@@ -88,8 +87,8 @@ mod tests {
         let mut network_dispatcher = Dispatcher::new(Box::new(network_sender.clone()));
 
         let mut circuit_dispatcher = Dispatcher::new(Box::new(network_sender));
-        let handler = ServiceConnectedTestHandler::default();
-        let echos = handler.echos.clone();
+        let (tx, rx) = channel();
+        let handler = ServiceConnectedTestHandler::new(tx);
         circuit_dispatcher.set_handler(Box::new(handler));
 
         let circuit_dispatcher_loop = DispatchLoopBuilder::new()
@@ -120,23 +119,17 @@ mod tests {
             )
             .unwrap();
 
-        let mut count = 0;
-        let ten_millis = time::Duration::from_millis(10);
-        // give the dispatcher a chance to pass the message to the circuit dispatcher
-        while echos.read().unwrap().is_empty() && count < 10 {
-            thread::sleep(ten_millis);
-            count += 1;
-        }
-
-        assert_eq!(
-            vec!["TEST_SERVICE".to_string()],
-            echos.read().unwrap().clone()
-        );
+        assert_eq!("TEST_SERVICE".to_string(), rx.recv().unwrap());
     }
 
-    #[derive(Default)]
     struct ServiceConnectedTestHandler {
-        echos: Arc<RwLock<Vec<String>>>,
+        echos: Sender<String>,
+    }
+
+    impl ServiceConnectedTestHandler {
+        fn new(echos: Sender<String>) -> Self {
+            Self { echos }
+        }
     }
 
     impl Handler for ServiceConnectedTestHandler {
@@ -155,9 +148,8 @@ mod tests {
             _: &dyn MessageSender<Self::Source>,
         ) -> Result<(), DispatchError> {
             self.echos
-                .write()
-                .unwrap()
-                .push(message.get_service_id().to_string());
+                .send(message.get_service_id().to_string())
+                .unwrap();
             Ok(())
         }
     }
