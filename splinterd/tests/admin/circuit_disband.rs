@@ -390,7 +390,7 @@ pub fn test_3_party_circuit_lifecycle() {
     // Wait for the proposal event from each node.
     let proposal_a_event = node_a_events.next().expect("Unable to get next event");
     let proposal_b_event = node_b_events.next().expect("Unable to get next event");
-    let proposal_c_event = node_b_events.next().expect("Unable to get next event");
+    let proposal_c_event = node_c_events.next().expect("Unable to get next event");
 
     assert_eq!(&EventType::ProposalSubmitted, proposal_a_event.event_type());
     assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
