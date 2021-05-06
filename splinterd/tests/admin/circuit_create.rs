@@ -126,10 +126,10 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
     let circuit_id = "ABCDE-01234";
 
     let node_a_event_client = node_a
-        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
     let node_b_event_client = node_b
-        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes = make_create_circuit_payload(
@@ -262,13 +262,13 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     let circuit_id = "ABCDE-01234";
 
     let node_a_event_client = node_a
-        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
     let node_b_event_client = node_b
-        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
     let node_c_event_client = node_b
-        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
 
     // Create the `CircuitManagementPayload` to be sent to a node

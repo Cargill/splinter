@@ -69,14 +69,14 @@ pub fn test_2_party_circuit_lifecycle() {
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
         node_a
-            .admin_service_event_client(&management_type)
+            .admin_service_event_client(&management_type, None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_b_events = BlockingAdminServiceEventIterator::new(
         node_b
-            .admin_service_event_client(&management_type)
+            .admin_service_event_client(&management_type, None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
@@ -213,14 +213,14 @@ pub fn test_2_party_circuit_disband_proposal_rejected() {
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
         node_a
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_b_events = BlockingAdminServiceEventIterator::new(
         node_b
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
@@ -355,21 +355,21 @@ pub fn test_3_party_circuit_lifecycle() {
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
         node_a
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_b_events = BlockingAdminServiceEventIterator::new(
         node_b
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_c_events = BlockingAdminServiceEventIterator::new(
         node_c
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
@@ -560,21 +560,21 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
         node_a
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_b_events = BlockingAdminServiceEventIterator::new(
         node_b
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_c_events = BlockingAdminServiceEventIterator::new(
         node_c
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
