@@ -31,6 +31,22 @@ enum AuthorizationMessageType {
 
     // Trust.
     TRUST_REQUEST = 10;
+
+
+    // Start of v1 messages
+    AUTH_COMPLETE = 100;
+    AUTH_PROTOCOL_REQUEST = 101;
+    AUTH_PROTOCOL_RESPONSE = 102;
+
+    // v1 Trust authorization
+    AUTH_TRUST_REQUEST = 110;
+    AUTH_TRUST_RESPONSE = 111;
+
+    // Challenge Authorization
+    AUTH_CHALLENGE_NONCE_REQUEST = 120;
+    AUTH_CHALLENGE_NONCE_RESPONSE = 121;
+    AUTH_CHALLENGE_SUBMIT_REQUEST = 122;
+    AUTH_CHALLENGE_SUBMIT_RESPONSE = 123;
 }
 
 // The authorization message envelope.
@@ -103,3 +119,70 @@ message AuthorizationError {
     string error_message = 2;
 }
 
+// ------------- v1 Messages ------------------
+
+// Authorization protocol agreement request message
+//
+// This message will allow for the two connecting nodes to agree on what
+// authorization protocol version will be used
+message AuthProtocolRequest {
+    int32 auth_protocol_min = 1;
+    int32 auth_protocol_max = 2;
+}
+
+// Authorization protocol agreement response message
+//
+// Contains the agreed upon protocol version and the list of supported
+// authorization types
+message AuthProtocolResponse {
+    enum PeerAuthorizationType {
+        UNSET_AUTHORIZATION_TYPE = 0;
+        TRUST = 1;
+        CHALLENGE = 2;
+    }
+    int32 auth_protocol = 1;
+    repeated PeerAuthorizationType accepted_authorization_type = 2;
+}
+
+// v1 Trust request
+//
+// Contains the identity of the connecting node
+message AuthTrustRequest {
+    string identity = 1;
+}
+
+// v1 Trust response
+//
+// Returned if the identity was accepted
+message AuthTrustResponse{}
+
+// Challenge nonce requests
+//
+// Sent to a node to request a nonce that can be used for challenge
+// authorization
+message AuthChallengeNonceRequest{}
+
+// Challenge nonce response
+//
+// Returns the nonce that must be signed by the requesting node to prove
+// their identity
+message AuthChallengeNonceResponse {
+    bytes nonce = 1;
+}
+
+// Challenge submit requests
+//
+// The connecting nodes public key and the signature created by signing the
+// nonce received from the nonce response
+message AuthChallengeSubmitRequest {
+  bytes public_key = 1;
+  bytes signature = 2;
+}
+
+// v1 challenge response
+//
+// Returned if the signature and public key are valid
+message AuthChallengeSubmitResponse {}
+
+// Returned if authorization is complete
+message AuthComplete {}
