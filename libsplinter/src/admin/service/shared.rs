@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::iter::ExactSizeIterator;
@@ -23,10 +22,9 @@ use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::{Message, RepeatedField};
 
 use crate::admin::store::{
-    self, AdminServiceStore, Circuit as StoreCircuit, CircuitBuilder as StoreCircuitBuilder,
-    CircuitNode, CircuitPredicate, CircuitProposal as StoreProposal,
-    CircuitStatus as StoreCircuitStatus, ProposalType, ProposedNode, Service as StoreService, Vote,
-    VoteRecordBuilder,
+    AdminServiceStore, Circuit as StoreCircuit, CircuitBuilder as StoreCircuitBuilder, CircuitNode,
+    CircuitPredicate, CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus,
+    ProposalType, ProposedNode, Service as StoreService, Vote, VoteRecordBuilder,
 };
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
@@ -55,10 +53,8 @@ use crate::service::ServiceNetworkSender;
 
 use super::error::{AdminSharedError, MarshallingError};
 use super::messages;
-use super::{
-    admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscriber, AdminSubscriberError,
-    Events,
-};
+use super::subscriber::SubscriberMap;
+use super::{admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscriber, Events};
 
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";
@@ -99,50 +95,6 @@ struct CircuitProposalContext {
 struct UninitializedCircuit {
     pub circuit: Option<CircuitProposal>,
     pub ready_members: HashSet<String>,
-}
-
-struct SubscriberMap {
-    subscribers_by_type: RefCell<HashMap<String, Vec<Box<dyn AdminServiceEventSubscriber>>>>,
-}
-
-impl SubscriberMap {
-    fn new() -> Self {
-        Self {
-            subscribers_by_type: RefCell::new(HashMap::new()),
-        }
-    }
-
-    fn broadcast_by_type(&self, event_type: &str, admin_service_event: &store::AdminServiceEvent) {
-        let mut subscribers_by_type = self.subscribers_by_type.borrow_mut();
-        if let Some(subscribers) = subscribers_by_type.get_mut(event_type) {
-            subscribers.retain(
-                |subscriber| match subscriber.handle_event(admin_service_event) {
-                    Ok(()) => true,
-                    Err(AdminSubscriberError::Unsubscribe) => false,
-                    Err(AdminSubscriberError::UnableToHandleEvent(msg)) => {
-                        error!("Unable to send event: {}", msg);
-                        true
-                    }
-                },
-            );
-        }
-    }
-
-    fn add_subscriber(
-        &mut self,
-        event_type: String,
-        listener: Box<dyn AdminServiceEventSubscriber>,
-    ) {
-        let mut subscribers_by_type = self.subscribers_by_type.borrow_mut();
-        let subscribers = subscribers_by_type
-            .entry(event_type)
-            .or_insert_with(Vec::new);
-        subscribers.push(listener);
-    }
-
-    fn clear(&mut self) {
-        self.subscribers_by_type.borrow_mut().clear()
-    }
 }
 
 pub struct AdminServiceShared {
@@ -1610,6 +1562,7 @@ impl AdminServiceShared {
         }
     }
 
+    #[cfg(not(feature = "admin-service-event-subscriber-glob"))]
     pub fn get_events_since(
         &self,
         since_event_id: &i64,
@@ -1622,6 +1575,29 @@ impl AdminServiceShared {
                 *since_event_id,
             )
             .map_err(|err| AdminSharedError::UnableToAddSubscriber(err.to_string()))?;
+        Ok(Events {
+            inner: Box::new(events),
+        })
+    }
+
+    #[cfg(feature = "admin-service-event-subscriber-glob")]
+    pub fn get_events_since(
+        &self,
+        since_event_id: &i64,
+        circuit_management_type: &str,
+    ) -> Result<Events, AdminSharedError> {
+        let events = if circuit_management_type == "*" {
+            self.event_store
+                .list_events_since(*since_event_id)
+                .map_err(|err| AdminSharedError::UnableToAddSubscriber(err.to_string()))?
+        } else {
+            self.event_store
+                .list_events_by_management_type_since(
+                    circuit_management_type.to_string(),
+                    *since_event_id,
+                )
+                .map_err(|err| AdminSharedError::UnableToAddSubscriber(err.to_string()))?
+        };
         Ok(Events {
             inner: Box::new(events),
         })
