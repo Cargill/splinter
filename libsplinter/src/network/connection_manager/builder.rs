@@ -202,8 +202,8 @@ where
             .map_err(|err| ConnectionManagerError::StartUpError(err.to_string()))?;
 
         Ok(ConnectionManager {
-            join_handle,
             pacemaker,
+            join_handle,
             sender,
         })
     }

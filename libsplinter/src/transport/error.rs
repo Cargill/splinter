@@ -226,11 +226,9 @@ impl ConnectionMatrixAddError {
 
 impl Error for ConnectionMatrixAddError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        if let Some(ref err) = self.source {
-            Some(&**err)
-        } else {
-            None
-        }
+        self.source
+            .as_ref()
+            .map(|err| &**err as &(dyn Error + 'static))
     }
 }
 
@@ -258,11 +256,9 @@ impl ConnectionMatrixRemoveError {
 
 impl Error for ConnectionMatrixRemoveError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        if let Some(ref err) = self.source {
-            Some(&**err)
-        } else {
-            None
-        }
+        self.source
+            .as_ref()
+            .map(|err| &**err as &(dyn Error + 'static))
     }
 }
 
@@ -290,11 +286,9 @@ impl ConnectionMatrixSendError {
 
 impl Error for ConnectionMatrixSendError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        if let Some(ref err) = self.source {
-            Some(&**err)
-        } else {
-            None
-        }
+        self.source
+            .as_ref()
+            .map(|err| &**err as &(dyn Error + 'static))
     }
 }
 
@@ -329,11 +323,7 @@ impl Error for ConnectionMatrixRecvError {
         match self {
             ConnectionMatrixRecvError::Disconnected => None,
             ConnectionMatrixRecvError::InternalError { source, .. } => {
-                if let Some(ref err) = source {
-                    Some(&**err)
-                } else {
-                    None
-                }
+                source.as_ref().map(|err| &**err as &(dyn Error + 'static))
             }
             ConnectionMatrixRecvError::Shutdown => None,
         }
@@ -383,11 +373,7 @@ impl Error for ConnectionMatrixRecvTimeoutError {
             ConnectionMatrixRecvTimeoutError::Timeout => None,
             ConnectionMatrixRecvTimeoutError::Disconnected => None,
             ConnectionMatrixRecvTimeoutError::InternalError { source, .. } => {
-                if let Some(ref err) = source {
-                    Some(&**err)
-                } else {
-                    None
-                }
+                source.as_ref().map(|err| &**err as &(dyn Error + 'static))
             }
             ConnectionMatrixRecvTimeoutError::Shutdown => None,
         }

@@ -139,10 +139,7 @@ impl Iterator for ProposalIter {
     type Item = CircuitProposal;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.inner.next() {
-            Some(circuit_proposal) => Some(CircuitProposal::from(circuit_proposal)),
-            None => None,
-        }
+        self.inner.next().map(CircuitProposal::from)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

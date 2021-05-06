@@ -219,8 +219,8 @@ impl NodeBuilder {
         Ok(RunnableNode {
             admin_signer,
             admin_subsystem_builder,
-            runnable_network_subsystem,
             rest_api_variant,
+            runnable_network_subsystem,
             node_id,
             enable_biome,
         })

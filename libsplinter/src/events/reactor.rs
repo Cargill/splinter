@@ -123,8 +123,8 @@ impl Reactor {
             .expect("Unable to spawn event reactor thread");
 
         Self {
-            thread_handle,
             sender,
+            thread_handle,
             running,
         }
     }
