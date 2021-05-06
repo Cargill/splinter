@@ -20,9 +20,9 @@ use crate::transport::Connection;
 
 use super::runnable::RunnableServiceOrchestrator;
 
-const DEFAULT_INCOMING_CAPACITY: usize = 8;
-const DEFAULT_OUTGOING_CAPACITY: usize = 8;
-const DEFAULT_CHANNEL_CAPACITY: usize = 8;
+const DEFAULT_INCOMING_CAPACITY: usize = 512;
+const DEFAULT_OUTGOING_CAPACITY: usize = 512;
+const DEFAULT_CHANNEL_CAPACITY: usize = 512;
 
 /// Builds new [RunnableServiceOrchestrator] instances.
 #[derive(Default)]
