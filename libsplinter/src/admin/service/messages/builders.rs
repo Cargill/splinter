@@ -419,7 +419,7 @@ mod tests {
     /// Verify that the `CreateCircuitBuilder` works properly and builds a correct `CreateCircuit`
     /// when all fields are set.
     #[test]
-    fn circuit_builder_successful() {
+    fn create_circuit_builder_successful() {
         let mut builder = CreateCircuitBuilder::new();
         assert!(builder.circuit_id().is_none());
         assert!(builder.roster().is_none());
@@ -481,7 +481,7 @@ mod tests {
     /// `authorization_type`, `persistence`, `durability`, `routes`, `application_metadata`, and
     /// `comments` are unset.
     #[test]
-    fn circuit_builder_successful_with_defaults() {
+    fn create_circuit_builder_successful_with_defaults() {
         let service = SplinterServiceBuilder::new()
             .with_service_type("service_type")
             .with_allowed_nodes(&["node_id".into()])
@@ -521,7 +521,7 @@ mod tests {
     /// Verify that the `CreateCircuitBuilder` fails to build when an invalid `circuit_id` is
     /// given.
     #[test]
-    fn circuit_builder_invalid_circuit_id() {
+    fn create_circuit_builder_invalid_circuit_id() {
         let service = SplinterServiceBuilder::new()
             .with_service_type("service_type")
             .with_allowed_nodes(&["node_id".into()])
@@ -575,7 +575,7 @@ mod tests {
 
     /// Verify that the `CreateCircuitBuilder` fails to build when `roster` is not set.
     #[test]
-    fn circuit_builder_unset_roster() {
+    fn create_circuit_builder_unset_roster() {
         let node = SplinterNodeBuilder::new()
             .with_node_id("node_id")
             .with_endpoints(&["endpoint".into()])
@@ -593,7 +593,7 @@ mod tests {
 
     /// Verify that the `CreateCircuitBuilder` fails to build when `members` is not set.
     #[test]
-    fn circuit_builder_unset_members() {
+    fn create_circuit_builder_unset_members() {
         let service = SplinterServiceBuilder::new()
             .with_service_type("service_type")
             .with_allowed_nodes(&["node_id".into()])
@@ -612,7 +612,7 @@ mod tests {
     /// Verify that the `CreateCircuitBuilder` fails to build when `circuit_management_type` is not
     /// set.
     #[test]
-    fn circuit_builder_unset_circuit_management_type() {
+    fn create_circuit_builder_unset_circuit_management_type() {
         let service = SplinterServiceBuilder::new()
             .with_service_type("service_type")
             .with_allowed_nodes(&["node_id".into()])
