@@ -1522,13 +1522,10 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
 
 impl From<ProposedCircuit> for YamlProposedCircuit {
     fn from(circuit: ProposedCircuit) -> Self {
-        let application_metadata = {
-            if let Some(application_metadata) = circuit.application_metadata() {
-                Some(to_hex(application_metadata))
-            } else {
-                None
-            }
-        };
+        let application_metadata = circuit
+            .application_metadata()
+            .as_ref()
+            .map(|app_metadata| to_hex(&app_metadata));
 
         YamlProposedCircuit {
             circuit_id: circuit.circuit_id().into(),

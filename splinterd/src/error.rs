@@ -66,20 +66,8 @@ impl Error for UserError {
             UserError::MissingArgument(_) => None,
             UserError::InvalidArgument(_) => None,
             UserError::ConfigError(err) => Some(err),
-            UserError::IoError { source, .. } => {
-                if let Some(ref err) = source {
-                    Some(&**err)
-                } else {
-                    None
-                }
-            }
-            UserError::DaemonError { source, .. } => {
-                if let Some(ref err) = source {
-                    Some(&**err)
-                } else {
-                    None
-                }
-            }
+            UserError::IoError { source, .. } => source.as_ref().map(|err| &**err as &dyn Error),
+            UserError::DaemonError { source, .. } => source.as_ref().map(|err| &**err),
             #[cfg(feature = "metrics")]
             UserError::MetricsError(err) => Some(err),
         }

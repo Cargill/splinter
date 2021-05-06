@@ -53,13 +53,7 @@ impl Error for AdminServiceError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             AdminServiceError::ServiceError(err) => Some(err),
-            AdminServiceError::GeneralError { source, .. } => {
-                if let Some(ref err) = source {
-                    Some(&**err)
-                } else {
-                    None
-                }
-            }
+            AdminServiceError::GeneralError { source, .. } => source.as_ref().map(|err| &**err),
         }
     }
 }
@@ -128,11 +122,7 @@ impl AdminKeyVerifierError {
 
 impl Error for AdminKeyVerifierError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        if let Some(ref err) = self.source {
-            Some(&**err)
-        } else {
-            None
-        }
+        self.source.as_deref()
     }
 }
 
