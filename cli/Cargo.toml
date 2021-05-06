@@ -74,6 +74,7 @@ experimental = [
     "health",
     "https-certs",
     "permissions",
+    "proposal-removal",
     "registry",
 ]
 
@@ -88,6 +89,7 @@ health = []
 
 https-certs = []
 permissions = []
+proposal-removal = ["splinter/proposal-removal"]
 
 database = ["diesel"]
 postgres = [

@@ -101,6 +101,7 @@ experimental = [
     "https-bind",
     "metrics",
     "node",
+    "proposal-removal",
     "service-arg-validation",
     "service-endpoint",
     "ws-transport",
@@ -148,6 +149,7 @@ node = [
 oauth = [
     "splinter/oauth"
 ]
+proposal-removal = ["splinter/proposal-removal"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [
     "scabbard/service-arg-validation",
