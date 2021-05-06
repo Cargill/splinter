@@ -778,8 +778,20 @@ fn run() -> Result<(), CliError> {
                     .with_contract(smart_contract.contract)
                     .into_payload_builder()?
                     .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_batch_builder(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to get batch builder for CreateContractAction",
+                            Box::new(err),
+                        )
+                    })?
+                    .build(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to build batch for CreateContractAction",
+                            Box::new(err),
+                        )
+                    })?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -932,8 +944,20 @@ fn run() -> Result<(), CliError> {
                 .with_payload(contract_payload)
                 .into_payload_builder()?
                 .into_transaction_builder(&*signer)?
-                .into_batch_builder(&*signer)?
-                .build(&*signer)?;
+                .into_batch_builder(&*signer)
+                .map_err(|err| {
+                    CliError::action_error_with_source(
+                        "Unable to get batch builder for ExecuteContractAction",
+                        Box::new(err),
+                    )
+                })?
+                .build(&*signer)
+                .map_err(|err| {
+                    CliError::action_error_with_source(
+                        "Unable to build batch for ExecuteContractAction",
+                        Box::new(err),
+                    )
+                })?;
 
             Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
         }
@@ -974,8 +998,20 @@ fn run() -> Result<(), CliError> {
                     .with_owners(owners)
                     .into_payload_builder()?
                     .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_batch_builder(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to get batch builder for CreateNamespaceRegistryAction",
+                            Box::new(err),
+                        )
+                    })?
+                    .build(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to build batch for CreateNamespaceRegistryAction",
+                            Box::new(err),
+                        )
+                    })?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1015,8 +1051,20 @@ fn run() -> Result<(), CliError> {
                     .with_owners(owners)
                     .into_payload_builder()?
                     .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_batch_builder(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to get batch builder for UpdateNamespaceRegistryOwnersAction",
+                            Box::new(err),
+                        )
+                    })?
+                    .build(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to build batch for UpdateNamespaceRegistryOwnersAction",
+                            Box::new(err),
+                        )
+                    })?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1050,8 +1098,20 @@ fn run() -> Result<(), CliError> {
                     .with_namespace(namespace.into())
                     .into_payload_builder()?
                     .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_batch_builder(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to get batch builder for DeleteNamespaceRegistryAction",
+                            Box::new(err),
+                        )
+                    })?
+                    .build(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to build batch for DeleteNamespaceRegistryAction",
+                            Box::new(err),
+                        )
+                    })?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1104,8 +1164,20 @@ fn run() -> Result<(), CliError> {
 
             let batch = payload_builder
                 .into_transaction_builder(&*signer)?
-                .into_batch_builder(&*signer)?
-                .build(&*signer)?;
+                .into_batch_builder(&*signer)
+                .map_err(|err| {
+                    CliError::action_error_with_source(
+                        "Unable to get batch builder for CreateNamespaceRegistryPermissionAction",
+                        Box::new(err),
+                    )
+                })?
+                .build(&*signer)
+                .map_err(|err| {
+                    CliError::action_error_with_source(
+                        "Unable to build batch for CreateNamespaceRegistryPermissionAction",
+                        Box::new(err),
+                    )
+                })?;
 
             Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
         }
@@ -1146,8 +1218,20 @@ fn run() -> Result<(), CliError> {
                     .with_owners(owners)
                     .into_payload_builder()?
                     .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_batch_builder(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to get batch builder for CreateContractRegistryAction",
+                            Box::new(err),
+                        )
+                    })?
+                    .build(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to build batch for CreateContractRegistryAction",
+                            Box::new(err),
+                        )
+                    })?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1187,8 +1271,20 @@ fn run() -> Result<(), CliError> {
                     .with_owners(owners)
                     .into_payload_builder()?
                     .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_batch_builder(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to get batch builder for UpdateContractRegistryOwnersAction",
+                            Box::new(err),
+                        )
+                    })?
+                    .build(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to build batch for UpdateContractRegistryOwnersAction",
+                            Box::new(err),
+                        )
+                    })?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1222,8 +1318,20 @@ fn run() -> Result<(), CliError> {
                     .with_name(name.into())
                     .into_payload_builder()?
                     .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_batch_builder(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to get batch builder for DeleteContractRegistryAction",
+                            Box::new(err),
+                        )
+                    })?
+                    .build(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to build batch for DeleteContractRegistryAction",
+                            Box::new(err),
+                        )
+                    })?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1269,8 +1377,20 @@ fn run() -> Result<(), CliError> {
                     .with_function(function)
                     .into_payload_builder()?
                     .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_batch_builder(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to get batch builder for CreateSmartPermissionAction",
+                            Box::new(err),
+                        )
+                    })?
+                    .build(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to build batch for CreateSmartPermissionAction",
+                            Box::new(err),
+                        )
+                    })?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1313,8 +1433,20 @@ fn run() -> Result<(), CliError> {
                     .with_function(function)
                     .into_payload_builder()?
                     .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_batch_builder(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to get batch builder for UpdateSmartPermissionAction",
+                            Box::new(err),
+                        )
+                    })?
+                    .build(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to build batch for UpdateSmartPermissionAction",
+                            Box::new(err),
+                        )
+                    })?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1352,8 +1484,20 @@ fn run() -> Result<(), CliError> {
                     .with_org_id(org_id.to_string())
                     .into_payload_builder()?
                     .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_batch_builder(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to get batch builder for DeleteSmartPermissionAction",
+                            Box::new(err),
+                        )
+                    })?
+                    .build(&*signer)
+                    .map_err(|err| {
+                        CliError::action_error_with_source(
+                            "Unable to build batch for DeleteSmartPermissionAction",
+                            Box::new(err),
+                        )
+                    })?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
