@@ -652,9 +652,9 @@ impl ZmqListener {
 
         Ok(ZmqListener {
             context,
+            endpoint,
             sender,
             join_handle,
-            endpoint,
         })
     }
 

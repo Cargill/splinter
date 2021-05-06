@@ -327,9 +327,9 @@ impl PeerManager {
             })?;
 
         Ok(PeerManager {
-            pacemaker_shutdown_signaler,
             join_handle,
             sender,
+            pacemaker_shutdown_signaler,
         })
     }
 }

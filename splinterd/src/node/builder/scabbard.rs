@@ -57,8 +57,8 @@ impl ScabbardConfigBuilder {
             .ok_or_else(|| InternalError::with_message("A data directory is required.".into()))?;
 
         Ok(ScabbardConfig {
-            database_size,
             data_dir,
+            database_size,
         })
     }
 }

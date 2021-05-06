@@ -131,9 +131,9 @@ impl AuthorizationManager {
         let shared = Arc::new(Mutex::new(ManagedAuthorizations::new()));
 
         Ok(Self {
+            local_identity,
             thread_pool,
             shared,
-            local_identity,
         })
     }
 
