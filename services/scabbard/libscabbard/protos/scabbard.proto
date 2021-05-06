@@ -20,6 +20,9 @@ message ScabbardMessage {
         CONSENSUS_MESSAGE = 1;
         PROPOSED_BATCH = 2;
         NEW_BATCH = 3;
+
+        TOO_MANY_REQUESTS = 10;
+        ACCEPTING_REQUESTS = 11;
     }
 
     Type message_type = 1;

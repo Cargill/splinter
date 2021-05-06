@@ -187,7 +187,10 @@ impl ProposalManager for ScabbardProposalManager {
             .lock()
             .map_err(|_| ProposalManagerError::Internal(Box::new(ScabbardError::LockPoisoned)))?;
 
-        if let Some(batch) = shared.pop_batch_from_queue() {
+        if let Some(batch) = shared
+            .pop_batch_from_queue()
+            .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?
+        {
             let expected_hash = self
                 .state
                 .lock()
@@ -419,6 +422,8 @@ mod tests {
             peer_services.clone(),
             "svc0".to_string(),
             Secp256k1Context::new().new_verifier(),
+            #[cfg(feature = "back-pressure")]
+            ScabbardVersion::V2,
         )));
         let consensus_sender = ScabbardConsensusNetworkSender::new("svc0".into(), shared);
 

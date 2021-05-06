@@ -66,11 +66,13 @@ experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
+  "back-pressure",
   "factory-builder",
   "metrics",
 ]
 
 authorization = ["splinter/authorization"]
+back-pressure = []
 client = []
 client-reqwest = ["client", "reqwest"]
 events = ["splinter/events"]
