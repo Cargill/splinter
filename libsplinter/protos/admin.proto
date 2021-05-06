@@ -40,6 +40,9 @@ message Circuit {
         UNSET_AUTHORIZATION_TYPE = 0;
         // Connections are trusted, and no authorization is done
         TRUST_AUTHORIZATION = 1;
+        // Connections must prove their identity by signing bytes and providing
+        // their public key
+        CHALLENGE_AUTHORIZATION = 2;
     }
 
     enum PersistenceType {
