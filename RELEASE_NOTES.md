@@ -1,5 +1,84 @@
 # Release Notes
 
+## Changes in Splinter 0.5.2
+
+### Highlights
+
+* Circuit deletion is now stabilized. Circuits can now be disbanded or
+  abandoned and then purged. The CLI commands are now available in the
+  `splinter` CLI.
+  - [Circuit Disband](https://www.splinter.dev/community/planning/circuit_disband.html)
+  - [Circuit Abandon](https://www.splinter.dev/community/planning/circuit_abandon.html])
+  - [Circuit Purge](https://www.splinter.dev/community/planning/circuit_purge.html])
+
+* Added the `proposal-removal` experimental feature, which enables removing
+  circuit proposals. The experimental `splinter-circuit-remove-proposal` CLI
+  command is available in the `splinter` CLI.
+
+### splinter CLI
+
+* Stabilized `splinter circuit disband` subcommand.
+
+* Stabilized `splinter circuit abandon` subcommand.
+
+* Stabilized `splinter circuit purge` subcommand.
+
+* Added `--dry-run` to the experimental role-based access control subcommands.
+
+* Added `splinter-circuit-remove-proposal` subcommand, guarded by the
+  experimental `proposal-removal` feature.
+
+### splinterd
+
+* Stabilized `circuit-disband`, `circuit-abandon`, and `circuit-purge`.
+
+* Added explicit check for existence of the state directory.
+
+### libsplinter
+
+* Added experimental admin event client trait and Actix Web Client (AWC)
+  implementation. This trait provides a simplified wait to wait for admin
+  service events.
+
+* Added the `rbac_` prefix to database tables for the experimental role-based
+  access control authorization handler.
+
+* Fixed a timing bug that resulted in important messages being dropped. If a
+  PeerInterconnect did not have the peer id for a connection before a message
+  was received that message would be dropped. Now, the message is retried in
+  the future, allowing time for the peering processes to finish.
+
+* Fixed a timing bug where the process of adding internal connections to the
+  mesh instance in the orchestrator or the service processor would block
+  indefinitely, due to an internal channel not yet registered with mio::Poll
+  before the connection was added.
+
+* Log error and drop messages if the orchestrator's send queue is full. Before
+  this commit, a full queue error would kill the loop, breaking the
+  orchestrator.
+
+* Increased default orchestrator capacity values to 512. Previously, these
+  values were set to 8 messages. This is a very small restriction on the
+  capacity of the message queues, especially during load.
+
+* Added an experimental feature, `proposal-removal`, which provides the ability
+  to remove circuit proposals.
+
+* Added experimental support for count_circuits and count_proposals to
+  AdminServiceStore.
+
+### scabbard
+
+* Implemented simple back pressure for pending batches. The submit route will
+  return TOO_MANY_REQUESTS and reject the batch if the pending batch queue is
+  longer than 30 batches. Scabbard will start accepting batches agains when the
+  batch queue makes it to 15 batches pending. This feature is experimental
+  behind `back-pressure`.
+
+### Miscellaneous
+
+* Switched to GitHub Actions from Travis CI for builds.
+
 ## Changes in Splinter 0.5.1
 
 ### Highlights
