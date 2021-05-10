@@ -2176,6 +2176,17 @@ impl AdminServiceShared {
             ));
         }
 
+        #[cfg(feature = "challenge-authorization")]
+        if circuit.get_circuit_version() < CIRCUIT_PROTOCOL_VERSION
+            && circuit.get_authorization_type()
+                == Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION
+        {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "authorization_type CHALLENGE is not support in circuit schema version {}",
+                circuit.get_circuit_version()
+            )));
+        }
+
         if circuit.get_persistence() == Circuit_PersistenceType::UNSET_PERSISTENCE_TYPE {
             return Err(AdminSharedError::ValidationFailed(
                 "persistence_type cannot be unset".to_string(),
@@ -4680,6 +4691,49 @@ mod tests {
             ADMIN_SERVICE_PROTOCOL_VERSION,
         ) {
             panic!("Should have been invalid because route type is unset");
+        }
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "challenge-authorization")]
+    #[test]
+    // test that if a circuit has challenge auth set while circuit version 1 an error is returned
+    fn test_validate_circuit_challenge_auth_not_supported() {
+        let store = setup_admin_service_store();
+        let event_store = store.clone_boxed();
+
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            event_store,
+        );
+        let mut circuit = setup_v1_test_circuit();
+
+        circuit.set_authorization_type(Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION);
+
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because cannot have challenge auth if version 1");
         }
         shutdown(mesh, cm, pm);
     }
