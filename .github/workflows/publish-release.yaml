@@ -8,6 +8,8 @@ on:
 jobs:
 
   unit_test_splinter:
+    if: >-
+      github.repository_owner == 'Cargill'
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
@@ -22,6 +24,8 @@ jobs:
 
   publish_docker:
     needs: unit_test_splinter
+    if: >-
+      github.repository_owner == 'Cargill'
     runs-on: ubuntu-18.04
     steps:
       - name: Login to DockerHub
@@ -44,6 +48,8 @@ jobs:
 
   publish_to_crates:
     needs: unit_test_splinter
+    if: >-
+      github.repository_owner == 'Cargill'
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2

@@ -11,7 +11,8 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main'
+      github.event.workflow_run.head_branch == 'main' &&
+      github.repository_owner == 'Cargill'
     runs-on: ubuntu-18.04
     steps:
       - name: Login to DockerHub
@@ -35,7 +36,8 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == '0-4'
+      github.event.workflow_run.head_branch == '0-4' &&
+      github.repository_owner == 'Cargill'
     runs-on: ubuntu-18.04
     steps:
       - name: Login to DockerHub
