@@ -13,6 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Display envvars
+        run: env
+
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
@@ -23,6 +26,9 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+
+      - name: Display envvars
+        run: env
 
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
@@ -35,6 +41,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Display envvars
+        run: env
+
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
@@ -46,6 +55,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Display envvars
+        run: env
+
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
@@ -56,6 +68,9 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+
+      - name: Display envvars
+        run: env
 
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
