@@ -42,18 +42,39 @@ pub(in crate::admin) fn make_create_circuit_payload(
     node_info: HashMap<String, Vec<String>>,
     signer: &dyn Signer,
     admin_keys: &[String],
-) -> Vec<u8> {
+) -> Result<Vec<u8>, InternalError> {
+    let circuit_request = setup_circuit(circuit_id, node_info, admin_keys);
+    complete_create_payload(requester, signer, circuit_request)
+}
+
+pub(in crate) fn complete_create_payload(
+    requester: &str,
+    signer: &dyn Signer,
+    circuit_request: CircuitCreateRequest,
+) -> Result<Vec<u8>, InternalError> {
+    let serialized_action = circuit_request.write_to_bytes().map_err(|e| {
+        InternalError::from_source_with_message(
+            Box::new(e),
+            "unable to serialize `CreateCircuitRequest`".to_string(),
+        )
+    })?;
+
     // Get the public key to set the `requester` field of the `CircuitManagementPayload` header
     let public_key = signer
         .public_key()
-        .expect("Unable to get signer's public key")
+        .map_err(|e| {
+            InternalError::from_source_with_message(
+                Box::new(e),
+                "unable to get signer's public key".to_string(),
+            )
+        })?
         .into_bytes();
-    let circuit_request = setup_circuit(circuit_id, node_info, admin_keys);
-    let serialized_action = circuit_request
-        .write_to_bytes()
-        .expect("Unable to serialize `CircuitCreateRequest`");
-    let hashed_bytes = hash(MessageDigest::sha512(), &serialized_action)
-        .expect("Unable to hash `CircuitCreateRequest` bytes");
+    let hashed_bytes = hash(MessageDigest::sha512(), &serialized_action).map_err(|e| {
+        InternalError::from_source_with_message(
+            Box::new(e),
+            "unable to hash `CircuitCreateRequest` bytes".to_string(),
+        )
+    })?;
 
     let mut header = CircuitManagementPayload_Header::new();
     header.set_action(CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
@@ -65,19 +86,36 @@ pub(in crate::admin) fn make_create_circuit_payload(
     payload.set_signature(
         signer
             .sign(&payload.header)
-            .expect("Unable to sign `CircuitManagementPayload` header")
+            .map_err(|e| {
+                InternalError::from_source_with_message(
+                    Box::new(e),
+                    "unable to sign `CircuitManagementPayload` header".to_string(),
+                )
+            })?
             .take_bytes(),
     );
     payload.set_circuit_create_request(circuit_request);
-    payload
-        .set_header(Message::write_to_bytes(&header).expect("Unable to serialize payload header"));
+    payload.set_header(Message::write_to_bytes(&header).map_err(|e| {
+        InternalError::from_source_with_message(
+            Box::new(e),
+            "unable to serialize payload header".to_string(),
+        )
+    })?);
+
+    let bytes = Message::write_to_bytes(&payload).map_err(|e| {
+        InternalError::from_source_with_message(
+            Box::new(e),
+            "unable to serialize `CircuitManagementPayload`".to_string(),
+        )
+    })?;
+
     // Return the bytes of the payload
-    Message::write_to_bytes(&payload).expect("Unable to serialize `CircuitManagementPayload`")
+    Ok(bytes)
 }
 
 /// Makes the `CircuitProposalVote` payload to either accept or reject the proposal (based on
 /// the `accept` argument) and returns the bytes of this payload
-pub(in crate::admin) fn make_circuit_proposal_vote_payload(
+pub(in crate) fn make_circuit_proposal_vote_payload(
     proposal: ProposalSlice,
     requester: &str,
     signer: &dyn Signer,
@@ -92,7 +130,7 @@ pub(in crate::admin) fn make_circuit_proposal_vote_payload(
 
     let vote_proto = CircuitProposalVote {
         circuit_id: proposal.circuit_id.to_string(),
-        circuit_hash: proposal.circuit_hash.to_string(),
+        circuit_hash: proposal.circuit_hash,
         vote,
     }
     .into_proto();

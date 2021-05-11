@@ -142,7 +142,8 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
             .public_key()
             .expect("Unable to get first node's public key")
             .as_hex()],
-    );
+    )
+    .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
         .admin_service_client()
@@ -281,7 +282,8 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
             .public_key()
             .expect("Unable to get first node's public key")
             .as_hex()],
-    );
+    )
+    .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
         .admin_service_client()

@@ -65,7 +65,8 @@ pub(in crate::admin) fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, 
                 .expect("Unable to get second node's public key")
                 .as_hex(),
         ],
-    );
+    )
+    .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
         .admin_service_client()
@@ -217,7 +218,8 @@ pub(in crate::admin) fn commit_3_party_circuit(
                 .expect("Unable to get third node's public key")
                 .as_hex(),
         ],
-    );
+    )
+    .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
         .admin_service_client()
