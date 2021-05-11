@@ -11,9 +11,13 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main'
+      github.event.workflow_run.head_branch == 'main' &&
+      github.repository_owner == 'Cargill'
     runs-on: ubuntu-18.04
     steps:
+      - name: Display envvars
+        run: env
+
       - name: Login to DockerHub
         uses: docker/login-action@v1
         with:
@@ -25,7 +29,7 @@ jobs:
           fetch-depth: 0
 
       - name: Publish branch to dockerhub
-        run: ./ci/publish-docker master
+        run: ./ci/publish-docker main
         env:
           NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
           VERSION: AUTO_STRICT
@@ -35,9 +39,13 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == '0-4'
+      github.event.workflow_run.head_branch == '0-4' &&
+      github.repository_owner == 'Cargill'
     runs-on: ubuntu-18.04
     steps:
+      - name: Display envvars
+        run: env
+
       - name: Login to DockerHub
         uses: docker/login-action@v1
         with:
