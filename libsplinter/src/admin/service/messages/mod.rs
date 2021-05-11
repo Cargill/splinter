@@ -54,9 +54,13 @@ impl CreateCircuit {
     pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, MarshallingError> {
         let authorization_type = match proto.get_authorization_type() {
             admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
-            admin::Circuit_AuthorizationType::UNSET_AUTHORIZATION_TYPE => {
+            #[cfg(feature = "challenge-authorization")]
+            admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION => {
+                AuthorizationType::Challenge
+            }
+            _ => {
                 return Err(MarshallingError::UnsetField(
-                    "Unset authorization type".to_string(),
+                    "Unsupported authorization type".to_string(),
                 ));
             }
         };
@@ -176,6 +180,12 @@ impl CreateCircuit {
                 circuit
                     .set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
             }
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationType::Challenge => {
+                circuit.set_authorization_type(
+                    admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION,
+                );
+            }
         };
 
         match self.persistence {
@@ -254,6 +264,12 @@ impl TryInto<admin::Circuit> for CreateCircuit {
                 circuit
                     .set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
             }
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationType::Challenge => {
+                circuit.set_authorization_type(
+                    admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION,
+                );
+            }
         };
 
         match self.persistence {
@@ -303,12 +319,16 @@ pub fn is_valid_circuit_id(circuit_id: &str) -> bool {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum AuthorizationType {
     Trust,
+    #[cfg(feature = "challenge-authorization")]
+    Challenge,
 }
 
 impl From<&store::AuthorizationType> for AuthorizationType {
     fn from(store_enum: &store::AuthorizationType) -> Self {
         match *store_enum {
             store::AuthorizationType::Trust => AuthorizationType::Trust,
+            #[cfg(feature = "challenge-authorization")]
+            store::AuthorizationType::Challenge => AuthorizationType::Challenge,
         }
     }
 }

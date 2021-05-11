@@ -122,6 +122,7 @@ experimental = [
     "biome-client-reqwest",
     "biome-notifications",
     "biome-profile",
+    "challenge-authorization",
     "client-reqwest",
     "https-bind",
     "metrics",
@@ -160,6 +161,7 @@ biome-key-management = ["biome"]
 biome-notifications = ["biome"]
 biome-profile = ["biome"]
 oauth-profile = ["base64"]
+challenge-authorization = []
 circuit-template = ["admin-service", "glob"]
 client-reqwest = ["reqwest"]
 cylinder-jwt = ["cylinder/jwt", "rest-api"]

@@ -111,9 +111,14 @@ impl ProposedCircuit {
     pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, InvalidStateError> {
         let authorization_type = match proto.get_authorization_type() {
             admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
-            admin::Circuit_AuthorizationType::UNSET_AUTHORIZATION_TYPE => {
+            #[cfg(feature = "challenge-authorization")]
+            admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION => {
+                AuthorizationType::Challenge
+            }
+            _ => {
                 return Err(InvalidStateError::with_message(
-                    "unable to build, missing field: `authorization_type`".to_string(),
+                    "unable to build, missing or unsupported field: `authorization_type`"
+                        .to_string(),
                 ));
             }
         };
@@ -243,6 +248,12 @@ impl ProposedCircuit {
             AuthorizationType::Trust => {
                 circuit
                     .set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
+            }
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationType::Challenge => {
+                circuit.set_authorization_type(
+                    admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION,
+                );
             }
         };
 

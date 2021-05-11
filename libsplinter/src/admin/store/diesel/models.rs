@@ -970,6 +970,8 @@ impl TryFrom<String> for AuthorizationType {
     fn try_from(variant: String) -> Result<Self, Self::Error> {
         match variant.as_ref() {
             "Trust" => Ok(AuthorizationType::Trust),
+            #[cfg(feature = "challenge-authorization")]
+            "Challenge" => Ok(AuthorizationType::Challenge),
             _ => Err(AdminServiceStoreError::InvalidStateError(
                 InvalidStateError::with_message(
                     "Unable to convert string to AuthorizationType".into(),
@@ -983,6 +985,8 @@ impl From<&AuthorizationType> for String {
     fn from(variant: &AuthorizationType) -> Self {
         match variant {
             AuthorizationType::Trust => String::from("Trust"),
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationType::Challenge => String::from("Challenge"),
         }
     }
 }
@@ -991,6 +995,8 @@ impl From<&messages::AuthorizationType> for String {
     fn from(variant: &messages::AuthorizationType) -> Self {
         match variant {
             messages::AuthorizationType::Trust => String::from("Trust"),
+            #[cfg(feature = "challenge-authorization")]
+            messages::AuthorizationType::Challenge => String::from("Challenge"),
         }
     }
 }
