@@ -27,8 +27,9 @@ mod transport;
 
 #[cfg(feature = "challenge-authorization")]
 use cylinder::{load_key_from_path, secp256k1::Secp256k1Context, Context, Signer};
-use flexi_logger::{style, DeferredNow, LogSpecBuilder, Logger};
-use log::Record;
+use log4rs::config::{Appender, Logger, Root};
+use log4rs::encode::pattern::PatternEncoder;
+
 use rand::{thread_rng, Rng};
 #[cfg(feature = "metrics")]
 use splinter::metrics::influx::InfluxRecorder;
@@ -47,7 +48,6 @@ use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
-use std::thread;
 
 use error::UserError;
 use transport::build_transport;
@@ -184,24 +184,6 @@ fn load_signer_keys(config_dir: &str) -> Result<Vec<Box<dyn Signer>>, UserError>
     }
 
     Ok(signing_keys)
-}
-
-// format for logs
-pub fn log_format(
-    w: &mut dyn std::io::Write,
-    now: &mut DeferredNow,
-    record: &Record,
-) -> Result<(), std::io::Error> {
-    let level = record.level();
-    write!(
-        w,
-        "[{}] T[{:?}] {} [{}] {}",
-        now.now().format("%Y-%m-%d %H:%M:%S%.3f"),
-        thread::current().name().unwrap_or("<unnamed>"),
-        record.level(),
-        record.module_path().unwrap_or("<unnamed>"),
-        style(level, &record.args()),
-    )
 }
 
 fn main() {
@@ -492,18 +474,24 @@ fn main() {
         _ => log::LevelFilter::Trace,
     };
 
-    let mut log_spec_builder = LogSpecBuilder::new();
-    log_spec_builder.default(log_level);
-    log_spec_builder.module("hyper", log::LevelFilter::Warn);
-    log_spec_builder.module("tokio", log::LevelFilter::Warn);
+    let encoder = PatternEncoder::new("[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n");
+    let stdout = log4rs::append::console::ConsoleAppender::builder()
+        .encoder(Box::new(encoder))
+        .build();
+    let config = log4rs::Config::builder()
+        .appender(Appender::builder().build("stdout", Box::new(stdout)))
+        .logger(Logger::builder().build("hyper", log::LevelFilter::Warn))
+        .logger(Logger::builder().build("tokio", log::LevelFilter::Warn));
     #[cfg(feature = "https-bind")]
-    log_spec_builder.module("h2", log::LevelFilter::Warn);
-
-    Logger::with(log_spec_builder.build())
-        .format(log_format)
-        .log_target(flexi_logger::LogTarget::StdOut)
-        .start()
-        .expect("Failed to create logger");
+    let config = config.logger(Logger::builder().build("h2", log::LevelFilter::Warn));
+    let log_config = config.build(Root::builder().appender("stdout").build(log_level));
+    if let Ok(lc) = log_config {
+        let _handle = log4rs::init_config(lc);
+    } else {
+        unreachable!();
+        // log_config  should always return an Ok variant.
+        // Err is returned if multiple logger facades are registered which shouldn't ever happen
+    }
 
     if let Err(err) = start_daemon(matches) {
         error!("Failed to start daemon, {}", err);
