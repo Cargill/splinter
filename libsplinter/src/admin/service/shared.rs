@@ -362,9 +362,11 @@ impl AdminServiceShared {
                                 let envelope_bytes =
                                     msg.write_to_bytes().map_err(MarshallingError::from)?;
                                 for member in store_circuit.members().iter() {
-                                    if member != &self.node_id {
-                                        network_sender
-                                            .send(&admin_service_id(member), &envelope_bytes)?;
+                                    if member.node_id() != self.node_id {
+                                        network_sender.send(
+                                            &admin_service_id(member.node_id()),
+                                            &envelope_bytes,
+                                        )?;
                                     }
                                 }
                             }
@@ -399,7 +401,11 @@ impl AdminServiceShared {
                                         )
                                     })
                                     .collect(),
-                                circuit.members().to_vec(),
+                                circuit
+                                    .members()
+                                    .iter()
+                                    .map(|node| node.node_id().to_string())
+                                    .collect(),
                             );
 
                             let routing_members = circuit_proposal
@@ -449,9 +455,11 @@ impl AdminServiceShared {
                                 let envelope_bytes =
                                     msg.write_to_bytes().map_err(MarshallingError::from)?;
                                 for member in circuit.members().iter() {
-                                    if member != &self.node_id {
-                                        network_sender
-                                            .send(&admin_service_id(member), &envelope_bytes)?;
+                                    if member.node_id() != self.node_id {
+                                        network_sender.send(
+                                            &admin_service_id(member.node_id()),
+                                            &envelope_bytes,
+                                        )?;
                                     }
                                 }
                             }
@@ -969,8 +977,8 @@ impl AdminServiceShared {
                 ServiceError::UnableToHandleMessage(Box::new(MarshallingError::ProtobufError(err)))
             })?;
             for member in stored_circuit.members().iter() {
-                if member != &self.node_id {
-                    network_sender.send(&admin_service_id(member), &envelope_bytes)?;
+                if member.node_id() != self.node_id {
+                    network_sender.send(&admin_service_id(member.node_id()), &envelope_bytes)?;
                 }
             }
         }
@@ -1018,7 +1026,7 @@ impl AdminServiceShared {
             })?;
         // Removing the circuit's peer refs
         for member in stored_circuit.members() {
-            self.remove_peer_ref(member);
+            self.remove_peer_ref(member.node_id());
         }
 
         Ok(())
@@ -1507,29 +1515,17 @@ impl AdminServiceShared {
 
             // Collecting the node endpoints associated with the currently active version of the
             // circuit proposed to be disbanded.
-            let node_ids = circuit.members().to_vec();
-            let disband_members = self
-                .admin_store
-                .list_nodes()
-                .map_err(|err| {
-                    ServiceError::UnableToHandleMessage(Box::new(
-                        AdminSharedError::ValidationFailed(format!(
-                            "error occurred when trying to get circuit nodes {}",
-                            err
-                        )),
-                    ))
-                })?
-                .filter_map(|circuit_node| {
-                    if node_ids.contains(&circuit_node.node_id().to_string()) {
-                        return Some(
-                            messages::SplinterNode {
-                                node_id: circuit_node.node_id().to_string(),
-                                endpoints: circuit_node.endpoints().to_vec(),
-                            }
-                            .into_proto(),
-                        );
+            let disband_members = circuit
+                .members()
+                .iter()
+                .map(|circuit_node| {
+                    messages::SplinterNode {
+                        node_id: circuit_node.node_id().to_string(),
+                        endpoints: circuit_node.endpoints().to_vec(),
+                        #[cfg(feature = "challenge-authorization")]
+                        public_key: circuit_node.public_key().clone(),
                     }
-                    None
+                    .into_proto()
                 })
                 .collect::<Vec<SplinterNode>>();
             members.extend(disband_members);
@@ -2862,24 +2858,14 @@ impl AdminServiceShared {
                 ))
             })?;
         // Collecting the endpoints of the nodes apart of the circuit being disbanded
-        let node_ids = store_circuit.members().to_vec();
-        let circuit_members = self
-            .admin_store
-            .list_nodes()
-            .map_err(|err| {
-                AdminSharedError::ValidationFailed(format!(
-                    "error occurred when trying to get circuit {}",
-                    err
-                ))
-            })?
-            .filter_map(|circuit_node| {
-                if node_ids.contains(&circuit_node.node_id().to_string()) {
-                    return Some(messages::SplinterNode {
-                        node_id: circuit_node.node_id().to_string(),
-                        endpoints: circuit_node.endpoints().to_vec(),
-                    });
-                }
-                None
+        let circuit_members = store_circuit
+            .members()
+            .iter()
+            .map(|circuit_node| messages::SplinterNode {
+                node_id: circuit_node.node_id().to_string(),
+                endpoints: circuit_node.endpoints().to_vec(),
+                #[cfg(feature = "challenge-authorization")]
+                public_key: circuit_node.public_key().clone(),
             })
             .collect::<Vec<messages::SplinterNode>>();
         let mut create_circuit_builder = messages::builders::CreateCircuitBuilder::new()
@@ -2952,24 +2938,20 @@ impl AdminServiceShared {
         store_circuit: &StoreCircuit,
     ) -> Result<(Circuit, StoreCircuit), AdminSharedError> {
         // Collecting the endpoints of the nodes apart of the circuit being abandoned
-        let node_ids = store_circuit.members().to_vec();
-        let circuit_members = self
-            .admin_store
-            .list_nodes()
-            .map_err(|err| {
-                AdminSharedError::SplinterStateError(format!(
-                    "error occurred when trying to get circuit {}",
-                    err
-                ))
-            })?
-            .filter_map(|circuit_node| {
-                if node_ids.contains(&circuit_node.node_id().to_string()) {
-                    let mut node = SplinterNode::new();
-                    node.set_node_id(circuit_node.node_id().to_string());
-                    node.set_endpoints(RepeatedField::from_vec(circuit_node.endpoints().to_vec()));
-                    return Some(node);
+        let circuit_members = store_circuit
+            .members()
+            .iter()
+            .map(|circuit_node| {
+                let mut node = SplinterNode::new();
+                node.set_node_id(circuit_node.node_id().to_string());
+                node.set_endpoints(RepeatedField::from_vec(circuit_node.endpoints().to_vec()));
+                #[cfg(feature = "challenge-authorization")]
+                {
+                    if let Some(public_key) = circuit_node.public_key() {
+                        node.set_public_key(public_key.clone());
+                    }
                 }
-                None
+                node
             })
             .collect::<Vec<SplinterNode>>();
 
@@ -7209,6 +7191,7 @@ mod tests {
     }
 
     fn store_circuit(version: i32, status: StoreCircuitStatus) -> StoreCircuit {
+        let nodes = store_circuit_nodes();
         store::CircuitBuilder::new()
             .with_circuit_id("01234-ABCDE")
             .with_roster(&vec![
@@ -7225,7 +7208,7 @@ mod tests {
                     .build()
                     .expect("unable to build admin store Service"),
             ])
-            .with_members(vec!["node_a".to_string(), "node_b".to_string()].as_slice())
+            .with_members(&nodes)
             .with_authorization_type(&store::AuthorizationType::Trust)
             .with_persistence(&store::PersistenceType::Any)
             .with_durability(&store::DurabilityType::NoDurability)

@@ -16,7 +16,10 @@
 
 use std::collections::HashMap;
 
-use diesel::{prelude::*, sql_types::Text};
+use diesel::{
+    prelude::*,
+    sql_types::{Binary, Integer, Nullable, Text},
+};
 
 use crate::admin::store::{
     diesel::{
@@ -41,8 +44,9 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
+    i32: diesel::deserialize::FromSql<Integer, C::Backend>,
     NodeEndpointModel: diesel::Queryable<(Text, Text), C::Backend>,
+    CircuitMemberModel: diesel::Queryable<(Text, Text, Integer, Nullable<Binary>), C::Backend>,
 {
     fn list_nodes(
         &self,
@@ -82,6 +86,13 @@ where
             .iter()
             .map(|node| {
                 let mut builder = CircuitNodeBuilder::new().with_node_id(&node.node_id);
+
+                #[cfg(feature = "challenge-authorization")]
+                {
+                    if let Some(public_key) = &node.public_key {
+                        builder = builder.with_public_key(&public_key);
+                    }
+                }
 
                 if let Some(endpoints) = node_map.get(&node.node_id) {
                     builder = builder.with_endpoints(&endpoints);

@@ -1156,7 +1156,19 @@ impl TryFrom<YamlCircuit> for Circuit {
                     .map(Service::try_from)
                     .collect::<Result<Vec<Service>, InvalidStateError>>()?,
             )
-            .with_members(&circuit.members)
+            .with_members(
+                &circuit
+                    .members
+                    .into_iter()
+                    .map(|node| {
+                        CircuitNodeBuilder::new()
+                            .with_node_id(&node)
+                            // yaml does not support a full circuit node stored in the circuit
+                            .with_endpoints(&[])
+                            .build()
+                    })
+                    .collect::<Result<Vec<CircuitNode>, InvalidStateError>>()?,
+            )
             .with_authorization_type(&AuthorizationType::from(circuit.auth))
             .with_persistence(&PersistenceType::from(circuit.persistence))
             .with_durability(&DurabilityType::from(circuit.durability))
@@ -1182,7 +1194,11 @@ impl From<Circuit> for YamlCircuit {
                 .iter()
                 .map(|service| YamlService::from(service.clone()))
                 .collect(),
-            members: circuit.members().to_vec(),
+            members: circuit
+                .members()
+                .iter()
+                .map(|node| node.node_id().to_string())
+                .collect(),
             auth: circuit.authorization_type().clone().into(),
             persistence: circuit.persistence().clone().into(),
             durability: circuit.durability().clone().into(),
@@ -2199,7 +2215,18 @@ proposals:
                         .build()
                         .expect("Unable to build service"),
                 ])
-                .with_members(&vec!["bubba-node-000".into(), "acme-node-000".into()])
+                .with_members(&vec![
+                    CircuitNodeBuilder::new()
+                        .with_node_id("bubba-node-000")
+                        .with_endpoints(&[])
+                        .build()
+                        .expect("Unable to build circuit node"),
+                    CircuitNodeBuilder::new()
+                        .with_node_id("acme-node-000")
+                        .with_endpoints(&[])
+                        .build()
+                        .expect("Unable to build circuit node"),
+                ])
                 .with_circuit_management_type("test")
                 .with_circuit_status(&CircuitStatus::default())
                 .build()
@@ -2572,7 +2599,18 @@ proposals:
                     .build()
                     .expect("Unable to build service"),
             ])
-            .with_members(&vec!["bubba-node-000".into(), "acme-node-000".into()])
+            .with_members(&vec![
+                CircuitNodeBuilder::new()
+                    .with_node_id("bubba-node-000")
+                    .with_endpoints(&[])
+                    .build()
+                    .expect("Unable to build circuit node"),
+                CircuitNodeBuilder::new()
+                    .with_node_id("acme-node-000")
+                    .with_endpoints(&[])
+                    .build()
+                    .expect("Unable to build circuit node"),
+            ])
             .with_circuit_management_type("gameroom")
             .with_circuit_version(1)
             .with_circuit_status(&CircuitStatus::default())
@@ -2662,9 +2700,20 @@ proposals:
                 ])
             .with_members(
                 &vec![
-                    "bubba-node-000".into(),
-                    "acme-node-000".into(),
-                    "new-node-000".into()
+                    CircuitNodeBuilder::new()
+                        .with_node_id("acme-node-000")
+                        .with_endpoints(&[])
+                        .build()
+                        .expect("Unable to build circuit node"),
+                    CircuitNodeBuilder::new()
+                        .with_node_id("bubba-node-000")
+                        .with_endpoints(&[])
+                        .build()
+                        .expect("Unable to build circuit node"),
+                    CircuitNodeBuilder::default()
+                        .with_node_id("new-node-000".into())
+                        .with_endpoints(&vec![])
+                        .build().expect("Unable to build node")
                 ]
             )
             .with_circuit_management_type("test")

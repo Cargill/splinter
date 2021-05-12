@@ -141,7 +141,11 @@ impl CircuitPredicate {
             }
             CircuitPredicate::MembersInclude(nodes) => {
                 for node_id in nodes.iter() {
-                    if !circuit.members().contains(node_id) {
+                    if !circuit
+                        .members()
+                        .iter()
+                        .any(|node| node.node_id() == node_id)
+                    {
                         return false;
                     }
                 }

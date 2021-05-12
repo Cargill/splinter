@@ -167,6 +167,7 @@ pub struct ProposedNodeModel {
     pub circuit_id: String,
     pub node_id: String,
     pub position: i32,
+    pub public_key: Option<Vec<u8>>,
 }
 
 impl TryFrom<&ProposedCircuit> for Vec<ProposedNodeModel> {
@@ -186,6 +187,10 @@ impl TryFrom<&ProposedCircuit> for Vec<ProposedNodeModel> {
                             "Unable to convert index into i32".to_string(),
                         ))
                     })?,
+                    #[cfg(feature = "challenge-authorization")]
+                    public_key: node.public_key().clone(),
+                    #[cfg(not(feature = "challenge-authorization"))]
+                    public_key: None,
                 })
             })
             .collect::<Result<Vec<ProposedNodeModel>, AdminServiceStoreError>>()
@@ -439,6 +444,7 @@ pub struct CircuitMemberModel {
     pub circuit_id: String,
     pub node_id: String,
     pub position: i32,
+    pub public_key: Option<Vec<u8>>,
 }
 
 impl TryFrom<&Circuit> for Vec<CircuitMemberModel> {
@@ -449,15 +455,19 @@ impl TryFrom<&Circuit> for Vec<CircuitMemberModel> {
             .members()
             .iter()
             .enumerate()
-            .map(|(idx, node_id)| {
+            .map(|(idx, node)| {
                 Ok(CircuitMemberModel {
                     circuit_id: circuit.circuit_id().into(),
-                    node_id: node_id.clone(),
+                    node_id: node.node_id().into(),
                     position: i32::try_from(idx).map_err(|_| {
                         AdminServiceStoreError::InternalError(InternalError::with_message(
                             "Unable to convert index into i32".to_string(),
                         ))
                     })?,
+                    #[cfg(feature = "challenge-authorization")]
+                    public_key: node.public_key().clone(),
+                    #[cfg(not(feature = "challenge-authorization"))]
+                    public_key: None,
                 })
             })
             .collect::<Result<Vec<CircuitMemberModel>, AdminServiceStoreError>>()

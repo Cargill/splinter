@@ -20,14 +20,16 @@ use crate::admin::messages::{self, is_valid_circuit_id};
 use crate::error::InvalidStateError;
 use crate::protos::admin;
 
-use super::{ProposedCircuit, Service, ServiceBuilder, UNSET_CIRCUIT_VERSION};
+use super::{
+    CircuitNode, ProposedCircuit, ProposedNode, Service, ServiceBuilder, UNSET_CIRCUIT_VERSION,
+};
 
 /// Native representation of a circuit in state
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Circuit {
     id: String,
     roster: Vec<Service>,
-    members: Vec<String>,
+    members: Vec<CircuitNode>,
     authorization_type: AuthorizationType,
     persistence: PersistenceType,
     durability: DurabilityType,
@@ -50,7 +52,7 @@ impl Circuit {
     }
 
     /// Returns the list of node IDs that are in the circuit
-    pub fn members(&self) -> &[String] {
+    pub fn members(&self) -> &[CircuitNode] {
         &self.members
     }
 
@@ -122,8 +124,11 @@ impl TryFrom<&admin::Circuit> for Circuit {
         let members = proto
             .get_members()
             .iter()
-            .map(|node| node.get_node_id().to_string())
-            .collect::<Vec<String>>();
+            .map(|node| {
+                let propose_node = ProposedNode::from_proto(node.clone());
+                CircuitNode::from(propose_node)
+            })
+            .collect::<Vec<CircuitNode>>();
         let mut builder = CircuitBuilder::new()
             .with_circuit_id(proto.get_circuit_id())
             .with_roster(&roster)
@@ -364,7 +369,7 @@ impl From<&CircuitStatus> for admin::Circuit_CircuitStatus {
 pub struct CircuitBuilder {
     circuit_id: Option<String>,
     roster: Option<Vec<Service>>,
-    members: Option<Vec<String>>,
+    members: Option<Vec<CircuitNode>>,
     authorization_type: Option<AuthorizationType>,
     persistence: Option<PersistenceType>,
     durability: Option<DurabilityType>,
@@ -392,7 +397,7 @@ impl CircuitBuilder {
     }
 
     /// Returns the list of node IDs in the builder
-    pub fn members(&self) -> Option<Vec<String>> {
+    pub fn members(&self) -> Option<Vec<CircuitNode>> {
         self.members.clone()
     }
 
@@ -460,8 +465,8 @@ impl CircuitBuilder {
     ///
     /// # Arguments
     ///
-    ///  * `members` - List of node IDs
-    pub fn with_members(mut self, members: &[String]) -> CircuitBuilder {
+    ///  * `members` - List of CircuitNodes
+    pub fn with_members(mut self, members: &[CircuitNode]) -> CircuitBuilder {
         self.members = Some(members.into());
         self
     }
@@ -623,11 +628,7 @@ impl From<ProposedCircuit> for Circuit {
         Circuit {
             id: circuit.circuit_id().into(),
             roster: circuit.roster().iter().map(Service::from).collect(),
-            members: circuit
-                .members()
-                .iter()
-                .map(|node| node.node_id().to_string())
-                .collect(),
+            members: circuit.members().iter().map(CircuitNode::from).collect(),
             authorization_type: circuit.authorization_type().clone(),
             persistence: circuit.persistence().clone(),
             durability: circuit.durability().clone(),

@@ -343,6 +343,8 @@ impl SplinterServiceBuilder {
 pub struct SplinterNodeBuilder {
     node_id: Option<String>,
     endpoints: Option<Vec<String>>,
+    #[cfg(feature = "challenge-authorization")]
+    public_key: Option<Vec<u8>>,
 }
 
 impl SplinterNodeBuilder {
@@ -356,6 +358,11 @@ impl SplinterNodeBuilder {
 
     pub fn endpoints(&self) -> Option<Vec<String>> {
         self.endpoints.clone()
+    }
+
+    #[cfg(feature = "challenge-authorization")]
+    pub fn public_key(&self) -> Option<Vec<u8>> {
+        self.public_key.clone()
     }
 
     pub fn with_node_id(mut self, node_id: &str) -> SplinterNodeBuilder {
@@ -377,7 +384,12 @@ impl SplinterNodeBuilder {
             .endpoints
             .ok_or_else(|| BuilderError::MissingField("endpoints".to_string()))?;
 
-        let node = SplinterNode { node_id, endpoints };
+        let node = SplinterNode {
+            node_id,
+            endpoints,
+            #[cfg(feature = "challenge-authorization")]
+            public_key: self.public_key,
+        };
 
         Ok(node)
     }
