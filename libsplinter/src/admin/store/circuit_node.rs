@@ -136,11 +136,13 @@ impl CircuitNodeBuilder {
             InvalidStateError::with_message("unable to build, missing field: `node_id`".to_string())
         })?;
 
-        let endpoints = self.endpoints.ok_or_else(|| {
+        let mut endpoints = self.endpoints.ok_or_else(|| {
             InvalidStateError::with_message(
                 "unable to build, missing field: `endpoints`".to_string(),
             )
         })?;
+
+        endpoints.sort();
 
         let node = CircuitNode {
             id: node_id,
