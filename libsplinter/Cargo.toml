@@ -87,6 +87,7 @@ default = []
 stable = [
     "admin-service",
     "authorization",
+    "authorization-handler-allow-keys",
     "biome",
     "biome-credentials",
     "biome-key-management",
@@ -115,7 +116,6 @@ experimental = [
     "admin-service-event-client",
     "admin-service-event-client-actix-web-client",
     "admin-service-event-subscriber-glob",
-    "authorization-handler-allow-keys",
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "biome-client",
