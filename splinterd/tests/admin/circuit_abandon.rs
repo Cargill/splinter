@@ -258,7 +258,7 @@ pub fn test_2_party_circuit_abandon() {
 #[test]
 #[ignore]
 pub fn test_3_party_circuit_abandon() {
-    // Start a 2-node network
+    // Start a 3-node network
     let mut network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(3)
