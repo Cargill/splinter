@@ -256,7 +256,6 @@ pub fn test_2_party_circuit_abandon() {
 /// 16. Create and submit a `Scabbard` transaction to the circuit that has remained active,
 ///    validate this transaction completes successfully.
 #[test]
-#[ignore]
 pub fn test_3_party_circuit_abandon() {
     // Start a 3-node network
     let mut network = Network::new()
@@ -644,7 +643,6 @@ pub fn test_2_party_circuit_abandon_stop() {
 /// 16. Verify the circuit is returned as `Abandoned` for each node, using `list_circuits` filtered
 ///     on the circuit's status (`status=abandoned`)
 #[test]
-#[ignore]
 pub fn test_3_party_circuit_abandon_stop() {
     // Start a 3-node network
     let mut network = Network::new()
