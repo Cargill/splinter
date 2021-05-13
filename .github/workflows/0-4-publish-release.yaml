@@ -1,0 +1,69 @@
+name: 0-4 Publish Release
+
+on:
+  push:
+    tags:
+      - 'v0.4.*'
+
+jobs:
+
+  unit_test_splinter:
+    if: >-
+      github.repository_owner == 'Cargill'
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Run tests
+        run: just ci-test
+
+  publish_docker:
+    needs: unit_test_splinter
+    if: >-
+      github.repository_owner == 'Cargill'
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Display envvars
+        run: env
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Publish release to dockerhub
+        run: ./ci/publish-docker
+        env:
+          NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
+          VERSION: AUTO_STRICT
+          CARGO_TERM_COLOR: always
+
+
+  publish_to_crates:
+    needs: unit_test_splinter
+    if: >-
+      github.repository_owner == 'Cargill'
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Display envvars
+        run: env
+
+      - name: Publish release to crates
+        run: CARGO_TOKEN=${{ secrets.CARGO_TOKEN }} ./ci/publish-crates
