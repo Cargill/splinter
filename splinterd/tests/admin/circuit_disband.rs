@@ -20,6 +20,7 @@ use splinterd::node::{Node, RestApiVariant};
 
 use crate::admin::circuit_commit::{commit_2_party_circuit, commit_3_party_circuit};
 use crate::admin::payload::{make_circuit_disband_payload, make_circuit_proposal_vote_payload};
+use crate::framework::circuit_builder::{CircuitData, ScabbardCircuitBuilderVeil};
 use crate::framework::network::Network;
 
 /// Test that a 2-party circuit may be created on a 2-node network. This test then validates the
@@ -49,22 +50,33 @@ pub fn test_2_party_circuit_lifecycle() {
     let node_a = network.node(0).expect("Unable to get first node");
     // Get the second node in the network
     let node_b = network.node(1).expect("Unable to get second node");
-    let node_b_admin_pubkey = admin_pubkey(node_b);
-    let circuit_id = "ABCDE-01234";
     // Commit the circuit to state
-    commit_2_party_circuit(&circuit_id, node_a, node_b);
+    let node_b_admin_pubkey = admin_pubkey(node_b);
+
+    let CircuitData {
+        circuit_id,
+        management_type,
+        ..
+    } = network
+        .circuit_builder(&[0, 1])
+        .expect("Could not create builder")
+        .veil::<ScabbardCircuitBuilderVeil>()
+        .add_service_group(&[0, 1])
+        .unwrap()
+        .build()
+        .expect("Could not create circuit");
 
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
         node_a
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&management_type)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_b_events = BlockingAdminServiceEventIterator::new(
         node_b
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&management_type)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
