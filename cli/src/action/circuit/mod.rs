@@ -21,12 +21,14 @@ pub mod template;
 #[cfg(feature = "circuit-template")]
 use std::collections::HashMap;
 use std::convert::TryFrom;
+#[cfg(feature = "challenge-authorization")]
+use std::fmt::Write;
 use std::fs::File;
 
 use clap::ArgMatches;
 use cylinder::Signer;
 use serde::Deserialize;
-use splinter::admin::messages::{CircuitStatus, CreateCircuit, SplinterService};
+use splinter::admin::messages::{CircuitStatus, CreateCircuit, SplinterNode, SplinterService};
 use splinter::protocol::CIRCUIT_PROTOCOL_VERSION;
 
 use crate::error::CliError;
@@ -40,7 +42,7 @@ use super::{
     SPLINTER_REST_API_URL_ENV,
 };
 
-use api::{CircuitServiceSlice, CircuitSlice};
+use api::{CircuitMembers, CircuitServiceSlice, CircuitSlice};
 pub(crate) use builder::CreateCircuitMessageBuilder;
 use payload::make_signed_payload;
 
@@ -518,8 +520,8 @@ impl TryFrom<&CreateCircuit> for CircuitSlice {
             members: circuit
                 .members
                 .iter()
-                .map(|member| member.node_id.clone())
-                .collect(),
+                .map(CircuitMembers::try_from)
+                .collect::<Result<Vec<CircuitMembers>, CliError>>()?,
             roster: circuit
                 .roster
                 .iter()
@@ -553,6 +555,32 @@ impl TryFrom<&SplinterService> for CircuitServiceSlice {
             arguments: service.arguments.iter().cloned().collect(),
         })
     }
+}
+
+impl TryFrom<&SplinterNode> for CircuitMembers {
+    type Error = CliError;
+
+    fn try_from(node: &SplinterNode) -> Result<Self, Self::Error> {
+        Ok(Self {
+            node_id: node.node_id.clone(),
+            endpoints: node.endpoints.clone(),
+            #[cfg(feature = "challenge-authorization")]
+            public_key: node
+                .public_key
+                .as_ref()
+                .map(|public_key| to_hex(&public_key)),
+        })
+    }
+}
+
+#[cfg(feature = "challenge-authorization")]
+fn to_hex(bytes: &[u8]) -> String {
+    let mut buf = String::new();
+    for b in bytes {
+        write!(&mut buf, "{:02x}", b).expect("Unable to write to string");
+    }
+
+    buf
 }
 
 enum Vote {
@@ -908,7 +936,12 @@ fn list_circuits(
         ],
     ];
     circuits.data.iter().for_each(|circuit| {
-        let members = circuit.members.join(";");
+        let members = circuit
+            .members
+            .iter()
+            .map(|node| node.node_id.to_string())
+            .collect::<Vec<String>>()
+            .join(";");
         let display_name = {
             if format == "csv" {
                 circuit.display_name.clone().unwrap_or_default()

@@ -241,7 +241,7 @@ impl SplinterRestClient {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct CircuitSlice {
     pub id: String,
-    pub members: Vec<String>,
+    pub members: Vec<CircuitMembers>,
     pub roster: Vec<CircuitServiceSlice>,
     pub management_type: String,
     pub display_name: Option<String>,
@@ -271,9 +271,13 @@ impl fmt::Display for CircuitSlice {
         );
 
         for member in self.members.iter() {
-            display_string += &format!("\n    {}\n", member);
+            display_string += &format!("\n    {}\n", member.node_id);
+            #[cfg(feature = "challenge-authorization")]
+            if let Some(public_key) = &member.public_key {
+                display_string += &format!("        Public Key: {}\n", public_key);
+            }
             for service in self.roster.iter() {
-                if member == &service.node_id {
+                if member.node_id == service.node_id {
                     display_string += &format!(
                         "        Service ({}): {}\n",
                         service.service_type, service.service_id
@@ -361,6 +365,10 @@ impl fmt::Display for ProposalSlice {
 
         for member in self.circuit.members.iter() {
             display_string += &format!("\n    {} ({:?})\n", member.node_id, member.endpoints);
+            #[cfg(feature = "challenge-authorization")]
+            if let Some(public_key) = &member.public_key {
+                display_string += &format!("        Public Key: {}\n", public_key);
+            }
             if member.node_id == self.requester_node_id {
                 display_string += &"        Vote: ACCEPT (implied as requester):\n".to_string();
                 display_string += &format!("            {}\n", self.requester);
@@ -427,6 +435,8 @@ pub struct ProposalCircuitSlice {
 pub struct CircuitMembers {
     pub node_id: String,
     pub endpoints: Vec<String>,
+    #[cfg(feature = "challenge-authorization")]
+    pub public_key: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]

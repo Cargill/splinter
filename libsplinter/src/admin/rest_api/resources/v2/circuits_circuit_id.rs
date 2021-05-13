@@ -14,7 +14,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::admin::store::{Circuit, CircuitStatus, Service, CircuitNode};
+use crate::admin::store::{Circuit, CircuitNode, CircuitStatus, Service};
 #[cfg(feature = "challenge-authorization")]
 use crate::hex::to_hex;
 
@@ -74,25 +74,20 @@ impl<'a> From<&'a Service> for ServiceResponse<'a> {
 pub(crate) struct CircuitNodeResponse<'a> {
     pub node_id: &'a str,
     pub endpoints: &'a [String],
+    #[cfg(feature = "challenge-authorization")]
     pub public_key: Option<String>,
 }
 
 impl<'a> From<&'a CircuitNode> for CircuitNodeResponse<'a> {
     fn from(node_def: &'a CircuitNode) -> Self {
-        // need to mutable if challenge-authorization is enabled
-        #[allow(unused_mut)]
-        let mut public_key = None;
-
-        #[cfg(feature = "challenge-authorization")]
-        if let Some(node_public_key) = node_def.public_key() {
-            public_key = Some(to_hex(node_public_key));
-        }
-
         Self {
             node_id: node_def.node_id(),
             endpoints: node_def.endpoints(),
-            public_key: public_key,
-
+            #[cfg(feature = "challenge-authorization")]
+            public_key: node_def
+                .public_key()
+                .as_ref()
+                .map(|public_key| to_hex(&public_key)),
         }
     }
 }
