@@ -137,6 +137,7 @@ metrics = [
 node = [
     "authorization",
     "https-bind",
+    "challenge-authorization",
     "scabbard/client-reqwest",
     "scabbard/factory-builder",
     "splinter/admin-service-client",

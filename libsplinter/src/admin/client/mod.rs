@@ -52,7 +52,7 @@ pub struct CircuitServiceSlice {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CircuitSlice {
     pub id: String,
-    pub members: Vec<String>,
+    pub members: Vec<CircuitMembers>,
     pub roster: Vec<CircuitServiceSlice>,
     pub management_type: String,
     pub display_name: Option<String>,
@@ -68,6 +68,8 @@ pub struct CircuitListSlice {
 pub struct CircuitMembers {
     pub node_id: String,
     pub endpoints: Vec<String>,
+    #[cfg(feature = "challenge-authorization")]
+    pub public_key: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
