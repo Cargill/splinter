@@ -40,3 +40,27 @@ impl Error for NextEventError {
         }
     }
 }
+
+#[derive(Debug)]
+pub enum WaitForError {
+    TimeoutError,
+    NextEventError(NextEventError),
+}
+
+impl fmt::Display for WaitForError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WaitForError::TimeoutError => f.write_str("Timeout"),
+            WaitForError::NextEventError(e) => f.write_str(&e.to_string()),
+        }
+    }
+}
+
+impl Error for WaitForError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            WaitForError::TimeoutError => None,
+            WaitForError::NextEventError(ref e) => Some(&*e),
+        }
+    }
+}

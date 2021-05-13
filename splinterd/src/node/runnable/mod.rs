@@ -153,6 +153,16 @@ impl RunnableNode {
             }
         };
 
+        let admin_service_event_client = Box::new(
+            admin_subsystem
+                .admin_service_event_client(
+                    format!("http://localhost:{}", rest_api_port),
+                    "foo".to_string(),
+                    "*".to_string(),
+                )
+                .map_err(|e| InternalError::from_source(Box::new(e)))?,
+        );
+
         Ok(Node {
             admin_signer: self.admin_signer,
             admin_subsystem,
@@ -160,6 +170,7 @@ impl RunnableNode {
             rest_api_variant,
             rest_api_port,
             node_id,
+            admin_service_event_client,
         })
     }
 }
