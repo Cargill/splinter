@@ -70,6 +70,7 @@ experimental = [
     # The following features are experimental:
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
+    "challenge-authorization",
     "circuit-auth-type",
     "health",
     "https-certs",
@@ -80,6 +81,7 @@ experimental = [
 
 authorization-handler-maintenance = []
 authorization-handler-rbac = []
+challenge-authorization = ["circuit-auth-type", "splinter/challenge-authorization"]
 circuit-auth-type = []
 circuit-template = ["splinter/circuit-template"]
 

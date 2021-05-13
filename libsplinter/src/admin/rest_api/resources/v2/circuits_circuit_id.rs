@@ -14,12 +14,14 @@
 
 use std::collections::BTreeMap;
 
-use crate::admin::store::{Circuit, CircuitStatus, Service};
+use crate::admin::store::{Circuit, CircuitStatus, Service, CircuitNode};
+#[cfg(feature = "challenge-authorization")]
+use crate::hex::to_hex;
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
 pub(crate) struct CircuitResponse<'a> {
     pub id: &'a str,
-    pub members: Vec<String>,
+    pub members: Vec<CircuitNodeResponse<'a>>,
     pub roster: Vec<ServiceResponse<'a>>,
     pub management_type: &'a str,
     pub display_name: &'a Option<String>,
@@ -34,7 +36,7 @@ impl<'a> From<&'a Circuit> for CircuitResponse<'a> {
             members: circuit
                 .members()
                 .iter()
-                .map(|node| node.node_id().to_string())
+                .map(CircuitNodeResponse::from)
                 .collect(),
             roster: circuit.roster().iter().map(ServiceResponse::from).collect(),
             management_type: circuit.circuit_management_type(),
@@ -64,6 +66,33 @@ impl<'a> From<&'a Service> for ServiceResponse<'a> {
                 .iter()
                 .map(|(key, value)| (key.to_string(), value.to_string()))
                 .collect::<BTreeMap<String, String>>(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq)]
+pub(crate) struct CircuitNodeResponse<'a> {
+    pub node_id: &'a str,
+    pub endpoints: &'a [String],
+    pub public_key: Option<String>,
+}
+
+impl<'a> From<&'a CircuitNode> for CircuitNodeResponse<'a> {
+    fn from(node_def: &'a CircuitNode) -> Self {
+        // need to mutable if challenge-authorization is enabled
+        #[allow(unused_mut)]
+        let mut public_key = None;
+
+        #[cfg(feature = "challenge-authorization")]
+        if let Some(node_public_key) = node_def.public_key() {
+            public_key = Some(to_hex(node_public_key));
+        }
+
+        Self {
+            node_id: node_def.node_id(),
+            endpoints: node_def.endpoints(),
+            public_key: public_key,
+
         }
     }
 }
