@@ -46,6 +46,41 @@ build:
     done
     echo "\n\033[92mBuild Success\033[0m\n"
 
+ci:
+    just ci-lint-client
+    just ci-lint-splinter
+    just ci-test
+    just ci-test-gameroom
+    just ci-test-gameroom-ui
+
+ci-lint-client:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f docker/compose/run-lint.yaml build lint-gameroom-client
+    docker-compose -f docker/compose/run-lint.yaml up \
+      --abort-on-container-exit lint-gameroom-client
+
+ci-lint-splinter:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f docker/compose/run-lint.yaml build \
+      lint-splinter clippy-splinter
+    docker-compose -f docker/compose/run-lint.yaml up \
+      --abort-on-container-exit lint-splinter
+    docker-compose -f docker/compose/run-lint.yaml up \
+      --abort-on-container-exit clippy-splinter
+
+ci-test:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f tests/test-splinter.yaml build unit-test-splinter
+    docker-compose -f tests/test-splinter.yaml up \
+      --abort-on-container-exit unit-test-splinter
+
+ci-test-gameroom: test-gameroom
+
+ci-test-gameroom-ui: test-gameroom-ui
+
 clean:
     cargo clean
 
@@ -83,3 +118,17 @@ test: build
         done
     done
     echo "\n\033[92mTest Success\033[0m\n"
+
+test-gameroom:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f examples/gameroom/tests/docker-compose.yaml build
+    docker-compose -f examples/gameroom/tests/docker-compose.yaml up \
+    --abort-on-container-exit
+
+test-gameroom-ui:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f examples/gameroom/tests/cypress/docker-compose.yaml build
+    docker-compose -f examples/gameroom/tests/cypress/docker-compose.yaml up \
+    --abort-on-container-exit
