@@ -1,5 +1,40 @@
 # Release Notes
 
+## Changes in Splinter 0.5.3
+
+### Highlights
+
+* Stabilized authorization-handler-allow-keys feature. This enables authorizing
+  REST API users via the `allow_keys` file in the stable builds.
+
+### libsplinter
+
+* Add `Challenge` to `AuthorizationType` behind an experimental feature
+  `challenge-authorization`. This is the first step in implementing Challenge
+  Authorization. For more information see the [Challenge Authorization ](https://www.splinter.dev/community/planning/challenge_authorization.html)
+  feature doc.
+
+* Added new authorization messages to support challenge authorization and v1
+  trust authorization.
+
+* Stabilized authorization-handler-allow-keys feature
+
+* Add `wait_for` and `wait_for_filter` methods, which allow a node to wait for a
+  particular admin event type. The `wait_for` method uses the new `EventQuery`,
+  which transforms itself into a filter to be consumed by `wait_for_filter`
+
+### splinterd
+
+* Stabilized authorization-handler-allow-keys feature
+
+* Add bug fix to ensure splinterd does not start before network interfaces have
+  IP Addresses
+
+* Update the registry creation process to not require the "file://" prefix when
+  a file name is being passed as a registry argument
+
+* Add integration tests related to abandoning circuits
+
 ## Changes in Splinter 0.5.2
 
 ### Highlights
