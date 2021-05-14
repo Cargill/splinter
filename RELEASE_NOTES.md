@@ -8,8 +8,8 @@
   abandoned and then purged. The CLI commands are now available in the
   `splinter` CLI.
   - [Circuit Disband](https://www.splinter.dev/community/planning/circuit_disband.html)
-  - [Circuit Abandon](https://www.splinter.dev/community/planning/circuit_abandon.html])
-  - [Circuit Purge](https://www.splinter.dev/community/planning/circuit_purge.html])
+  - [Circuit Abandon](https://www.splinter.dev/community/planning/circuit_abandon.html)
+  - [Circuit Purge](https://www.splinter.dev/community/planning/circuit_purge.html)
 
 * Added the `proposal-removal` experimental feature, which enables removing
   circuit proposals. The experimental `splinter-circuit-remove-proposal` CLI
