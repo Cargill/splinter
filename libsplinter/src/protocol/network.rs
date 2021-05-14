@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::protos::authorization;
 use crate::protos::network;
 use crate::protos::prelude::*;
+
+use super::authorization::AuthorizationMessage;
 
 /// The network message envelope
 #[derive(Debug)]
@@ -21,15 +24,15 @@ pub enum NetworkMessage {
     NetworkEcho(NetworkEcho),
     NetworkHeartbeat(NetworkHeartbeat),
     Circuit(Vec<u8>),
-    Authorization(Vec<u8>),
+    Authorization(AuthorizationMessage),
 }
 
 /// This message is used for debugging
 #[derive(Debug)]
 pub struct NetworkEcho {
-    payload: Vec<u8>,
-    recipient: String,
-    time_to_live: i32,
+    pub payload: Vec<u8>,
+    pub recipient: String,
+    pub time_to_live: i32,
 }
 
 /// This message is used to keep connections alive
@@ -84,7 +87,9 @@ impl FromProto<network::NetworkMessage> for NetworkMessage {
                 source.get_payload()
             )?)),
             CIRCUIT => Ok(NetworkMessage::Circuit(source.take_payload())),
-            AUTHORIZATION => Ok(NetworkMessage::Authorization(source.take_payload())),
+            AUTHORIZATION => Ok(NetworkMessage::Authorization(
+                AuthorizationMessage::from_bytes(source.get_payload())?,
+            )),
             UNSET_NETWORK_MESSAGE_TYPE => Err(ProtoConversionError::InvalidTypeError(
                 "no message type was set".into(),
             )),
@@ -112,9 +117,17 @@ impl FromNative<NetworkMessage> for network::NetworkMessage {
             }
             NetworkMessage::Authorization(payload) => {
                 message.set_message_type(AUTHORIZATION);
-                message.set_payload(payload);
+                message.set_payload(
+                    IntoBytes::<authorization::AuthorizationMessage>::into_bytes(payload)?,
+                );
             }
         }
         Ok(message)
+    }
+}
+
+impl From<AuthorizationMessage> for NetworkMessage {
+    fn from(auth_message: AuthorizationMessage) -> Self {
+        NetworkMessage::Authorization(auth_message)
     }
 }

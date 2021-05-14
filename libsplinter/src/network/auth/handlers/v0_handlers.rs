@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use protobuf::Message;
-
 use crate::network::dispatch::{
     ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
 };
@@ -21,8 +19,9 @@ use crate::protocol::authorization::{
     AuthorizationMessage, AuthorizationType, Authorized, ConnectRequest, ConnectResponse,
     TrustRequest,
 };
+use crate::protocol::network::NetworkMessage;
 use crate::protos::authorization;
-use crate::protos::network::{NetworkMessage, NetworkMessageType};
+use crate::protos::network;
 use crate::protos::prelude::*;
 
 use crate::network::auth::{
@@ -134,15 +133,11 @@ impl Handler for ConnectRequestHandler {
                     ConnectRequest::Bidirectional => {
                         let connect_req =
                             AuthorizationMessage::ConnectRequest(ConnectRequest::Unidirectional);
-                        let mut msg = NetworkMessage::new();
-                        msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-                        msg.set_payload(
-                            IntoBytes::<authorization::AuthorizationMessage>::into_bytes(
-                                connect_req,
-                            )?,
-                        );
+                        let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
+                            NetworkMessage::from(connect_req),
+                        )?;
                         sender
-                            .send(context.source_id().clone(), msg.write_to_bytes()?)
+                            .send(context.source_id().clone(), msg_bytes)
                             .map_err(|(recipient, payload)| {
                                 DispatchError::NetworkSendError((recipient.into(), payload))
                             })?;
@@ -159,14 +154,12 @@ impl Handler for ConnectRequestHandler {
                     accepted_authorization_types: vec![AuthorizationType::Trust],
                 });
 
-                let mut msg = NetworkMessage::new();
-                msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-                msg.set_payload(
-                    IntoBytes::<authorization::AuthorizationMessage>::into_bytes(response)?,
-                );
+                let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
+                    NetworkMessage::from(response),
+                )?;
 
                 sender
-                    .send(context.source_id().clone(), msg.write_to_bytes()?)
+                    .send(context.source_id().clone(), msg_bytes)
                     .map_err(|(recipient, payload)| {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
@@ -219,13 +212,11 @@ impl Handler for ConnectResponseHandler {
             let trust_request = AuthorizationMessage::TrustRequest(TrustRequest {
                 identity: self.identity.clone(),
             });
-            let mut msg = NetworkMessage::new();
-            msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-            msg.set_payload(
-                IntoBytes::<authorization::AuthorizationMessage>::into_bytes(trust_request)?,
-            );
+            let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
+                NetworkMessage::from(trust_request),
+            )?;
             sender
-                .send(context.source_id().clone(), msg.write_to_bytes()?)
+                .send(context.source_id().clone(), msg_bytes)
                 .map_err(|(recipient, payload)| {
                     DispatchError::NetworkSendError((recipient.into(), payload))
                 })?;
@@ -284,13 +275,11 @@ impl Handler for TrustRequestHandler {
                     identity,
                 );
                 let auth_msg = AuthorizationMessage::Authorized(Authorized);
-                let mut msg = NetworkMessage::new();
-                msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-                msg.set_payload(
-                    IntoBytes::<authorization::AuthorizationMessage>::into_bytes(auth_msg)?,
-                );
+                let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
+                    NetworkMessage::from(auth_msg),
+                )?;
                 sender
-                    .send(context.source_id().clone(), msg.write_to_bytes()?)
+                    .send(context.source_id().clone(), msg_bytes)
                     .map_err(|(recipient, payload)| {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
