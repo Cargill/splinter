@@ -29,6 +29,10 @@ command offers a partially completed circuit proposal, requiring less input than
 using `splinter circuit propose`. More information on how to use circuit templates
 can be found in the splinter-circuit-template(1) man page.
 
+A circuit proposal may be removed using `splinter circuit remove-proposal`.
+More information on this command is available in the
+splinter-circuit-remove-proposal(1) man page.
+
 FLAGS
 =====
 `-n`, `--dry-run`
@@ -197,5 +201,6 @@ SEE ALSO
 | `splinter-circuit-proposals(1)`
 | `splinter-circuit-template(1)`
 | `splinter-circuit-vote(1)`
+| `splinter-circuit-remove-proposal(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/0.5/

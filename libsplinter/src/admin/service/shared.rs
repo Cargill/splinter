@@ -2702,11 +2702,11 @@ impl AdminServiceShared {
     #[cfg(feature = "proposal-removal")]
     /// Validate a `ProposalRemoveRequest` payload by the following:
     ///
-    /// - Validate the protocol version used by the submitter node. Currently, abandoning is only
-    ///   available to nodes using `ADMIN_SERVICE_PROTOCOL_VERSION` 2.
+    /// - Validate the protocol version used by the submitter node. Currently, removing a proposal
+    ///   is only available to nodes using `ADMIN_SERVICE_PROTOCOL_VERSION` 2.
     /// - Validate the requester is authorized to propose a change for the requesting node
     /// - Validate the signer's public key is authorized for the requesting node
-    /// - Validate the proposal being abandoned exists
+    /// - Validate the proposal being removed exists
     fn validate_remove_proposal(
         &self,
         circuit_id: &str,
