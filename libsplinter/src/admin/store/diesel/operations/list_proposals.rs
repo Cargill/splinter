@@ -74,6 +74,7 @@ where
         C::Backend,
     >,
     VoteRecordModel: diesel::Queryable<(Text, Binary, Text, Text, Integer), C::Backend>,
+    ProposedNodeModel: diesel::Queryable<(Text, Text, Integer, Nullable<Binary>), C::Backend>,
 {
     fn list_proposals(
         &self,

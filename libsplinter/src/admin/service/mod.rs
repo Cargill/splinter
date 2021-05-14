@@ -273,24 +273,24 @@ impl AdminService {
             let mut routing_members = vec![];
             // restart all peer in the circuit
             for member in circuit.members().iter() {
-                if member != &self.node_id {
-                    if let Some(node) = nodes.get(member) {
+                if member.node_id() != self.node_id {
+                    if let Some(node) = nodes.get(member.node_id()) {
                         let peer_ref = self
                             .peer_connector
-                            .add_peer_ref(member.to_string(), node.endpoints().to_vec());
+                            .add_peer_ref(member.node_id().to_string(), node.endpoints().to_vec());
 
                         if let Ok(peer_ref) = peer_ref {
                             peer_refs.push(peer_ref);
                         } else {
-                            info!("Unable to peer with {} at this time", member);
+                            info!("Unable to peer with {} at this time", member.node_id());
                         }
 
                         routing_members.push(routing::CircuitNode::new(
-                            member.to_string(),
+                            member.node_id().to_string(),
                             node.endpoints().to_vec(),
                         ))
                     } else {
-                        error!("Missing node information for {}", member);
+                        error!("Missing node information for {}", member.node_id());
                     }
                 }
             }
@@ -327,7 +327,11 @@ impl AdminService {
                     routing::Circuit::new(
                         circuit.circuit_id().to_string(),
                         routing_services,
-                        circuit.members().to_vec(),
+                        circuit
+                            .members()
+                            .iter()
+                            .map(|node| node.node_id().to_string())
+                            .collect(),
                     ),
                     routing_members,
                 )

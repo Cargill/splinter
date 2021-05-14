@@ -84,6 +84,10 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                                 "Unable to convert index into i32".to_string(),
                             ))
                         })?,
+                        #[cfg(feature = "challenge-authorization")]
+                        public_key: node.public_key().clone(),
+                        #[cfg(not(feature = "challenge-authorization"))]
+                        public_key: None,
                     })
                 })
                 .collect::<Result<Vec<CircuitMemberModel>, AdminServiceStoreError>>()?;
@@ -179,6 +183,10 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                                 "Unable to convert index into i32".to_string(),
                             ))
                         })?,
+                        #[cfg(feature = "challenge-authorization")]
+                        public_key: node.public_key().clone(),
+                        #[cfg(not(feature = "challenge-authorization"))]
+                        public_key: None,
                     })
                 })
                 .collect::<Result<Vec<CircuitMemberModel>, AdminServiceStoreError>>()?;

@@ -17,20 +17,22 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
+use diesel::sql_types::{Binary, Integer, Nullable, Text};
 use diesel::{dsl::exists, prelude::*};
 
 use crate::admin::store::{
     diesel::{
         models::{
-            CircuitMemberModel, CircuitModel, CircuitStatusModel, ServiceArgumentModel,
-            ServiceModel,
+            CircuitMemberModel, CircuitModel, CircuitStatusModel, NodeEndpointModel,
+            ServiceArgumentModel, ServiceModel,
         },
-        schema::{circuit, circuit_member, service, service_argument},
+        schema::{circuit, circuit_member, node_endpoint, service, service_argument},
     },
     error::AdminServiceStoreError,
-    AuthorizationType, Circuit, CircuitBuilder, CircuitPredicate, CircuitStatus, DurabilityType,
-    PersistenceType, RouteType, Service, ServiceBuilder,
+    AuthorizationType, Circuit, CircuitBuilder, CircuitNode, CircuitNodeBuilder, CircuitPredicate,
+    CircuitStatus, DurabilityType, PersistenceType, RouteType, Service, ServiceBuilder,
 };
+use crate::error::InvalidStateError;
 
 use super::AdminServiceStoreOperations;
 
@@ -44,10 +46,11 @@ pub(in crate::admin::store::diesel) trait AdminServiceStoreListCircuitsOperation
 impl<'a, C> AdminServiceStoreListCircuitsOperation for AdminServiceStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+    String: diesel::deserialize::FromSql<Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
+    i32: diesel::deserialize::FromSql<Integer, C::Backend>,
     i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
+    CircuitMemberModel: diesel::Queryable<(Text, Text, Integer, Nullable<Binary>), C::Backend>,
 {
     fn list_circuits(
         &self,
@@ -121,10 +124,23 @@ where
                 // Collect the `Circuit` members and put them in a HashMap to associate the list
                 // of `node_ids` to the `circuit_id`
                 let mut circuit_members: HashMap<String, Vec<CircuitMemberModel>> = HashMap::new();
-                for member in circuit_member::table
+                let mut node_map: HashMap<String, Vec<String>> = HashMap::new();
+                for (member, node_endpoint) in circuit_member::table
                     .filter(circuit_member::circuit_id.eq_any(&circuit_ids))
-                    .load::<CircuitMemberModel>(self.conn)?
+                    .inner_join(
+                        node_endpoint::table.on(circuit_member::node_id.eq(node_endpoint::node_id)),
+                    )
+                    .load::<(CircuitMemberModel, NodeEndpointModel)>(self.conn)?
                 {
+                    if let Some(endpoint_list) = node_map.get_mut(&member.node_id) {
+                        endpoint_list.push(node_endpoint.endpoint);
+                        // Ensure only unique endpoints are added to the node's endpoint list
+                        endpoint_list.sort();
+                        endpoint_list.dedup();
+                    } else {
+                        node_map.insert(member.node_id.to_string(), vec![node_endpoint.endpoint]);
+                    }
+
                     if let Some(members) = circuit_members.get_mut(&member.circuit_id) {
                         members.push(member);
                     } else {
@@ -242,13 +258,31 @@ where
                         circuit_builder = circuit_builder.with_display_name(&display_name);
                     }
                     if let Some(members) = circuit_members.get_mut(&model.circuit_id) {
-                        members.sort_by_key(|member| member.position);
-                        circuit_builder = circuit_builder.with_members(
-                            &members
-                                .iter()
-                                .map(|member| member.node_id.to_string())
-                                .collect::<Vec<String>>(),
-                        );
+                        members.sort_by_key(|node| node.position);
+
+                        let circuit_node_members: Vec<CircuitNode> = members
+                            .iter()
+                            .map(|member| {
+                                let mut builder =
+                                    CircuitNodeBuilder::new().with_node_id(&member.node_id);
+
+                                if let Some(endpoints) = node_map.get(&member.node_id) {
+                                    builder = builder.with_endpoints(&endpoints);
+                                }
+
+                                #[cfg(feature = "challenge-authorization")]
+                                {
+                                    if let Some(public_key) = &member.public_key {
+                                        builder = builder.with_public_key(&public_key);
+                                    }
+                                }
+
+                                builder.build()
+                            })
+                            .collect::<Result<Vec<CircuitNode>, InvalidStateError>>()
+                            .map_err(AdminServiceStoreError::InvalidStateError)?;
+
+                        circuit_builder = circuit_builder.with_members(&circuit_node_members);
                     }
                     if let Some(services) = built_services.get(&model.circuit_id) {
                         circuit_builder = circuit_builder.with_roster(&services);

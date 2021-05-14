@@ -38,7 +38,11 @@ impl<'a> From<&'a Circuit> for CircuitResponse<'a> {
     fn from(circuit: &'a Circuit) -> Self {
         Self {
             id: circuit.circuit_id(),
-            members: circuit.members().to_vec(),
+            members: circuit
+                .members()
+                .iter()
+                .map(|node| node.node_id().to_string())
+                .collect(),
             roster: circuit.roster().iter().map(ServiceResponse::from).collect(),
             management_type: circuit.circuit_management_type(),
             display_name: circuit.display_name(),

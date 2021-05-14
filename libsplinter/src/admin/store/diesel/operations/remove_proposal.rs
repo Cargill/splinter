@@ -22,7 +22,7 @@ use diesel::{
 
 use crate::admin::store::{
     diesel::{
-        models::{CircuitProposalModel, ProposedCircuitModel, VoteRecordModel},
+        models::{CircuitProposalModel, ProposedCircuitModel, ProposedNodeModel, VoteRecordModel},
         schema::circuit_proposal,
     },
     error::AdminServiceStoreError,
@@ -58,6 +58,7 @@ where
         C::Backend,
     >,
     VoteRecordModel: diesel::Queryable<(Text, Binary, Text, Text, Integer), C::Backend>,
+    ProposedNodeModel: diesel::Queryable<(Text, Text, Integer, Nullable<Binary>), C::Backend>,
 {
     fn remove_proposal(&self, proposal_id: &str) -> Result<(), AdminServiceStoreError> {
         self.conn.transaction::<(), _, _>(|| {

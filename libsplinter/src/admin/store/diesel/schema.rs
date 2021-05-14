@@ -53,6 +53,7 @@ table! {
         circuit_id -> Text,
         node_id -> Text,
         position -> Integer,
+        public_key -> Nullable<Binary>,
     }
 }
 
@@ -124,6 +125,7 @@ table! {
         circuit_id -> Text,
         node_id -> Text,
         position -> Integer,
+        public_key -> Nullable<Binary>,
     }
 }
 

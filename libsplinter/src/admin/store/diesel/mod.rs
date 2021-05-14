@@ -682,7 +682,7 @@ pub mod tests {
             .expect("Got None when expecting circuit");
 
         assert_eq!(
-            create_circuit("WBKLF-BBBBB", CircuitStatus::Active),
+            create_circuit_from_proposal("WBKLF-BBBBB", CircuitStatus::Active),
             fetched_circuit
         );
     }
@@ -1122,21 +1122,13 @@ pub mod tests {
 
         let mut nodes = store.list_nodes().expect("Unable to get services");
 
-        assert!(fetched_circuit.members().contains(
-            &nodes
-                .next()
-                .expect("Unable to get service")
-                .node_id()
-                .to_string()
-        ));
+        assert!(fetched_circuit
+            .members()
+            .contains(&nodes.next().expect("Unable to get service")));
 
-        assert!(fetched_circuit.members().contains(
-            &nodes
-                .next()
-                .expect("Unable to get service")
-                .node_id()
-                .to_string()
-        ));
+        assert!(fetched_circuit
+            .members()
+            .contains(&nodes.next().expect("Unable to get service")));
 
         assert!(nodes.next().is_none());
     }
@@ -1504,6 +1496,8 @@ pub mod tests {
     }
 
     fn create_circuit(circuit_id: &str, status: CircuitStatus) -> Circuit {
+        let nodes = create_nodes();
+
         CircuitBuilder::default()
             .with_circuit_id(circuit_id)
             .with_roster(&vec![
@@ -1530,7 +1524,56 @@ pub mod tests {
                     .build()
                     .expect("Unable to build service"),
             ])
-            .with_members(&vec!["bubba-node-000".into(), "acme-node-000".into()])
+            .with_members(&nodes)
+            .with_circuit_management_type("gameroom")
+            .with_display_name("test_display")
+            .with_circuit_version(3)
+            .with_circuit_status(&status)
+            .build()
+            .expect("Unable to build circuit")
+    }
+
+    fn create_circuit_from_proposal(circuit_id: &str, status: CircuitStatus) -> Circuit {
+        CircuitBuilder::default()
+            .with_circuit_id(circuit_id)
+            .with_roster(&vec![
+                ServiceBuilder::default()
+                    .with_service_id("a000")
+                    .with_service_type("scabbard")
+                    .with_node_id("acme-node-000")
+                    .with_arguments(&vec![
+                        ("peer_services".into(), "[\"a001\"]".into()),
+                        ("admin_keys".into(),
+                       "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]".into())
+                    ])
+                    .build()
+                    .expect("Unable to build service"),
+                ServiceBuilder::default()
+                    .with_service_id("a001")
+                    .with_service_type("scabbard")
+                    .with_node_id("bubba-node-000")
+                    .with_arguments(&vec![
+                        ("peer_services".into(), "[\"a000\"]".into()),
+                        ("admin_keys".into(),
+                       "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]".into())
+                    ])
+                    .build()
+                    .expect("Unable to build service"),
+            ])
+            .with_members(
+                &vec![
+                CircuitNodeBuilder::default()
+                    .with_node_id("bubba-node-000".into())
+                    .with_endpoints(
+                        &vec!["tcps://splinterd-node-bubba:8044".into(),
+                              "tcps://splinterd-node-bubba-2:8044".into()])
+                    .build().expect("Unable to build node"),
+                CircuitNodeBuilder::default()
+                    .with_node_id("acme-node-000".into())
+                    .with_endpoints(&vec!["tcps://splinterd-node-acme:8044".into()])
+                    .build().expect("Unable to build node"),
+                ]
+            )
             .with_circuit_management_type("gameroom")
             .with_display_name("test_display")
             .with_circuit_version(3)
@@ -1540,6 +1583,7 @@ pub mod tests {
     }
 
     fn create_extra_circuit(circuit_id: &str) -> Circuit {
+        let nodes = create_extra_nodes();
         CircuitBuilder::default()
             .with_circuit_id(circuit_id)
             .with_roster(&vec![
@@ -1569,7 +1613,7 @@ pub mod tests {
                     .build()
                     .expect("Unable to build service"),
             ])
-            .with_members(&vec!["gumbo-node-000".into(), "acme-node-000".into()])
+            .with_members(&nodes)
             .with_circuit_management_type("other")
             .build()
             .expect("Unable to build circuit")

@@ -15,6 +15,7 @@
 //! Provides the "fetch node" operation for the `DieselAdminServiceStore`.
 
 use diesel::prelude::*;
+use diesel::sql_types::{Binary, Integer, Nullable, Text};
 
 use super::AdminServiceStoreOperations;
 use crate::admin::store::{
@@ -33,9 +34,10 @@ pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchNodeOperation {
 impl<'a, C> AdminServiceStoreFetchNodeOperation for AdminServiceStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+    String: diesel::deserialize::FromSql<Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
+    i32: diesel::deserialize::FromSql<Integer, C::Backend>,
+    CircuitMemberModel: diesel::Queryable<(Text, Text, Integer, Nullable<Binary>), C::Backend>,
 {
     fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
         self.conn.transaction::<Option<CircuitNode>, _, _>(|| {

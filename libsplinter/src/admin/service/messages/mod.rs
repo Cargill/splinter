@@ -421,6 +421,8 @@ impl std::fmt::Display for CircuitStatus {
 pub struct SplinterNode {
     pub node_id: String,
     pub endpoints: Vec<String>,
+    #[cfg(feature = "challenge-authorization")]
+    pub public_key: Option<Vec<u8>>,
 }
 
 impl SplinterNode {
@@ -430,13 +432,30 @@ impl SplinterNode {
         proto.set_node_id(self.node_id);
         proto.set_endpoints(self.endpoints.into());
 
+        #[cfg(feature = "challenge-authorization")]
+        if let Some(public_key) = self.public_key {
+            proto.set_public_key(public_key);
+        }
+
         proto
     }
 
     pub fn from_proto(mut proto: admin::SplinterNode) -> Result<Self, MarshallingError> {
+        #[cfg(feature = "challenge-authorization")]
+        let public_key = {
+            let public_key = proto.take_public_key();
+            if public_key.is_empty() {
+                None
+            } else {
+                Some(public_key)
+            }
+        };
+
         Ok(Self {
             node_id: proto.take_node_id(),
             endpoints: proto.take_endpoints().into(),
+            #[cfg(feature = "challenge-authorization")]
+            public_key,
         })
     }
 }
@@ -605,6 +624,8 @@ impl From<store::CircuitProposal> for CircuitProposal {
                 .map(|node| SplinterNode {
                     node_id: node.node_id().to_string(),
                     endpoints: node.endpoints().to_vec(),
+                    #[cfg(feature = "challenge-authorization")]
+                    public_key: node.public_key().clone(),
                 })
                 .collect::<Vec<SplinterNode>>(),
             authorization_type: AuthorizationType::Trust,

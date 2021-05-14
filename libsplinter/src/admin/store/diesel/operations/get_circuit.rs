@@ -15,18 +15,21 @@
 //! Provides the "fetch circuit" operation for the `DieselAdminServiceStore`.
 
 use diesel::prelude::*;
+use diesel::sql_types::{Binary, Integer, Nullable, Text};
+use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use super::{list_services::AdminServiceStoreListServicesOperation, AdminServiceStoreOperations};
 use crate::admin::store::{
     diesel::{
-        models::{CircuitMemberModel, CircuitModel},
-        schema::{circuit, circuit_member},
+        models::{CircuitMemberModel, CircuitModel, NodeEndpointModel},
+        schema::{circuit, circuit_member, node_endpoint},
     },
     error::AdminServiceStoreError,
-    AuthorizationType, Circuit, CircuitBuilder, CircuitStatus, DurabilityType, PersistenceType,
-    RouteType, Service,
+    AuthorizationType, Circuit, CircuitBuilder, CircuitNode, CircuitNodeBuilder, CircuitStatus,
+    DurabilityType, PersistenceType, RouteType, Service,
 };
+use crate::error::InvalidStateError;
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchCircuitOperation {
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError>;
@@ -35,10 +38,11 @@ pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchCircuitOperation
 impl<'a, C> AdminServiceStoreFetchCircuitOperation for AdminServiceStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+    String: diesel::deserialize::FromSql<Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
+    i32: diesel::deserialize::FromSql<Integer, C::Backend>,
     i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
+    CircuitMemberModel: diesel::Queryable<(Text, Text, Integer, Nullable<Binary>), C::Backend>,
 {
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
         self.conn.transaction::<Option<Circuit>, _, _>(|| {
@@ -55,23 +59,67 @@ where
             };
 
             // Collecting the members of the `Circuit`
-            let members: Vec<CircuitMemberModel> = circuit_member::table
+            let nodes_info: Vec<(CircuitMemberModel, NodeEndpointModel)> = circuit_member::table
                 .filter(circuit_member::circuit_id.eq(circuit_id.to_string()))
+                // As `circuit_member` and `node_endpoint` have a one-to-many relationship, this join
+                // will return all matching entries as there are `node_endpoint` entries.
                 .order(circuit_member::position)
+                .inner_join(
+                    node_endpoint::table.on(circuit_member::node_id.eq(node_endpoint::node_id)),
+                )
                 .load(self.conn)?;
+
+            let mut node_map: HashMap<String, Vec<String>> = HashMap::new();
+            let mut nodes: HashMap<String, CircuitMemberModel> = HashMap::new();
+            // Iterate over the list of node data retrieved from the database, in order to collect all
+            // endpoints associated with the `node_ids` in a HashMap.
+            nodes_info.into_iter().for_each(|(node, node_endpoint)| {
+                if let Some(endpoint_list) = node_map.get_mut(&node.node_id) {
+                    endpoint_list.push(node_endpoint.endpoint);
+                    // Ensure only unique endpoints are added to the node's endpoint list
+                    endpoint_list.sort();
+                    endpoint_list.dedup();
+                } else {
+                    node_map.insert(node.node_id.to_string(), vec![node_endpoint.endpoint]);
+                }
+
+                if !nodes.contains_key(&node.node_id) {
+                    nodes.insert(node.node_id.to_string(), node);
+                }
+            });
+
+            let mut nodes_vec: Vec<CircuitMemberModel> =
+                nodes.into_iter().map(|(_, node)| node).collect();
+            nodes_vec.sort_by_key(|node| node.position);
 
             // Collecting services associated with the `Circuit` using the `list_services` method,
             // which provides a list of the `Services` with the matching `circuit_id`.
             let services: Vec<Service> = self.list_services(&circuit_id)?.collect();
-            let circuit_member: Vec<String> = members
+            let circuit_members: Vec<CircuitNode> = nodes_vec
                 .iter()
-                .map(|member| member.node_id.to_string())
-                .collect();
+                .map(|member| {
+                    let mut builder = CircuitNodeBuilder::new().with_node_id(&member.node_id);
+
+                    if let Some(endpoints) = node_map.get(&member.node_id) {
+                        builder = builder.with_endpoints(&endpoints);
+                    }
+
+                    #[cfg(feature = "challenge-authorization")]
+                    {
+                        if let Some(public_key) = &member.public_key {
+                            builder = builder.with_public_key(&public_key);
+                        }
+                    }
+
+                    builder.build()
+                })
+                .collect::<Result<Vec<CircuitNode>, InvalidStateError>>()
+                .map_err(AdminServiceStoreError::InvalidStateError)?;
 
             let mut builder = CircuitBuilder::new()
                 .with_circuit_id(&circuit.circuit_id)
                 .with_roster(&services)
-                .with_members(&circuit_member)
+                .with_members(&circuit_members)
                 .with_authorization_type(&AuthorizationType::try_from(circuit.authorization_type)?)
                 .with_persistence(&PersistenceType::try_from(circuit.persistence)?)
                 .with_durability(&DurabilityType::try_from(circuit.durability)?)

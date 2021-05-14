@@ -21,6 +21,10 @@ message SplinterNode {
 
     // The endpoints the splinter node is available on
     repeated string endpoints = 2;
+
+    // The public key that must be used for identification if authorization is
+    // set to challenge. This does not need to be set if using Trust.
+    bytes public_key = 3;
 }
 
 message SplinterService {
