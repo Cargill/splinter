@@ -190,7 +190,7 @@ pub(in crate::admin) fn commit_3_party_circuit(
     let node_b_event_client = node_b
         .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
-    let node_c_event_client = node_b
+    let node_c_event_client = node_c
         .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
         .expect("Unable to get event client");
 
