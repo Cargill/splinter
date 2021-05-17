@@ -35,10 +35,18 @@ services:
         - SPLINTERD_ARGS=${SPLINTERD_ARGS}
     entrypoint: |
       bash -c "
+        if [ ! -f /acme.priv ]
+        then
+          splinter admin keygen acme
+        fi && \
+        if [ ! -f /etc/splinter/allow_keys ]
+        then
+          echo $$(cat /acme.pub) > /etc/splinter/allow_keys
+        fi && \
         until PGPASSWORD=splinter_test psql -h splinter-db -U splinter_admin -d splinter -c '\q'; do
           >&2 echo \"Database is unavailable - sleeping\"
           sleep 1
-        done
+        done && \
         splinter database migrate -C postgres://splinter_admin:splinter_test@splinter-db:5432/splinter && \
         splinter cert generate --skip && \
         splinterd \
