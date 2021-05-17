@@ -1,0 +1,23 @@
+name: 0-4 Test Gameroom UI
+
+on:
+  pull_request:
+    branches:
+      - 0-4
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  gameroom_ui_tests:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Gameroom UI Tests
+        run: just ci-test-gameroom-ui
