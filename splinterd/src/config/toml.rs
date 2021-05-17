@@ -16,6 +16,8 @@
 
 use crate::config::PartialConfigBuilder;
 use crate::config::{ConfigError, ConfigSource, PartialConfig};
+#[cfg(feature = "log-config")]
+use crate::logging::{AppenderConfig, LoggerConfig};
 
 use serde_derive::Deserialize;
 
@@ -77,6 +79,10 @@ struct TomlConfig {
     metrics_username: Option<String>,
     #[cfg(feature = "metrics")]
     metrics_password: Option<String>,
+    #[cfg(feature = "log-config")]
+    appenders: Option<Vec<AppenderConfig>>,
+    #[cfg(feature = "log-config")]
+    loggers: Option<Vec<LoggerConfig>>,
 
     // Deprecated values
     cert_dir: Option<String>,
@@ -194,6 +200,12 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 .with_metrics_url(self.toml_config.metrics_url)
                 .with_metrics_username(self.toml_config.metrics_username)
                 .with_metrics_password(self.toml_config.metrics_password)
+        }
+        #[cfg(feature = "log-config")]
+        {
+            partial_config = partial_config
+                .with_appenders(self.toml_config.appenders)
+                .with_loggers(self.toml_config.loggers);
         }
 
         // deprecated values, only set if the current value was not set

@@ -193,8 +193,6 @@ impl ConfigBuilder {
             })
             .ok_or_else(|| ConfigError::MissingValue("database".to_string()))?;
 
-        // Iterates over the list of `PartialConfig` objects to find the first config with a value
-        // for the specific field. If no value is found, an error is returned.
         Ok(Config {
             config_dir,
             tls_cert_dir,
@@ -352,6 +350,48 @@ impl ConfigBuilder {
                 .partial_configs
                 .iter()
                 .find_map(|p| p.metrics_password().map(|v| (v, p.source()))),
+            #[cfg(feature = "log-config")]
+            appenders: Some(
+                self.partial_configs
+                    .iter()
+                    .filter_map(|partial| {
+                        partial.appenders().map(|vector| {
+                            vector
+                                .iter()
+                                .map(|item| (item.to_owned(), partial.source()))
+                                .collect::<Vec<_>>()
+                        })
+                    })
+                    .flatten()
+                    .collect(),
+            ),
+            #[cfg(feature = "log-config")]
+            loggers: Some(
+                self.partial_configs
+                    .iter()
+                    .filter_map(|partial| {
+                        partial.loggers().map(|vector| {
+                            vector
+                                .iter()
+                                .map(|item| (item.to_owned(), partial.source()))
+                                .collect::<Vec<_>>()
+                        })
+                    })
+                    .flatten()
+                    .collect(),
+            ),
+            #[cfg(feature = "log-config")]
+            root_logger: self
+                .partial_configs
+                .iter()
+                .find_map(|p| p.root_logger().map(|v| (v, p.source())))
+                .ok_or_else(|| ConfigError::MissingValue("root_logger".to_string()))?,
+            #[cfg(feature = "log-config")]
+            verbosity: self
+                .partial_configs
+                .iter()
+                .find_map(|p| p.verbosity().map(|v| (v, p.source())))
+                .ok_or_else(|| ConfigError::MissingValue("verbosity".to_string()))?,
         })
     }
 }
