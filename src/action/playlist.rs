@@ -235,12 +235,12 @@ impl Action for SubmitPlaylistAction {
             .map_err(|_| CliError::ActionError("Unable to parse provided update time".into()))?;
 
         let target_vec: Vec<String> = target.split(';').map(String::from).collect();
-
+        let time_to_wait = std::time::Duration::from_secs(1) / rate;
         submit_batches_from_source(
             &mut in_file,
             input.to_string(),
             target_vec,
-            rate,
+            time_to_wait,
             auth,
             update,
         );

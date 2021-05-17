@@ -199,12 +199,13 @@ fn start_smallbank_workloads(
             "Starting Smallbank-Workload-{} with target rate {}",
             i, rate
         );
+        let time_to_wait = std::time::Duration::from_secs(1) / rate;
         workload_runner
             .add_workload(
                 format!("Smallbank-Workload-{}", i),
                 Box::new(smallbank_workload),
                 target,
-                rate,
+                time_to_wait,
                 auth.to_string(),
                 update,
             )
@@ -241,12 +242,13 @@ fn start_command_workloads(
 
         info!("Starting Command-Workload-{} with target rate {}", i, rate);
 
+        let time_to_wait = std::time::Duration::from_secs(1) / rate;
         workload_runner
             .add_workload(
                 format!("Command-Workload-{}", i),
                 Box::new(command_workload),
                 target,
-                rate,
+                time_to_wait,
                 auth.to_string(),
                 update,
             )
