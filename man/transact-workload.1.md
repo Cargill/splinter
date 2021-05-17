@@ -52,8 +52,8 @@ OPTIONS
 : An integer to use as a seed to make the workload reproducible.
 
 `--target-rate TARGET-RATE`
-: How many batches to submit per second, either provide a number or a range
-  with the min and max separated by `-` ex: `5-15`. (default: `1`)
+: Rate of batch submissions, either provide a float, a batch rate in form <float>/<h,m,s> or a range
+  with the min and max separated by `-` ex: `5.0/s-15.0/m`,`1/m`,`15/s-2/m`,`2.0` (default: `1/s`)
 
 `--targets TARGETS`
 :  Node URLS to submit batches to, combine groups with `;`. Each group will get
@@ -78,7 +78,7 @@ The smallbank smart contract must already be submitted to scabbard.
 
 ```
 transact workload \
-  --target-rate 1 \
+  --target-rate 1/s \
   --key ./alice.priv \
   --workload smallbank \
   --update 5 \

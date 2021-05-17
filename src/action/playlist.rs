@@ -14,6 +14,7 @@
 
 use std::fs::File;
 use std::io::Write;
+use std::time::Duration;
 
 use clap::ArgMatches;
 use transact::families::smallbank::workload::playlist::{
@@ -22,6 +23,7 @@ use transact::families::smallbank::workload::playlist::{
 use transact::workload::batch_gen::generate_signed_batches;
 use transact::workload::{submit_batches_from_source, DEFAULT_LOG_TIME_SECS};
 
+use crate::action::rate::Rate;
 use crate::error::CliError;
 
 use super::{create_cylinder_jwt_auth_signer_key, load_cylinder_signer_key, Action};
@@ -29,7 +31,7 @@ use super::{create_cylinder_jwt_auth_signer_key, load_cylinder_signer_key, Actio
 const DEFAULT_ACCOUNTS: &str = "10";
 const DEFAULT_TRANSACTIONS: &str = "10";
 const DEFAULT_BATCH_SIZE: &str = "1";
-const DEFAULT_RATE: &str = "1";
+const DEFAULT_RATE: &str = "1/s";
 
 pub struct CreatePlaylistAction;
 
@@ -203,13 +205,17 @@ impl Action for SubmitPlaylistAction {
             .ok_or_else(|| CliError::ActionError("'key' is required".into()))?;
         let (auth, _) = create_cylinder_jwt_auth_signer_key(key_path)?;
 
-        let rate: f32 = args
-            .value_of("rate")
-            .unwrap_or(DEFAULT_RATE)
-            .parse()
-            .map_err(|_| CliError::ActionError("Unable to parse provided rate".into()))?;
+        let rate_string = args.value_of("rate").unwrap_or(DEFAULT_RATE);
+        let rate: Duration = if let Ok(interval) = rate_string.parse::<Rate>() {
+            interval.into()
+        } else {
+            let raw_num = rate_string.parse::<f32>().map_err(|_| {
+                CliError::UnparseableArg("time must be floating point value".into())
+            })?;
+            std::time::Duration::from_secs_f32(1.0 / raw_num)
+        };
 
-        if rate <= 0.0 {
+        if rate == Duration::from_secs(0) {
             return Err(CliError::ActionError(
                 "rate must be a number greater than 0".to_string(),
             ));
@@ -226,7 +232,12 @@ impl Action for SubmitPlaylistAction {
         let mut in_file = File::open(&input)
             .map_err(|_| CliError::ActionError("Unable to open input file".to_string()))?;
 
-        info!("Input: {} Target: {:?} Rate: {}", input, target, rate);
+        info!(
+            "Input: {} Target: {:?} Rate: {}",
+            input,
+            target,
+            1000 / rate.as_millis()
+        );
 
         let update: u32 = args
             .value_of("update")
@@ -235,12 +246,11 @@ impl Action for SubmitPlaylistAction {
             .map_err(|_| CliError::ActionError("Unable to parse provided update time".into()))?;
 
         let target_vec: Vec<String> = target.split(';').map(String::from).collect();
-        let time_to_wait = std::time::Duration::from_secs(1).div_f32(rate);
         submit_batches_from_source(
             &mut in_file,
             input.to_string(),
             target_vec,
-            time_to_wait,
+            rate,
             auth,
             update,
         );
