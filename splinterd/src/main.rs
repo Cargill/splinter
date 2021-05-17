@@ -530,13 +530,26 @@ fn setup_metrics_recorder(config: &Config) -> Result<(), UserError> {
     Ok(())
 }
 
+fn get_config_file<'a>(matches: &'a ArgMatches) -> &'a str {
+    matches
+        .value_of("config")
+        .unwrap_or("/etc/splinter/splinterd.toml")
+}
+
+fn get_log_filter_level(matches: &ArgMatches) -> log::LevelFilter {
+    match matches.occurrences_of("verbose") {
+        0 => log::LevelFilter::Warn,
+        1 => log::LevelFilter::Info,
+        2 => log::LevelFilter::Debug,
+        _ => log::LevelFilter::Trace,
+    }
+}
+
 fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     // get provided config file or search default location
-    let config_file = matches
-        .value_of("config")
-        .unwrap_or("/etc/splinter/splinterd.toml");
+    let config_file = get_config_file(&matches);
 
-    let config_file_path = if Path::new(&config_file).is_file() {
+    let config_file_path = if Path::new(config_file).is_file() {
         Some(config_file)
     } else {
         None
