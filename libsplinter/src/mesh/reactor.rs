@@ -102,6 +102,9 @@ impl Reactor {
                 Turn::Continue => (),
             }
         }
+        if let Err(err) = self.pool.remove_all() {
+            error!("Failed to clean up mesh pool: {}", err);
+        }
     }
 
     fn turn(&mut self, events: &mut Events) -> Turn {
@@ -129,33 +132,33 @@ impl Reactor {
     }
 
     fn handle_control_ready(&mut self) -> Turn {
-        match self.ctrl_rx.try_recv() {
-            Ok(ControlRequest::Add(AddRequest {
-                connection,
-                response_tx,
-                ..
-            })) => {
-                if let Err(err) = response_tx.send(self.add_connection(connection)) {
-                    error!("Failed to send back AddResponse: {:?}", err);
+        loop {
+            match self.ctrl_rx.try_recv() {
+                Ok(ControlRequest::Add(AddRequest {
+                    connection,
+                    response_tx,
+                    ..
+                })) => {
+                    if let Err(err) = response_tx.send(self.add_connection(connection)) {
+                        error!("Failed to send back AddResponse: {:?}", err);
+                    }
                 }
-                Turn::Continue
-            }
-            Ok(ControlRequest::Remove(RemoveRequest {
-                id, response_tx, ..
-            })) => {
-                if let Err(err) = response_tx.send(self.remove_connection(id)) {
-                    error!("Failed to send back RemoveResponse: {:?}", err);
+                Ok(ControlRequest::Remove(RemoveRequest {
+                    id, response_tx, ..
+                })) => {
+                    if let Err(err) = response_tx.send(self.remove_connection(id)) {
+                        error!("Failed to send back RemoveResponse: {:?}", err);
+                    }
                 }
-                Turn::Continue
-            }
-            Ok(ControlRequest::Shutdown) => {
-                if self.incoming_tx.send(InternalEnvelope::Shutdown).is_err() {
-                    error!("Unable to send shutdown envelope to Mesh")
+                Ok(ControlRequest::Shutdown) => {
+                    if self.incoming_tx.send(InternalEnvelope::Shutdown).is_err() {
+                        error!("Unable to send shutdown envelope to Mesh")
+                    }
+                    break Turn::Shutdown;
                 }
-                Turn::Shutdown
+                Err(TryRecvError::Empty) => break Turn::Continue,
+                Err(TryRecvError::Disconnected) => break Turn::Shutdown,
             }
-            Err(TryRecvError::Empty) => Turn::Continue,
-            Err(TryRecvError::Disconnected) => Turn::Shutdown,
         }
     }
 

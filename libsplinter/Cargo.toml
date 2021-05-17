@@ -53,7 +53,7 @@ influxdb = { version = "0.4.0", features = ["derive"], optional = true }
 log = "0.3.0"
 # rename to not conflict with splinter::metrics
 metrics-lib = {package = "metrics", version = "0.12", features = ["std"], optional = true}
-mio = "0.6"
+mio = { version = "0.6", default-features = false }
 mio-extras = "2"
 oauth2 = { version = "3.0", optional = true }
 openssl = "0.10"

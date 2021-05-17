@@ -115,10 +115,27 @@ impl Pool {
         }
     }
 
+    pub fn remove_all(&mut self) -> Result<(), io::Error> {
+        for (_, entry) in self.entries.drain() {
+            let connection_token = entry.connection_token();
+            let outgoing_token = entry.outgoing_token();
+
+            self.tokens.remove(&connection_token);
+            self.tokens.remove(&outgoing_token);
+
+            let (connection, outgoing) = entry.into_evented();
+
+            self.poll.deregister(connection.evented())?;
+            self.poll.deregister(&outgoing)?;
+        }
+
+        Ok(())
+    }
+
     pub fn register_external<E: Evented>(&mut self, evented: &E) -> Result<Token, io::Error> {
         let token = self.next_token();
         self.poll
-            .register(evented, token, Ready::readable(), PollOpt::level())?;
+            .register(evented, token, Ready::readable(), PollOpt::edge())?;
         Ok(token)
     }
 
