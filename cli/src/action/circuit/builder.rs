@@ -233,6 +233,7 @@ impl CreateCircuitMessageBuilder {
     pub fn set_authorization_type(&mut self, authorization_type: &str) -> Result<(), CliError> {
         let auth_type = match authorization_type {
             "trust" => AuthorizationType::Trust,
+            "challenge" => AuthorizationType::Challenge,
             _ => {
                 return Err(CliError::ActionError(format!(
                     "Invalid authorization type {}",

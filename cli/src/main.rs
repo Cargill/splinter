@@ -257,7 +257,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     let propose_circuit = propose_circuit.arg(
         Arg::with_name("authorization_type")
             .long("auth-type")
-            .possible_values(&["trust"])
+            .possible_values(&["trust", "challenge"])
             .default_value("trust")
             .takes_value(true)
             .help("Authorization type for the circuit"),

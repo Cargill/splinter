@@ -54,6 +54,10 @@ FLAGS
 
 OPTIONS
 =======
+`--auth-type AUTHORIZATION_TYPE`
+: Authorization type for the circuit. Possible values `trust` or `challenge`.
+  Defaults to `trust`. If using `challenge`, node public keys are required.
+
 `--comments COMMENTS`
 : Adds human-readable comments to the circuit proposal.
 
