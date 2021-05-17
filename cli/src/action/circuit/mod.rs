@@ -55,15 +55,40 @@ impl Action for CircuitProposeAction {
         let mut builder = CreateCircuitMessageBuilder::new();
 
         if let Some(node_file) = args.value_of("node_file") {
+            #[cfg(feature = "challenge-authorization")]
+            for node in load_nodes_from_file(node_file)? {
+                builder.add_node(&node.identity, &node.endpoints, None)?;
+            }
+
+            #[cfg(not(feature = "challenge-authorization"))]
             for node in load_nodes_from_file(node_file)? {
                 builder.add_node(&node.identity, &node.endpoints)?;
             }
         }
 
         if let Some(nodes) = args.values_of("node") {
-            for node_argument in nodes {
-                let (node, endpoints) = parse_node_argument(node_argument)?;
-                builder.add_node(&node, &endpoints)?;
+            #[cfg(feature = "challenge-authorization")]
+            {
+                let mut public_keys = HashMap::new();
+                if let Some(nodes_public_keys) = args.values_of("node_public_key") {
+                    for node_argument in nodes_public_keys {
+                        let (node, public_key) = parse_node_public_key(node_argument)?;
+                        public_keys.insert(node, public_key);
+                    }
+                }
+
+                for node_argument in nodes {
+                    let (node, endpoints) = parse_node_argument(node_argument)?;
+                    builder.add_node(&node, &endpoints, public_keys.get(&node))?;
+                }
+            }
+
+            #[cfg(not(feature = "challenge-authorization"))]
+            {
+                for node_argument in nodes {
+                    let (node, endpoints) = parse_node_argument(node_argument)?;
+                    builder.add_node(&node, &endpoints)?;
+                }
             }
         }
 
@@ -306,6 +331,34 @@ fn parse_node_argument(node_argument: &str) -> Result<(String, Vec<String>), Cli
         .collect::<Result<_, _>>()?;
 
     Ok((node_id, endpoints))
+}
+
+#[cfg(feature = "challenge-authorization")]
+fn parse_node_public_key(node_argument: &str) -> Result<(String, String), CliError> {
+    let mut iter = node_argument.split("::");
+
+    let node_id = iter
+        .next()
+        .expect("str::split cannot return an empty iterator")
+        .to_string();
+    if node_id.is_empty() {
+        return Err(CliError::ActionError(
+            "Empty '--node-public-key' argument detected".into(),
+        ));
+    }
+
+    let public_key = iter
+        .next()
+        .ok_or_else(|| CliError::ActionError(format!("Missing public key for node '{}'", node_id)))?
+        .to_string();
+    if public_key.is_empty() {
+        return Err(CliError::ActionError(format!(
+            "No public key detected for node '{}'",
+            node_id
+        )));
+    }
+
+    Ok((node_id, public_key))
 }
 
 fn parse_service(service: &str) -> Result<(String, Vec<String>), CliError> {

@@ -186,7 +186,12 @@ impl CreateCircuitMessageBuilder {
         Ok(())
     }
 
-    pub fn add_node(&mut self, node_id: &str, node_endpoints: &[String]) -> Result<(), CliError> {
+    pub fn add_node(
+        &mut self,
+        node_id: &str,
+        node_endpoints: &[String],
+        #[cfg(feature = "challenge-authorization")] public_key: Option<&String>,
+    ) -> Result<(), CliError> {
         for node in &self.nodes {
             if node.node_id == node_id {
                 return Err(CliError::ActionError(format!(
@@ -205,8 +210,18 @@ impl CreateCircuitMessageBuilder {
             }
         }
 
-        self.nodes
-            .push(make_splinter_node(node_id, node_endpoints)?);
+        #[cfg(feature = "challenge-authorization")]
+        {
+            self.nodes
+                .push(make_splinter_node(node_id, node_endpoints, public_key)?);
+        }
+
+        #[cfg(not(feature = "challenge-authorization"))]
+        {
+            self.nodes
+                .push(make_splinter_node(node_id, node_endpoints)?);
+        }
+
         Ok(())
     }
 
@@ -377,18 +392,50 @@ fn is_match(service_id_match: &str, service_id: &str) -> bool {
     })
 }
 
-fn make_splinter_node(node_id: &str, endpoints: &[String]) -> Result<SplinterNode, CliError> {
-    let node = SplinterNodeBuilder::new()
+fn make_splinter_node(
+    node_id: &str,
+    endpoints: &[String],
+    #[cfg(feature = "challenge-authorization")] public_key: Option<&String>,
+) -> Result<SplinterNode, CliError> {
+    #[allow(unused_mut)]
+    let mut node_builder = SplinterNodeBuilder::new()
         .with_node_id(&node_id)
-        .with_endpoints(endpoints)
-        .build()
-        .map_err(|err| {
-            CliError::ActionError(format!(
-                "Failed to build node: {}",
-                msg_from_builder_error(err)
-            ))
-        })?;
+        .with_endpoints(endpoints);
+
+    #[cfg(feature = "challenge-authorization")]
+    {
+        if let Some(public_key) = public_key {
+            node_builder = node_builder.with_public_key(&parse_hex(&public_key)?)
+        }
+    }
+
+    let node = node_builder.build().map_err(|err| {
+        CliError::ActionError(format!(
+            "Failed to build node: {}",
+            msg_from_builder_error(err)
+        ))
+    })?;
     Ok(node)
+}
+
+#[cfg(feature = "challenge-authorization")]
+pub fn parse_hex(hex: &str) -> Result<Vec<u8>, CliError> {
+    if hex.len() % 2 != 0 {
+        return Err(CliError::ActionError(format!(
+            "{} is not valid hex: odd number of digits",
+            hex
+        )));
+    }
+
+    let mut res = vec![];
+    for i in (0..hex.len()).step_by(2) {
+        res.push(
+            u8::from_str_radix(&hex[i..i + 2], 16)
+                .map_err(|_| CliError::ActionError(format!("{} contains invalid hex", hex)))?,
+        );
+    }
+
+    Ok(res)
 }
 
 fn msg_from_builder_error(err: BuilderError) -> String {

@@ -375,6 +375,12 @@ impl SplinterNodeBuilder {
         self
     }
 
+    #[cfg(feature = "challenge-authorization")]
+    pub fn with_public_key(mut self, public_key: &[u8]) -> SplinterNodeBuilder {
+        self.public_key = Some(public_key.into());
+        self
+    }
+
     pub fn build(self) -> Result<SplinterNode, BuilderError> {
         let node_id = self
             .node_id

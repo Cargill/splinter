@@ -86,6 +86,13 @@ OPTIONS
   to be be included on the circuit proposal. Repeat this option to specify
   multiple nodes.
 
+`--node-public-key NODE-PUBLIC-KEY-STRING` ...
+: Specifies the public key for node, using the format `NODE-ID::PUBLIC-KEY`.
+  The proposer must also specify its own node's public key, if it is
+  to be be included on the circuit proposal. Repeat this option to specify keys
+  for multiple nodes. Public keys are required if using `challenge`
+  authorization.
+
 `--service SERVICE-STRING` ...
 : Specifies the service ID and allowed nodes, using the format
   `SERVICE-ID::ALLOWED-NODES`. Service IDs are comprised of 4 ASCII alphanumeric
