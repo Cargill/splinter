@@ -307,7 +307,14 @@ where
                     {
                         proposed_node.endpoints.push(endpoint);
                     } else {
-                        let proposed_node = ProposedNodeBuilder::new().with_node_id(&node.node_id);
+                        #[allow(unused_mut)]
+                        let mut proposed_node =
+                            ProposedNodeBuilder::new().with_node_id(&node.node_id);
+
+                        #[cfg(feature = "challenge-authorization")]
+                        if let Some(public_key) = &node.public_key {
+                            proposed_node = proposed_node.with_public_key(&public_key)
+                        }
 
                         proposed_nodes.insert(
                             (node.circuit_id, node.node_id),
