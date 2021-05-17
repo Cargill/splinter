@@ -14,6 +14,8 @@
 
 //! `PartialConfig` builder using values from a toml config file.
 
+#[cfg(feature = "log-config")]
+use crate::config::logger::LogConfig;
 use crate::config::PartialConfigBuilder;
 use crate::config::{ConfigError, ConfigSource, PartialConfig};
 
@@ -78,6 +80,9 @@ struct TomlConfig {
     metrics_username: Option<String>,
     #[cfg(feature = "metrics")]
     metrics_password: Option<String>,
+    #[cfg(feature = "log-config")]
+    #[serde(rename = "log")]
+    log_config: Option<LogConfig>,
 
     // Deprecated values
     cert_dir: Option<String>,
@@ -196,6 +201,10 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 .with_metrics_url(self.toml_config.metrics_url)
                 .with_metrics_username(self.toml_config.metrics_username)
                 .with_metrics_password(self.toml_config.metrics_password)
+        }
+        #[cfg(feature = "log-config")]
+        {
+            partial_config = partial_config.with_log_config(self.toml_config.log_config);
         }
 
         // deprecated values, only set if the current value was not set

@@ -17,6 +17,9 @@
 
 use std::time::Duration;
 
+#[cfg(feature = "log-config")]
+use super::logger::LogConfig;
+
 /// `ConfigSource` displays the source of configuration values, used to identify which of the various
 /// config modules were used to create a particular `PartialConfig` object.
 #[derive(Deserialize, Debug, Clone, PartialEq)]
@@ -89,6 +92,8 @@ pub struct PartialConfig {
     metrics_username: Option<String>,
     #[cfg(feature = "metrics")]
     metrics_password: Option<String>,
+    #[cfg(feature = "log-config")]
+    log_config: Option<LogConfig>,
 }
 
 impl PartialConfig {
@@ -152,6 +157,8 @@ impl PartialConfig {
             metrics_username: None,
             #[cfg(feature = "metrics")]
             metrics_password: None,
+            #[cfg(feature = "log-config")]
+            log_config: None,
         }
     }
 
@@ -333,6 +340,11 @@ impl PartialConfig {
     #[cfg(feature = "metrics")]
     pub fn metrics_password(&self) -> Option<String> {
         self.metrics_password.clone()
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn log_config(&self) -> Option<LogConfig> {
+        self.log_config.clone()
     }
 
     /// Adds a `config_dir` value to the `PartialConfig` object.
@@ -800,6 +812,18 @@ impl PartialConfig {
     ///
     pub fn with_metrics_password(mut self, metrics_password: Option<String>) -> Self {
         self.metrics_password = metrics_password;
+        self
+    }
+
+    #[cfg(feature = "log-config")]
+    /// Sets log target appenders
+    ///
+    /// # Arguments
+    ///
+    /// *'targets' - Vec of log target
+    ///
+    pub fn with_log_config(mut self, config: Option<LogConfig>) -> Self {
+        self.log_config = config;
         self
     }
 }

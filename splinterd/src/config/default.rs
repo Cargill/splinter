@@ -96,6 +96,10 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         {
             partial_config = partial_config.with_enable_biome_credentials(Some(false))
         }
+        #[cfg(feature = "log-config")]
+        {
+            partial_config = partial_config.with_log_config(Some(Default::default()));
+        }
 
         Ok(partial_config)
     }
