@@ -253,7 +253,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
         .after_help(CIRCUIT_PROPOSE_AFTER_HELP);
 
-    #[cfg(feature = "circuit-auth-type")]
+    #[cfg(feature = "challenge-authorization")]
     let propose_circuit = propose_circuit.arg(
         Arg::with_name("authorization_type")
             .long("auth-type")

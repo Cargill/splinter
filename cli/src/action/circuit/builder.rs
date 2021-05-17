@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "circuit-auth-type")]
+#[cfg(feature = "challenge-authorization")]
 use splinter::admin::messages::AuthorizationType;
 use splinter::admin::messages::{
     BuilderError, CircuitStatus, CreateCircuit, CreateCircuitBuilder, SplinterNode,
@@ -30,7 +30,7 @@ pub struct CreateCircuitMessageBuilder {
     services: Vec<SplinterServiceBuilder>,
     nodes: Vec<SplinterNode>,
     management_type: Option<String>,
-    #[cfg(feature = "circuit-auth-type")]
+    #[cfg(feature = "challenge-authorization")]
     authorization_type: Option<AuthorizationType>,
     application_metadata: Vec<u8>,
     comments: Option<String>,
@@ -46,7 +46,7 @@ impl CreateCircuitMessageBuilder {
             services: vec![],
             nodes: vec![],
             management_type: None,
-            #[cfg(feature = "circuit-auth-type")]
+            #[cfg(feature = "challenge-authorization")]
             authorization_type: None,
             application_metadata: vec![],
             comments: None,
@@ -229,7 +229,7 @@ impl CreateCircuitMessageBuilder {
         self.management_type = Some(management_type.into());
     }
 
-    #[cfg(feature = "circuit-auth-type")]
+    #[cfg(feature = "challenge-authorization")]
     pub fn set_authorization_type(&mut self, authorization_type: &str) -> Result<(), CliError> {
         let auth_type = match authorization_type {
             "trust" => AuthorizationType::Trust,
@@ -340,7 +340,7 @@ impl CreateCircuitMessageBuilder {
             create_circuit_builder = create_circuit_builder.with_circuit_status(&circuit_status);
         }
 
-        #[cfg(feature = "circuit-auth-type")]
+        #[cfg(feature = "challenge-authorization")]
         let create_circuit_builder = match self.authorization_type {
             Some(authorization_type) => {
                 create_circuit_builder.with_authorization_type(&authorization_type)

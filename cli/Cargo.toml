@@ -71,7 +71,6 @@ experimental = [
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "challenge-authorization",
-    "circuit-auth-type",
     "health",
     "https-certs",
     "permissions",
@@ -81,8 +80,7 @@ experimental = [
 
 authorization-handler-maintenance = []
 authorization-handler-rbac = []
-challenge-authorization = ["circuit-auth-type", "splinter/challenge-authorization"]
-circuit-auth-type = []
+challenge-authorization = ["splinter/challenge-authorization"]
 circuit-template = ["splinter/circuit-template"]
 
 registry = []

@@ -131,7 +131,7 @@ impl Action for CircuitProposeAction {
             }
         }
 
-        #[cfg(feature = "circuit-auth-type")]
+        #[cfg(feature = "challenge-authorization")]
         #[allow(clippy::single_match)]
         match args.value_of("authorization_type") {
             Some(auth_type) => builder.set_authorization_type(auth_type)?,
