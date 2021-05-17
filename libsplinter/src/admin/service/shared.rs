@@ -2255,6 +2255,17 @@ impl AdminServiceShared {
             } else {
                 all_endpoints.append(&mut endpoints);
             }
+
+            #[cfg(feature = "challenge-authorization")]
+            if circuit.get_authorization_type()
+                == Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION
+                && member.get_public_key().is_empty()
+            {
+                return Err(AdminSharedError::ValidationFailed(
+                    "All members must have public keys if authorization type is challenge"
+                        .to_string(),
+                ));
+            }
         }
 
         if members.is_empty() {
@@ -4716,6 +4727,49 @@ mod tests {
             ADMIN_SERVICE_PROTOCOL_VERSION,
         ) {
             panic!("Should have been invalid because cannot have challenge auth if version 1");
+        }
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "challenge-authorization")]
+    #[test]
+    // test that if a circuit has challenge auth set and nodes do not have public keys, the circuit
+    // is invalid
+    fn test_validate_circuit_challenge_auth_no_public_keys() {
+        let store = setup_admin_service_store();
+        let event_store = store.clone_boxed();
+
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            event_store,
+        );
+        let mut circuit = setup_test_circuit();
+
+        circuit.set_authorization_type(Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION);
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because nodes do not have public keys set");
         }
         shutdown(mesh, cm, pm);
     }
