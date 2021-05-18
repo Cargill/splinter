@@ -335,7 +335,7 @@ impl Handler for TrustRequestHandler {
         let trust_request = TrustRequest::from_proto(msg)?;
         match self.auth_manager.next_state(
             context.source_connection_id(),
-            AuthorizationAction::TrustIdentifying(trust_request.identity),
+            AuthorizationAction::TrustIdentifyingV0(trust_request.identity),
         ) {
             Err(err) => {
                 warn!(

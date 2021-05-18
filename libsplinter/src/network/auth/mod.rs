@@ -63,7 +63,7 @@ type Identity = String;
 #[derive(PartialEq, Debug)]
 pub(crate) enum AuthorizationAction {
     Connecting,
-    TrustIdentifying(Identity),
+    TrustIdentifyingV0(Identity),
     Unauthorizing,
     RemoteAuthorizing,
 }
@@ -72,7 +72,7 @@ impl fmt::Display for AuthorizationAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             AuthorizationAction::Connecting => f.write_str("Connecting"),
-            AuthorizationAction::TrustIdentifying(_) => f.write_str("TrustIdentifying"),
+            AuthorizationAction::TrustIdentifyingV0(_) => f.write_str("TrustIdentifyingV0"),
             AuthorizationAction::Unauthorizing => f.write_str("Unauthorizing"),
             AuthorizationAction::RemoteAuthorizing => f.write_str("RemoteAuthorizing"),
         }
@@ -367,7 +367,7 @@ impl AuthorizationManagerStateMachine {
             },
             AuthorizationState::Connecting => match action {
                 AuthorizationAction::Connecting => Err(AuthorizationActionError::AlreadyConnecting),
-                AuthorizationAction::TrustIdentifying(identity) => {
+                AuthorizationAction::TrustIdentifyingV0(identity) => {
                     let new_state = AuthorizationState::RemoteIdentified(identity);
                     *cur_state = new_state.clone();
                     // Verify pub key allowed
@@ -394,7 +394,7 @@ impl AuthorizationManagerStateMachine {
                 )),
             },
             AuthorizationState::RemoteAccepted => match action {
-                AuthorizationAction::TrustIdentifying(identity) => {
+                AuthorizationAction::TrustIdentifyingV0(identity) => {
                     let new_state = AuthorizationState::Authorized(identity);
                     *cur_state = new_state.clone();
                     Ok(new_state)
