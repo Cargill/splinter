@@ -23,6 +23,8 @@ use splinter::threading::lifecycle::ShutdownHandle;
 use splinterd::node::{Node, NodeBuilder, RestApiVariant, RunnableNode, ScabbardConfigBuilder};
 use tempdir::TempDir;
 
+use super::circuit_builder::CircuitBuilder;
+
 pub struct Network {
     default_rest_api_variant: RestApiVariant,
     nodes: Vec<NetworkNode>,
@@ -127,6 +129,14 @@ impl Network {
                 "out of range".to_string(),
             )),
         }
+    }
+
+    /// Create a [`CircuitBuilder`] with the given the node indices
+    pub fn circuit_builder<'a>(
+        &'a self,
+        nodes: &[usize],
+    ) -> Result<CircuitBuilder<'a>, InvalidArgumentError> {
+        CircuitBuilder::new(self, nodes)
     }
 
     pub fn start(mut self, index: usize) -> Result<Network, InternalError> {

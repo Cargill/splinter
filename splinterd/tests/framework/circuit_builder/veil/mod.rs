@@ -12,13 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A framework for running a network of Splinter nodes in a single process for
-//! integration testing purposes.
+//! Veils that can be used with [`CircuitBuilder`]
 
-#[cfg(feature = "node")]
-pub mod network;
-#[macro_use]
-#[cfg(feature = "node")]
-pub mod shutdown;
-#[cfg(feature = "node")]
-pub mod circuit_builder;
+pub mod scabbard;

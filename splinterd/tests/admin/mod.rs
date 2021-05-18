@@ -21,7 +21,7 @@ mod circuit_create;
 mod circuit_disband;
 mod circuit_list;
 mod node_lifecycle;
-mod payload;
+pub(super) mod payload;
 mod registry;
 
 use scabbard::client::ServiceId;
