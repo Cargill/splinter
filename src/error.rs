@@ -21,6 +21,8 @@ use clap::Error as ClapError;
 pub enum CliError {
     /// A subcommand requires one or more arguments, but none were provided.
     RequiresArgs,
+    /// An argument is malformed and unparsable
+    UnparseableArg(String),
     /// A non-existent subcommand was specified.
     InvalidSubcommand,
     /// An error was detected by `clap`.
@@ -40,6 +42,7 @@ impl fmt::Display for CliError {
                 f,
                 "The specified subcommand requires arguments, but none were provided"
             ),
+            CliError::UnparseableArg(msg) => write!(f, "An argument could not be parsed: {}", msg),
             CliError::InvalidSubcommand => write!(f, "An invalid subcommand was specified"),
             CliError::ClapError(err) => f.write_str(&err.message),
             CliError::ActionError(msg) => write!(f, "Subcommand encountered an error: {}", msg),
