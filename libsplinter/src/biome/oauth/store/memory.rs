@@ -23,6 +23,8 @@ use crate::error::{
     InvalidStateError,
 };
 
+#[cfg(feature = "oauth-user-list")]
+use super::OAuthUserIter;
 use super::{
     InsertableOAuthUserSession, OAuthUser, OAuthUserSession, OAuthUserSessionStore,
     OAuthUserSessionStoreError,
@@ -184,6 +186,11 @@ impl OAuthUserSessionStore for MemoryOAuthUserSessionStore {
             .users
             .get(subject)
             .cloned())
+    }
+
+    #[cfg(feature = "oauth-user-list")]
+    fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
+        unimplemented!()
     }
 
     fn clone_box(&self) -> Box<dyn OAuthUserSessionStore> {

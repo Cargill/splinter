@@ -20,6 +20,8 @@ pub(in crate::biome) mod schema;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
+#[cfg(feature = "oauth-user-list")]
+use super::OAuthUserIter;
 use super::{
     InsertableOAuthUserSession, OAuthUser, OAuthUserSession, OAuthUserSessionStore,
     OAuthUserSessionStoreError,
@@ -82,6 +84,11 @@ impl OAuthUserSessionStore for DieselOAuthUserSessionStore<diesel::sqlite::Sqlit
         OAuthUserSessionStoreOperations::new(&*connection).get_user(subject)
     }
 
+    #[cfg(feature = "oauth-user-list")]
+    fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
+        unimplemented!()
+    }
+
     fn clone_box(&self) -> Box<dyn OAuthUserSessionStore> {
         Box::new(Self {
             connection_pool: self.connection_pool.clone(),
@@ -126,6 +133,11 @@ impl OAuthUserSessionStore for DieselOAuthUserSessionStore<diesel::pg::PgConnect
     fn get_user(&self, subject: &str) -> Result<Option<OAuthUser>, OAuthUserSessionStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserSessionStoreOperations::new(&*connection).get_user(subject)
+    }
+
+    #[cfg(feature = "oauth-user-list")]
+    fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
+        unimplemented!()
     }
 
     fn clone_box(&self) -> Box<dyn OAuthUserSessionStore> {

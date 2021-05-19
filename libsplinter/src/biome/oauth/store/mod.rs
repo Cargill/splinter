@@ -390,6 +390,10 @@ pub trait OAuthUserSessionStore: Send + Sync {
     /// exists
     fn get_user(&self, subject: &str) -> Result<Option<OAuthUser>, OAuthUserSessionStoreError>;
 
+    #[cfg(feature = "oauth-user-list")]
+    /// Returns the list of OAuth users, including the Biome user ID if it exists
+    fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError>;
+
     /// Clone into a boxed, dynamically dispatched store
     fn clone_box(&self) -> Box<dyn OAuthUserSessionStore>;
 }
@@ -397,5 +401,33 @@ pub trait OAuthUserSessionStore: Send + Sync {
 impl Clone for Box<dyn OAuthUserSessionStore> {
     fn clone(&self) -> Self {
         self.clone_box()
+    }
+}
+
+#[cfg(feature = "oauth-user-list")]
+/// An iterator over OauthUsers, with a well-known count of values.
+pub struct OAuthUserIter {
+    inner: Box<dyn ExactSizeIterator<Item = OAuthUser>>,
+}
+
+#[cfg(feature = "oauth-user-list")]
+impl OAuthUserIter {
+    pub fn new(users: Vec<OAuthUser>) -> Self {
+        Self {
+            inner: Box::new(users.into_iter()),
+        }
+    }
+}
+
+#[cfg(feature = "oauth-user-list")]
+impl Iterator for OAuthUserIter {
+    type Item = OAuthUser;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.inner.len(), Some(self.inner.len()))
     }
 }
