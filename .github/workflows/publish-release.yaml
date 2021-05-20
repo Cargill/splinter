@@ -45,7 +45,9 @@ jobs:
           fetch-depth: 0
 
       - name: Publish release to dockerhub
-        run: ./ci/publish-docker
+        run: |
+          git fetch --tags --force
+          ./ci/publish-docker
         env:
           NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
           VERSION: AUTO_STRICT
@@ -66,4 +68,6 @@ jobs:
         run: env
 
       - name: Publish release to crates
-        run: CARGO_TOKEN=${{ secrets.CARGO_TOKEN }} ./ci/publish-crates
+        run: |
+          git fetch --tags --force
+          CARGO_TOKEN=${{ secrets.CARGO_TOKEN }} ./ci/publish-crates
