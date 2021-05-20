@@ -28,7 +28,7 @@ use crate::biome::{
 };
 #[cfg(feature = "biome-profile")]
 use crate::error::InternalError;
-#[cfg(feature = "oauth-profile")]
+#[cfg(feature = "biome-profile")]
 use crate::oauth::Profile as OauthProfile;
 use crate::oauth::{
     rest_api::resources::callback::{generate_redirect_query, CallbackQuery},
