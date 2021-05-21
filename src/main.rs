@@ -94,7 +94,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .long("workload")
                         .takes_value(true)
                         .required(true)
-                        .possible_values(&["smallbank"])
+                        .possible_values(&["smallbank", "command"])
                         .help("The workload to be submitted"),
                 )
                 .arg(
@@ -111,13 +111,10 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .help("The number of smallbank accounts to make. Defaults to 100"),
                 )
                 .arg(
-                    Arg::with_name("smallbank_seed")
-                        .long("smallbank-seed")
+                    Arg::with_name("seed")
+                        .long("seed")
                         .value_name("SEED")
-                        .long_help(
-                            "An integer to use as a seed to make the smallbank workload \
-                        reproducible",
-                        ),
+                        .long_help("An integer to use as a seed to make the workload reproducible"),
                 ),
         );
     }

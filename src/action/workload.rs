@@ -94,25 +94,22 @@ impl Action for WorkloadAction {
             .parse()
             .map_err(|_| CliError::ActionError("Unable to parse provided update time".into()))?;
 
+        let seed = match args.value_of("seed").map(str::parse).unwrap_or_else(|| {
+            let mut rng = rand::thread_rng();
+            Ok(rng.gen::<u64>())
+        }) {
+            Ok(seed) => seed,
+            Err(_) => {
+                return Err(CliError::ActionError(
+                    "Unable to get seed for workload".into(),
+                ))
+            }
+        };
+
         let mut workload_runner = WorkloadRunner::default();
 
         match workload {
             "smallbank" => {
-                let seed = match args
-                    .value_of("smallbank_seed")
-                    .map(str::parse)
-                    .unwrap_or_else(|| {
-                        let mut rng = rand::thread_rng();
-                        Ok(rng.gen::<u64>())
-                    }) {
-                    Ok(seed) => seed,
-                    Err(_) => {
-                        return Err(CliError::ActionError(
-                            "Unable to get seed for smallbank workload".into(),
-                        ))
-                    }
-                };
-
                 let num_accounts: usize = args
                     .value_of("smallbank_num_accounts")
                     .unwrap_or("100")
