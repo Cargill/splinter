@@ -1,5 +1,42 @@
 # Release Notes
 
+## Changes in Splinter 0.5.4
+
+### Highlights
+
+* Includes a number of minor improvements to mesh stability.
+
+* Adds experimental support for including a public key in circuit nodes.
+
+### libsplinter
+
+* Add an optional public key to both ProposedNode and CircuitNode. This public
+  key will be used during challenge authorization. This requires that the
+  Circuit member list is updated to contain CircuitNodes instead of just the
+  node id. This will allow storing the public key directly in the circuit. This
+  is a breaking change against the YAML format, as such if a node is using the
+  YamlAdminServiceStore it cannot support including public keys in the member
+  list and thus will not be able to support challenge authorization.
+
+* Fix a bug that was causing the gameroom example to fail because the Websocket
+  event from Scabbard when a contract was submitted was too large. This was
+  fixed reverting to use json::to_string instead of json::to_string_pretty
+
+* Remove all mesh connection registrations on shutdown
+
+* Remove lock contention when adding connections to mesh
+
+* Change mesh control channel registration from level to edge, in order to
+  process all control messages on a single event firing.
+
+* Replace inproc connection internals with channels, greatly simplifying the
+  implementation.
+
+* Add simple circuit generation via CircuitBuilder and
+  ScabbardCircuitBuilderVeil for creating and testing various configurations of
+  Scabbard circuits.  Available through the experimental feature "node".
+
+
 ## Changes in Splinter 0.5.3
 
 ### Highlights
