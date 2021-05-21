@@ -48,8 +48,8 @@ OPTIONS
 `--smallbank-num-accounts ACCOUNTS`
 : The number of smallbank accounts to make. (default: `100`)
 
-`--smallbank-seed SEEDS`
-: An integer to use as a seed to make the smallbank workload reproducible.
+`---seed SEEDS`
+: An integer to use as a seed to make the workload reproducible.
 
 `--target-rate TARGET-RATE`
 : How many batches to submit per second, either provide a number or a range
@@ -66,8 +66,9 @@ OPTIONS
   of submitting the HTTP requests. (default: `30`)
 
 `--workload WORKLOAD `
-: The workload to be submitted. The possibly value is `smallbank`. The smallbank
-  workload submits batches containing sabre Transactions for smallbank payloads.
+: The workload to be submitted. The possible values are `smallbank` or `command`.
+  Determines the type of sabre transactions contained within the batches
+  submitted by the workload, either smallbank or command payloads.
 
 EXAMPLES
 ========
