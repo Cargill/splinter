@@ -18,8 +18,13 @@ use std::sync::Arc;
 use clap::ArgMatches;
 use cylinder::Signer;
 use rand::Rng;
-use transact::families::smallbank::workload::{
-    playlist::SmallbankGeneratingIter, SmallbankBatchWorkload, SmallbankTransactionWorkload,
+use transact::families::{
+    command::workload::{
+        playlist::CommandGeneratingIter, CommandBatchWorkload, CommandTransactionWorkload,
+    },
+    smallbank::workload::{
+        playlist::SmallbankGeneratingIter, SmallbankBatchWorkload, SmallbankTransactionWorkload,
+    },
 };
 use transact::workload::{WorkloadRunner, DEFAULT_LOG_TIME_SECS};
 
@@ -128,6 +133,18 @@ impl Action for WorkloadAction {
                     num_accounts,
                 )?;
             }
+            "command" => {
+                start_command_workloads(
+                    &mut workload_runner,
+                    targets,
+                    min,
+                    max,
+                    auth,
+                    signer,
+                    update,
+                    seed,
+                )?;
+            }
             _ => {
                 return Err(CliError::ActionError(format!(
                     "Unsupported workload type: {}",
@@ -189,6 +206,48 @@ fn start_smallbank_workloads(
             .add_workload(
                 format!("Smallbank-Workload-{}", i),
                 Box::new(smallbank_workload),
+                target,
+                rate,
+                auth.to_string(),
+                update,
+            )
+            .map_err(|err| CliError::ActionError(format!("Unable to start workload: {}", err)))?
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn start_command_workloads(
+    workload_runner: &mut WorkloadRunner,
+    targets: Vec<Vec<String>>,
+    target_rate_min: u32,
+    target_rate_max: u32,
+    auth: String,
+    signer: Box<dyn Signer>,
+    update: u32,
+    seed: u64,
+) -> Result<(), CliError> {
+    let mut rng = rand::thread_rng();
+
+    for (i, target) in targets.into_iter().enumerate() {
+        let command_generator = CommandGeneratingIter::new(seed);
+        let transaction_workload =
+            CommandTransactionWorkload::new(command_generator, signer.clone());
+        let command_workload = CommandBatchWorkload::new(transaction_workload, signer.clone());
+
+        let rate = if target_rate_min == target_rate_max {
+            target_rate_min
+        } else {
+            rng.gen_range(target_rate_min..=target_rate_max)
+        };
+
+        info!("Starting Command-Workload-{} with target rate {}", i, rate);
+
+        workload_runner
+            .add_workload(
+                format!("Command-Workload-{}", i),
+                Box::new(command_workload),
                 target,
                 rate,
                 auth.to_string(),
