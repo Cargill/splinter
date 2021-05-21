@@ -54,6 +54,10 @@ FLAGS
 
 OPTIONS
 =======
+`--auth-type AUTHORIZATION_TYPE`
+: Authorization type for the circuit. Possible values `trust` or `challenge`.
+  Defaults to `trust`. If using `challenge`, node public keys are required.
+
 `--comments COMMENTS`
 : Adds human-readable comments to the circuit proposal.
 
@@ -85,6 +89,13 @@ OPTIONS
   for the given node ID. The proposer must also specify its own node, if it is
   to be be included on the circuit proposal. Repeat this option to specify
   multiple nodes.
+
+`--node-public-key NODE-PUBLIC-KEY-STRING` ...
+: Specifies the public key for node, using the format `NODE-ID::PUBLIC-KEY`.
+  The proposer must also specify its own node's public key, if it is
+  to be be included on the circuit proposal. Repeat this option to specify keys
+  for multiple nodes. Public keys are required if using `challenge`
+  authorization.
 
 `--service SERVICE-STRING` ...
 : Specifies the service ID and allowed nodes, using the format

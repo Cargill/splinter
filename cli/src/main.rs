@@ -253,14 +253,26 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
         .after_help(CIRCUIT_PROPOSE_AFTER_HELP);
 
-    #[cfg(feature = "circuit-auth-type")]
+    #[cfg(feature = "challenge-authorization")]
     let propose_circuit = propose_circuit.arg(
         Arg::with_name("authorization_type")
             .long("auth-type")
-            .possible_values(&["trust"])
+            .possible_values(&["trust", "challenge"])
             .default_value("trust")
             .takes_value(true)
             .help("Authorization type for the circuit"),
+    );
+
+    #[cfg(feature = "challenge-authorization")]
+    let propose_circuit = propose_circuit.arg(
+        Arg::with_name("node_public_key")
+            .long("node-public-key")
+            .takes_value(true)
+            .multiple(true)
+            .help(
+                "Public key for a node that will be used in challenge authorization \
+                 (<node_id>::<public_key>)",
+            ),
     );
 
     #[cfg(feature = "circuit-template")]

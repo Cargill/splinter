@@ -2216,11 +2216,10 @@ components:
           type: string
           example: 01234-ABCDE
         members:
-          description: Node IDs of the circuit's members
+          description: Circuit members in the circuit
           type: array
           items:
-            type: string
-            example: alpha-node-000
+              $ref: '#/components/schemas/CircuitMember'
         roster:
           description: All services defined for the circuit
           type: array
@@ -2255,6 +2254,21 @@ components:
           description: The node ID that is allowed to run this service
           type: string
           example: alpha-node-000
+
+    CircuitMember:
+      type: object
+      properties:
+        node_id:
+          type: string
+          example: alpha-node-000
+        endpoints:
+          type: array
+          items:
+            type: string
+            example: tcps://12.0.0.123:8431
+        public_key:
+          type: string
+          example: 026c889058c2d22558ead2c61b321634b74e705c42f890e6b7bc2c80abb4713118
 
     Proposal:
       type: object
@@ -2332,6 +2346,9 @@ components:
           items:
             type: string
             example: tcps://12.0.0.123:8431
+        public_key:
+          type: string
+          example: 026c889058c2d22558ead2c61b321634b74e705c42f890e6b7bc2c80abb4713118
 
     ProposedCircuitService:
       type: object

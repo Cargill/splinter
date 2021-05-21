@@ -97,6 +97,7 @@ experimental = [
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "biome-profile",
+    "challenge-authorization",
     "health-service",
     "https-bind",
     "metrics",
@@ -123,6 +124,7 @@ authorization-handler-rbac = [
 biome-credentials = ["splinter/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management"]
 biome-profile = ["splinter/biome-profile", "splinter/oauth-profile"]
+challenge-authorization = ["splinter/challenge-authorization"]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
 health-service = ["health"]
@@ -135,6 +137,7 @@ metrics = [
 node = [
     "authorization",
     "https-bind",
+    "challenge-authorization",
     "scabbard/client-reqwest",
     "scabbard/factory-builder",
     "splinter/admin-service-client",
