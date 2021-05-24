@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::env;
 use std::fs::{create_dir_all, metadata, OpenOptions};
 use std::io::prelude::*;
 use std::os::unix::fs::OpenOptionsExt;
@@ -30,6 +31,8 @@ use crate::error::CliError;
 use super::{chown, Action};
 
 const SYSTEM_KEY_PATH: &str = "/etc/splinter/keys";
+const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
+const CONFIG_DIR_ENV: &str = "SPLINTER_CONFIG_DIR";
 
 pub struct KeyGenAction;
 
@@ -45,7 +48,31 @@ impl Action for KeyGenAction {
         let key_dir = if let Some(dir) = args.value_of("key_dir") {
             PathBuf::from(dir)
         } else if args.is_present("system") {
-            PathBuf::from(SYSTEM_KEY_PATH)
+            if let Ok(config_dir) = env::var(CONFIG_DIR_ENV) {
+                let opt_path = Path::new(&config_dir).join("keys");
+                if !opt_path.is_dir() {
+                    create_dir_all(&opt_path).map_err(|_| {
+                        CliError::ActionError(format!(
+                            "Unable to create directory: {}",
+                            opt_path.display()
+                        ))
+                    })?;
+                }
+                opt_path
+            } else if let Ok(splinter_home) = env::var(SPLINTER_HOME_ENV) {
+                let opt_path = Path::new(&splinter_home).join("etc").join("keys");
+                if !opt_path.is_dir() {
+                    create_dir_all(&opt_path).map_err(|_| {
+                        CliError::ActionError(format!(
+                            "Unable to create directory: {}",
+                            opt_path.display()
+                        ))
+                    })?;
+                }
+                opt_path
+            } else {
+                PathBuf::from(SYSTEM_KEY_PATH)
+            }
         } else {
             dirs::home_dir()
                 .map(|mut p| {

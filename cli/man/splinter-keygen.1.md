@@ -94,6 +94,19 @@ writing file: "/etc/splinter/keys/splinterd.priv"
 writing file: "/etc/splinter/keys/splinterd.pub"
 ```
 
+ENVIRONMENT VARIABLES
+=====================
+
+**SPLINTER_CONFIG_DIR**
+: Specifies the directory containing configuration files, including system keys.
+  (See: `--config-dir`.)
+
+**SPLINTER_HOME**
+
+: Changes the base directory path for the Splinter directories, including the
+  config directory and system key location. (See the `splinterd(1)` man page for
+  more information.) This value is not used if `SPLINTER_CONFIG_DIR` is set.
+
 SEE ALSO
 ========
 
