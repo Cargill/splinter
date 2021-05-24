@@ -49,11 +49,18 @@ ENV PATH=$PATH:/root/.cargo/bin
 WORKDIR /project/splinter/libsplinter
 
 CMD cargo login $CARGO_CRED \
+ && echo "Publshing version $REPO_VERSION" \
  && rm -f ../Cargo.lock ./Cargo.lock \
  && cargo clean \
  && cargo test \
  && cargo publish \
- && sleep 10 \
+ && bash -c '\
+    while true; do echo "Waiting for Splinter publishing to complete"; \
+    cargo search splinter | grep "splinter = " | grep -q $REPO_VERSION; \
+    if [ $? -eq 0 ]; \
+      then break; \
+    fi; \
+    sleep 0.5; done; ' \
  && cd /project/splinter/services/scabbard/libscabbard \
  && sed -i'' -e "s/splinter = {.*$/splinter\ =\ \"$REPO_VERSION\"/" Cargo.toml \
  && rm -f ../../../Cargo.lock ./Cargo.lock \
