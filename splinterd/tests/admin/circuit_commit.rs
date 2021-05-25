@@ -42,10 +42,10 @@ pub(in crate::admin) fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, 
     let node_b_admin_pubkey = admin_pubkey(node_b);
 
     let node_a_event_client = node_a
-        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
     let node_b_event_client = node_b
-        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
 
     let circuit_payload_bytes = make_create_circuit_payload(
@@ -186,13 +186,13 @@ pub(in crate::admin) fn commit_3_party_circuit(
     let node_c_admin_pubkey = admin_pubkey(node_c);
 
     let node_a_event_client = node_a
-        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
     let node_b_event_client = node_b
-        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
     let node_c_event_client = node_c
-        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
 
     // Create the `CircuitManagementPayload` to be sent to a node

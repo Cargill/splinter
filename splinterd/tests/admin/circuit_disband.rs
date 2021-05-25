@@ -69,14 +69,14 @@ pub fn test_2_party_circuit_lifecycle() {
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
         node_a
-            .admin_service_event_client(&management_type)
+            .admin_service_event_client(&management_type, None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_b_events = BlockingAdminServiceEventIterator::new(
         node_b
-            .admin_service_event_client(&management_type)
+            .admin_service_event_client(&management_type, None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
@@ -213,14 +213,14 @@ pub fn test_2_party_circuit_disband_proposal_rejected() {
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
         node_a
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_b_events = BlockingAdminServiceEventIterator::new(
         node_b
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
@@ -355,21 +355,21 @@ pub fn test_3_party_circuit_lifecycle() {
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
         node_a
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_b_events = BlockingAdminServiceEventIterator::new(
         node_b
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_c_events = BlockingAdminServiceEventIterator::new(
         node_c
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
@@ -560,21 +560,21 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
         node_a
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_b_events = BlockingAdminServiceEventIterator::new(
         node_b
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
     .skip(1); // skip the ready event itself.
     let mut node_c_events = BlockingAdminServiceEventIterator::new(
         node_c
-            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id))
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
             .expect("Unable to get event client"),
     )
     .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
@@ -732,4 +732,1008 @@ fn admin_pubkey(node: &Node) -> PublicKey {
             .as_slice()
             .to_vec(),
     )
+}
+
+/// Test that a 2-party circuit may be created on a 2-node network. This test then validates the
+/// circuit is able to be disbanded, in a scenario where throughout the process the non-requester
+/// node is stopped.
+///
+/// 1. Create a circuit between 2 nodes
+/// 2. Stop the second node in the network
+/// 3. Create and submit a `CircuitDisbandRequest` from the first node
+/// 4. Restart the second node
+/// 5. Wait for the `ProposalSubmitted` event from each node's event client, validate the
+///    corresponding proposal
+/// 6. Stop the first node in the network
+/// 7. Create and submit a `CircuitProposalVote` from the second node to accept the disband
+///    proposal
+/// 8. Restart the first node in the network and reinstantiate this node's event client
+/// 9. Wait for the `ProposalAccepted` event from each node's event client, validate the
+///    corresponding proposal
+/// 10. Wait for the `CircuitDisbanded` event from each node's event client, validate the
+///     corresponding proposal
+/// 11. Validate the circuit is returned with a `circuit_status` of `Disbanded` for each node
+#[test]
+#[ignore]
+pub fn test_2_party_circuit_lifecycle_stop() {
+    // Start a 2-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .add_nodes_with_defaults(2)
+        .expect("Unable to start 2-node ActixWeb1 network");
+    // Get the first node in the network
+    let mut node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node in the network
+    let mut node_b = network.node(1).expect("Unable to get second node");
+    let circuit_id = "ABCDE-01234";
+    // Commit the circuit to state
+    commit_2_party_circuit(&circuit_id, node_a, node_b);
+
+    // As we've started a new event client, we'll skip just to the circuit ready event and record
+    // this event ID. We will use this again once the node has been restarted to catch back up.
+    let mut node_a_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
+        node_a
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+            .expect("Unable to get event client"),
+    )
+    .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
+    .next()
+    .expect("Unable to get CircuitReady event")
+    .event_id();
+    let node_b_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
+        node_b
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+            .expect("Unable to get event client"),
+    )
+    .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
+    .next()
+    .expect("Unable to get CircuitReady event")
+    .event_id();
+    // Stop the second node in the network.
+    network = network.stop(1).expect("Unable to stop second node");
+    node_a = network.node(0).expect("Unable to get first node");
+    // Create disband request to be sent from the first node
+    let disband_payload = make_circuit_disband_payload(
+        &circuit_id,
+        node_a.node_id(),
+        &*node_a.admin_signer().clone_box(),
+    );
+    // Submit the `CircuitManagementPayload` to the first node
+    let res = node_a
+        .admin_service_client()
+        .submit_admin_payload(disband_payload.clone());
+    assert!(res.is_ok());
+    // Restart the second node in the network
+    network = network.start(1).expect("Unable to start second node");
+    node_a = network.node(0).expect("Unable to get first node");
+    node_b = network.node(1).expect("Unable to get second node");
+
+    // We're creating a new event client, we will supply the `last_event_id` recorded. The last
+    // event seen was the `CircuitReady` event.
+    let node_a_event_client = node_a
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_a_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+    let node_b_event_client = node_b
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_b_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+
+    // Wait for the proposal event from each node.
+    let proposal_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let proposal_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    node_a_last_seen_event_id = *proposal_a_event.event_id();
+    assert_eq!(&EventType::ProposalSubmitted, proposal_a_event.event_type());
+    assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
+    assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
+    assert_eq!(&proposal_a_event.proposal().proposal_type, "Disband");
+
+    // Stop the first node
+    network = network.stop(0).expect("Unable to stop first node");
+    node_b = network.node(1).expect("Unable to get second node");
+
+    // Create `CircuitProposalVote` to accept the disband proposal
+    // Uses `true` for the `accept` argument to create a vote to accept the proposal
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_b_event.proposal().clone(),
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_b
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
+    assert!(res.is_ok());
+
+    // Restart the first node in the network
+    network = network.start(0).expect("Unable to start first node");
+    node_a = network.node(0).expect("Unable to get first node");
+    node_b = network.node(1).expect("Unable to get second node");
+    let node_b_admin_pubkey = admin_pubkey(node_b);
+    // Recreate the first node's event client as this node has been restarted since the previous
+    // event client was created.
+    let node_a_event_client = node_a
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_a_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+
+    // Wait for the proposal event from each node.
+    let accepted_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let accepted_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_b_admin_pubkey.clone()
+        },
+        accepted_a_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_b_admin_pubkey.clone()
+        },
+        accepted_b_event.event_type(),
+    );
+    assert_eq!(accepted_a_event.proposal(), accepted_b_event.proposal());
+    assert_eq!(&accepted_a_event.proposal().proposal_type, "Disband");
+
+    // Wait for circuit disbanded event.
+    let ready_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let ready_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    assert_eq!(ready_a_event.event_type(), &EventType::CircuitDisbanded);
+    assert_eq!(ready_b_event.event_type(), &EventType::CircuitDisbanded);
+    assert_eq!(ready_a_event.proposal(), ready_b_event.proposal());
+    assert_eq!(&ready_a_event.proposal().proposal_type, "Disband");
+
+    // If the circuit no longer appears in the list of active circuits, the circuit
+    // has been successfully disbanded.
+    assert!(node_a
+        .admin_service_client()
+        .list_circuits(None)
+        .expect("Unable to list circuits from first node")
+        .data
+        .is_empty());
+    assert!(node_b
+        .admin_service_client()
+        .list_circuits(None)
+        .expect("Unable to list circuits from second node")
+        .data
+        .is_empty());
+
+    // Validate the disbanded circuit is the same for both nodes
+    assert_eq!(
+        node_a
+            .admin_service_client()
+            .fetch_circuit(&circuit_id)
+            .expect("Unable to fetch circuit from first node")
+            .unwrap(),
+        node_b
+            .admin_service_client()
+            .fetch_circuit(&circuit_id)
+            .expect("Unable to fetch circuit from second node")
+            .unwrap()
+    );
+
+    shutdown!(network).expect("Unable to shutdown network");
+}
+
+/// Tests that a 2-party circuit may be created on a 2-node network and then proposed to be
+/// disbanded. This test validates the scenario when the other node is down when a payload is
+/// submitted. Also, this test validates the behavior when a disband proposal is rejected.
+///
+/// 1. Create a circuit between 2 nodes
+/// 2. Stop the second node in the network
+/// 3. Create and submit a `CircuitDisbandRequest` from the first node
+/// 4. Restart the second node
+/// 5. Wait for the `ProposalSubmitted` event from each node's event client, validate the
+///    corresponding proposal
+/// 6. Stop the first node in the network
+/// 7. Create and submit a `CircuitProposalVote` from the second node to reject the disband
+///    proposal
+/// 8. Restart the first node in the network and reinstantiate this node's event client.
+/// 9. Wait until the `ProposalRejected` message is received by each node's event client, validate
+///    this event contains the expected proposal
+/// 10. Validate the proposal is no longer available on the nodes
+/// 11. Validate the active circuit is still available to each node, using `list_circuits` which
+///    only returns active circuits
+#[test]
+#[ignore]
+pub fn test_2_party_circuit_disband_rejected_stop() {
+    // Start a 2-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .add_nodes_with_defaults(2)
+        .expect("Unable to start 2-node ActixWeb1 network");
+    // Get the first node in the network
+    let mut node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node in the network
+    let mut node_b = network.node(1).expect("Unable to get second node");
+    let circuit_id = "ABCDE-01234";
+    // Commit the circuit to state
+    commit_2_party_circuit(&circuit_id, node_a, node_b);
+
+    // As we've started a new event client, we'll skip just to the circuit ready event and record
+    // this event ID. We will use this again once the node has been restarted to catch back up.
+    let mut node_a_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
+        node_a
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+            .expect("Unable to get event client"),
+    )
+    .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
+    .next()
+    .expect("Unable to get CircuitReady event")
+    .event_id();
+    let node_b_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
+        node_b
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+            .expect("Unable to get event client"),
+    )
+    .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
+    .next()
+    .expect("Unable to get CircuitReady event")
+    .event_id();
+
+    // Stop the second node in the network.
+    network = network.stop(1).expect("Unable to stop second node");
+    node_a = network.node(0).expect("Unable to get first node");
+
+    // Create disband request to be sent from the first node
+    let disband_payload = make_circuit_disband_payload(
+        &circuit_id,
+        node_a.node_id(),
+        &*node_a.admin_signer().clone_box(),
+    );
+    // Submit the `CircuitManagementPayload` to the first node
+    let res = node_a
+        .admin_service_client()
+        .submit_admin_payload(disband_payload);
+    assert!(res.is_ok());
+
+    // Restart the second node in the network
+    network = network.start(1).expect("Unable to start second node");
+    node_a = network.node(0).expect("Unable to get first node");
+    node_b = network.node(1).expect("Unable to get second node");
+
+    // We're creating a new event client, we will supply the `last_event_id` recorded. The last
+    // event seen was the `CircuitReady` event.
+    let node_a_event_client = node_a
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_a_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+    let node_b_event_client = node_b
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_b_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+
+    // Wait for the proposal event from each node.
+    let proposal_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let proposal_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    node_a_last_seen_event_id = *proposal_a_event.event_id();
+
+    assert_eq!(&EventType::ProposalSubmitted, proposal_a_event.event_type());
+    assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
+    assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
+    assert_eq!(&proposal_a_event.proposal().proposal_type, "Disband");
+
+    // Stop the first node
+    network = network.stop(0).expect("Unable to stop first node");
+    node_b = network.node(1).expect("Unable to get second node");
+
+    // Create `CircuitProposalVote` to reject the disband proposal
+    // Uses `false` for the `accept` argument to create a vote to reject the proposal
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_b_event.proposal().clone(),
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        false,
+    );
+    let res = node_b
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
+    assert!(res.is_ok());
+
+    // Restart the first node in the network
+    network = network.start(0).expect("Unable to start first node");
+    node_a = network.node(0).expect("Unable to get first node");
+    node_b = network.node(1).expect("Unable to get second node");
+    let node_b_admin_pubkey = admin_pubkey(node_b);
+
+    // Recreate the first node's event client as this node has been restarted since the previous
+    // event client was created.
+    let node_a_event_client = node_a
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_a_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+
+    // Wait for the proposal event from each node.
+    let rejected_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let rejected_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+
+    assert_eq!(
+        &EventType::ProposalRejected {
+            requester: node_b_admin_pubkey.clone()
+        },
+        rejected_a_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalRejected {
+            requester: node_b_admin_pubkey.clone()
+        },
+        rejected_b_event.event_type(),
+    );
+    assert_eq!(rejected_a_event.proposal(), rejected_b_event.proposal());
+    assert_eq!(&rejected_a_event.proposal().proposal_type, "Disband");
+
+    // validate the proposal no longer appears in the list, the proposal has been removed as it was
+    // rejected
+    assert!(node_a
+        .admin_service_client()
+        .list_proposals(None, None)
+        .expect("Unable to list proposals from first node")
+        .data
+        .is_empty());
+    assert!(node_b
+        .admin_service_client()
+        .list_proposals(None, None)
+        .expect("Unable to list proposals from second node")
+        .data
+        .is_empty());
+
+    // Validate the active circuit is still available to each node
+    assert!(
+        node_a
+            .admin_service_client()
+            .list_circuits(None)
+            .expect("Unable to list circuits from first node")
+            .data
+            .len()
+            == 1
+    );
+    assert!(
+        node_b
+            .admin_service_client()
+            .list_circuits(None)
+            .expect("Unable to list circuits from second node")
+            .data
+            .len()
+            == 1
+    );
+
+    shutdown!(network).expect("Unable to shutdown network");
+}
+
+/// Test that a 3-party circuit may be created on a 3-node network. This test then validates the
+/// circuit is able to be disbanded, in a scenario where throughout the process the non-requester
+/// node is stopped.
+///
+/// 1. Create a circuit between 3 nodes
+/// 2. Stop the second node in the network
+/// 3. Create and submit a `CircuitDisbandRequest` from the first node
+/// 4. Restart the second node
+/// 5. Wait for the `ProposalSubmitted` event from each node's event client, validate the
+///    corresponding proposal
+/// 6. Stop the third node in the network
+/// 7. Create and submit a `CircuitProposalVote` from the second node to accept the disband
+///    proposal
+/// 8. Restart the third node and reinstantiate this node's event client
+/// 9. Wait for the `ProposalVote` event from each node's event client, validate the
+///     corresponding proposal
+/// 10. Stop the first node in the network
+/// 11. Create and submit a `CircuitProposalVote` from the third node to accept the disband
+///     proposal
+/// 12. Restart the first node in the network and reinstantiate this node's event client
+/// 13. Wait for the `ProposalAccepted` event from each node's event client, validate the
+///     corresponding proposal
+/// 14. Wait for the `CircuitDisbanded` event from each node's event client, validate the
+///     corresponding proposal
+/// 15. Validate the circuit is returned with a `circuit_status` of `Disbanded` for each node
+#[test]
+#[ignore]
+pub fn test_3_party_circuit_lifecycle_stop() {
+    // Start a 3-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .add_nodes_with_defaults(3)
+        .expect("Unable to start 3-node ActixWeb1 network");
+    // Get the first node from the network
+    let mut node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node from the network
+    let mut node_b = network.node(1).expect("Unable to get second node");
+    // Get the third node from the network
+    let mut node_c = network.node(2).expect("Unable to get third node");
+    let circuit_id = "ABCDE-01234";
+    commit_3_party_circuit(circuit_id, node_a, node_b, node_c);
+    // As we've started a new event client, we'll skip just to the circuit ready event and record
+    // this event ID. We will use this again once the node has been restarted to catch back up.
+    let mut node_a_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
+        node_a
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+            .expect("Unable to get event client"),
+    )
+    .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
+    .next()
+    .expect("Unable to get CircuitReady event")
+    .event_id();
+    let node_b_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
+        node_b
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+            .expect("Unable to get event client"),
+    )
+    .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
+    .next()
+    .expect("Unable to get CircuitReady event")
+    .event_id();
+    let mut node_c_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
+        node_c
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+            .expect("Unable to get event client"),
+    )
+    .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
+    .next()
+    .expect("Unable to get CircuitReady event")
+    .event_id();
+
+    // Stop the second node in the network.
+    network = network.stop(1).expect("Unable to stop second node");
+    node_a = network.node(0).expect("Unable to get first node");
+
+    // Create disband request to be sent from the first node
+    let disband_payload = make_circuit_disband_payload(
+        &circuit_id,
+        node_a.node_id(),
+        &*node_a.admin_signer().clone_box(),
+    );
+    // Submit the `CircuitManagementPayload` to the first node
+    let res = node_a
+        .admin_service_client()
+        .submit_admin_payload(disband_payload.clone());
+    assert!(res.is_ok());
+
+    // Restart the second node in the network
+    network = network.start(1).expect("Unable to start second node");
+    node_a = network.node(0).expect("Unable to get first node");
+    node_b = network.node(1).expect("Unable to get second node");
+    node_c = network.node(2).expect("Unable to get third node");
+
+    // We're creating a new event client, we will supply the `last_event_id` recorded. The last
+    // event seen was the `CircuitReady` event.
+    let mut node_a_event_client = node_a
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_a_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+    let node_b_event_client = node_b
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_b_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+    let mut node_c_event_client = node_c
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_c_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+
+    // Wait for the proposal event from each node.
+    let proposal_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let proposal_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let proposal_c_event = node_c_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    node_c_last_seen_event_id = *proposal_c_event.event_id();
+
+    assert_eq!(&EventType::ProposalSubmitted, proposal_a_event.event_type());
+    assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
+    assert_eq!(&EventType::ProposalSubmitted, proposal_c_event.event_type());
+    assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
+    assert_eq!(proposal_a_event.proposal(), proposal_c_event.proposal());
+    assert_eq!(&proposal_a_event.proposal().proposal_type, "Disband");
+
+    // Stop the third node
+    network = network.stop(2).expect("Unable to stop third node");
+    node_b = network.node(1).expect("Unable to get second node");
+
+    // Create `CircuitProposalVote` to accept the disband proposal
+    // Uses `true` for the `accept` argument to create a vote to accept the proposal
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_b_event.proposal().clone(),
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_b
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
+    assert!(res.is_ok());
+
+    // Restart the third node in the network
+    network = network.start(2).expect("Unable to start third node");
+    node_b = network.node(1).expect("Unable to get second node");
+    node_c = network.node(2).expect("Unable to get third node");
+    let node_b_admin_pubkey = admin_pubkey(node_b);
+
+    // Recreate the third node's event client as this node has been restarted since the previous
+    // event client was created.
+    node_c_event_client = node_c
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_c_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+
+    // Wait for the proposal vote event from each node.
+    let vote_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let vote_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let vote_c_event = node_c_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    node_a_last_seen_event_id = *vote_a_event.event_id();
+
+    assert_eq!(
+        &EventType::ProposalVote {
+            requester: node_b_admin_pubkey.clone()
+        },
+        vote_a_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalVote {
+            requester: node_b_admin_pubkey.clone()
+        },
+        vote_b_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalVote {
+            requester: node_b_admin_pubkey.clone()
+        },
+        vote_c_event.event_type(),
+    );
+    assert_eq!(vote_a_event.proposal(), vote_b_event.proposal());
+    assert_eq!(vote_a_event.proposal(), vote_c_event.proposal());
+
+    // Stop the first node in the network
+    network = network.stop(0).expect("Unable to stop first node");
+    node_c = network.node(2).expect("Unable to get third node");
+
+    // Create the `CircuitProposalVote` to be sent to a node
+    // Uses `true` for the `accept` argument to create a vote to accept the proposal
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_c_event.proposal().clone(),
+        node_c.node_id(),
+        &*node_c.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_c
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
+    assert!(res.is_ok());
+
+    // Restart the first node in the network
+    network = network.start(0).expect("Unable to start first node");
+    node_a = network.node(0).expect("Unable to get first node");
+    node_b = network.node(1).expect("Unable to get second node");
+    node_c = network.node(2).expect("Unable to get third node");
+    let node_c_admin_pubkey = admin_pubkey(node_c);
+
+    // Recreate the first node's event client, as we will be starting a new one since this node
+    // has been restarted
+    node_a_event_client = node_a
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_a_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+
+    // Wait for proposal accepted
+    let accepted_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let accepted_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let accepted_c_event = node_c_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_c_admin_pubkey.clone()
+        },
+        accepted_a_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_c_admin_pubkey.clone()
+        },
+        accepted_b_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_c_admin_pubkey.clone()
+        },
+        accepted_c_event.event_type(),
+    );
+    assert_eq!(accepted_a_event.proposal(), accepted_b_event.proposal());
+    assert_eq!(accepted_a_event.proposal(), accepted_c_event.proposal());
+
+    // Wait for Circuit Disbanded event.
+    let ready_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let ready_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let ready_c_event = node_c_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    assert_eq!(ready_a_event.event_type(), &EventType::CircuitDisbanded);
+    assert_eq!(ready_b_event.event_type(), &EventType::CircuitDisbanded);
+    assert_eq!(ready_c_event.event_type(), &EventType::CircuitDisbanded);
+    assert_eq!(ready_a_event.proposal(), ready_b_event.proposal());
+    assert_eq!(ready_a_event.proposal(), ready_c_event.proposal());
+
+    // Validate the disbanded circuit is available and the same for each node
+    let disbanded_circuit_a = node_a
+        .admin_service_client()
+        .fetch_circuit(&circuit_id)
+        .expect("Unable to fetch circuit from first node")
+        .unwrap();
+    let disbanded_circuit_b = node_b
+        .admin_service_client()
+        .fetch_circuit(&circuit_id)
+        .expect("Unable to fetch circuit from second node")
+        .unwrap();
+    let disbanded_circuit_c = node_c
+        .admin_service_client()
+        .fetch_circuit(&circuit_id)
+        .expect("Unable to fetch circuit from third node")
+        .unwrap();
+    assert_eq!(disbanded_circuit_a, disbanded_circuit_b);
+    assert_eq!(disbanded_circuit_b, disbanded_circuit_c);
+
+    shutdown!(network).expect("Unable to shutdown network");
+}
+
+/// Tests that a 3-party circuit may be created on a 3-node network and then proposed to be
+/// disbanded. This test validates the scenario when the other node is down when a payload is
+/// submitted. Also, this test validates the behavior when a disband proposal is rejected.
+///
+/// 1. Create a circuit between 3 nodes
+/// 2. Stop the second node in the network
+/// 3. Create and submit a `CircuitDisbandRequest` from the first node
+/// 4. Restart the second node
+/// 5. Wait for the `ProposalSubmitted` event from each node's event client, validate the
+///    corresponding proposal
+/// 6. Stop the third node in the network
+/// 7. Create and submit a `CircuitProposalVote` from the second node to accept the disband
+///    proposal
+/// 8. Restart the third node and reinstantiate this node's event client
+/// 9. Wait for the `ProposalVote` event from each node's event client, validate the
+///     corresponding proposal
+/// 10. Stop the first node in the network
+/// 11. Create and submit a `CircuitProposalVote` from the third node to reject the disband proposal
+/// 12. Restart the first node in the network and reinstantiate this node's event client
+/// 13. Wait for the `ProposalRejected` event from each node's event client, validate the
+///     corresponding proposal
+/// 14. Validate the disband proposal is no longer available for every node
+/// 15. Validate the circuit is still active for each node, using `list_circuits` which only
+///     returns active circuits
+#[test]
+#[ignore]
+pub fn test_3_party_circuit_disband_rejected_stop() {
+    // Start a 3-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .add_nodes_with_defaults(3)
+        .expect("Unable to start 3-node ActixWeb1 network");
+    // Get the first node from the network
+    let mut node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node from the network
+    let mut node_b = network.node(1).expect("Unable to get second node");
+    // Get the third node from the network
+    let mut node_c = network.node(2).expect("Unable to get third node");
+
+    let circuit_id = "ABCDE-01234";
+    commit_3_party_circuit(circuit_id, node_a, node_b, node_c);
+
+    // As we've started a new event client, we'll skip just to the circuit ready event and record
+    // this event ID. We will use this again once the node has been restarted to catch back up.
+    let mut node_a_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
+        node_a
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+            .expect("Unable to get event client"),
+    )
+    .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
+    .next()
+    .expect("Unable to get CircuitReady event")
+    .event_id();
+    let node_b_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
+        node_b
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+            .expect("Unable to get event client"),
+    )
+    .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
+    .next()
+    .expect("Unable to get CircuitReady event")
+    .event_id();
+    let mut node_c_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
+        node_c
+            .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+            .expect("Unable to get event client"),
+    )
+    .skip_while(|evt| evt.event_type() != &EventType::CircuitReady)
+    .next()
+    .expect("Unable to get CircuitReady event")
+    .event_id();
+
+    // Stop the second node in the network.
+    network = network.stop(1).expect("Unable to stop second node");
+    node_a = network.node(0).expect("Unable to get first node");
+
+    // Create disband request to be sent from the first node
+    let disband_payload = make_circuit_disband_payload(
+        &circuit_id,
+        node_a.node_id(),
+        &*node_a.admin_signer().clone_box(),
+    );
+    // Submit the `CircuitManagementPayload` to the first node
+    let res = node_a
+        .admin_service_client()
+        .submit_admin_payload(disband_payload);
+    assert!(res.is_ok());
+
+    // Restart the second node in the network
+    network = network.start(1).expect("Unable to start second node");
+    node_a = network.node(0).expect("Unable to get first node");
+    node_b = network.node(1).expect("Unable to get second node");
+    node_c = network.node(2).expect("Unable to get third node");
+
+    // We're creating a new event client, we will supply the `last_event_id` recorded. The last
+    // event seen was the `CircuitReady` event.
+    let mut node_a_event_client = node_a
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_a_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+    let node_b_event_client = node_b
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_b_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+    let mut node_c_event_client = node_c
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_c_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+
+    // Wait for the proposal event from each node.
+    let proposal_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let proposal_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let proposal_c_event = node_c_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    node_c_last_seen_event_id = *proposal_c_event.event_id();
+
+    assert_eq!(&EventType::ProposalSubmitted, proposal_a_event.event_type());
+    assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
+    assert_eq!(&EventType::ProposalSubmitted, proposal_c_event.event_type());
+    assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
+    assert_eq!(proposal_a_event.proposal(), proposal_c_event.proposal());
+    assert_eq!(&proposal_a_event.proposal().proposal_type, "Disband");
+
+    // Stop the third node
+    network = network.stop(2).expect("Unable to stop third node");
+    node_b = network.node(1).expect("Unable to get second node");
+
+    // Create `CircuitProposalVote` to accept the disband proposal
+    // Uses `true` for the `accept` argument to create a vote to accept the proposal
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_b_event.proposal().clone(),
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_b
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
+    assert!(res.is_ok());
+
+    // Restart the third node in the network
+    network = network.start(2).expect("Unable to start third node");
+    node_b = network.node(1).expect("Unable to get second node");
+    node_c = network.node(2).expect("Unable to get third node");
+    let node_b_admin_pubkey = admin_pubkey(node_b);
+
+    // Recreate the third node's event client as this node has been restarted since the previous
+    // event client was created.
+    node_c_event_client = node_c
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_c_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+
+    // Wait for the proposal vote event from each node.
+    let vote_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let vote_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let vote_c_event = node_c_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    node_a_last_seen_event_id = *vote_a_event.event_id();
+
+    assert_eq!(
+        &EventType::ProposalVote {
+            requester: node_b_admin_pubkey.clone()
+        },
+        vote_a_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalVote {
+            requester: node_b_admin_pubkey.clone()
+        },
+        vote_b_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalVote {
+            requester: node_b_admin_pubkey.clone()
+        },
+        vote_c_event.event_type(),
+    );
+    assert_eq!(vote_a_event.proposal(), vote_b_event.proposal());
+    assert_eq!(vote_a_event.proposal(), vote_c_event.proposal());
+
+    // Stop the first node in the network
+    network = network.stop(0).expect("Unable to stop first node");
+    node_c = network.node(2).expect("Unable to get third node");
+
+    // Create the `CircuitProposalVote` to be sent to a node
+    // Uses `false` for the `accept` argument to create a vote to reject the proposal
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_c_event.proposal().clone(),
+        node_c.node_id(),
+        &*node_c.admin_signer().clone_box(),
+        false,
+    );
+    let res = node_c
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
+    assert!(res.is_ok());
+
+    // Restart the first node in the network
+    network = network.start(0).expect("Unable to start first node");
+    node_a = network.node(0).expect("Unable to get first node");
+    node_b = network.node(1).expect("Unable to get second node");
+    node_c = network.node(2).expect("Unable to get third node");
+    let node_c_admin_pubkey = admin_pubkey(node_c);
+
+    // Recreate the first node's event client, as this node has been restarted
+    node_a_event_client = node_a
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(node_a_last_seen_event_id),
+        )
+        .expect("Unable to get event client");
+
+    let rejected_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let rejected_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let rejected_c_event = node_c_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    assert_eq!(
+        &EventType::ProposalRejected {
+            requester: node_c_admin_pubkey.clone()
+        },
+        rejected_a_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalRejected {
+            requester: node_c_admin_pubkey.clone()
+        },
+        rejected_b_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalRejected {
+            requester: node_c_admin_pubkey.clone()
+        },
+        rejected_c_event.event_type(),
+    );
+    assert_eq!(rejected_a_event.proposal(), rejected_b_event.proposal());
+    assert_eq!(rejected_a_event.proposal(), rejected_c_event.proposal());
+
+    let proposals_a = node_a
+        .admin_service_client()
+        .list_proposals(None, None)
+        .expect("Unable to list proposals from first node")
+        .data;
+    assert!(proposals_a.is_empty());
+    let proposals_b = node_b
+        .admin_service_client()
+        .list_proposals(None, None)
+        .expect("Unable to list proposals from second node")
+        .data;
+    assert!(proposals_b.is_empty());
+    let proposals_c = node_c
+        .admin_service_client()
+        .list_proposals(None, None)
+        .expect("Unable to list proposals from third node")
+        .data;
+    assert!(proposals_c.is_empty());
+
+    // Validate the active circuit is still available to each node
+    let active_circuits_a = node_a
+        .admin_service_client()
+        .list_circuits(None)
+        .expect("Unable to list circuits from first node")
+        .data;
+    assert!(active_circuits_a.len() == 1);
+
+    let active_circuits_b = node_b
+        .admin_service_client()
+        .list_circuits(None)
+        .expect("Unable to list circuits from second node")
+        .data;
+    assert!(active_circuits_b.len() == 1);
+
+    let active_circuits_c = node_c
+        .admin_service_client()
+        .list_circuits(None)
+        .expect("Unable to list circuits from third node")
+        .data;
+    assert!(active_circuits_c.len() == 1);
+
+    shutdown!(network).expect("Unable to shutdown network");
 }

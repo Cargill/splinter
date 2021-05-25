@@ -272,7 +272,10 @@ where
         let node_event_clients = nodes
             .iter()
             .map(|node| {
-                node.admin_service_event_client(&create_circuit_message.circuit_management_type)
+                node.admin_service_event_client(
+                    &create_circuit_message.circuit_management_type,
+                    None,
+                )
             })
             .collect::<Result<Vec<Box<dyn AdminServiceEventClient>>, InternalError>>()?;
 

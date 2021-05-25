@@ -159,6 +159,7 @@ impl RunnableNode {
                     format!("http://localhost:{}", rest_api_port),
                     "foo".to_string(),
                     "*".to_string(),
+                    None,
                 )
                 .map_err(|e| InternalError::from_source(Box::new(e)))?,
         );

@@ -54,6 +54,7 @@ impl AdminSubsystem {
         splinter_url: String,
         authorization: String,
         event_type: String,
+        last_event_id: Option<u64>,
     ) -> Result<Box<dyn AdminServiceEventClient>, InternalError> {
         match &self.admin_service_event_client_variant {
             AdminServiceEventClientVariant::ActixWebClient(reactor) => {
@@ -62,6 +63,7 @@ impl AdminSubsystem {
                     .with_splinter_url(splinter_url)
                     .with_event_type(event_type)
                     .with_authorization(authorization)
+                    .with_last_event_id(last_event_id)
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?
                     .run()
