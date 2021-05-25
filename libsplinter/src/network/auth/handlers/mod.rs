@@ -14,6 +14,9 @@
 
 mod v0_handlers;
 
+#[cfg(feature = "challenge-authorization")]
+use cylinder::Signer;
+
 use crate::network::auth::{
     AuthorizationAction, AuthorizationManagerStateMachine, AuthorizationMessageSender,
     AuthorizationState,
@@ -39,6 +42,7 @@ use self::v0_handlers::{
 /// The identity provided is sent to connections for Trust authorizations.
 pub fn create_authorization_dispatcher(
     identity: String,
+    #[cfg(feature = "challenge-authorization")] _signers: Vec<Box<dyn Signer>>,
     auth_manager: AuthorizationManagerStateMachine,
     auth_msg_sender: impl MessageSender<ConnectionId> + Clone + 'static,
 ) -> Dispatcher<NetworkMessageType, ConnectionId> {

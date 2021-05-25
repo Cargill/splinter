@@ -321,8 +321,13 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        let dispatcher =
-            create_authorization_dispatcher("mock_identity".into(), auth_mgr, dispatch_sender);
+        let dispatcher = create_authorization_dispatcher(
+            "mock_identity".into(),
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+            auth_mgr,
+            dispatch_sender,
+        );
 
         let connection_id = "test_connection".to_string();
         let mut msg = authorization::ConnectRequest::new();
@@ -380,8 +385,13 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        let dispatcher =
-            create_authorization_dispatcher("mock_identity".into(), auth_mgr, dispatch_sender);
+        let dispatcher = create_authorization_dispatcher(
+            "mock_identity".into(),
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+            auth_mgr,
+            dispatch_sender,
+        );
         let connection_id = "test_connection".to_string();
         let mut msg = authorization::ConnectResponse::new();
         msg.set_accepted_authorization_types(
@@ -424,8 +434,13 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        let dispatcher =
-            create_authorization_dispatcher("mock_identity".into(), auth_mgr, dispatch_sender);
+        let dispatcher = create_authorization_dispatcher(
+            "mock_identity".into(),
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+            auth_mgr,
+            dispatch_sender,
+        );
         let connection_id = "test_connection".to_string();
         // Begin the connection process, otherwise, the response will fail
         let mut msg = authorization::ConnectRequest::new();
