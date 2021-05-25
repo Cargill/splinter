@@ -20,11 +20,28 @@ mod resources;
 
 use crate::biome::OAuthUserSessionStore;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
+#[cfg(all(
+    feature = "authorization",
+    feature = "rest-api-actix",
+    feature = "oauth-user-list"
+))]
+use crate::rest_api::auth::authorization::Permission;
 
 #[cfg(feature = "biome-profile")]
 use crate::biome::UserProfileStore;
 
 use super::OAuthClient;
+
+#[cfg(all(
+    feature = "authorization",
+    feature = "rest-api-actix",
+    feature = "oauth-user-list"
+))]
+const OAUTH_USER_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "oauth.users.read",
+    permission_display_name: "OAuth Users read",
+    permission_description: "Allows the client to read OAuth users",
+};
 
 /// Provides the REST API [Resource](../../../rest_api/struct.Resource.html) definitions for OAuth
 /// endpoints. The following endpoints are provided:
