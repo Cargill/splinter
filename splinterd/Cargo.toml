@@ -86,6 +86,7 @@ default = [
 stable = [
     "authorization",
     "authorization-handler-allow-keys",
+    "authorization-handler-rbac",
     "default",
     "rest-api-cors",
 ]
@@ -95,7 +96,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization-handler-maintenance",
-    "authorization-handler-rbac",
     "biome-profile",
     "challenge-authorization",
     "health-service",
