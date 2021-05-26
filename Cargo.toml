@@ -38,7 +38,7 @@ cylinder = { version = "0.2.2", features = ["jwt", "key-load"], optional = true 
 flexi_logger = "0.17"
 hex = { version = "0.4", optional = true }
 log = "0.4"
-protobuf = { version = "2.19", optional = true }
+protobuf = { version = "2.23", optional = true }
 rand = { version = "0.8", optional = true }
 reqwest = { version = "0.11", features = ["blocking"], optional = true}
 serde = { version = "1.0", features = ["derive"], optional = true }
