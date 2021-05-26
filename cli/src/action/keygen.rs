@@ -33,6 +33,7 @@ use super::{chown, Action};
 const SYSTEM_KEY_PATH: &str = "/etc/splinter/keys";
 const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
 const CONFIG_DIR_ENV: &str = "SPLINTER_CONFIG_DIR";
+const DEFAULT_SYSTEM_KEY_NAME: &str = "splinterd";
 
 pub struct KeyGenAction;
 
@@ -43,7 +44,13 @@ impl Action for KeyGenAction {
         let key_name = args
             .value_of("key-name")
             .map(String::from)
-            .unwrap_or_else(whoami::username);
+            .unwrap_or_else(|| {
+                if args.is_present("system") {
+                    DEFAULT_SYSTEM_KEY_NAME.to_string()
+                } else {
+                    whoami::username()
+                }
+            });
 
         let key_dir = if let Some(dir) = args.value_of("key_dir") {
             PathBuf::from(dir)
