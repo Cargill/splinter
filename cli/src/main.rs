@@ -951,6 +951,29 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
     }
 
+    #[cfg(feature = "upgrade")]
+    {
+        app = app.subcommand(
+            SubCommand::with_name("upgrade")
+                .about("Upgrade splinter by importing YAML state files to a database")
+                .arg(
+                    Arg::with_name("state_dir")
+                        .value_name("state-dir")
+                        .long("state-dir")
+                        .short("S")
+                        .takes_value(true)
+                        .help("State directory for splinterd"),
+                )
+                .arg(
+                    Arg::with_name("connect")
+                        .short("C")
+                        .long("connect")
+                        .takes_value(true)
+                        .help("Database connection URI"),
+                ),
+        );
+    }
+
     #[cfg(feature = "authorization-handler-maintenance")]
     {
         app = app.subcommand(
@@ -1627,6 +1650,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             "database",
             SubcommandActions::new().with_command("migrate", database::MigrateAction),
         )
+    }
+
+    #[cfg(feature = "upgrade")]
+    {
+        use action::database;
+        subcommands = subcommands.with_command("upgrade", database::ImportFromYamlAction);
     }
 
     #[cfg(feature = "authorization-handler-maintenance")]

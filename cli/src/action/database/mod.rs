@@ -27,16 +27,18 @@ use diesel::{connection::Connection as _, pg::PgConnection};
 
 use splinter::migrations::run_postgres_migrations;
 
-use crate::error::CliError;
-
 #[cfg(feature = "sqlite")]
 use self::sqlite::{get_default_database, sqlite_migrations};
+#[cfg(feature = "upgrade")]
+pub use self::upgrade::ImportFromYamlAction;
+use crate::error::CliError;
 
 use super::Action;
 
 const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
 const SPLINTER_STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
 const DEFAULT_STATE_DIR: &str = "/var/lib/splinter";
+
 pub struct MigrateAction;
 
 impl Action for MigrateAction {
