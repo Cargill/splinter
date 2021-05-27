@@ -5,6 +5,9 @@ on:
     tags:
       - 'v0.4.*'
 
+env:
+  slack-channel: 'alerts'
+
 jobs:
 
   unit_test_splinter:
@@ -53,6 +56,14 @@ jobs:
           VERSION: AUTO_STRICT
           CARGO_TERM_COLOR: always
 
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   publish_to_crates:
     needs: unit_test_splinter
@@ -71,3 +82,12 @@ jobs:
         run: |
           git fetch --tags --force
           CARGO_TOKEN=${{ secrets.CARGO_TOKEN }} ./ci/publish-crates
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

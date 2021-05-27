@@ -7,6 +7,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  slack-channel: 'alerts'
 
 concurrency:
   group: "${{ github.ref }}-${{ github.workflow }}"
@@ -28,6 +29,15 @@ jobs:
       - name: Lint Gameroom Client
         run: just ci-lint-client
 
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   lint_splinter:
     runs-on: ubuntu-18.04
     steps:
@@ -41,6 +51,15 @@ jobs:
 
       - name: Run Lint/Clippy on Splinter
         run: just ci-lint-splinter
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   unit_test_splinter:
     runs-on: ubuntu-18.04
@@ -56,6 +75,15 @@ jobs:
       - name: Unit Test Splinter
         run: just ci-test
 
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   gameroom_tests:
     runs-on: ubuntu-18.04
     steps:
@@ -70,6 +98,15 @@ jobs:
       - name: Gameroom Tests
         run: just ci-test-gameroom
 
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   gameroom_ui_tests:
     runs-on: ubuntu-18.04
     steps:
@@ -83,3 +120,12 @@ jobs:
 
       - name: Gameroom UI Tests
         run: just ci-test-gameroom-ui
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
