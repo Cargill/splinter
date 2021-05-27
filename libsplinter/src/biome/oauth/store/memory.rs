@@ -23,6 +23,8 @@ use crate::error::{
     InvalidStateError,
 };
 
+#[cfg(feature = "oauth-user-list")]
+use super::OAuthUserIter;
 use super::{
     InsertableOAuthUserSession, OAuthUser, OAuthUserSession, OAuthUserSessionStore,
     OAuthUserSessionStoreError,
@@ -184,6 +186,19 @@ impl OAuthUserSessionStore for MemoryOAuthUserSessionStore {
             .users
             .get(subject)
             .cloned())
+    }
+
+    #[cfg(feature = "oauth-user-list")]
+    fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
+        let internal = self.internal.lock().map_err(|_| {
+            OAuthUserSessionStoreError::Internal(InternalError::with_message(
+                "Cannot access OAuth user session store: mutex lock poisoned".to_string(),
+            ))
+        })?;
+
+        let users = internal.users.values().cloned().collect::<Vec<OAuthUser>>();
+
+        Ok(OAuthUserIter::new(users))
     }
 
     fn clone_box(&self) -> Box<dyn OAuthUserSessionStore> {

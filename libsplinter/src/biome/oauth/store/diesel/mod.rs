@@ -20,11 +20,15 @@ pub(in crate::biome) mod schema;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
+#[cfg(feature = "oauth-user-list")]
+use super::OAuthUserIter;
 use super::{
     InsertableOAuthUserSession, OAuthUser, OAuthUserSession, OAuthUserSessionStore,
     OAuthUserSessionStoreError,
 };
 
+#[cfg(feature = "oauth-user-list")]
+use operations::list_users::OAuthUserSessionStoreListUsers as _;
 use operations::{
     add_session::OAuthUserSessionStoreAddSession as _,
     get_session::OAuthUserSessionStoreGetSession as _, get_user::OAuthUserSessionStoreGetUser as _,
@@ -82,6 +86,12 @@ impl OAuthUserSessionStore for DieselOAuthUserSessionStore<diesel::sqlite::Sqlit
         OAuthUserSessionStoreOperations::new(&*connection).get_user(subject)
     }
 
+    #[cfg(feature = "oauth-user-list")]
+    fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
+        let connection = self.connection_pool.get()?;
+        OAuthUserSessionStoreOperations::new(&*connection).list_users()
+    }
+
     fn clone_box(&self) -> Box<dyn OAuthUserSessionStore> {
         Box::new(Self {
             connection_pool: self.connection_pool.clone(),
@@ -126,6 +136,12 @@ impl OAuthUserSessionStore for DieselOAuthUserSessionStore<diesel::pg::PgConnect
     fn get_user(&self, subject: &str) -> Result<Option<OAuthUser>, OAuthUserSessionStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserSessionStoreOperations::new(&*connection).get_user(subject)
+    }
+
+    #[cfg(feature = "oauth-user-list")]
+    fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
+        let connection = self.connection_pool.get()?;
+        OAuthUserSessionStoreOperations::new(&*connection).list_users()
     }
 
     fn clone_box(&self) -> Box<dyn OAuthUserSessionStore> {
@@ -457,6 +473,109 @@ pub mod tests {
         );
         assert_eq!(stored_session2.user().subject(), subject);
         assert_eq!(stored_session2.oauth_access_token(), oauth_access_token2);
+    }
+
+    #[cfg(feature = "oauth-user-list")]
+    /// Verify that a SQLite-backed `DieselOAuthUserSessionStore` correctly supports inserting and
+    /// and listing OAuth users.
+    ///
+    /// 1. Create a connection pool for an in-memory SQLite database and run migrations.
+    /// 2. Create a `DieselOAuthUserSessionStore`.
+    /// 3. Add an OAuth user session.
+    /// 4. Verify that the `list_users` method returns the OAuth user that matches the subject of
+    ///    the OAuth session.
+    /// 5. Add a new session for the same subject and verify that the `list_users` method returns
+    ///    the same user data as before.
+    /// 6. Add an OAuth user session for a different user subject
+    /// 7. Verify that the list_users method returns both OAuth users, matching the subject of both
+    ///    the OAuth sessions.
+    /// 8. Delete all sessions and verify that the `list_users` method still returns the users.
+    #[test]
+    fn sqlite_list_users() {
+        let pool = create_connection_pool_and_migrate();
+
+        let oauth_user_session_store = DieselOAuthUserSessionStore::new(pool);
+
+        // Create an initial session for the first user
+        let splinter_access_token1 = "splinter_access_token1";
+        let subject = "subject";
+        let session1 = InsertableOAuthUserSessionBuilder::new()
+            .with_splinter_access_token(splinter_access_token1.into())
+            .with_subject(subject.into())
+            .with_oauth_access_token("oauth_access_token1".into())
+            .build()
+            .expect("Unable to build session1");
+        oauth_user_session_store
+            .add_session(session1)
+            .expect("Unable to add session1");
+
+        let users = oauth_user_session_store
+            .list_users()
+            .expect("Unable to list users")
+            .collect::<Vec<OAuthUser>>();
+        assert_eq!(users.len(), 1);
+        let user = users.get(0).expect("Unable to get user");
+        assert_eq!(user.subject(), subject);
+
+        // Create another session for the same user
+        let splinter_access_token2 = "splinter_access_token2";
+        let session2 = InsertableOAuthUserSessionBuilder::new()
+            .with_splinter_access_token(splinter_access_token2.into())
+            .with_subject(subject.into())
+            .with_oauth_access_token("oauth_access_token2".into())
+            .build()
+            .expect("Unable to build session2");
+        oauth_user_session_store
+            .add_session(session2)
+            .expect("Unable to add session2");
+
+        let users = oauth_user_session_store
+            .list_users()
+            .expect("Unable to list users")
+            .collect::<Vec<OAuthUser>>();
+
+        assert_eq!(users.len(), 1);
+        let first_user = users.get(0).expect("Unable to get user");
+        assert_eq!(first_user.subject(), subject);
+
+        // Create a session for a second user
+        let splinter_access_token3 = "splinter_access_token3";
+        let second_subject = "second_subject";
+        let session3 = InsertableOAuthUserSessionBuilder::new()
+            .with_splinter_access_token(splinter_access_token3.into())
+            .with_subject(second_subject.into())
+            .with_oauth_access_token("oauth_access_token3".into())
+            .build()
+            .expect("Unable to build session3");
+        oauth_user_session_store
+            .add_session(session3)
+            .expect("Unable to add session3");
+
+        let users = oauth_user_session_store
+            .list_users()
+            .expect("Unable to list users")
+            .collect::<Vec<OAuthUser>>();
+        assert_eq!(users.len(), 2);
+        let user = users.get(0).expect("Unable to get user");
+        assert_eq!(user.subject(), subject);
+        let second_user = users.get(1).expect("Unable to get user");
+        assert_eq!(second_user.subject(), second_subject);
+
+        oauth_user_session_store
+            .remove_session(splinter_access_token1)
+            .expect("Unable to remove session1");
+        oauth_user_session_store
+            .remove_session(splinter_access_token2)
+            .expect("Unable to remove session2");
+        oauth_user_session_store
+            .remove_session(splinter_access_token3)
+            .expect("Unable to remove session3");
+
+        let users = oauth_user_session_store
+            .list_users()
+            .expect("Unable to list users")
+            .collect::<Vec<OAuthUser>>();
+        assert_eq!(users.len(), 2);
     }
 
     /// Creates a connection pool for an in-memory SQLite database with only a single connection

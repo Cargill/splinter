@@ -17,6 +17,8 @@
 pub(super) mod add_session;
 pub(super) mod get_session;
 pub(super) mod get_user;
+#[cfg(feature = "oauth-user-list")]
+pub(super) mod list_users;
 pub(super) mod remove_session;
 pub(super) mod update_session;
 
