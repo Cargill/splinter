@@ -1,5 +1,47 @@
 # Release Notes
 
+## Changes in Splinter 0.5.5
+
+### Highlights
+
+* The `admin/circuit` route now returns a list of nodes in the member list
+  instead of just the node id if the `SplinterProtocolVersion` is set to 2.
+  This is a breaking change from previous versions.
+
+* Stabilized `authorization-handler-rbac` feature.  This enables authorizing
+  REST API users via a role-based access control system in stable builds.
+
+### libsplinter
+
+* Stabilized `authorization-handler-rbac` feature.
+
+* Update admin REST API to return the nodes in the circuit member list. The
+  nodes will include a public key if the `challenge-authorization` experimental
+  feature is enabled.
+
+* Add a method to the `OAuthUserSessionStore` to list OAuth users. This is
+  available if the `oauth-user-list` experimental feature is enabled.
+
+### splinter CLI
+
+* Add experimental feature `challenge-authorization` to the splinter CLI
+
+* Add an option to give node's public keys in the `circuit propose` command.
+  The public keys will be used during challenge authorization. This is behind
+  the experimental feature `challenge-authorization`.
+
+* Add `challenge` as an option to the `--auth-type` option on `circuit propose`
+  command. This is behind the experimental feature `challenge-authorization`.
+
+### splinterd
+
+* Stabilized `authorization-handler-rbac` feature.
+
+* Add experimental feature `challenge-authorization` to splinterd.
+
+* Add integration tests for the process of disbanding a circuit, while nodes
+  are stopped throughout the process.
+
 ## Changes in Splinter 0.5.4
 
 ### Highlights
