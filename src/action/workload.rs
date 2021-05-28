@@ -55,7 +55,7 @@ impl Action for WorkloadAction {
 
         let rate = args.value_of("target_rate").unwrap_or("1").to_string();
 
-        let (min, max): (u32, u32) = {
+        let (min, max): (f32, f32) = {
             if rate.contains('-') {
                 let split_rate: Vec<String> = rate.split('-').map(String::from).collect();
                 let min = split_rate
@@ -173,8 +173,8 @@ impl Action for WorkloadAction {
 fn start_smallbank_workloads(
     workload_runner: &mut WorkloadRunner,
     targets: Vec<Vec<String>>,
-    target_rate_min: u32,
-    target_rate_max: u32,
+    target_rate_min: f32,
+    target_rate_max: f32,
     auth: String,
     signer: Box<dyn Signer>,
     update: u32,
@@ -189,7 +189,7 @@ fn start_smallbank_workloads(
             SmallbankTransactionWorkload::new(smallbank_generator, signer.clone());
         let smallbank_workload = SmallbankBatchWorkload::new(transaction_workload, signer.clone());
 
-        let rate = if target_rate_min == target_rate_max {
+        let rate = if (target_rate_min - target_rate_max).abs() < f32::EPSILON {
             target_rate_min
         } else {
             rng.gen_range(target_rate_min..=target_rate_max)
@@ -199,7 +199,7 @@ fn start_smallbank_workloads(
             "Starting Smallbank-Workload-{} with target rate {}",
             i, rate
         );
-        let time_to_wait = std::time::Duration::from_secs(1) / rate;
+        let time_to_wait = std::time::Duration::from_secs(1).div_f32(rate);
         workload_runner
             .add_workload(
                 format!("Smallbank-Workload-{}", i),
@@ -219,8 +219,8 @@ fn start_smallbank_workloads(
 fn start_command_workloads(
     workload_runner: &mut WorkloadRunner,
     targets: Vec<Vec<String>>,
-    target_rate_min: u32,
-    target_rate_max: u32,
+    target_rate_min: f32,
+    target_rate_max: f32,
     auth: String,
     signer: Box<dyn Signer>,
     update: u32,
@@ -234,7 +234,7 @@ fn start_command_workloads(
             CommandTransactionWorkload::new(command_generator, signer.clone());
         let command_workload = CommandBatchWorkload::new(transaction_workload, signer.clone());
 
-        let rate = if target_rate_min == target_rate_max {
+        let rate = if (target_rate_min - target_rate_max).abs() < f32::EPSILON {
             target_rate_min
         } else {
             rng.gen_range(target_rate_min..=target_rate_max)
@@ -242,7 +242,7 @@ fn start_command_workloads(
 
         info!("Starting Command-Workload-{} with target rate {}", i, rate);
 
-        let time_to_wait = std::time::Duration::from_secs(1) / rate;
+        let time_to_wait = std::time::Duration::from_secs(1).div_f32(rate);
         workload_runner
             .add_workload(
                 format!("Command-Workload-{}", i),

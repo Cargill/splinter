@@ -203,13 +203,13 @@ impl Action for SubmitPlaylistAction {
             .ok_or_else(|| CliError::ActionError("'key' is required".into()))?;
         let (auth, _) = create_cylinder_jwt_auth_signer_key(key_path)?;
 
-        let rate: u32 = args
+        let rate: f32 = args
             .value_of("rate")
             .unwrap_or(DEFAULT_RATE)
             .parse()
             .map_err(|_| CliError::ActionError("Unable to parse provided rate".into()))?;
 
-        if rate == 0 {
+        if rate <= 0.0 {
             return Err(CliError::ActionError(
                 "rate must be a number greater than 0".to_string(),
             ));
@@ -235,7 +235,7 @@ impl Action for SubmitPlaylistAction {
             .map_err(|_| CliError::ActionError("Unable to parse provided update time".into()))?;
 
         let target_vec: Vec<String> = target.split(';').map(String::from).collect();
-        let time_to_wait = std::time::Duration::from_secs(1) / rate;
+        let time_to_wait = std::time::Duration::from_secs(1).div_f32(rate);
         submit_batches_from_source(
             &mut in_file,
             input.to_string(),
