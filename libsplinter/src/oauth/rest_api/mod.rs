@@ -83,6 +83,10 @@ impl OAuthResourceProvider {
 /// * `GET /oauth/callback` - Receive the authorization code from the provider
 /// * `GET /oauth/logout` - Remove the user's access and refresh tokens
 ///
+/// The following endpoint is only available if the `oauth-user-list` feature is enabled:
+///
+/// * `GET` /oauth/users` - Get a list of the OAuth users
+///
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///
 /// * `rest-api-actix`
@@ -104,6 +108,12 @@ impl RestResourceProvider for OAuthResourceProvider {
                     self.user_profile_store.clone(),
                 ),
                 actix::logout::make_logout_route(self.oauth_user_session_store.clone()),
+            ]);
+            #[cfg(feature = "oauth-user-list")]
+            resources.append(&mut vec![
+                actix::list_users::make_oauth_list_users_resource(
+                    self.oauth_user_session_store.clone(),
+                ),
             ]);
         }
 
