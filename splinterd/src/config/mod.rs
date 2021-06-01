@@ -830,7 +830,7 @@ mod tests {
     static EXAMPLE_TLS_CERT_DIR: &str = "test/certs/";
 
     /// Values present in the example config TEST_TOML file.
-    static EXAMPLE_STORAGE: &str = "yaml";
+    static EXAMPLE_STORAGE: &str = "memory";
     static EXAMPLE_CA_CERTS: &str = "ca.pem";
     static EXAMPLE_CLIENT_CERT: &str = "client.crt";
     static EXAMPLE_CLIENT_KEY: &str = "private/client.key";

@@ -16,6 +16,8 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
+#[cfg(feature = "deprecate-yaml")]
+use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc::channel, Arc};
@@ -32,6 +34,7 @@ use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService, AdminServiceBuilder};
+#[cfg(not(feature = "deprecate-yaml"))]
 use splinter::admin::store::yaml::YamlAdminServiceStore;
 #[cfg(feature = "biome-credentials")]
 use splinter::biome::credentials::rest_api::BiomeCredentialsRestResourceProviderBuilder;
@@ -163,11 +166,48 @@ impl SplinterDaemon {
 
         let store_factory = create_store_factory(&self.db_url)?;
 
+        #[cfg(feature = "deprecate-yaml")]
+        {
+            let circuits_location = Path::new(&self.state_dir).join("circuits.yaml");
+            let proposals_location = Path::new(&self.state_dir).join("circuit_proposals.yaml");
+
+            let circuits_location_exists = circuits_location.exists();
+            let proposals_location_exists = circuits_location.exists();
+
+            if circuits_location_exists || proposals_location_exists {
+                if circuits_location_exists {
+                    error!(
+                        "Found outdated circuit state file: {}",
+                        fs::canonicalize(&circuits_location)
+                            .unwrap_or(circuits_location)
+                            .to_string_lossy()
+                    );
+                }
+
+                if proposals_location_exists {
+                    error!(
+                        "Found outdated proposals state file: {}",
+                        fs::canonicalize(&proposals_location)
+                            .unwrap_or(proposals_location)
+                            .to_string_lossy()
+                    );
+                }
+
+                return Err(StartError::StorageError(format!(
+                    "Run the `splinter upgrade` command to update outdated state files to
+                        a Splinter {}.{} database",
+                    env!("CARGO_PKG_VERSION_MAJOR", "unknown"),
+                    env!("CARGO_PKG_VERSION_MINOR", "unknown")
+                )));
+            }
+        }
+
         let admin_service_store = {
             if let Some(storage) = &self.storage_type {
                 // Get state from the configured storage type and state directory, then
                 // create the new AdminServiceStore
                 match &storage as &str {
+                    #[cfg(not(feature = "deprecate-yaml"))]
                     "yaml" => {
                         let circuits_location = Path::new(&self.state_dir)
                             .join("circuits.yaml")
