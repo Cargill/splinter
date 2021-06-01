@@ -89,7 +89,7 @@ health = []
 
 https-certs = []
 permissions = []
-proposal-removal = ["splinter/proposal-removal"]
+proposal-removal = []
 
 database = ["diesel"]
 postgres = [

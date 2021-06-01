@@ -128,7 +128,6 @@ experimental = [
     "metrics",
     "oauth-profile",
     "oauth-user-list",
-    "proposal-removal",
     "registry-client",
     "registry-client-reqwest",
     "rest-api-actix-web-3",
@@ -173,7 +172,6 @@ oauth = ["biome", "oauth2", "reqwest", "rest-api"]
 oauth-profile = ["base64"]
 oauth-user-list = ["oauth"]
 postgres = ["diesel/postgres", "diesel_migrations"]
-proposal-removal = []
 registry = []
 registry-client = ["registry"]
 registry-client-reqwest = ["registry-client", "reqwest"]

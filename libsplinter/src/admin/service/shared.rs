@@ -35,15 +35,13 @@ use crate::peer::{PeerManagerConnector, PeerRef};
 use crate::protocol::{
     ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION, CIRCUIT_PROTOCOL_VERSION,
 };
-#[cfg(feature = "proposal-removal")]
-use crate::protos::admin::RemovedProposal;
 use crate::protos::admin::{
     AbandonedCircuit, AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header, CircuitProposal,
     CircuitProposalVote, CircuitProposalVote_Vote, CircuitProposal_ProposalType,
     Circuit_AuthorizationType, Circuit_CircuitStatus, Circuit_DurabilityType,
-    Circuit_PersistenceType, Circuit_RouteType, MemberReady, ServiceProtocolVersionRequest,
-    SplinterNode, SplinterService,
+    Circuit_PersistenceType, Circuit_RouteType, MemberReady, RemovedProposal,
+    ServiceProtocolVersionRequest, SplinterNode, SplinterService,
 };
 use crate::service::error::ServiceError;
 #[cfg(feature = "service-arg-validation")]
@@ -1032,7 +1030,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "proposal-removal")]
     /// Locally remove a Circuit Proposal that has been committed. A message is sent to the
     /// circuit proposal members that the proposal is being removed locally. Once the proposal
     /// has been removed from the admin store, the peer refs created for this proposal are also
@@ -1389,7 +1386,6 @@ impl AdminServiceShared {
 
                 self.abandon_circuit(circuit_id)
             }
-            #[cfg(feature = "proposal-removal")]
             CircuitManagementPayload_Action::PROPOSAL_REMOVE_REQUEST => {
                 let signer_public_key = header.get_requester();
                 let requester_node_id = header.get_requester_node_id();
@@ -2706,7 +2702,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "proposal-removal")]
     /// Validate a `ProposalRemoveRequest` payload by the following:
     ///
     /// - Validate the protocol version used by the submitter node. Currently, removing a proposal
@@ -6645,7 +6640,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "proposal-removal")]
     /// Tests that a request to remove a circuit proposal is validated correctly
     ///
     /// 1. Set up `AdminServiceShared`
@@ -6700,7 +6694,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "proposal-removal")]
     /// Tests that a request to remove a circuit proposal returns an error if the proposal does
     /// not exist.
     ///
@@ -6745,7 +6738,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "proposal-removal")]
     /// Tests that a request to remove a circuit proposal returns an error if the circuit proposal
     /// has a circuit version less than the `CIRCUIT_PROTOCOL_VERSION`.
     ///
@@ -6801,7 +6793,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "proposal-removal")]
     /// Tests that a request to remove a circuit proposal returns an error if the request does not
     /// come from the local node.
     ///
@@ -6856,7 +6847,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "proposal-removal")]
     /// Tests that a request to remove a circuit proposal returns an error if the admin service
     /// used has an invalid protocol version.
     ///
@@ -6905,7 +6895,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "proposal-removal")]
     /// Tests that a request to remove a circuit proposal returns an error if the requester is not
     /// permitted for the admin service.
     ///
@@ -6959,7 +6948,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "proposal-removal")]
     /// Tests that a `ProposalRemoveRequest` submitted to the admin service will result as expected,
     /// removing the indicated circuit proposa.
     ///
