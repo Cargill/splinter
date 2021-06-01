@@ -209,8 +209,12 @@ impl RunnableNetworkSubsystem {
         // Set up Authorization
         let inproc_authorizer = InprocAuthorizer::new(inproc_ids);
 
-        let authorization_manager = AuthorizationManager::new(node_id.to_string())
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let authorization_manager = AuthorizationManager::new(
+            node_id.to_string(),
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+        )
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         let mut authorizers = Authorizers::new();
         authorizers.add_authorizer("inproc", inproc_authorizer);

@@ -25,6 +25,8 @@ mod error;
 mod routes;
 mod transport;
 
+#[cfg(feature = "challenge-authorization")]
+use cylinder::{load_key_from_path, secp256k1::Secp256k1Context, Context, Signer};
 use flexi_logger::{style, DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
 use rand::{thread_rng, Rng};
@@ -40,6 +42,8 @@ use clap::{clap_app, crate_version};
 use clap::{Arg, ArgMatches};
 
 use std::env;
+#[cfg(feature = "challenge-authorization")]
+use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
@@ -140,6 +144,46 @@ fn find_node_id(config: &Config) -> Result<String, UserError> {
         // Continue with node_id
         Ok(node_id)
     }
+}
+
+// load all signing keys from the configured splinterd key file
+#[cfg(feature = "challenge-authorization")]
+fn load_signer_keys(config_dir: &str) -> Result<Vec<Box<dyn Signer>>, UserError> {
+    let splinterd_key_path = Path::new(config_dir).join("keys");
+    let paths = match fs::read_dir(splinterd_key_path) {
+        Ok(paths) => paths,
+        Err(err) => {
+            warn!(
+                "Starting daemon with no signing keys, \
+                unable to read splinterd keys directory: {}",
+                err
+            );
+            return Ok(vec![]);
+        }
+    };
+
+    let mut signing_keys = vec![];
+    for path in paths {
+        let path = path
+            .map_err(|err| {
+                UserError::io_err_with_source(
+                    &format!("Unable to get keys in path {}/keys", config_dir),
+                    Box::new(err),
+                )
+            })?
+            .path();
+
+        if path.extension() == Some(OsStr::new("priv")) {
+            let private_key = load_key_from_path(&path).map_err(UserError::KeyLoadError)?;
+            signing_keys.push(Secp256k1Context::new().new_signer(private_key));
+        }
+    }
+
+    if signing_keys.is_empty() {
+        warn!("Starting daemon with no signing keys");
+    }
+
+    Ok(signing_keys)
 }
 
 // format for logs
@@ -616,6 +660,12 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
             .with_oauth_openid_url(config.oauth_openid_url().map(ToOwned::to_owned))
             .with_oauth_openid_auth_params(config.oauth_openid_auth_params().map(ToOwned::to_owned))
             .with_oauth_openid_scopes(config.oauth_openid_scopes().map(ToOwned::to_owned));
+    }
+
+    #[cfg(feature = "challenge-authorization")]
+    {
+        let signers = load_signer_keys(config.config_dir())?;
+        daemon_builder = daemon_builder.with_signers(signers);
     }
 
     let mut node = daemon_builder.build().map_err(|err| {

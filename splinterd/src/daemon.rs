@@ -22,7 +22,9 @@ use std::sync::{mpsc::channel, Arc};
 use std::thread;
 use std::time::Duration;
 
-use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
+#[cfg(feature = "challenge-authorization")]
+use cylinder::Signer;
+use cylinder::{secp256k1::Secp256k1Context, Context};
 #[cfg(feature = "health-service")]
 use health::HealthService;
 #[cfg(feature = "service-arg-validation")]
@@ -147,6 +149,8 @@ pub struct SplinterDaemon {
     oauth_openid_scopes: Option<Vec<String>>,
     heartbeat: u64,
     strict_ref_counts: bool,
+    #[cfg(feature = "challenge-authorization")]
+    signers: Vec<Box<dyn Signer>>,
 }
 
 impl SplinterDaemon {
@@ -250,10 +254,14 @@ impl SplinterDaemon {
         ];
 
         info!("Starting SpinterNode with ID {}", self.node_id);
-        let authorization_manager =
-            AuthorizationManager::new(self.node_id.clone()).map_err(|err| {
-                StartError::NetworkError(format!("Unable to create authorization manager: {}", err))
-            })?;
+        let authorization_manager = AuthorizationManager::new(
+            self.node_id.clone(),
+            #[cfg(feature = "challenge-authorization")]
+            self.signers.clone(),
+        )
+        .map_err(|err| {
+            StartError::NetworkError(format!("Unable to create authorization manager: {}", err))
+        })?;
 
         // Allowing unused_mut because inproc_ids must be mutable if feature health is enabled
         #[allow(unused_mut)]
@@ -1033,6 +1041,8 @@ pub struct SplinterDaemonBuilder {
     #[cfg(feature = "oauth")]
     oauth_openid_scopes: Option<Vec<String>>,
     strict_ref_counts: Option<bool>,
+    #[cfg(feature = "challenge-authorization")]
+    signers: Option<Vec<Box<dyn Signer>>>,
 }
 
 impl SplinterDaemonBuilder {
@@ -1193,6 +1203,12 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "challenge-authorization")]
+    pub fn with_signers(mut self, value: Vec<Box<dyn Signer>>) -> Self {
+        self.signers = Some(value);
+        self
+    }
+
     pub fn build(self) -> Result<SplinterDaemon, CreateError> {
         let heartbeat = self.heartbeat.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
@@ -1272,6 +1288,12 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: strict_ref_counts".to_string())
         })?;
 
+        #[cfg(feature = "challenge-authorization")]
+        let signers = self.signers.unwrap_or_else(|| {
+            warn!("Starting daemon with no signing keys");
+            vec![]
+        });
+
         Ok(SplinterDaemon {
             #[cfg(feature = "authorization-handler-allow-keys")]
             config_dir,
@@ -1313,6 +1335,8 @@ impl SplinterDaemonBuilder {
             oauth_openid_scopes: self.oauth_openid_scopes,
             heartbeat,
             strict_ref_counts,
+            #[cfg(feature = "challenge-authorization")]
+            signers,
         })
     }
 }

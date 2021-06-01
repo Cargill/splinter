@@ -37,7 +37,7 @@ bytes = "0.4"
 clap = "2.32"
 crossbeam-channel = "0.3"
 ctrlc = "3.0"
-cylinder = "0.2"
+cylinder = "0.2.2"
 flexi_logger = "0.14"
 health = { path = "../services/health", optional = true }
 log = "0.4"
@@ -124,7 +124,10 @@ authorization-handler-rbac = [
 biome-credentials = ["splinter/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management"]
 biome-profile = ["splinter/biome-profile", "splinter/oauth-profile"]
-challenge-authorization = ["splinter/challenge-authorization"]
+challenge-authorization = [
+  "cylinder/key-load",
+  "splinter/challenge-authorization"
+]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
 health-service = ["health"]

@@ -194,7 +194,11 @@ impl ServiceConnectionManager {
     /// # use splinter::transport::inproc::InprocTransport;
     /// # let transport = InprocTransport::default();
     /// # let mesh = Mesh::new(1, 1);
-    /// # let auth_mgr = AuthorizationManager::new("test_identity".into()).unwrap();
+    /// # let auth_mgr = AuthorizationManager::new(
+    /// #   "test_identity".into(),
+    /// #    #[cfg(feature = "challenge-authorization")]
+    /// #    vec![],
+    /// # ).unwrap();
     /// # let authorizer: Box<dyn Authorizer + Send> = Box::new(auth_mgr.authorization_connector());
     /// let mut cm = ConnectionManager::builder()
     ///     .with_authorizer(authorizer)

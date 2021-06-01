@@ -20,6 +20,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 
+#[cfg(feature = "challenge-authorization")]
+use cylinder::Signer;
 use protobuf::Message;
 
 use crate::protocol::authorization::{AuthorizationMessage, ConnectRequest};
@@ -115,13 +117,18 @@ impl fmt::Display for AuthorizationManagerError {
 /// Manages authorization states for connections on a network.
 pub struct AuthorizationManager {
     local_identity: String,
+    #[cfg(feature = "challenge-authorization")]
+    signers: Vec<Box<dyn Signer>>,
     thread_pool: ThreadPool,
     shared: Arc<Mutex<ManagedAuthorizations>>,
 }
 
 impl AuthorizationManager {
     /// Constructs an AuthorizationManager
-    pub fn new(local_identity: String) -> Result<Self, AuthorizationManagerError> {
+    pub fn new(
+        local_identity: String,
+        #[cfg(feature = "challenge-authorization")] signers: Vec<Box<dyn Signer>>,
+    ) -> Result<Self, AuthorizationManagerError> {
         let thread_pool = ThreadPoolBuilder::new()
             .with_size(AUTHORIZATION_THREAD_POOL_SIZE)
             .with_prefix("AuthorizationManager-".into())
@@ -132,6 +139,8 @@ impl AuthorizationManager {
 
         Ok(Self {
             local_identity,
+            #[cfg(feature = "challenge-authorization")]
+            signers,
             thread_pool,
             shared,
         })
@@ -150,6 +159,8 @@ impl AuthorizationManager {
     pub fn authorization_connector(&self) -> AuthorizationConnector {
         AuthorizationConnector {
             local_identity: self.local_identity.clone(),
+            #[cfg(feature = "challenge-authorization")]
+            signers: self.signers.clone(),
             shared: Arc::clone(&self.shared),
             executor: self.thread_pool.executor(),
         }
@@ -171,6 +182,8 @@ type Callback =
 
 pub struct AuthorizationConnector {
     local_identity: String,
+    #[cfg(feature = "challenge-authorization")]
+    signers: Vec<Box<dyn Signer>>,
     shared: Arc<Mutex<ManagedAuthorizations>>,
     executor: pool::JobExecutor,
 }
@@ -190,8 +203,13 @@ impl AuthorizationConnector {
             shared: Arc::clone(&self.shared),
         };
         let msg_sender = AuthorizationMessageSender { sender: tx };
-        let dispatcher =
-            create_authorization_dispatcher(self.local_identity.clone(), state_machine, msg_sender);
+        let dispatcher = create_authorization_dispatcher(
+            self.local_identity.clone(),
+            #[cfg(feature = "challenge-authorization")]
+            self.signers.clone(),
+            state_machine,
+            msg_sender,
+        );
         self.executor.execute(move || {
             let connect_request_bytes = match connect_msg_bytes() {
                 Ok(bytes) => bytes,

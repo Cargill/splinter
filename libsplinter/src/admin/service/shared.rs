@@ -7179,8 +7179,12 @@ mod tests {
             ),
         ]);
 
-        let authorization_manager = AuthorizationManager::new("test-node".into())
-            .expect("Unable to create authorization pool");
+        let authorization_manager = AuthorizationManager::new(
+            "test-node".into(),
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+        )
+        .expect("Unable to create authorization pool");
         let mut authorizers = Authorizers::new();
         authorizers.add_authorizer("inproc", inproc_authorizer);
         authorizers.add_authorizer("", authorization_manager.authorization_connector());

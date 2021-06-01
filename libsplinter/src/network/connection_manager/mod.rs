@@ -1044,8 +1044,12 @@ mod tests {
             mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
         });
 
-        let auth_mgr = AuthorizationManager::new("test_identity".into())
-            .expect("Unable to create authorization pool");
+        let auth_mgr = AuthorizationManager::new(
+            "test_identity".into(),
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+        )
+        .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(auth_mgr.authorization_connector()))
             .with_matrix_life_cycle(mesh.get_life_cycle())
@@ -1106,8 +1110,12 @@ mod tests {
             mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
         });
 
-        let auth_mgr = AuthorizationManager::new("test_identity".into())
-            .expect("Unable to create authorization pool");
+        let auth_mgr = AuthorizationManager::new(
+            "test_identity".into(),
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+        )
+        .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(auth_mgr.authorization_connector()))
             .with_matrix_life_cycle(mesh.get_life_cycle())
@@ -1245,8 +1253,12 @@ mod tests {
             mesh2.wait_for_shutdown().expect("Unable to shutdown mesh");
         });
 
-        let auth_mgr = AuthorizationManager::new("test_identity".into())
-            .expect("Unable to create authorization pool");
+        let auth_mgr = AuthorizationManager::new(
+            "test_identity".into(),
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+        )
+        .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(auth_mgr.authorization_connector()))
             .with_matrix_life_cycle(mesh1.get_life_cycle())
@@ -1401,8 +1413,12 @@ mod tests {
         let endpoint = listener.endpoint();
 
         let mesh = Mesh::new(512, 128);
-        let auth_mgr = AuthorizationManager::new("test_identity".into())
-            .expect("Unable to create authorization pool");
+        let auth_mgr = AuthorizationManager::new(
+            "test_identity".into(),
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+        )
+        .expect("Unable to create authorization pool");
 
         let (conn_tx, conn_rx) = mpsc::channel();
         let server_endpoint = endpoint.clone();
