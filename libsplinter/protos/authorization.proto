@@ -126,8 +126,8 @@ message AuthorizationError {
 // This message will allow for the two connecting nodes to agree on what
 // authorization protocol version will be used
 message AuthProtocolRequest {
-    int32 auth_protocol_min = 1;
-    int32 auth_protocol_max = 2;
+    uint32 auth_protocol_min = 1;
+    uint32 auth_protocol_max = 2;
 }
 
 // Authorization protocol agreement response message
@@ -140,7 +140,7 @@ message AuthProtocolResponse {
         TRUST = 1;
         CHALLENGE = 2;
     }
-    int32 auth_protocol = 1;
+    uint32 auth_protocol = 1;
     repeated PeerAuthorizationType accepted_authorization_type = 2;
 }
 

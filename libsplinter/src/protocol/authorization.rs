@@ -229,8 +229,8 @@ pub struct AuthComplete;
 /// returned.
 #[derive(Debug)]
 pub struct AuthProtocolRequest {
-    auth_protocol_min: i32,
-    auth_protocol_max: i32,
+    auth_protocol_min: u32,
+    auth_protocol_max: u32,
 }
 
 #[derive(Debug)]
@@ -245,7 +245,7 @@ pub enum PeerAuthorizationType {
 /// authorization types.
 #[derive(Debug)]
 pub struct AuthProtocolResponse {
-    auth_protocol: i32,
+    auth_protocol: u32,
     accepted_authorization_type: Vec<PeerAuthorizationType>,
 }
 
