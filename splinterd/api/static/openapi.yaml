@@ -2028,6 +2028,64 @@ paths:
                 schema:
                   $ref: '#/components/schemas/Error'
 
+  /oauth/users:
+    get:
+      tags:
+        - OAuth
+      description: |
+        Lists all OAuth users
+
+        This endpoint requires the permission "oauth.user.read".
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+        - name: offset
+          in: query
+          description: paging offset
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          description: maximum number of items to return (max 100)
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        200:
+          description: List of users registered in Biome's OAuth
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OAuthUser'
+                  paging:
+                    $ref: '#/components/schemas/Paging'
+        400:
+          description: Request was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: The client is unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
+
 components:
   parameters:
     auth:
@@ -2533,6 +2591,18 @@ components:
           type: string
           description: "The profile picture for the user's account"
           example: "https://lh6.googleusercontent.com/AMZpcempiaceeiA/s96-c/photo.jpg"
+
+    OAuthUser:
+      type: object
+      properties:
+        subject:
+          type: string
+          description: "Oauth provider's unique identifier for the user"
+          example: "129367690558975733497"
+        user_id:
+          type: string
+          description: "Biome's internal unique identifier for the user"
+          example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
 
 tags:
   - name: Biome

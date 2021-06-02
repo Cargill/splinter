@@ -431,3 +431,10 @@ impl Iterator for OAuthUserIter {
         (self.inner.len(), Some(self.inner.len()))
     }
 }
+
+#[cfg(feature = "oauth-user-list")]
+impl ExactSizeIterator for OAuthUserIter {
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}

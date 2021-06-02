@@ -13,5 +13,7 @@
 // limitations under the License.
 
 pub(super) mod callback;
+#[cfg(feature = "oauth-user-list")]
+pub(super) mod list_users;
 pub(super) mod login;
 pub(super) mod logout;
