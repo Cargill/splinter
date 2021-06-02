@@ -18,18 +18,20 @@
 //! internal reference count associated with the given `ref_id`. When `remove_ref` is called, the
 //! reference count is decremented. If a reference count reaches zero, then the item is removed.
 
+use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::hash::Hash;
 
 use super::error::RefMapRemoveError;
 
 /// A map that will keep track of the number of times an ID has been added, and only remove the ID
 /// once the reference count is 0.
-pub struct RefMap {
+pub struct RefMap<K: Hash + Eq> {
     // ID to reference count
-    references: HashMap<String, u64>,
+    references: HashMap<K, u64>,
 }
 
-impl RefMap {
+impl<K: Hash + Eq> RefMap<K> {
     /// Create a new `RefMap`
     pub fn new() -> Self {
         RefMap {
@@ -40,7 +42,7 @@ impl RefMap {
     /// Increments the reference count for `ref_id`
     ///
     /// If `ref_id` does not already exit, it will be added.
-    pub fn add_ref(&mut self, ref_id: String) -> u64 {
+    pub fn add_ref(&mut self, ref_id: K) -> u64 {
         if let Some(ref_count) = self.references.remove(&ref_id) {
             let new_ref_count = ref_count + 1;
             self.references.insert(ref_id, new_ref_count);
@@ -54,21 +56,24 @@ impl RefMap {
     /// Decrements the referece count for `ref_id`
     ///
     /// If the internal reference count reaches zero, then `ref_id` will be removed.
-    pub fn remove_ref(&mut self, ref_id: &str) -> Result<Option<String>, RefMapRemoveError> {
-        let ref_count = match self.references.remove(ref_id) {
-            Some(ref_count) => ref_count,
+    pub fn remove_ref<Q: ?Sized>(&mut self, ref_id: &Q) -> Result<Option<K>, RefMapRemoveError>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        let (key, ref_count) = match self.references.remove_entry(ref_id) {
+            Some((key, ref_count)) => (key, ref_count),
             None => {
-                return Err(RefMapRemoveError(format!(
-                    "Trying to remove a reference that does not exist: {}",
-                    ref_id
-                )))
+                return Err(RefMapRemoveError(
+                    "Trying to remove a reference that does not exist".into(),
+                ))
             }
         };
 
         if ref_count == 1 {
-            Ok(Some(ref_id.into()))
+            Ok(Some(key))
         } else {
-            self.references.insert(ref_id.into(), ref_count - 1);
+            self.references.insert(key, ref_count - 1);
             Ok(None)
         }
     }
@@ -121,7 +126,7 @@ pub mod tests {
     // Test that if `remove_ref` is called with a reference does not exist, an error is returned.
     #[test]
     fn test_remove_ref_err() {
-        let mut ref_map = RefMap::new();
+        let mut ref_map: RefMap<String> = RefMap::new();
         if let Ok(_) = ref_map.remove_ref("test_id") {
             panic!("remove_ref should have returned an error");
         }

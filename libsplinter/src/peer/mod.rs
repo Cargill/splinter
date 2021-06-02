@@ -364,7 +364,7 @@ fn handle_request(
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
-    ref_map: &mut RefMap,
+    ref_map: &mut RefMap<String>,
     subscribers: &mut SubscriberMap,
     strict_ref_counts: bool,
 ) {
@@ -546,7 +546,7 @@ fn add_peer(
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
-    ref_map: &mut RefMap,
+    ref_map: &mut RefMap<String>,
     subscribers: &mut SubscriberMap,
 ) -> Result<PeerRef, PeerRefAddError> {
     let new_ref_count = ref_map.add_ref(peer_id.to_string());
@@ -684,7 +684,7 @@ fn add_unidentified(
     unreferenced_peers: &mut UnreferencedPeerState,
     peer_remover: &PeerRemover,
     peers: &PeerMap,
-    ref_map: &mut RefMap,
+    ref_map: &mut RefMap<String>,
 ) -> EndpointPeerRef {
     info!("Attempting to peer with peer by endpoint {}", endpoint);
     if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
@@ -711,7 +711,7 @@ fn remove_peer(
     connector: Connector,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
-    ref_map: &mut RefMap,
+    ref_map: &mut RefMap<String>,
     strict_ref_counts: bool,
 ) -> Result<(), PeerRefRemoveError> {
     debug!("Removing peer: {}", peer_id);
@@ -773,7 +773,7 @@ fn remove_peer_by_endpoint(
     endpoint: String,
     connector: Connector,
     peers: &mut PeerMap,
-    ref_map: &mut RefMap,
+    ref_map: &mut RefMap<String>,
     strict_ref_counts: bool,
 ) -> Result<(), PeerRefRemoveError> {
     let peer_metadata = match peers.get_peer_from_endpoint(&endpoint) {
@@ -851,7 +851,7 @@ fn handle_notifications(
     subscribers: &mut SubscriberMap,
     max_retry_attempts: u64,
     local_identity: &str,
-    ref_map: &mut RefMap,
+    ref_map: &mut RefMap<String>,
     retry_frequency: u64,
 ) {
     match notification {
@@ -1128,7 +1128,7 @@ fn handle_connected(
     connector: Connector,
     subscribers: &mut SubscriberMap,
     local_identity: &str,
-    ref_map: &mut RefMap,
+    ref_map: &mut RefMap<String>,
     retry_frequency: u64,
 ) {
     if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
