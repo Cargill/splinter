@@ -26,6 +26,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 
 use super::error::RoutingTableReaderError;
+#[cfg(feature = "challenge-authorization")]
+use super::AuthorizationType;
 use super::{
     Circuit, CircuitIter, CircuitNode, CircuitNodeIter, RoutingTableReader, RoutingTableWriter,
     Service, ServiceId,
@@ -177,6 +179,8 @@ impl RoutingTableReader for RoutingTable {
                 ADMIN_CIRCUIT_ID.to_string(),
                 vec![],
                 vec![],
+                #[cfg(feature = "challenge-authorization")]
+                AuthorizationType::Trust,
             )))
         } else {
             Ok(self
@@ -394,6 +398,8 @@ impl RoutingTableWriter for RoutingTable {
 mod test {
     use super::*;
 
+    use crate::circuit::routing::AuthorizationType;
+
     // Test the routing table read and write operations for circuits
     //
     // 1. Create circuits with corresponding nodes and services and write one circuit to the
@@ -419,6 +425,7 @@ mod test {
             let node = CircuitNode {
                 node_id: format!("node-{}", x),
                 endpoints: vec![format!("endpoint_{}", x)],
+                public_key: None,
             };
             let service = Service {
                 service_id: format!("service-{}", x),
@@ -442,11 +449,13 @@ mod test {
             circuit_id: "012-abc".to_string(),
             roster: circuit_roster0.clone(),
             members: circuit_members0.clone(),
+            authorization_type: AuthorizationType::Trust,
         };
         let circuit1 = Circuit {
             circuit_id: "345-def".to_string(),
             roster: circuit_roster1.clone(),
             members: circuit_members1.clone(),
+            authorization_type: AuthorizationType::Trust,
         };
 
         let mut expected_nodes = BTreeMap::new();
@@ -573,6 +582,7 @@ mod test {
         let node0 = CircuitNode {
             node_id: "node-0".to_string(),
             endpoints: vec!["endpoint_0".to_string()],
+            public_key: None,
         };
         let service0 = Service {
             service_id: "service-0".to_string(),
@@ -584,6 +594,7 @@ mod test {
         let node1 = CircuitNode {
             node_id: "node-1".to_string(),
             endpoints: vec!["endpoint_1".to_string()],
+            public_key: None,
         };
         let service1 = Service {
             service_id: "service-1".to_string(),
@@ -596,6 +607,7 @@ mod test {
             circuit_id: "012-abc".to_string(),
             roster: vec![service0.clone(), service1.clone()],
             members: vec![node0.node_id.clone(), node1.node_id.clone()],
+            authorization_type: AuthorizationType::Trust,
         };
         let service_id0 = ServiceId::new(
             "012-abc".to_string(),
@@ -679,10 +691,12 @@ mod test {
         let node0 = CircuitNode {
             node_id: "node-0".to_string(),
             endpoints: vec!["endpoint_0".to_string()],
+            public_key: None,
         };
         let node1 = CircuitNode {
             node_id: "node-1".to_string(),
             endpoints: vec!["endpoint_1".to_string()],
+            public_key: None,
         };
 
         let mut expected_nodes = BTreeMap::new();

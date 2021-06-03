@@ -288,6 +288,8 @@ impl AdminService {
                         routing_members.push(routing::CircuitNode::new(
                             member.node_id().to_string(),
                             node.endpoints().to_vec(),
+                            #[cfg(feature = "challenge-authorization")]
+                            None,
                         ))
                     } else {
                         error!("Missing node information for {}", member.node_id());
@@ -332,6 +334,8 @@ impl AdminService {
                             .iter()
                             .map(|node| node.node_id().to_string())
                             .collect(),
+                        #[cfg(feature = "challenge-authorization")]
+                        routing::AuthorizationType::Trust,
                     ),
                     routing_members,
                 )
