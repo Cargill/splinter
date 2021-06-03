@@ -213,7 +213,7 @@ OPTIONS
 
 `--tls-ca-file CERT-FILE`
 : Specifies the path and file name for the trusted CA certificate.
-  (Default: `/etc/splinter/certs/ca_pem`.)
+  (Default: `/etc/splinter/certs/ca.pem`.)
 
   Do not use this option with the `--tls-insecure` flag.
 
