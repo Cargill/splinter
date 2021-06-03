@@ -157,7 +157,7 @@ node = [
 oauth = [
     "splinter/oauth"
 ]
-proposal-removal = ["splinter/proposal-removal"]
+proposal-removal = []
 rest-api-cors = ["splinter/rest-api-cors"]
 scabbard-back-pressure = ["scabbard/back-pressure"]
 service-arg-validation = [
