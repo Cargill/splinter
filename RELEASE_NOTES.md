@@ -1,5 +1,38 @@
 # Release Notes
 
+## Changes in Splinter 0.5.6
+
+### Highlights
+
+* The Splinter daemon now has its own sets of private/public keys that will be
+  used to support Challenge Authorization.
+
+### libsplinter
+
+* Replace MigrationError with InternalError.  This has the effect of properly
+  displaying the underlying error that may occur when accessing the database.
+
+* Add REST endpoint to the OAuthResourceProvider, oauth/users behind the
+  `oauth-user-list` feature, which lists OAuth users. This makes it easy for
+  administrators to get users' Biome IDs so they can be used in RBAC
+  authorization.
+
+* Stabilized the `proposal-removal` feature. This enables removing a circuit
+  proposal for the requesting node.
+
+### splinter CLI
+
+* Update `splinter keygen --system` to check the environment variables
+  `SPLINTER_HOME` and `SPLINTER_CONFIG_DIR` for where to put the generated keys.
+  Also updates the default key name to be `splinterd`.
+
+### splinterd
+
+* Add public/private keys to the Splinter daemon. If the experimental feature
+  `challenge-authorization` is enabled, the daemon will check the configured
+  "config" directory and load every key that is in the key directory. These keys
+  will be used in challenge authorization.
+
 ## Changes in Splinter 0.5.5
 
 ### Highlights
