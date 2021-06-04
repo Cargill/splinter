@@ -65,7 +65,44 @@ impl SplinterRestClient {
 
     /// Submits a request to list Biome's OAuth users
     pub fn list_oauth_users(&self) -> Result<ClientOAuthUserListResponse, CliError> {
-        unimplemented!();
+        Client::new()
+            .get(&format!("{}/oauth/users?limit={}", self.url, PAGING_LIMIT))
+            .header(
+                "SplinterProtocolVersion",
+                CLI_SPLINTER_USER_PROTOCOL_VERSION,
+            )
+            .header("Authorization", &self.auth)
+            .send()
+            .map_err(|err| CliError::ActionError(format!("Failed to list oauth users: {}", err)))
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    let response_data =
+                        res.json::<ClientOAuthUserListResponse>().map_err(|_| {
+                            CliError::ActionError(
+                                "List OAuth users request succeeded, but response was not valid"
+                                    .to_string(),
+                            )
+                        })?;
+                    Ok(response_data)
+                } else {
+                    let message = res
+                        .json::<ServerError>()
+                        .map_err(|_| {
+                            CliError::ActionError(format!(
+                                "List OAuth users request failed with status code '{}', but \
+                            error response was not valid",
+                                status
+                            ))
+                        })?
+                        .message;
+
+                    Err(CliError::ActionError(format!(
+                        "Failed to list OAuth users: {}",
+                        message
+                    )))
+                }
+            })
     }
 }
 
