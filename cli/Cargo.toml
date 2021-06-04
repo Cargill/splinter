@@ -75,6 +75,7 @@ experimental = [
     "health",
     "upgrade",
     "https-certs",
+    "user-list",
     "permissions",
     "proposal-removal",
     "registry",
@@ -82,6 +83,7 @@ experimental = [
 
 authorization-handler-maintenance = []
 authorization-handler-rbac = []
+user-list = []
 challenge-authorization = ["splinter/challenge-authorization"]
 circuit-template = ["splinter/circuit-template"]
 
