@@ -15,11 +15,11 @@
 #[cfg(feature = "circuit-template")]
 use std::str::FromStr as _;
 
-#[cfg(feature = "admin-service")]
+#[cfg(any(feature = "admin-service", feature = "benchmark"))]
 use rand::{distributions::Alphanumeric, Rng};
 
 /// Generate a random base62 string of the given length.
-#[cfg(feature = "admin-service")]
+#[cfg(any(feature = "admin-service", feature = "benchmark"))]
 pub fn generate_random_base62_string(len: usize) -> String {
     rand::thread_rng()
         .sample_iter(Alphanumeric)
