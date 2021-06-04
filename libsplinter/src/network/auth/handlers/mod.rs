@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Message handlers for authorization messages
+
 mod v0_handlers;
+#[cfg(feature = "trust-authorization")]
+mod v1_handlers;
 
 #[cfg(feature = "challenge-authorization")]
 use cylinder::Signer;
@@ -32,6 +36,11 @@ use crate::protos::prelude::*;
 use self::v0_handlers::{
     AuthorizedHandler, ConnectRequestHandler, ConnectResponseHandler, TrustRequestHandler,
 };
+#[cfg(feature = "trust-authorization")]
+use self::v1_handlers::{
+    AuthCompleteHandler, AuthProtocolRequestHandler, AuthProtocolResponseHandler,
+    AuthTrustRequestHandler, AuthTrustResponseHandler,
+};
 
 /// Create a Dispatcher for Authorization messages
 ///
@@ -48,13 +57,40 @@ pub fn create_authorization_dispatcher(
 ) -> Dispatcher<NetworkMessageType, ConnectionId> {
     let mut auth_dispatcher = Dispatcher::new(Box::new(auth_msg_sender.clone()));
 
+    // v0 message handlers
     auth_dispatcher.set_handler(Box::new(ConnectRequestHandler::new(auth_manager.clone())));
 
-    auth_dispatcher.set_handler(Box::new(ConnectResponseHandler::new(identity)));
+    // allow redundant_clone, must be cloned here if trust-authorization is enabled
+    #[allow(clippy::redundant_clone)]
+    auth_dispatcher.set_handler(Box::new(ConnectResponseHandler::new(identity.to_string())));
 
     auth_dispatcher.set_handler(Box::new(TrustRequestHandler::new(auth_manager.clone())));
 
     auth_dispatcher.set_handler(Box::new(AuthorizedHandler::new(auth_manager.clone())));
+
+    auth_dispatcher.set_handler(Box::new(AuthorizedHandler::new(auth_manager.clone())));
+
+    // v1 message handlers
+    #[cfg(feature = "trust-authorization")]
+    {
+        auth_dispatcher.set_handler(Box::new(AuthProtocolRequestHandler::new(
+            auth_manager.clone(),
+        )));
+
+        auth_dispatcher.set_handler(Box::new(AuthProtocolResponseHandler::new(
+            auth_manager.clone(),
+            identity.to_string(),
+        )));
+
+        auth_dispatcher.set_handler(Box::new(AuthTrustRequestHandler::new(auth_manager.clone())));
+
+        auth_dispatcher.set_handler(Box::new(AuthTrustResponseHandler::new(
+            auth_manager.clone(),
+            identity,
+        )));
+
+        auth_dispatcher.set_handler(Box::new(AuthCompleteHandler::new(auth_manager.clone())));
+    }
 
     auth_dispatcher.set_handler(Box::new(AuthorizationErrorHandler::new(auth_manager)));
 

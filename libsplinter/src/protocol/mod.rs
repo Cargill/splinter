@@ -112,3 +112,10 @@ pub(crate) const BIOME_FETCH_PROFILE_PROTOCOL_MIN: u32 = 1;
 pub(crate) const BIOME_FETCH_PROFILES_PROTOCOL_MIN: u32 = 1;
 #[cfg(all(feature = "biome-profile", feature = "rest-api",))]
 pub(crate) const BIOME_LIST_PROFILES_PROTOCOL_MIN: u32 = 1;
+
+// Peer authorization protocol versions
+#[cfg(feature = "trust-authorization")]
+pub const PEER_AUTHORIZATION_PROTOCOL_VERSION: u32 = 1;
+
+#[cfg(feature = "trust-authorization")]
+pub(crate) const PEER_AUTHORIZATION_PROTOCOL_MIN: u32 = 1;

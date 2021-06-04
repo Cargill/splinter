@@ -133,6 +133,7 @@ experimental = [
     "rest-api-actix-web-3",
     "service-arg-validation",
     "service-network",
+    "trust-authorization",
     "ws-transport",
     "zmq-transport",
 ]
@@ -192,6 +193,7 @@ service-arg-validation = []
 service-network = []
 sqlite = ["diesel/sqlite", "diesel_migrations"]
 store-factory = []
+trust-authorization = []
 ws-transport = ["tungstenite"]
 zmq-transport = ["zmq"]
 

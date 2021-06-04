@@ -229,8 +229,8 @@ pub struct AuthComplete;
 /// returned.
 #[derive(Debug)]
 pub struct AuthProtocolRequest {
-    auth_protocol_min: i32,
-    auth_protocol_max: i32,
+    pub auth_protocol_min: u32,
+    pub auth_protocol_max: u32,
 }
 
 #[derive(Debug)]
@@ -245,8 +245,8 @@ pub enum PeerAuthorizationType {
 /// authorization types.
 #[derive(Debug)]
 pub struct AuthProtocolResponse {
-    auth_protocol: i32,
-    accepted_authorization_type: Vec<PeerAuthorizationType>,
+    pub auth_protocol: u32,
+    pub accepted_authorization_type: Vec<PeerAuthorizationType>,
 }
 
 /// A trust request.
@@ -255,7 +255,7 @@ pub struct AuthProtocolResponse {
 /// response will be returned.
 #[derive(Debug)]
 pub struct AuthTrustRequest {
-    identity: String,
+    pub identity: String,
 }
 
 /// A successful trust authorization.
@@ -277,7 +277,7 @@ pub struct AuthChallengeNonceRequest;
 /// AuthChallengeSubmitRequest message
 #[derive(Debug)]
 pub struct AuthChallengeNonceResponse {
-    nonce: Vec<u8>,
+    pub nonce: Vec<u8>,
 }
 
 /// A challenge submit request
@@ -286,8 +286,8 @@ pub struct AuthChallengeNonceResponse {
 /// and the public key for the signature.
 #[derive(Debug)]
 pub struct AuthChallengeSubmitRequest {
-    public_key: Vec<u8>,
-    signature: Vec<u8>,
+    pub public_key: Vec<u8>,
+    pub signature: Vec<u8>,
 }
 
 /// A successful challenge authorization.

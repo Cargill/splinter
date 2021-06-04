@@ -106,6 +106,7 @@ experimental = [
     "scabbard-back-pressure",
     "service-arg-validation",
     "service-endpoint",
+    "trust-authorization",
     "ws-transport",
 ]
 
@@ -165,6 +166,7 @@ service-arg-validation = [
     "splinter/service-arg-validation",
 ]
 service-endpoint = []
+trust-authorization = ["splinter/trust-authorization"]
 ws-transport = ["splinter/ws-transport"]
 
 [package.metadata.deb]
