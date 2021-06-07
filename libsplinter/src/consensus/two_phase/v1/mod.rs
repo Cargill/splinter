@@ -725,7 +725,7 @@ pub mod tests {
     #[test]
     fn test_shutdown() {
         let (update_tx, update_rx) = channel();
-        let (_, consensus_msg_rx) = channel();
+        let (_consensus_msg_tx, consensus_msg_rx) = channel();
 
         let manager = MockProposalManager::new(update_tx.clone());
         let network = MockConsensusNetworkSender::new();
