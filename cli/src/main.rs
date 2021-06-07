@@ -1557,6 +1557,42 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
     }
 
+    #[cfg(feature = "user-list")]
+    {
+        app = app.subcommand(
+            SubCommand::with_name("user")
+                .about("Splinter user commands")
+                .subcommand(
+                    SubCommand::with_name("list")
+                        .about("List Splinter users, including Biome and OAuth users")
+                        .arg(
+                            Arg::with_name("format")
+                                .short("F")
+                                .long("format")
+                                .help("Output format")
+                                .possible_values(&["human", "csv"])
+                                .default_value("human")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        ),
+                ),
+        );
+    }
+
     let matches = app.get_matches_from_safe(args)?;
 
     // set default to info
@@ -1697,6 +1733,15 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     {
         use action::permissions;
         subcommands = subcommands.with_command("permissions", permissions::ListAction)
+    }
+
+    #[cfg(feature = "user-list")]
+    {
+        use action::user;
+        subcommands = subcommands.with_command(
+            "user",
+            SubcommandActions::new().with_command("list", user::ListSplinterUsersAction),
+        )
     }
 
     subcommands.run(Some(&matches))
