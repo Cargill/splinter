@@ -41,6 +41,7 @@ COPY Cargo.toml /build/Cargo.toml
 # Copy over dependencies and source files
 COPY examples/simple_xo /build/examples/simple_xo
 COPY examples/address_generator /build/examples/address_generator
+COPY examples/sabre_command_executor /build/examples/sabre_command_executor
 COPY libtransact /build/libtransact
 COPY README.md /build/README.md
 COPY cli /build/cli
