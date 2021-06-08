@@ -3460,6 +3460,7 @@ mod tests {
         circuit.set_comments("test circuit".into());
         circuit.set_display_name("test_display".into());
         circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
+        circuit.set_durability(admin::Circuit_DurabilityType::NO_DURABILITY);
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
             splinter_node("test-node", &["inproc://someplace:8000".to_string()]),
@@ -6769,6 +6770,7 @@ mod tests {
         let mut service = admin::SplinterService::new();
         service.set_service_id(service_id.into());
         service.set_service_type(service_type.into());
+        service.set_allowed_nodes(RepeatedField::from_vec(vec!["node_id".into()]));
         service
     }
 
