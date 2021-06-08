@@ -51,6 +51,7 @@ features = ["admin-service", "registry"]
 [dev-dependencies]
 gag = "0.1"
 serial_test = "0.3"
+tempdir = "0.3"
 
 [features]
 default = [
@@ -72,6 +73,7 @@ experimental = [
     "authorization-handler-rbac",
     "challenge-authorization",
     "health",
+    "upgrade",
     "https-certs",
     "permissions",
     "proposal-removal",
@@ -86,6 +88,8 @@ circuit-template = ["splinter/circuit-template"]
 registry = []
 
 health = []
+
+upgrade = ["database", "splinter/store-factory"]
 
 https-certs = []
 permissions = []

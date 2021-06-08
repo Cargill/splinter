@@ -14,9 +14,8 @@
 
 //! Provides sqlite migration support to the database action
 
-use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use diesel::{
     r2d2::{ConnectionManager, Pool},
@@ -25,11 +24,9 @@ use diesel::{
 
 use splinter::migrations::run_sqlite_migrations;
 
+use super::SplinterEnvironment;
 use crate::error::CliError;
 
-const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
-const SPLINTER_STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
-const DEFAULT_STATE_DIR: &str = "/var/lib/splinter";
 const DEFAULT_SQLITE: &str = "splinter_state.db";
 
 /// Run the sqlite migrations against the provided connection string
@@ -70,50 +67,28 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
     Ok(())
 }
 
-/// Returns the path to the default sqlite database
+/// Creates and returns the path to the default sqlite database
 ///
-/// If `SPLINTER_STATE_DIR` is set, returns `SPLINTER_STATE_DIR/splinter_state.db`.
-/// If `SPLINTER_HOME` is set, returns `SPLINTER_HOME/data/splinter_state.db`.
-/// Otherwise, returns `/var/lib/splinter/splinter_state.db`
+/// Gets the splinter default state path, creating it if it does not exist. Creates a db file with
+/// the name splinter_state.db.
 pub fn get_default_database() -> Result<String, CliError> {
-    let mut opt_path = {
-        if let Ok(state_dir) = env::var(SPLINTER_STATE_DIR_ENV) {
-            let opt_path = PathBuf::from(&state_dir);
-            if !opt_path.is_dir() {
-                fs::create_dir_all(&opt_path).map_err(|_| {
-                    CliError::ActionError(format!(
-                        "Unable to create directory: {}",
-                        opt_path.display()
-                    ))
-                })?;
-            }
-            opt_path
-        } else if let Ok(splinter_home) = env::var(SPLINTER_HOME_ENV) {
-            let opt_path = Path::new(&splinter_home).join("data");
-            if !opt_path.is_dir() {
-                fs::create_dir_all(&opt_path).map_err(|_| {
-                    CliError::ActionError(format!(
-                        "Unable to create directory: {}",
-                        opt_path.display()
-                    ))
-                })?;
-            }
-            opt_path
-        } else {
-            let opt_path = PathBuf::from(&DEFAULT_STATE_DIR);
-            if !opt_path.is_dir() {
-                fs::create_dir_all(&opt_path).map_err(|_| {
-                    CliError::ActionError(format!(
-                        "Unable to create directory: {}",
-                        opt_path.display()
-                    ))
-                })?;
-            }
-            opt_path
-        }
-    };
+    let state_path = SplinterEnvironment::load().get_state_path();
+    if !state_path.is_dir() {
+        fs::create_dir_all(&state_path).map_err(|_| {
+            CliError::ActionError(format!(
+                "Unable to create directory: {}",
+                state_path.display()
+            ))
+        })?;
+    }
 
-    opt_path = opt_path.join(DEFAULT_SQLITE);
+    get_database_at_state_path(state_path)
+}
+
+/// Gets the path to the sqlite database given the specified state path
+pub fn get_database_at_state_path<P: Into<PathBuf>>(state_path: P) -> Result<String, CliError> {
+    let state_path: PathBuf = state_path.into();
+    let opt_path = state_path.join(DEFAULT_SQLITE);
     let database_file = opt_path.to_str().map(ToOwned::to_owned).ok_or_else(|| {
         CliError::ActionError(format!(
             "Unable get database default database file: {}",
