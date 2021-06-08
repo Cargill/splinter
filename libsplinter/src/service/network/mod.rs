@@ -23,7 +23,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
-use crate::network::connection_manager::{ConnectionManagerNotification, Connector};
+use crate::network::connection_manager::{
+    ConnectionAuthorizationType, ConnectionManagerNotification, Connector,
+};
 
 use self::error::ServiceConnectionAgentError;
 pub use self::error::ServiceConnectionError;
@@ -519,6 +521,13 @@ impl ServiceConnectionAgent {
                 connection_id,
                 identity,
             } => {
+                let identity = match identity {
+                    ConnectionAuthorizationType::Trust { identity } => identity,
+                    _ => {
+                        error!("Service connections must only use trust authorization");
+                        return;
+                    }
+                };
                 self.services.add_connection(ServiceConnectionInfo {
                     endpoint: endpoint.clone(),
                     connection_id,
@@ -645,7 +654,8 @@ mod tests {
 
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
-        AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError, ConnectionManager,
+        AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError,
+        ConnectionAuthorizationType, ConnectionManager,
     };
     use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
@@ -767,7 +777,9 @@ mod tests {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                identity: self.authorized_id.clone(),
+                identity: ConnectionAuthorizationType::Trust {
+                    identity: self.authorized_id.clone(),
+                },
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

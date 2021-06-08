@@ -858,7 +858,7 @@ fn handle_notifications(
         // If a connection has disconnected, forward notification to subscribers
         ConnectionManagerNotification::Disconnected { endpoint, identity } => handle_disconnection(
             endpoint,
-            identity,
+            identity.into(),
             unreferenced_peers,
             peers,
             connector,
@@ -871,6 +871,7 @@ fn handle_notifications(
         } => {
             // Check if the disconnected peer has reached the retry limit, if so try to find a
             // different endpoint that can be connected to
+            let identity: String = identity.into();
             if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
                 info!(
                     "{} reconnection attempts have been made to peer {}",
@@ -916,7 +917,7 @@ fn handle_notifications(
             identity,
         } => handle_inbound_connection(
             endpoint,
-            identity,
+            identity.into(),
             connection_id,
             unreferenced_peers,
             peers,
@@ -931,7 +932,7 @@ fn handle_notifications(
             connection_id,
         } => handle_connected(
             endpoint,
-            identity,
+            identity.into(),
             connection_id,
             unreferenced_peers,
             peers,
@@ -1431,7 +1432,8 @@ pub mod tests {
 
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
-        AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
+        AuthorizationResult, Authorizer, AuthorizerError, ConnectionAuthorizationType,
+        ConnectionManager,
     };
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
     use crate::threading::lifecycle::ShutdownHandle;
@@ -2545,7 +2547,7 @@ pub mod tests {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                identity,
+                identity: ConnectionAuthorizationType::Trust { identity },
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

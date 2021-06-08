@@ -631,7 +631,8 @@ pub mod tests {
 
     use crate::mesh::{Envelope, Mesh};
     use crate::network::connection_manager::{
-        AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
+        AuthorizationResult, Authorizer, AuthorizerError, ConnectionAuthorizationType,
+        ConnectionManager,
     };
     use crate::network::dispatch::{
         dispatch_channel, DispatchError, DispatchLoopBuilder, Dispatcher, Handler, MessageContext,
@@ -963,7 +964,9 @@ pub mod tests {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                identity: self.authorized_id.clone(),
+                identity: ConnectionAuthorizationType::Trust {
+                    identity: self.authorized_id.clone(),
+                },
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }
