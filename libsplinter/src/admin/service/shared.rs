@@ -4511,7 +4511,7 @@ mod tests {
             "node_a",
             ADMIN_SERVICE_PROTOCOL_VERSION,
         ) {
-            panic!("Should have been invalid because authorizaiton type is unset");
+            panic!("Should have been invalid because authorization type is unset");
         }
         shutdown(mesh, cm, pm);
     }
