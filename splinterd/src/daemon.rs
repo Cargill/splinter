@@ -24,9 +24,9 @@ use std::sync::{mpsc::channel, Arc};
 use std::thread;
 use std::time::Duration;
 
-#[cfg(feature = "challenge-authorization")]
-use cylinder::Signer;
 use cylinder::{secp256k1::Secp256k1Context, Context};
+#[cfg(feature = "challenge-authorization")]
+use cylinder::{Signer, SigningError};
 #[cfg(feature = "health-service")]
 use health::HealthService;
 #[cfg(feature = "service-arg-validation")]
@@ -408,6 +408,18 @@ impl SplinterDaemon {
             &self.node_id,
             routing_reader.clone(),
             routing_writer.clone(),
+            #[cfg(feature = "challenge-authorization")]
+            self.signers
+                .iter()
+                .map(|signer| Ok(signer.public_key()?.as_hex()))
+                .collect::<Result<Vec<String>, SigningError>>()
+                .map_err(|err| {
+                    StartError::AdminServiceError(format!(
+                        "Unable to get public keys from signer for Admin message handler:
+                            {}",
+                        err
+                    ))
+                })?,
         );
         let mut circuit_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(circuit_dispatcher)
@@ -534,6 +546,23 @@ impl SplinterDaemon {
             validators.insert("scabbard".into(), Box::new(ScabbardArgValidator));
 
             admin_service_builder = admin_service_builder.with_service_arg_validators(validators);
+        }
+
+        #[cfg(feature = "challenge-authorization")]
+        {
+            admin_service_builder = admin_service_builder.with_public_keys(
+                self.signers
+                    .iter()
+                    .map(|signer| Ok(signer.public_key()?.into_bytes()))
+                    .collect::<Result<Vec<Vec<u8>>, SigningError>>()
+                    .map_err(|err| {
+                        StartError::AdminServiceError(format!(
+                            "Unable to get public keys from signer for Admin message handler:
+                            {}",
+                            err
+                        ))
+                    })?,
+            )
         }
 
         let admin_service = admin_service_builder.build().map_err(|err| {
@@ -1406,6 +1435,7 @@ fn set_up_circuit_dispatcher(
     node_id: &str,
     routing_reader: Box<dyn RoutingTableReader>,
     routing_writer: Box<dyn RoutingTableWriter>,
+    #[cfg(feature = "challenge-authorization")] public_keys: Vec<String>,
 ) -> Dispatcher<CircuitMessageType> {
     let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(network_sender));
 
@@ -1429,8 +1459,12 @@ fn set_up_circuit_dispatcher(
     dispatcher.set_handler(Box::new(circuit_error_handler));
 
     // Circuit Admin handlers
-    let admin_direct_message_handler =
-        AdminDirectMessageHandler::new(node_id.to_string(), routing_reader);
+    let admin_direct_message_handler = AdminDirectMessageHandler::new(
+        node_id.to_string(),
+        routing_reader,
+        #[cfg(feature = "challenge-authorization")]
+        public_keys,
+    );
     dispatcher.set_handler(Box::new(admin_direct_message_handler));
 
     dispatcher

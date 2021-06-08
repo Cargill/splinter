@@ -15,6 +15,7 @@
 use crate::circuit::handlers::create_message;
 use crate::circuit::routing::{RoutingTableReader, RoutingTableWriter, Service, ServiceId};
 use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
+use crate::peer::PeerAuthorizationToken;
 use crate::protos::circuit::{
     CircuitMessageType, ServiceConnectRequest, ServiceConnectResponse,
     ServiceConnectResponse_Status, ServiceDisconnectRequest, ServiceDisconnectResponse,
@@ -104,7 +105,9 @@ impl Handler for ServiceConnectRequestHandler {
                     response.set_status(ServiceConnectResponse_Status::ERROR_NOT_AN_ALLOWED_NODE);
                     response.set_error_message(format!("{} is not allowed on this node", unique_id))
                 } else {
-                    service.set_peer_id(context.source_peer_id().to_string());
+                    service.set_peer_id(PeerAuthorizationToken::from(
+                        context.source_peer_id().clone(),
+                    ));
                     let mut writer = self.routing_table_writer.clone();
                     writer
                         .add_service(unique_id, service)
@@ -134,10 +137,10 @@ impl Handler for ServiceConnectRequestHandler {
         let network_msg_bytes =
             create_message(response_bytes, CircuitMessageType::SERVICE_CONNECT_RESPONSE)?;
 
-        let recipient = context.source_peer_id().to_string();
+        let recipient = context.source_peer_id().clone();
 
         sender
-            .send(recipient.into(), network_msg_bytes)
+            .send(recipient, network_msg_bytes)
             .map_err(|(recipient, payload)| {
                 DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
@@ -249,9 +252,9 @@ impl Handler for ServiceDisconnectRequestHandler {
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
         )?;
 
-        let recipient = context.source_peer_id().to_string();
+        let recipient = context.source_peer_id().clone();
         sender
-            .send(recipient.into(), network_msg_bytes)
+            .send(recipient, network_msg_bytes)
             .map_err(|(recipient, payload)| {
                 DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
@@ -291,6 +294,7 @@ mod tests {
         memory::RoutingTable, Circuit, CircuitNode, RoutingTableWriter, Service,
     };
     use crate::network::dispatch::Dispatcher;
+    use crate::peer::PeerAuthorizationToken;
     use crate::protos::circuit::CircuitMessage;
     use crate::protos::network::NetworkMessage;
 
@@ -316,7 +320,7 @@ mod tests {
 
         dispatcher
             .dispatch(
-                "abc".into(),
+                PeerAuthorizationToken::from_peer_id("abc").into(),
                 &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                 connect_bytes.clone(),
             )
@@ -326,7 +330,7 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            "abc",
+            PeerAuthorizationToken::from_peer_id("abc"),
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -366,7 +370,7 @@ mod tests {
 
         dispatcher
             .dispatch(
-                "BAD".into(),
+                PeerAuthorizationToken::from_peer_id("BAD").into(),
                 &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                 connect_bytes.clone(),
             )
@@ -376,7 +380,7 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            "BAD",
+            PeerAuthorizationToken::from_peer_id("BAD"),
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "BAD");
@@ -415,7 +419,7 @@ mod tests {
 
         dispatcher
             .dispatch(
-                "abc".into(),
+                PeerAuthorizationToken::from_peer_id("abc").into(),
                 &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                 connect_bytes.clone(),
             )
@@ -428,7 +432,7 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            "abc",
+            PeerAuthorizationToken::from_peer_id("abc"),
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -460,7 +464,7 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .unwrap();
-        service.set_peer_id("abc_network".to_string());
+        service.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
         writer
             .add_service(id, service)
             .expect("Unable to add circuit");
@@ -475,7 +479,7 @@ mod tests {
 
         dispatcher
             .dispatch(
-                "abc".into(),
+                PeerAuthorizationToken::from_peer_id("abc").into(),
                 &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                 connect_bytes.clone(),
             )
@@ -485,7 +489,7 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            "abc",
+            PeerAuthorizationToken::from_peer_id("abc"),
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -519,7 +523,7 @@ mod tests {
 
         dispatcher
             .dispatch(
-                "abc".into(),
+                PeerAuthorizationToken::from_peer_id("abc").into(),
                 &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                 disconnect_bytes.clone(),
             )
@@ -529,7 +533,7 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            "abc",
+            PeerAuthorizationToken::from_peer_id("abc"),
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -570,7 +574,7 @@ mod tests {
 
         dispatcher
             .dispatch(
-                "BAD".into(),
+                PeerAuthorizationToken::from_peer_id("BAD").into(),
                 &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                 disconnect_bytes.clone(),
             )
@@ -580,7 +584,7 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            "BAD",
+            PeerAuthorizationToken::from_peer_id("BAD"),
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "BAD");
@@ -615,7 +619,7 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .unwrap();
-        service.set_peer_id("abc_network".to_string());
+        service.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
         writer
             .add_service(id, service)
             .expect("Unable to add circuit");
@@ -630,7 +634,7 @@ mod tests {
 
         dispatcher
             .dispatch(
-                "abc".into(),
+                PeerAuthorizationToken::from_peer_id("abc").into(),
                 &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                 disconnect_bytes.clone(),
             )
@@ -640,7 +644,7 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            "abc",
+            PeerAuthorizationToken::from_peer_id("abc"),
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -677,7 +681,7 @@ mod tests {
 
         dispatcher
             .dispatch(
-                "abc".into(),
+                PeerAuthorizationToken::from_peer_id("abc").into(),
                 &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                 disconnect_bytes.clone(),
             )
@@ -687,7 +691,7 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            "abc",
+            PeerAuthorizationToken::from_peer_id("abc"),
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -741,12 +745,12 @@ mod tests {
 
     fn assert_network_message<M: protobuf::Message, F: Fn(M)>(
         message: Vec<u8>,
-        recipient: String,
-        expected_recipient: &str,
+        recipient: PeerAuthorizationToken,
+        expected_recipient: PeerAuthorizationToken,
         expected_circuit_msg_type: CircuitMessageType,
         detail_assertions: F,
     ) {
-        assert_eq!(expected_recipient, &recipient);
+        assert_eq!(expected_recipient, recipient);
 
         let network_msg: NetworkMessage = Message::parse_from_bytes(&message).unwrap();
         let circuit_msg: CircuitMessage =

@@ -15,6 +15,7 @@
 //! trait implementations to support service components.
 
 use crate::circuit::routing::{RoutingTableReader, RoutingTableWriter, Service, ServiceId};
+use crate::peer::PeerAuthorizationToken;
 use crate::service::network::handlers::{
     ServiceAddInstanceError, ServiceInstances, ServiceRemoveInstanceError,
 };
@@ -102,7 +103,7 @@ impl ServiceInstances for RoutingTableServiceInstances {
             return Err(ServiceAddInstanceError::AlreadyRegistered);
         }
 
-        service.set_peer_id(component_id);
+        service.set_peer_id(PeerAuthorizationToken::from_peer_id(&component_id));
 
         let mut writer = self.routing_table_writer.clone();
         writer.add_service(unique_id, service).map_err(|err| {
@@ -219,7 +220,7 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .expect("Missing service");
-        service.set_peer_id("abc_network".into());
+        service.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network".into()));
         writer
             .add_service(id, service)
             .expect("Unable to add service");
@@ -265,7 +266,7 @@ mod tests {
                 .expect("cannot check if it has the service")
                 .expect("no service returned")
                 .peer_id(),
-            &Some("my_component".to_string())
+            &Some(PeerAuthorizationToken::from_peer_id("my_component"))
         );
     }
 
@@ -314,7 +315,7 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .expect("Missing service");
-        service.set_peer_id("abc_network".into());
+        service.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
         writer
             .add_service(id.clone(), service)
             .expect("Unable to add service");

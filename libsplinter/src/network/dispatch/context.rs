@@ -72,7 +72,7 @@ impl<MT> MessageContext<PeerId, MT> {
     /// The Source Peer ID.
     ///
     /// This is the peer id of the original sender of the message
-    pub fn source_peer_id(&self) -> &str {
+    pub fn source_peer_id(&self) -> &PeerId {
         &self.source_id
     }
 }

@@ -16,6 +16,7 @@
 //!
 //! The public interface includes the structs [`PeerRef`] and [`EndpointPeerRef`]
 
+use super::PeerAuthorizationToken;
 use crate::peer::connector::PeerRemover;
 
 /// Used to keep track of peer references. When dropped, the `PeerRef` will send a request to the
@@ -23,13 +24,13 @@ use crate::peer::connector::PeerRemover;
 /// exist.
 #[derive(Debug, PartialEq)]
 pub struct PeerRef {
-    peer_id: String,
+    peer_id: PeerAuthorizationToken,
     peer_remover: PeerRemover,
 }
 
 impl PeerRef {
     /// Creates a new `PeerRef`
-    pub(super) fn new(peer_id: String, peer_remover: PeerRemover) -> Self {
+    pub(super) fn new(peer_id: PeerAuthorizationToken, peer_remover: PeerRemover) -> Self {
         PeerRef {
             peer_id,
             peer_remover,
@@ -37,7 +38,7 @@ impl PeerRef {
     }
 
     /// Returns the peer ID this reference is for
-    pub fn peer_id(&self) -> &str {
+    pub fn peer_id(&self) -> &PeerAuthorizationToken {
         &self.peer_id
     }
 }

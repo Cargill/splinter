@@ -271,8 +271,12 @@ impl RunnableNetworkSubsystem {
         dispatcher.set_handler(Box::new(circuit_error_handler));
 
         // Circuit Admin handlers
-        let admin_direct_message_handler =
-            AdminDirectMessageHandler::new(node_id.to_string(), routing_reader);
+        let admin_direct_message_handler = AdminDirectMessageHandler::new(
+            node_id.to_string(),
+            routing_reader,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+        );
         dispatcher.set_handler(Box::new(admin_direct_message_handler));
 
         dispatcher

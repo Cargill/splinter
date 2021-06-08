@@ -30,8 +30,6 @@ pub use error::{AuthorizerError, ConnectionManagerError};
 pub use notification::ConnectionManagerNotification;
 
 use crate::error::InternalError;
-#[cfg(feature = "challenge-authorization")]
-use crate::hex::to_hex;
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::threading::pacemaker;
 use crate::transport::matrix::{ConnectionMatrixLifeCycle, ConnectionMatrixSender};
@@ -414,16 +412,6 @@ pub enum ConnectionAuthorizationType {
     Challenge {
         public_key: Vec<u8>,
     },
-}
-
-impl From<ConnectionAuthorizationType> for String {
-    fn from(auth_type: ConnectionAuthorizationType) -> Self {
-        match auth_type {
-            ConnectionAuthorizationType::Trust { identity } => identity.to_string(),
-            #[cfg(feature = "challenge-authorization")]
-            ConnectionAuthorizationType::Challenge { public_key } => to_hex(&public_key),
-        }
-    }
 }
 
 /// Metadata describing a connection managed by the connection manager.

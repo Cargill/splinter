@@ -31,41 +31,43 @@ pub use r#loop::{
     DispatchMessageReceiver, DispatchMessageSender,
 };
 
+use crate::peer::PeerAuthorizationToken;
+
 /// A wrapper for a PeerId.
 ///
 /// This type constrains a dispatcher to peer-specific messages
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct PeerId(String);
+#[derive(Debug, Clone, PartialEq)]
+pub struct PeerId(PeerAuthorizationToken);
 
 impl std::ops::Deref for PeerId {
-    type Target = str;
+    type Target = PeerAuthorizationToken;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl From<String> for PeerId {
-    fn from(s: String) -> PeerId {
-        PeerId(s)
+impl From<PeerAuthorizationToken> for PeerId {
+    fn from(p: PeerAuthorizationToken) -> PeerId {
+        PeerId(p)
     }
 }
 
-impl From<&str> for PeerId {
-    fn from(s: &str) -> PeerId {
-        PeerId(s.into())
+impl From<PeerId> for PeerAuthorizationToken {
+    fn from(p: PeerId) -> PeerAuthorizationToken {
+        p.0
     }
 }
 
 impl From<PeerId> for String {
     fn from(peer_id: PeerId) -> String {
-        peer_id.0
+        peer_id.0.id_as_string()
     }
 }
 
 impl fmt::Display for PeerId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.0)
+        f.write_str(&format!("{}", self.0))
     }
 }
 
@@ -422,7 +424,7 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                "TestPeer".into(),
+                PeerAuthorizationToken::from_peer_id("TestPeer").into(),
                 &NetworkMessageType::NETWORK_ECHO,
                 outgoing_message_bytes
             )
@@ -460,7 +462,7 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 dispatcher.dispatch(
-                    "TestPeer".into(),
+                    PeerAuthorizationToken::from_peer_id("TestPeer").into(),
                     &NetworkMessageType::NETWORK_ECHO,
                     outgoing_message_bytes
                 )

@@ -41,6 +41,7 @@ use crate::transport::matrix::{
 
 use super::connector::{PeerLookup, PeerLookupProvider};
 use super::error::PeerInterconnectError;
+use super::PeerAuthorizationToken;
 
 const DEFAULT_PENDING_QUEUE_SIZE: usize = 100;
 const DEFAULT_TIME_BETWEEN_ATTEMPTS: u64 = 10; // 10 seconds
@@ -50,7 +51,10 @@ const DEFAULT_INITIAL_ATTEMPTS: usize = 3; // 3 attempts
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum SendRequest {
     Shutdown,
-    Message { recipient: String, payload: Vec<u8> },
+    Message {
+        recipient: PeerAuthorizationToken,
+        payload: Vec<u8>,
+    },
 }
 
 /// A sender for outgoing messages that will be sent to peers.
@@ -75,7 +79,11 @@ impl NetworkMessageSender {
     ///
     /// * `recipient` - the peer ID the messsage is for
     /// * `payload` - the bytes of the message that should be sent
-    pub fn send(&self, recipient: String, payload: Vec<u8>) -> Result<(), (String, Vec<u8>)> {
+    pub fn send(
+        &self,
+        recipient: PeerAuthorizationToken,
+        payload: Vec<u8>,
+    ) -> Result<(), (PeerAuthorizationToken, Vec<u8>)> {
         self.sender
             .send(SendRequest::Message { recipient, payload })
             .map_err(|err| match err.0 {
@@ -365,7 +373,7 @@ fn run_recv_loop<R>(
 where
     R: ConnectionMatrixReceiver + 'static,
 {
-    let mut connection_id_to_peer_id: HashMap<String, String> = HashMap::new();
+    let mut connection_id_to_peer_id: HashMap<String, PeerAuthorizationToken> = HashMap::new();
     loop {
         // receive messages from peers
         let envelope = match message_receiver.recv() {
@@ -448,7 +456,7 @@ fn run_send_loop<S>(
 where
     S: ConnectionMatrixSender + 'static,
 {
-    let mut peer_id_to_connection_id: HashMap<String, String> = HashMap::new();
+    let mut peer_id_to_connection_id: HashMap<PeerAuthorizationToken, String> = HashMap::new();
     loop {
         // receive message from internal handlers to send over the network
         let (recipient, payload) = match receiver.recv() {
@@ -530,7 +538,7 @@ fn run_pending_recv_loop(
     receiver: Receiver<RetryIncoming>,
     dispatch_msg_sender: DispatchMessageSender<NetworkMessageType>,
 ) -> Result<(), String> {
-    let mut connection_id_to_peer_id: HashMap<String, String> = HashMap::new();
+    let mut connection_id_to_peer_id: HashMap<String, PeerAuthorizationToken> = HashMap::new();
     let mut pending_queue = VecDeque::new();
     loop {
         match receiver.recv() {
@@ -782,10 +790,16 @@ pub mod tests {
             .expect("Unable to get subscriber");
 
         let peer_ref = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["test".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                vec!["test".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer")
+        );
 
         // timeout after 60 seconds
         let timeout = Duration::from_secs(60);
@@ -795,7 +809,7 @@ pub mod tests {
         assert_eq!(
             notification,
             PeerManagerNotification::Connected {
-                peer: "test_peer".to_string()
+                peer: PeerAuthorizationToken::from_peer_id("test_peer")
             }
         );
 
@@ -912,7 +926,10 @@ pub mod tests {
                     .send(Shutdown {})
                     .expect("Cannot send shutdown");
             } else {
-                assert_eq!(message_context.source_peer_id(), "test_peer");
+                assert_eq!(
+                    message_context.source_peer_id(),
+                    &PeerId::from(PeerAuthorizationToken::from_peer_id("test_peer"))
+                );
                 let echo_bytes = message.write_to_bytes().unwrap();
 
                 let mut network_msg = NetworkMessage::new();

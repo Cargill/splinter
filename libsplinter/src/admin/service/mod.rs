@@ -31,13 +31,13 @@ use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::{self, Message};
 
-use crate::admin::store::{self, AdminServiceStore};
+use crate::admin::store::{self, AdminServiceStore, AuthorizationType};
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::Proposal;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
-use crate::peer::{PeerManagerConnector, PeerManagerNotification};
+use crate::peer::{PeerAuthorizationToken, PeerManagerConnector, PeerManagerNotification};
 use crate::protocol::{ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION};
 use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
@@ -270,27 +270,39 @@ impl AdminService {
             .routing_table_writer();
 
         for circuit in active_circuits {
-            let mut routing_members = vec![];
             // restart all peer in the circuit
             for member in circuit.members().iter() {
                 if member.node_id() != self.node_id {
                     if let Some(node) = nodes.get(member.node_id()) {
+                        // Need to manually get peer token here because we also need the endpoints
+                        // for requesting the peer ref
+                        let peer_token = match circuit.authorization_type() {
+                            AuthorizationType::Trust => {
+                                PeerAuthorizationToken::from_peer_id(member.node_id())
+                            }
+                            #[cfg(feature = "challenge-authorization")]
+                            AuthorizationType::Challenge => {
+                                if let Some(public_key) = member.public_key() {
+                                    PeerAuthorizationToken::from_public_key(public_key)
+                                } else {
+                                    error!(
+                                        "No public key set when circuit requries challenge \
+                                        authorization: {}",
+                                        circuit.circuit_id()
+                                    );
+                                    continue;
+                                }
+                            }
+                        };
+
                         let peer_ref = self
                             .peer_connector
-                            .add_peer_ref(member.node_id().to_string(), node.endpoints().to_vec());
-
+                            .add_peer_ref(peer_token.clone(), node.endpoints().to_vec());
                         if let Ok(peer_ref) = peer_ref {
                             peer_refs.push(peer_ref);
                         } else {
                             info!("Unable to peer with {} at this time", member.node_id());
                         }
-
-                        routing_members.push(routing::CircuitNode::new(
-                            member.node_id().to_string(),
-                            node.endpoints().to_vec(),
-                            #[cfg(feature = "challenge-authorization")]
-                            None,
-                        ))
                     } else {
                         error!("Missing node information for {}", member.node_id());
                     }
@@ -323,6 +335,19 @@ impl AdminService {
                 })
                 .collect::<Vec<_>>();
 
+            let routing_members = circuit
+                .members()
+                .iter()
+                .map(|node| {
+                    routing::CircuitNode::new(
+                        node.node_id().to_string(),
+                        node.endpoints().to_vec(),
+                        #[cfg(feature = "challenge-authorization")]
+                        node.public_key().clone(),
+                    )
+                })
+                .collect::<Vec<routing::CircuitNode>>();
+
             writer
                 .add_circuit(
                     circuit.circuit_id().to_string(),
@@ -335,7 +360,7 @@ impl AdminService {
                             .map(|node| node.node_id().to_string())
                             .collect(),
                         #[cfg(feature = "challenge-authorization")]
-                        routing::AuthorizationType::Trust,
+                        circuit.authorization_type().into(),
                     ),
                     routing_members,
                 )
@@ -422,9 +447,30 @@ impl AdminService {
             // connect to all peers in the circuit proposal
             for member in proposal.circuit().members().iter() {
                 if member.node_id() != self.node_id {
+                    // Need to manually get peer token here because we also need the endpoints
+                    // for requesting the peer ref
+                    let peer_token = match proposal.circuit().authorization_type() {
+                        AuthorizationType::Trust => {
+                            PeerAuthorizationToken::from_peer_id(member.node_id())
+                        }
+                        #[cfg(feature = "challenge-authorization")]
+                        AuthorizationType::Challenge => {
+                            if let Some(public_key) = member.public_key() {
+                                PeerAuthorizationToken::from_public_key(public_key)
+                            } else {
+                                error!(
+                                    "No public key set when circuit requries challenge \
+                                    authorization: {}",
+                                    proposal.circuit().circuit_id()
+                                );
+                                continue;
+                            }
+                        }
+                    };
+
                     let peer_ref = self
                         .peer_connector
-                        .add_peer_ref(member.node_id().to_string(), member.endpoints().to_vec());
+                        .add_peer_ref(peer_token, member.endpoints().to_vec());
 
                     if let Ok(peer_ref) = peer_ref {
                         peer_refs.push(peer_ref);

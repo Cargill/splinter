@@ -22,16 +22,18 @@ use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::{Message, RepeatedField};
 
 use crate::admin::store::{
-    AdminServiceStore, Circuit as StoreCircuit, CircuitBuilder as StoreCircuitBuilder, CircuitNode,
-    CircuitPredicate, CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus,
-    ProposalType, ProposedNode, Service as StoreService, Vote, VoteRecordBuilder,
+    AdminServiceStore, AuthorizationType, Circuit as StoreCircuit,
+    CircuitBuilder as StoreCircuitBuilder, CircuitNode, CircuitPredicate,
+    CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus, ProposalType,
+    ProposedCircuit, Service as StoreService, Vote, VoteRecordBuilder,
 };
+use crate::admin::token::ListPeerAuthorizationTokens;
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
-use crate::peer::{PeerManagerConnector, PeerRef};
+use crate::peer::{PeerAuthorizationToken, PeerManagerConnector, PeerRef};
 use crate::protocol::{
     ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION, CIRCUIT_PROTOCOL_VERSION,
 };
@@ -71,11 +73,11 @@ pub enum AdminServiceStatus {
 }
 
 pub struct PendingPayload {
-    pub unpeered_ids: Vec<String>,
+    pub unpeered_ids: Vec<PeerAuthorizationToken>,
     pub missing_protocol_ids: Vec<String>,
     pub payload_type: PayloadType,
     pub message_sender: String,
-    pub members: Vec<String>,
+    pub members: Vec<PeerAuthorizationToken>,
 }
 
 enum CircuitProposalStatus {
@@ -109,7 +111,7 @@ pub struct AdminServiceShared {
     peer_connector: PeerManagerConnector,
     // PeerRef Map, peer_id to PeerRef, these PeerRef should be dropped when the peer is no longer
     // needed
-    peer_refs: HashMap<String, Vec<PeerRef>>,
+    peer_refs: HashMap<PeerAuthorizationToken, Vec<PeerRef>>,
     // network sender is used to communicate with other services on the splinter network
     network_sender: Option<Box<dyn ServiceNetworkSender>>,
     // the CircuitManagementPayloads that are waiting for members to be peered
@@ -142,6 +144,8 @@ pub struct AdminServiceShared {
     routing_table_writer: Box<dyn RoutingTableWriter>,
     // Mailbox of AdminServiceEvent values
     event_store: Box<dyn AdminServiceStore>,
+    #[cfg(feature = "challenge-authorization")]
+    public_keys: Vec<Vec<u8>>,
 }
 
 impl AdminServiceShared {
@@ -160,6 +164,7 @@ impl AdminServiceShared {
         key_permission_manager: Box<dyn KeyPermissionManager>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
         admin_service_event_store: Box<dyn AdminServiceStore>,
+        #[cfg(feature = "challenge-authorization")] public_keys: Vec<Vec<u8>>,
     ) -> Self {
         AdminServiceShared {
             node_id,
@@ -186,11 +191,34 @@ impl AdminServiceShared {
             admin_service_status: AdminServiceStatus::NotRunning,
             routing_table_writer,
             event_store: admin_service_event_store,
+            #[cfg(feature = "challenge-authorization")]
+            public_keys,
         }
     }
 
     pub fn node_id(&self) -> &str {
         &self.node_id
+    }
+
+    fn is_local_node(&self, peer_id: &PeerAuthorizationToken) -> bool {
+        match peer_id {
+            PeerAuthorizationToken::Trust { peer_id } => peer_id == self.node_id(),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::Challenge { public_key } => {
+                self.public_keys.contains(&public_key)
+            }
+        }
+    }
+
+    // The local admin service will always be connected using Trust
+    fn is_local_admin_service(&self, peer_id: &PeerAuthorizationToken) -> bool {
+        match peer_id {
+            PeerAuthorizationToken::Trust { .. } => {
+                peer_id.has_peer_id(&admin_service_id(self.node_id()))
+            }
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::Challenge { .. } => false,
+        }
     }
 
     pub fn network_sender(&self) -> &Option<Box<dyn ServiceNetworkSender>> {
@@ -244,7 +272,7 @@ impl AdminServiceShared {
             peer_ref_vec.push(peer_ref);
         } else {
             self.peer_refs
-                .insert(peer_ref.peer_id().to_string(), vec![peer_ref]);
+                .insert(peer_ref.peer_id().clone(), vec![peer_ref]);
         }
     }
 
@@ -254,15 +282,18 @@ impl AdminServiceShared {
         }
     }
 
-    pub fn remove_peer_ref(&mut self, peer_id: &str) {
-        if let Some(mut peer_ref_vec) = self.peer_refs.remove(peer_id) {
-            peer_ref_vec.pop();
-            if !peer_ref_vec.is_empty() {
-                self.peer_refs.insert(peer_id.to_string(), peer_ref_vec);
-            } else {
-                // If we have no other peer refs for this peer, the connection will be closed.
-                // On reconnection, the peer must go through protocol agreement again
-                self.service_protocols.remove(&admin_service_id(&peer_id));
+    pub fn remove_peer_refs(&mut self, peer_ids: Vec<PeerAuthorizationToken>) {
+        for peer_id in peer_ids {
+            if let Some(mut peer_ref_vec) = self.peer_refs.remove(&peer_id) {
+                peer_ref_vec.pop();
+                if !peer_ref_vec.is_empty() {
+                    self.peer_refs.insert(peer_id, peer_ref_vec);
+                } else {
+                    // If we have no other peer refs for this peer, the connection will be closed.
+                    // On reconnection, the peer must go through protocol agreement again
+                    self.service_protocols
+                        .remove(&admin_service_id(&peer_id.id_as_string()));
+                }
             }
         }
     }
@@ -403,7 +434,7 @@ impl AdminServiceShared {
                                     .map(|node| node.node_id().to_string())
                                     .collect(),
                                 #[cfg(feature = "challenge-authorization")]
-                                routing::AuthorizationType::Trust,
+                                circuit.authorization_type().into(),
                             );
 
                             let routing_members = circuit_proposal
@@ -415,7 +446,11 @@ impl AdminServiceShared {
                                         node.get_node_id().to_string(),
                                         node.get_endpoints().to_vec(),
                                         #[cfg(feature = "challenge-authorization")]
-                                        None,
+                                        if node.get_public_key().is_empty() {
+                                            None
+                                        } else {
+                                            Some(node.get_public_key().to_vec())
+                                        },
                                     )
                                 })
                                 .collect::<Vec<routing::CircuitNode>>();
@@ -540,9 +575,15 @@ impl AdminServiceShared {
                         #[cfg(feature = "admin-service-count")]
                         self.update_metrics()?;
                         if let Some(proposal) = proposal {
-                            for member in proposal.circuit().members().iter() {
-                                self.remove_peer_ref(member.node_id());
-                            }
+                            self.remove_peer_refs(proposal.circuit().list_tokens().map_err(
+                                |err| {
+                                    AdminSharedError::SplinterStateError(format!(
+                                        "Unable to remove peer refs for proposal {}: {}",
+                                        proposal.circuit_id(),
+                                        err
+                                    ))
+                                },
+                            )?);
                         }
                         let circuit_proposal_proto =
                             messages::CircuitProposal::from_proto(circuit_proposal.clone())
@@ -613,10 +654,17 @@ impl AdminServiceShared {
                     protocol,
                 )
                 .map_err(|err| {
-                    // remove peer_ref because we will not accept this proposal
-                    for member in proposed_circuit.get_members() {
-                        self.remove_peer_ref(member.get_node_id())
-                    }
+                    match proposed_circuit.list_tokens() {
+                        Ok(tokens) => self.remove_peer_refs(tokens),
+                        Err(err) => {
+                            error!(
+                                "Unable to remove peer refs for proposal {}: {}",
+                                proposed_circuit.get_circuit_id(),
+                                err
+                            );
+                        }
+                    };
+
                     err
                 })?;
                 debug!("proposing {}", proposed_circuit.get_circuit_id());
@@ -672,10 +720,16 @@ impl AdminServiceShared {
                 )
                 .map_err(|err| {
                     if circuit_proposal.proposal_type() == &ProposalType::Create {
-                        // remove peer_ref because we will not accept this proposal
-                        for member in circuit_proposal.circuit().members() {
-                            self.remove_peer_ref(member.node_id())
-                        }
+                        match circuit_proposal.circuit().list_tokens() {
+                            Ok(tokens) => self.remove_peer_refs(tokens),
+                            Err(err) => {
+                                error!(
+                                    "Unable to remove peer refs for proposal {}: {}",
+                                    circuit_proposal.circuit_id(),
+                                    err
+                                );
+                            }
+                        };
                     }
                     err
                 })?;
@@ -818,13 +872,39 @@ impl AdminServiceShared {
                 .get_circuit()
                 .get_circuit_id()
         );
+        let proposed_circuit =
+            ProposedCircuit::from_proto(payload.get_circuit_create_request().get_circuit().clone())
+                .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
-        // get members as vec to payload can be sent to helper function as well
-        let members = payload
-            .get_circuit_create_request()
-            .get_circuit()
-            .get_members()
-            .to_vec();
+        // Need to gather the tokens here because the endpoints are also required
+        let members = proposed_circuit
+            .members()
+            .iter()
+            .map(|member| match proposed_circuit.authorization_type() {
+                AuthorizationType::Trust => Ok((
+                    PeerAuthorizationToken::from_peer_id(member.node_id()),
+                    member.endpoints().to_vec(),
+                )),
+                #[cfg(feature = "challenge-authorization")]
+                AuthorizationType::Challenge => {
+                    if let Some(public_key) = member.public_key() {
+                        Ok((
+                            PeerAuthorizationToken::from_public_key(public_key),
+                            member.endpoints().to_vec(),
+                        ))
+                    } else {
+                        Err(ServiceError::UnableToHandleMessage(Box::new(
+                            AdminSharedError::ValidationFailed(format!(
+                                "No public key set when circuit requries challenge \
+                                    authorization: {}",
+                                proposed_circuit.circuit_id()
+                            )),
+                        )))
+                    }
+                }
+            })
+            .collect::<Result<Vec<(PeerAuthorizationToken, Vec<String>)>, ServiceError>>()?;
+
         self.check_connected_peers_payload_create(&members, payload, message_sender)
     }
 
@@ -854,11 +934,13 @@ impl AdminServiceShared {
                 )))
             })?;
 
-        self.check_connected_peers_payload_vote(
-            &proposal.circuit().members(),
-            payload,
-            message_sender,
-        )
+        let members = proposal.circuit().list_tokens().map_err(|err| {
+            ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
+                format!("Unable to get peer tokens for members: {}", err),
+            )))
+        })?;
+
+        self.check_connected_peers_payload_vote(&members, payload, message_sender)
     }
 
     /// Once a local `CircuitDisbandRequest` has been validated, the admin service may now proceed
@@ -879,11 +961,16 @@ impl AdminServiceShared {
             .make_disband_request_circuit_proposal(circuit_id, requester, requester_node_id)
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
-        self.check_connected_peers_payload_disband(
-            &circuit_proposal.get_circuit_proposal().get_members(),
-            payload,
-            message_sender,
-        )
+        let members = circuit_proposal
+            .get_circuit_proposal()
+            .list_tokens()
+            .map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
+                    format!("Unable to get peer tokens for members: {}", err),
+                )))
+            })?;
+
+        self.check_connected_peers_payload_disband(&members, payload, message_sender)
     }
 
     #[cfg(feature = "admin-service-count")]
@@ -1025,9 +1112,14 @@ impl AdminServiceShared {
                 )))
             })?;
         // Removing the circuit's peer refs
-        for member in stored_circuit.members() {
-            self.remove_peer_ref(member.node_id());
-        }
+        self.remove_peer_refs(stored_circuit.list_tokens().map_err(|err| {
+            ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                format!(
+                    "Unable to remove peer refs for circuit: {}: {}",
+                    circuit_id, err
+                ),
+            )))
+        })?);
 
         Ok(())
     }
@@ -1078,10 +1170,14 @@ impl AdminServiceShared {
             self.update_metrics()
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
-            // Remove the peer refs belonging to the removed proposal
-            for member in proposal.circuit().members() {
-                self.remove_peer_ref(member.node_id());
-            }
+            self.remove_peer_refs(proposal.circuit().list_tokens().map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                    format!(
+                        "Unable to remove peer refs for proposal: {}: {}",
+                        circuit_id, err
+                    ),
+                )))
+            })?);
             Ok(())
         } else {
             Err(ServiceError::UnableToHandleMessage(Box::new(
@@ -1093,17 +1189,20 @@ impl AdminServiceShared {
         }
     }
 
-    pub fn send_protocol_request(&mut self, node_id: &str) -> Result<(), ServiceError> {
+    pub fn send_protocol_request(
+        &mut self,
+        node_id: &PeerAuthorizationToken,
+    ) -> Result<(), ServiceError> {
         if self
             .service_protocols
-            .get(&admin_service_id(node_id))
+            .get(&admin_service_id(&node_id.id_as_string()))
             .is_none()
         {
             // we will always have the network sender at this point
             if let Some(ref network_sender) = self.network_sender {
                 debug!(
                     "Sending service protocol request to {}",
-                    admin_service_id(node_id)
+                    admin_service_id(&node_id.id_as_string())
                 );
                 let mut request = ServiceProtocolVersionRequest::new();
                 request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
@@ -1113,12 +1212,12 @@ impl AdminServiceShared {
                 msg.set_protocol_request(request);
 
                 let envelope_bytes = msg.write_to_bytes()?;
-                network_sender.send(&admin_service_id(node_id), &envelope_bytes)?;
+                network_sender.send(&admin_service_id(&node_id.id_as_string()), &envelope_bytes)?;
             }
         } else {
             debug!(
                 "Already agreed on protocol version with {}",
-                admin_service_id(node_id)
+                admin_service_id(&node_id.id_as_string())
             );
         }
         Ok(())
@@ -1126,23 +1225,23 @@ impl AdminServiceShared {
 
     fn check_connected_peers_payload_vote(
         &mut self,
-        members: &[ProposedNode],
+        members: &[PeerAuthorizationToken],
         payload: CircuitManagementPayload,
         message_sender: String,
     ) -> Result<(), ServiceError> {
         let mut missing_protocol_ids = vec![];
         let mut pending_members = vec![];
         for node in members {
-            if self.node_id() != node.node_id()
+            if !self.is_local_node(node)
                 && self
                     .service_protocols
-                    .get(&admin_service_id(node.node_id()))
+                    .get(&admin_service_id(&node.id_as_string()))
                     .is_none()
             {
-                self.send_protocol_request(node.node_id())?;
-                missing_protocol_ids.push(admin_service_id(node.node_id()))
+                self.send_protocol_request(node)?;
+                missing_protocol_ids.push(admin_service_id(&node.id_as_string()))
             }
-            pending_members.push(node.node_id().to_string());
+            pending_members.push(node.clone());
         }
 
         if missing_protocol_ids.is_empty() {
@@ -1166,46 +1265,41 @@ impl AdminServiceShared {
 
     fn check_connected_peers_payload_create(
         &mut self,
-        members: &[SplinterNode],
+        members: &[(PeerAuthorizationToken, Vec<String>)],
         payload: CircuitManagementPayload,
         message_sender: String,
     ) -> Result<(), ServiceError> {
         let mut missing_protocol_ids = vec![];
         let mut pending_peers = vec![];
         let mut pending_members = vec![];
-        let mut added_peers: Vec<String> = vec![];
-        for node in members {
-            if self.node_id() != node.get_node_id() {
-                debug!("Referencing node {:?}", node);
+        let mut added_peers: Vec<PeerAuthorizationToken> = vec![];
+        for (node_id, endpoints) in members {
+            if !self.is_local_node(node_id) {
+                debug!("Referencing node {:?}", node_id);
                 let peer_ref = self
                     .peer_connector
-                    .add_peer_ref(
-                        node.get_node_id().to_string(),
-                        node.get_endpoints().to_vec(),
-                    )
+                    .add_peer_ref(node_id.clone(), endpoints.to_vec())
                     .map_err(|err| {
                         // remove all peer refs added for this proposal
-                        for node_id in added_peers.iter() {
-                            self.remove_peer_ref(node_id);
-                        }
+                        self.remove_peer_refs(added_peers.to_vec());
 
                         ServiceError::UnableToHandleMessage(Box::new(err))
                     })?;
 
                 self.add_peer_ref(peer_ref);
-                added_peers.push(node.get_node_id().to_string());
+                added_peers.push(node_id.clone());
 
                 // if we have a protocol the connection exists for the peer already
                 if self
                     .service_protocols
-                    .get(&admin_service_id(node.get_node_id()))
+                    .get(&admin_service_id(&node_id.id_as_string()))
                     .is_none()
                 {
-                    pending_peers.push(node.get_node_id().to_string());
-                    missing_protocol_ids.push(admin_service_id(node.get_node_id()))
+                    pending_peers.push(node_id.clone());
+                    missing_protocol_ids.push(admin_service_id(&node_id.id_as_string()))
                 }
             }
-            pending_members.push(node.get_node_id().to_string())
+            pending_members.push(node_id.clone())
         }
 
         if missing_protocol_ids.is_empty() {
@@ -1234,23 +1328,23 @@ impl AdminServiceShared {
     /// added to the `pending_protocol_payloads` list to await all nodes' protocol agreement.
     fn check_connected_peers_payload_disband(
         &mut self,
-        members: &[SplinterNode],
+        members: &[PeerAuthorizationToken],
         payload: CircuitManagementPayload,
         message_sender: String,
     ) -> Result<(), ServiceError> {
         let mut missing_protocol_ids = vec![];
         let mut pending_members = vec![];
         for node in members {
-            if self.node_id() != node.get_node_id()
+            if !self.is_local_node(node)
                 && self
                     .service_protocols
-                    .get(&admin_service_id(node.get_node_id()))
+                    .get(&admin_service_id(&node.id_as_string()))
                     .is_none()
             {
-                self.send_protocol_request(node.get_node_id())?;
-                missing_protocol_ids.push(admin_service_id(node.get_node_id()))
+                self.send_protocol_request(node)?;
+                missing_protocol_ids.push(admin_service_id(&node.id_as_string()))
             }
-            pending_members.push(node.get_node_id().to_string());
+            pending_members.push(node.clone());
         }
 
         if missing_protocol_ids.is_empty() {
@@ -1415,49 +1509,74 @@ impl AdminServiceShared {
     ) -> Result<(), ServiceError> {
         let mut missing_protocol_ids = vec![];
         let mut pending_peers = vec![];
-        let mut added_peers: Vec<String> = vec![];
+        let mut added_peers: Vec<PeerAuthorizationToken> = vec![];
         let mut pending_members = vec![];
         let mut members = vec![];
+
         // Check if that payload is to create a circuit, in which case PeerRefs for the new
         // members must be added.
         if payload.has_circuit_create_request() {
-            let create_request_members = payload
-                .get_circuit_create_request()
-                .get_circuit()
-                .get_members()
-                .to_vec();
-            for node in &create_request_members {
-                if self.node_id() != node.get_node_id() {
-                    debug!("Referencing node {:?}", node);
+            let store_proposed_circuit = ProposedCircuit::from_proto(
+                payload.get_circuit_create_request().get_circuit().clone(),
+            )
+            .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+
+            // Need to gather the tokens here because the endpoints are also required
+            let create_request_members = store_proposed_circuit
+                .members()
+                .iter()
+                .map(|member| match store_proposed_circuit.authorization_type() {
+                    AuthorizationType::Trust => Ok((
+                        PeerAuthorizationToken::from_peer_id(member.node_id()),
+                        member.endpoints().to_vec(),
+                    )),
+                    #[cfg(feature = "challenge-authorization")]
+                    AuthorizationType::Challenge => {
+                        if let Some(public_key) = member.public_key() {
+                            Ok((
+                                PeerAuthorizationToken::from_public_key(public_key),
+                                member.endpoints().to_vec(),
+                            ))
+                        } else {
+                            Err(ServiceError::UnableToHandleMessage(Box::new(
+                                AdminSharedError::ValidationFailed(format!(
+                                    "No public key set when circuit requries challenge \
+                                        authorization: {}",
+                                    store_proposed_circuit.circuit_id()
+                                )),
+                            )))
+                        }
+                    }
+                })
+                .collect::<Result<Vec<(PeerAuthorizationToken, Vec<String>)>, ServiceError>>()?;
+
+            for (node_id, endpoints) in &create_request_members {
+                if !self.is_local_node(node_id) {
+                    debug!("Referencing node {:?}", node_id);
                     let peer_ref = self
                         .peer_connector
-                        .add_peer_ref(
-                            node.get_node_id().to_string(),
-                            node.get_endpoints().to_vec(),
-                        )
+                        .add_peer_ref(node_id.clone(), endpoints.to_vec())
                         .map_err(|err| {
                             // remove all peer refs added for this proposal
-                            for node_id in added_peers.iter() {
-                                self.remove_peer_ref(node_id);
-                            }
+                            self.remove_peer_refs(added_peers.to_vec());
 
                             ServiceError::UnableToHandleMessage(Box::new(err))
                         })?;
 
                     self.add_peer_ref(peer_ref);
-                    added_peers.push(node.get_node_id().to_string());
+                    added_peers.push(node_id.clone());
 
                     // if we have a protocol the connection exists for the peer already
                     if self
                         .service_protocols
-                        .get(&admin_service_id(node.get_node_id()))
+                        .get(&admin_service_id(&node_id.id_as_string()))
                         .is_none()
                     {
-                        pending_peers.push(node.get_node_id().to_string());
-                        missing_protocol_ids.push(admin_service_id(node.get_node_id()))
+                        pending_peers.push(node_id.clone());
+                        missing_protocol_ids.push(admin_service_id(&node_id.id_as_string()))
                     }
                 }
-                pending_members.push(node.get_node_id().to_string())
+                pending_members.push(node_id.clone())
             }
             members.extend(create_request_members);
         } else if payload.has_circuit_disband_request() {
@@ -1496,17 +1615,23 @@ impl AdminServiceShared {
                     ))
                 })?;
 
-            for node in circuit.members() {
+            let tokens = circuit.list_tokens().map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
+                    format!("Unable to get peer tokens for members: {}", err),
+                )))
+            })?;
+
+            for node_id in tokens {
                 // Verify each disband member has an agreed upon protocol version with this node
                 // Otherwise, re-establish a peer connection
-                if self.node_id() != node.node_id()
+                if !self.is_local_node(&node_id)
                     && self
                         .service_protocols
-                        .get(&admin_service_id(node.node_id()))
+                        .get(&admin_service_id(&node_id.id_as_string()))
                         .is_none()
                 {
-                    pending_peers.push(node.node_id().to_string());
-                    missing_protocol_ids.push(admin_service_id(node.node_id()))
+                    pending_peers.push(node_id.clone());
+                    missing_protocol_ids.push(admin_service_id(&node_id.id_as_string()))
                 }
             }
         }
@@ -1611,8 +1736,9 @@ impl AdminServiceShared {
         self.event_subscribers.clear();
     }
 
-    pub fn on_peer_disconnected(&mut self, peer_id: String) {
-        self.service_protocols.remove(&admin_service_id(&peer_id));
+    pub fn on_peer_disconnected(&mut self, peer_id: PeerAuthorizationToken) {
+        self.service_protocols
+            .remove(&admin_service_id(&peer_id.id_as_string()));
         let mut pending_protocol_payloads = std::mem::take(&mut self.pending_protocol_payloads);
 
         // Add peer back to any pending payloads
@@ -1620,7 +1746,7 @@ impl AdminServiceShared {
             if pending_protocol_payload.members.contains(&peer_id) {
                 pending_protocol_payload
                     .missing_protocol_ids
-                    .push(peer_id.to_string())
+                    .push(admin_service_id(&peer_id.id_as_string()))
             }
         }
 
@@ -1628,7 +1754,9 @@ impl AdminServiceShared {
             pending_protocol_payloads
                 .into_iter()
                 .partition(|pending_payload| {
-                    pending_payload.missing_protocol_ids.contains(&peer_id)
+                    pending_payload
+                        .missing_protocol_ids
+                        .contains(&admin_service_id(&peer_id.id_as_string()))
                 });
 
         self.pending_protocol_payloads = protocol;
@@ -1636,7 +1764,7 @@ impl AdminServiceShared {
         let mut unpeered_payloads = std::mem::take(&mut self.unpeered_payloads);
         for unpeered_payload in unpeered_payloads.iter_mut() {
             if unpeered_payload.members.contains(&peer_id) {
-                unpeered_payload.unpeered_ids.push(peer_id.to_string())
+                unpeered_payload.unpeered_ids.push(peer_id.clone())
             }
         }
         // add payloads that are not waiting on peer connection
@@ -1644,7 +1772,10 @@ impl AdminServiceShared {
         self.unpeered_payloads = unpeered_payloads;
     }
 
-    pub fn on_peer_connected(&mut self, peer_id: &str) -> Result<(), AdminSharedError> {
+    pub fn on_peer_connected(
+        &mut self,
+        peer_id: &PeerAuthorizationToken,
+    ) -> Result<(), AdminSharedError> {
         let mut unpeered_payloads = std::mem::take(&mut self.unpeered_payloads);
         for unpeered_payload in unpeered_payloads.iter_mut() {
             unpeered_payload
@@ -1663,14 +1794,14 @@ impl AdminServiceShared {
         }
 
         // Ignore own admin service
-        if peer_id == admin_service_id(self.node_id()) {
+        if self.is_local_admin_service(peer_id) {
             return Ok(());
         }
 
         // We have already received a service protocol request, don't sent another request
         if self
             .service_protocols
-            .get(&admin_service_id(peer_id))
+            .get(&admin_service_id(&peer_id.id_as_string()))
             .is_some()
         {
             return Ok(());
@@ -1680,7 +1811,7 @@ impl AdminServiceShared {
         if let Some(ref network_sender) = self.network_sender {
             debug!(
                 "Sending service protocol request to {}",
-                admin_service_id(peer_id)
+                admin_service_id(&peer_id.id_as_string())
             );
             let mut request = ServiceProtocolVersionRequest::new();
             request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
@@ -1697,7 +1828,7 @@ impl AdminServiceShared {
             })?;
 
             network_sender
-                .send(&admin_service_id(peer_id), &envelope_bytes)
+                .send(&admin_service_id(&peer_id.id_as_string()), &envelope_bytes)
                 .map_err(|err| {
                     AdminSharedError::ServiceProtocolError(format!(
                         "Unable to send service protocol request: {}",
@@ -1795,9 +1926,7 @@ impl AdminServiceShared {
         if protocol == 0 {
             // if no agreed protocol, remove all peer refs for proposals
             for pending_payload in ready {
-                for peer in pending_payload.members {
-                    self.remove_peer_ref(&peer);
-                }
+                self.remove_peer_refs(pending_payload.members.to_vec());
             }
             return Ok(());
         }
@@ -3132,7 +3261,7 @@ impl AdminServiceShared {
         };
 
         if ready {
-            let circuit_proposal = self
+            let mut circuit_proposal = self
                 .uninitialized_circuits
                 .remove(circuit_id)
                 .expect("Pending disband circuit not set")
@@ -3162,10 +3291,24 @@ impl AdminServiceShared {
                         circuit_id
                     ))
                 })?;
+
+            let proposed_circuit = ProposedCircuit::from_proto(
+                circuit_proposal.take_circuit_proposal(),
+            )
+            .map_err(|err| {
+                AdminSharedError::SplinterStateError(format!(
+                    "Unable to get store proposed circuit from proto: {}",
+                    err
+                ))
+            })?;
             // Removing the circuit's peer refs
-            for member in circuit_proposal.get_circuit_proposal().get_members() {
-                self.remove_peer_ref(member.get_node_id());
-            }
+            self.remove_peer_refs(proposed_circuit.list_tokens().map_err(|err| {
+                AdminSharedError::SplinterStateError(format!(
+                    "Unable to remove peer refs for proposal {}: {}",
+                    proposed_circuit.circuit_id(),
+                    err
+                ))
+            })?);
         }
 
         Ok(())
@@ -3309,6 +3452,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         let service_sender = MockServiceNetworkSender::new();
@@ -3368,7 +3513,7 @@ mod tests {
 
         // Set other-node to peered
         shared
-            .on_peer_connected("other-node")
+            .on_peer_connected(&PeerAuthorizationToken::from_peer_id("other-node"))
             .expect("Unable to set peer to peered");
 
         // Still waitin on 1 peer
@@ -3377,7 +3522,7 @@ mod tests {
 
         // Set other-node to peered
         shared
-            .on_peer_connected("test-node")
+            .on_peer_connected(&PeerAuthorizationToken::from_peer_id("test-node"))
             .expect("Unable to set peer to peered");
 
         // We're fully peered, but need to wait for protocol to be agreed on
@@ -3446,6 +3591,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         let service_sender = MockServiceNetworkSender::new();
@@ -3493,7 +3640,7 @@ mod tests {
 
         // Set other-node to peered
         shared
-            .on_peer_connected("other-node")
+            .on_peer_connected(&PeerAuthorizationToken::from_peer_id("other-node"))
             .expect("Unable to set peer to peered");
 
         assert_eq!(0, shared.unpeered_payloads.len());
@@ -3545,6 +3692,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let circuit = setup_test_circuit();
 
@@ -3588,6 +3737,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let circuit = setup_test_circuit();
 
@@ -3625,6 +3776,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let circuit = setup_test_circuit();
 
@@ -3666,6 +3819,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let circuit = setup_test_circuit();
 
@@ -3718,6 +3873,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -3765,6 +3922,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -3815,6 +3974,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -3862,6 +4023,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -3909,6 +4072,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -3961,6 +4126,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
         circuit.set_roster(RepeatedField::from_vec(vec![]));
@@ -4002,6 +4169,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4045,6 +4214,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4092,6 +4263,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4146,6 +4319,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4200,6 +4375,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4242,6 +4419,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4284,6 +4463,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4334,6 +4515,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4384,6 +4567,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4434,6 +4619,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4476,6 +4663,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4518,6 +4707,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4560,6 +4751,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4602,6 +4795,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4645,6 +4840,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_v1_test_circuit();
 
@@ -4689,6 +4886,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let mut circuit = setup_test_circuit();
 
@@ -4729,6 +4928,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
@@ -4772,6 +4973,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
@@ -4814,6 +5017,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
@@ -4856,6 +5061,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
@@ -4906,6 +5113,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
@@ -4954,6 +5163,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         let circuit = setup_test_circuit();
@@ -5013,6 +5224,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         let circuit = setup_test_circuit();
@@ -5073,6 +5286,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         let circuit = setup_test_circuit();
@@ -5135,6 +5350,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         let circuit = setup_test_circuit();
@@ -5201,6 +5418,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the circuit to be disbanded
@@ -5261,6 +5480,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the circuit to be disbanded
@@ -5319,6 +5540,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the v1 circuit to be attempted to disbanded
@@ -5378,6 +5601,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         if let Ok(()) = admin_shared.validate_disband_circuit(
@@ -5427,6 +5652,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the circuit to be disbanded
@@ -5486,6 +5713,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         admin_shared
@@ -5572,6 +5801,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         let service_sender = MockServiceNetworkSender::new();
@@ -5611,12 +5842,12 @@ mod tests {
 
         // Set `node_b` to peered
         shared
-            .on_peer_connected("node_b")
+            .on_peer_connected(&PeerAuthorizationToken::from_peer_id("node_b"))
             .expect("Unable to set peer to peered");
 
         // Set `node_a` to peered
         shared
-            .on_peer_connected("node_a")
+            .on_peer_connected(&PeerAuthorizationToken::from_peer_id("other_a"))
             .expect("Unable to set peer to peered");
 
         shared
@@ -5682,6 +5913,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the disbanded circuit to be purged
@@ -5734,6 +5967,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         if let Ok(()) = admin_shared.validate_purge_request("01234-ABCDE", PUB_KEY, "node_a") {
@@ -5777,6 +6012,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the circuit to be purged
@@ -5831,6 +6068,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the disbanded circuit to be purged
@@ -5886,6 +6125,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         admin_shared
@@ -5944,6 +6185,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the disbanded circuit to be purged
@@ -6016,6 +6259,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the circuit to be abandoned
@@ -6063,6 +6308,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         if let Ok(()) = admin_shared.validate_abandon_circuit("01234-ABCDE", PUB_KEY, "node_a") {
@@ -6102,6 +6349,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the circuit to be abandoned
@@ -6152,6 +6401,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the circuit to be abandoned
@@ -6201,6 +6452,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the circuit to be abandoned
@@ -6258,6 +6511,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         // Add the circuit to be abandoned
@@ -6333,6 +6588,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
         let store_proposal = StoreProposal::from_proto(setup_test_proposal(&setup_test_circuit()))
             .expect("Unable to build CircuitProposal");
@@ -6379,6 +6636,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         if let Ok(()) = admin_shared.validate_remove_proposal("01234-ABCDE", PUB_KEY, "node_a") {
@@ -6420,6 +6679,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         let store_proposal = StoreProposal::from_proto(setup_test_proposal(&setup_test_circuit()))
@@ -6468,6 +6729,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         let store_proposal = StoreProposal::from_proto(setup_test_proposal(&setup_test_circuit()))
@@ -6524,6 +6787,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
         );
 
         let store_proposal = StoreProposal::from_proto(setup_test_proposal(&setup_test_circuit()))

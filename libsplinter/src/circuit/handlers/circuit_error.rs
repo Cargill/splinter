@@ -55,7 +55,7 @@ impl Handler for CircuitErrorHandler {
                 if node_id == self.node_id {
                     // If the service is connected to this node, send the error to the service
                     match service.peer_id() {
-                        Some(peer_id) => peer_id.to_string(),
+                        Some(peer_id) => peer_id.clone(),
                         None => {
                             // This should never happen, as a peer id will always
                             // be set on a service that is connected to the local node.
@@ -65,7 +65,28 @@ impl Handler for CircuitErrorHandler {
                     }
                 } else {
                     // If the service is connected to another node, send the error to that node
-                    service.node_id().to_string()
+                    let circuit = self
+                        .routing_table
+                        .get_circuit(circuit_name)
+                        .map_err(|err| DispatchError::HandleError(err.to_string()))?
+                        .ok_or_else(|| {
+                            DispatchError::HandleError(format!(
+                                "Circuit does not exist {}, cannot sent error",
+                                node_id
+                            ))
+                        })?;
+
+                    self.routing_table
+                        .get_node(&service.node_id())
+                        .map_err(|err| DispatchError::HandleError(err.to_string()))?
+                        .ok_or_else(|| {
+                            DispatchError::HandleError(format!(
+                                "Node {} not in routing table",
+                                node_id
+                            ))
+                        })?
+                        .get_peer_auth_token(circuit.authorization_type())
+                        .map_err(|err| DispatchError::HandleError(err.to_string()))?
                 }
             }
             None => {
@@ -118,6 +139,7 @@ mod tests {
         memory::RoutingTable, Circuit, CircuitNode, RoutingTableWriter, Service,
     };
     use crate::network::dispatch::Dispatcher;
+    use crate::peer::PeerAuthorizationToken;
     use crate::protos::circuit::{CircuitError_Error, CircuitMessage};
     use crate::protos::network::{NetworkEcho, NetworkMessage, NetworkMessageType};
 
@@ -178,8 +200,8 @@ mod tests {
 
         let abc_id = ServiceId::new("alpha".into(), "abc".into());
         let def_id = ServiceId::new("alpha".into(), "def".into());
-        service_abc.set_peer_id("abc_network".to_string());
-        service_def.set_peer_id("def_network".to_string());
+        service_abc.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
+        service_def.set_peer_id(PeerAuthorizationToken::from_peer_id("def_network"));
 
         writer.add_service(abc_id, service_abc).unwrap();
         writer.add_service(def_id, service_def).unwrap();
@@ -200,7 +222,7 @@ mod tests {
         // dispatch the error message
         dispatcher
             .dispatch(
-                "345".into(),
+                PeerAuthorizationToken::from_peer_id("345").into(),
                 &CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
                 error_bytes.clone(),
             )
@@ -210,7 +232,7 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            "abc_network",
+            PeerAuthorizationToken::from_peer_id("abc_network").into(),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -282,8 +304,8 @@ mod tests {
 
         let abc_id = ServiceId::new("alpha".into(), "abc".into());
         let def_id = ServiceId::new("alpha".into(), "def".into());
-        service_abc.set_peer_id("abc_network".to_string());
-        service_def.set_peer_id("def_network".to_string());
+        service_abc.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
+        service_def.set_peer_id(PeerAuthorizationToken::from_peer_id("def_network"));
 
         writer.add_service(abc_id, service_abc).unwrap();
         writer.add_service(def_id, service_def).unwrap();
@@ -304,7 +326,7 @@ mod tests {
         // dispatch the error message
         dispatcher
             .dispatch(
-                "586".into(),
+                PeerAuthorizationToken::from_peer_id("586").into(),
                 &CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
                 error_bytes.clone(),
             )
@@ -314,7 +336,7 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            "345",
+            PeerAuthorizationToken::from_peer_id("345").into(),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
                 assert_eq!(msg.get_service_id(), "def");
@@ -355,7 +377,7 @@ mod tests {
         // dispatch the error message
         dispatcher
             .dispatch(
-                "def".into(),
+                PeerAuthorizationToken::from_peer_id("def").into(),
                 &CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
                 error_bytes.clone(),
             )
@@ -367,7 +389,10 @@ mod tests {
         network_msg.set_payload(network_echo.write_to_bytes().unwrap());
         network_msg.set_message_type(NetworkMessageType::NETWORK_ECHO);
         mock_sender
-            .send("345".into(), network_msg.write_to_bytes().unwrap())
+            .send(
+                PeerAuthorizationToken::from_peer_id("345").into(),
+                network_msg.write_to_bytes().unwrap(),
+            )
             .expect("Unable to send network echo");
 
         let (_, message) = mock_sender.next_outbound().expect("No message was sent");
@@ -383,12 +408,12 @@ mod tests {
 
     fn assert_network_message<M: protobuf::Message, F: Fn(M)>(
         message: Vec<u8>,
-        recipient: String,
-        expected_recipient: &str,
+        recipient: PeerAuthorizationToken,
+        expected_recipient: PeerAuthorizationToken,
         expected_circuit_msg_type: CircuitMessageType,
         detail_assertions: F,
     ) {
-        assert_eq!(expected_recipient, &recipient);
+        assert_eq!(expected_recipient, recipient);
 
         let network_msg: NetworkMessage = Message::parse_from_bytes(&message).unwrap();
         let circuit_msg: CircuitMessage =

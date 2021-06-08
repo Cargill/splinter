@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
+use crate::peer::PeerAuthorizationToken;
 use crate::protos::network::{NetworkEcho, NetworkHeartbeat, NetworkMessage, NetworkMessageType};
 
 use protobuf::Message;
@@ -43,9 +44,11 @@ impl Handler for NetworkEchoHandler {
             // if the recipient is us forward back to sender else forward on to the intended
             // recipient
             if msg.get_recipient() == self.node_id {
-                context.source_peer_id().to_string()
+                context.source_peer_id().clone()
             } else {
-                msg.get_recipient().to_string()
+                // NetworkEcho currently only can be sent to peers who are using Trust
+                // authorization
+                PeerAuthorizationToken::from_peer_id(msg.get_recipient()).into()
             }
         };
 
@@ -62,7 +65,7 @@ impl Handler for NetworkEchoHandler {
         let network_msg_bytes = network_msg.write_to_bytes().unwrap();
 
         sender
-            .send(recipient.into(), network_msg_bytes)
+            .send(recipient, network_msg_bytes)
             .map_err(|(recipient, payload)| {
                 DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
@@ -139,7 +142,7 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                "OTHER_PEER".into(),
+                PeerAuthorizationToken::from_peer_id("OTHER_PEER").into(),
                 &NetworkMessageType::NETWORK_ECHO,
                 outgoing_message_bytes.clone()
             )
