@@ -170,13 +170,17 @@ message AuthChallengeNonceResponse {
     bytes nonce = 1;
 }
 
+message SubmitRequest {
+    bytes public_key = 1;
+    bytes signature = 2;
+}
+
 // Challenge submit requests
 //
-// The connecting nodes public key and the signature created by signing the
+// The connecting nodes public keys and the signatures created by signing the
 // nonce received from the nonce response
 message AuthChallengeSubmitRequest {
-  bytes public_key = 1;
-  bytes signature = 2;
+    repeated SubmitRequest submit_requests = 1;
 }
 
 // v1 challenge response
