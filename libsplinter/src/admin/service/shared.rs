@@ -1478,7 +1478,7 @@ impl AdminServiceShared {
             }
             members.extend(create_request_members);
         } else if payload.has_circuit_disband_request() {
-            // If a `CircuitDisbandRequest` is present in the payload, the members mut be gathered
+            // If a `CircuitDisbandRequest` is present in the payload, the members must be gathered
             // from the admin store based on the provided circuit id.
             // If the members list has already been updated, the payload was to create a
             // new circuit.
@@ -1513,22 +1513,19 @@ impl AdminServiceShared {
                     ))
                 })?;
 
-            // Collecting the node endpoints associated with the currently active version of the
-            // circuit proposed to be disbanded.
-            let disband_members = circuit
-                .members()
-                .iter()
-                .map(|circuit_node| {
-                    messages::SplinterNode {
-                        node_id: circuit_node.node_id().to_string(),
-                        endpoints: circuit_node.endpoints().to_vec(),
-                        #[cfg(feature = "challenge-authorization")]
-                        public_key: circuit_node.public_key().clone(),
-                    }
-                    .into_proto()
-                })
-                .collect::<Vec<SplinterNode>>();
-            members.extend(disband_members);
+            for node in circuit.members() {
+                // Verify each disband member has an agreed upon protocol version with this node
+                // Otherwise, re-establish a peer connection
+                if self.node_id() != node.node_id()
+                    && self
+                        .service_protocols
+                        .get(&admin_service_id(node.node_id()))
+                        .is_none()
+                {
+                    pending_peers.push(node.node_id().to_string());
+                    missing_protocol_ids.push(admin_service_id(node.node_id()))
+                }
+            }
         }
 
         if missing_protocol_ids.is_empty() {
