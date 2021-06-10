@@ -28,10 +28,6 @@ network_endpoints = ["tcps://localhost:8044"]
 # example: peers = ["tcps://acme-node-001:8044", "tcps://acme-node-002:8044"]
 peers = []
 
-# The type of storage that should be used to store circuit state. Options are
-# currently "yaml" or "memory"
-storage = "memory"
-
 # Rest api address.
 rest_api_endpoint = "localhost:8085"
 

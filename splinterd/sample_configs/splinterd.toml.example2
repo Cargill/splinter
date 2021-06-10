@@ -46,12 +46,6 @@ peers = [
     "127.0.0.1:8044"
 ]
 
-# Deprecated, use `database` instead
-# The type of storage that should be used to store circuit state. Option are
-# currently "yaml" or "memory".
-# (default "yaml")
-storage = "yaml"
-
 # Directory containing tls certificate and key files.
 # Using this option will prefix the default tls certificate and key file names.
 # For example, `tls_client_cert`, by default "client.crt", will become

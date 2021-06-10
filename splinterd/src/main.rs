@@ -336,7 +336,7 @@ fn main() {
         .arg(
             Arg::with_name("storage")
                 .long("storage")
-                .help("Storage type used for the node; defaults to yaml")
+                .help("Storage type used for the node; Deprecated. Use database instead")
                 .hidden(true)
                 .takes_value(true),
         )
