@@ -29,6 +29,7 @@ pub mod interconnect;
 mod notification;
 mod peer_map;
 mod peer_ref;
+mod token;
 
 use std::cmp::min;
 use std::collections::HashMap;
