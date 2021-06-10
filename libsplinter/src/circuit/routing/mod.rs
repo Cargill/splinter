@@ -186,6 +186,7 @@ pub struct Circuit {
     circuit_id: String,
     roster: Vec<Service>,
     members: Vec<String>,
+    authorization_type: AuthorizationType,
 }
 
 impl Circuit {
@@ -196,11 +197,20 @@ impl Circuit {
     /// * `circuit_id` -  The unique ID for the circuit
     /// * `roster` - The list of services in the circuit
     /// * `members` - The list of node IDs for the members of a circuit
-    pub fn new(circuit_id: String, roster: Vec<Service>, members: Vec<String>) -> Self {
+    pub fn new(
+        circuit_id: String,
+        roster: Vec<Service>,
+        members: Vec<String>,
+        #[cfg(feature = "challenge-authorization")] authorization_type: AuthorizationType,
+    ) -> Self {
         Circuit {
             circuit_id,
             roster,
             members,
+            #[cfg(feature = "challenge-authorization")]
+            authorization_type,
+            #[cfg(not(feature = "challenge-authorization"))]
+            authorization_type: AuthorizationType::Trust,
         }
     }
 
@@ -218,6 +228,18 @@ impl Circuit {
     pub fn members(&self) -> &[String] {
         &self.members
     }
+
+    /// Returns the authorization type
+    pub fn authorization_type(&self) -> &AuthorizationType {
+        &self.authorization_type
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AuthorizationType {
+    Trust,
+    #[cfg(feature = "challenge-authorization")]
+    Challenge,
 }
 
 /// The routing table representation of a node
@@ -225,6 +247,7 @@ impl Circuit {
 pub struct CircuitNode {
     node_id: String,
     endpoints: Vec<String>,
+    public_key: Option<Vec<u8>>,
 }
 
 impl CircuitNode {
@@ -234,8 +257,19 @@ impl CircuitNode {
     ///
     /// * `node_id` -  The unique ID for the circuit
     /// * `endpoints` -  A list of endpoints the node can be reached at
-    pub fn new(node_id: String, endpoints: Vec<String>) -> Self {
-        CircuitNode { node_id, endpoints }
+    pub fn new(
+        node_id: String,
+        endpoints: Vec<String>,
+        #[cfg(feature = "challenge-authorization")] public_key: Option<Vec<u8>>,
+    ) -> Self {
+        CircuitNode {
+            node_id,
+            endpoints,
+            #[cfg(feature = "challenge-authorization")]
+            public_key,
+            #[cfg(not(feature = "challenge-authorization"))]
+            public_key: None,
+        }
     }
 }
 

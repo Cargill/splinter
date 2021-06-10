@@ -285,6 +285,8 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
+    #[cfg(feature = "challenge-authorization")]
+    use crate::circuit::routing::AuthorizationType;
     use crate::circuit::routing::{
         memory::RoutingTable, Circuit, CircuitNode, RoutingTableWriter, Service,
     };
@@ -699,8 +701,18 @@ mod tests {
     }
 
     fn build_circuit() -> (Circuit, Vec<CircuitNode>) {
-        let node_123 = CircuitNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-        let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()]);
+        let node_123 = CircuitNode::new(
+            "123".to_string(),
+            vec!["123.0.0.1:0".to_string()],
+            #[cfg(feature = "challenge-authorization")]
+            None,
+        );
+        let node_345 = CircuitNode::new(
+            "345".to_string(),
+            vec!["123.0.0.1:1".to_string()],
+            #[cfg(feature = "challenge-authorization")]
+            None,
+        );
 
         let service_abc = Service::new(
             "abc".to_string(),
@@ -720,6 +732,8 @@ mod tests {
             "alpha".into(),
             vec![service_abc.clone(), service_def.clone()],
             vec!["123".into(), "345".into()],
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationType::Trust,
         );
 
         (circuit, vec![node_123, node_345])

@@ -18,6 +18,7 @@
 use super::{
     Circuit, CircuitNode, RoutingTable, RoutingTableReader, RoutingTableWriter, Service, ServiceId,
 };
+use crate::circuit::routing::AuthorizationType;
 
 extern crate test;
 
@@ -38,6 +39,7 @@ fn generate_circuits(num_circuits: i64, total_num_node: i64) -> (Vec<Circuit>, V
         let node = CircuitNode {
             node_id: format!("node_{}", i),
             endpoints: vec![format!("inproc://node_{}", i)],
+            public_key: None,
         };
         let service = Service {
             service_id: generate_random_base62_string(4),
@@ -76,6 +78,7 @@ fn generate_circuits(num_circuits: i64, total_num_node: i64) -> (Vec<Circuit>, V
             ),
             roster,
             members,
+            authorization_type: AuthorizationType::Trust,
         };
         circuits.push(circuit);
     }

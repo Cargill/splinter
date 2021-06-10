@@ -404,6 +404,8 @@ impl AdminServiceShared {
                                     .iter()
                                     .map(|node| node.node_id().to_string())
                                     .collect(),
+                                #[cfg(feature = "challenge-authorization")]
+                                routing::AuthorizationType::Trust,
                             );
 
                             let routing_members = circuit_proposal
@@ -414,6 +416,8 @@ impl AdminServiceShared {
                                     routing::CircuitNode::new(
                                         node.get_node_id().to_string(),
                                         node.get_endpoints().to_vec(),
+                                        #[cfg(feature = "challenge-authorization")]
+                                        None,
                                     )
                                 })
                                 .collect::<Vec<routing::CircuitNode>>();
