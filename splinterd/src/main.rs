@@ -27,8 +27,11 @@ mod transport;
 
 #[cfg(feature = "challenge-authorization")]
 use cylinder::{load_key_from_path, secp256k1::Secp256k1Context, Context, Signer};
+#[cfg(not(feature = "log-config"))]
 use log4rs::config::{Appender, Logger, Root};
+#[cfg(not(feature = "log-config"))]
 use log4rs::encode::pattern::PatternEncoder;
+use log4rs::Handle;
 
 use rand::{thread_rng, Rng};
 #[cfg(feature = "metrics")]
@@ -467,33 +470,51 @@ fn main() {
 
     let matches = app.get_matches();
 
-    let log_level = match matches.occurrences_of("verbose") {
-        0 => log::LevelFilter::Warn,
-        1 => log::LevelFilter::Info,
-        2 => log::LevelFilter::Debug,
-        _ => log::LevelFilter::Trace,
+    let log_handle = {
+        #[cfg(feature = "log-config")]
+        {
+            let default_config: config::LogConfig = Default::default();
+            let log_handle = log4rs::init_config(
+                //Always produces a valid config try_into_config just returns a Result
+                default_config
+                    .try_into_config()
+                    .expect("Default logging config failure"),
+            );
+            if let Err(e) = log_handle {
+                eprintln!("Could not start logging, {}", e);
+                std::process::exit(1);
+            }
+            log_handle.unwrap()
+        }
+        #[cfg(not(feature = "log-config"))]
+        {
+            let encoder =
+                PatternEncoder::new("[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n");
+            let stdout = log4rs::append::console::ConsoleAppender::builder()
+                .encoder(Box::new(encoder))
+                .build();
+            let config = log4rs::Config::builder()
+                .appender(Appender::builder().build("stdout", Box::new(stdout)))
+                .logger(Logger::builder().build("hyper", log::LevelFilter::Warn))
+                .logger(Logger::builder().build("tokio", log::LevelFilter::Warn));
+            #[cfg(feature = "https-bind")]
+            let config = config.logger(Logger::builder().build("h2", log::LevelFilter::Warn));
+            let conf = config.build(
+                Root::builder()
+                    .appender("stdout")
+                    .build(get_log_filter_level(&matches)),
+            );
+
+            if let Ok(lc) = conf {
+                log4rs::init_config(lc).unwrap()
+            } else {
+                unreachable!();
+                //the basic config should always be valid
+            }
+        }
     };
 
-    let encoder = PatternEncoder::new("[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n");
-    let stdout = log4rs::append::console::ConsoleAppender::builder()
-        .encoder(Box::new(encoder))
-        .build();
-    let config = log4rs::Config::builder()
-        .appender(Appender::builder().build("stdout", Box::new(stdout)))
-        .logger(Logger::builder().build("hyper", log::LevelFilter::Warn))
-        .logger(Logger::builder().build("tokio", log::LevelFilter::Warn));
-    #[cfg(feature = "https-bind")]
-    let config = config.logger(Logger::builder().build("h2", log::LevelFilter::Warn));
-    let log_config = config.build(Root::builder().appender("stdout").build(log_level));
-    if let Ok(lc) = log_config {
-        let _handle = log4rs::init_config(lc);
-    } else {
-        unreachable!();
-        // log_config  should always return an Ok variant.
-        // Err is returned if multiple logger facades are registered which shouldn't ever happen
-    }
-
-    if let Err(err) = start_daemon(matches) {
+    if let Err(err) = start_daemon(matches, log_handle) {
         error!("Failed to start daemon, {}", err);
         std::process::exit(1);
     }
@@ -545,7 +566,7 @@ fn get_log_filter_level(matches: &ArgMatches) -> log::LevelFilter {
     }
 }
 
-fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
+fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserError> {
     // get provided config file or search default location
     let config_file = get_config_file(&matches);
 
@@ -556,6 +577,18 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     };
 
     let config = create_config(config_file_path, matches.clone())?;
+
+    #[cfg(feature = "log-config")]
+    if let Some(lc) = config.log_config() {
+        // its safe to use unwrap here because all the defined LevelFilters map to Some
+        if let Ok(log_config) = lc
+            .to_owned()
+            .set_root_level(get_log_filter_level(&matches).to_level().unwrap())
+            .try_into_config()
+        {
+            _log_handle.set_config(log_config);
+        }
+    }
 
     let state_dir = config.state_dir();
     if !Path::new(&state_dir).is_dir() {
