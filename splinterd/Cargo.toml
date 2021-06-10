@@ -100,6 +100,7 @@ experimental = [
     "challenge-authorization",
     "health-service",
     "https-bind",
+    "log-config",
     "metrics",
     "node",
     "oauth-user-list",
@@ -133,6 +134,7 @@ database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
 health-service = ["health"]
 https-bind = ["splinter/https-bind"]
+log-config = []
 metrics = [
   "splinter/admin-service-count",
   "splinter/metrics",
