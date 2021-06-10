@@ -55,6 +55,9 @@ SUBCOMMANDS
 `registry`
 : Provides commands to create and manage Splinter registry information.
 
+`upgrade`
+: Upgrades splinter yaml state to database state
+
 FLAGS
 =====
 
@@ -101,6 +104,7 @@ SEE ALSO
 | `splinter-keygen(1)`
 | `splinter-role-list(1)`
 | `splinter-role-show(1)`
+| `splinter-upgrade(1)`
 |
 | `splinterd(1)`
 |
