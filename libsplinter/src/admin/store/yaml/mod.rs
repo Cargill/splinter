@@ -1140,6 +1140,7 @@ struct YamlCircuit {
     display_name: Option<String>,
     #[serde(default = "default_circuit_value")]
     circuit_version: i32,
+    #[serde(default = "default_circuit_status")]
     circuit_status: YamlCircuitStatus,
 }
 
@@ -1483,6 +1484,7 @@ struct YamlProposedCircuit {
     display_name: Option<String>,
     #[serde(default = "default_circuit_value")]
     circuit_version: i32,
+    #[serde(default = "default_circuit_status")]
     circuit_status: YamlCircuitStatus,
 }
 
@@ -1811,6 +1813,10 @@ struct YamlState {
 
 fn default_circuit_value() -> i32 {
     1
+}
+
+fn default_circuit_status() -> YamlCircuitStatus {
+    YamlCircuitStatus::Active
 }
 
 /// YAML file specific CircuitStatus definition for serialization.
