@@ -280,14 +280,19 @@ pub struct AuthChallengeNonceResponse {
     pub nonce: Vec<u8>,
 }
 
+#[derive(Debug)]
+pub struct SubmitRequest {
+    pub public_key: Vec<u8>,
+    pub signature: Vec<u8>,
+}
+
 /// A challenge submit request
 ///
 /// This request contains the signature created from the nonce in the AuthChallengeNonceResponse
 /// and the public key for the signature.
 #[derive(Debug)]
 pub struct AuthChallengeSubmitRequest {
-    pub public_key: Vec<u8>,
-    pub signature: Vec<u8>,
+    pub submit_requests: Vec<SubmitRequest>,
 }
 
 /// A successful challenge authorization.
@@ -436,8 +441,14 @@ impl FromProto<authorization::AuthChallengeSubmitRequest> for AuthChallengeSubmi
         mut source: authorization::AuthChallengeSubmitRequest,
     ) -> Result<Self, ProtoConversionError> {
         Ok(AuthChallengeSubmitRequest {
-            public_key: source.take_public_key(),
-            signature: source.take_signature(),
+            submit_requests: source
+                .take_submit_requests()
+                .into_iter()
+                .map(|mut submit_request| SubmitRequest {
+                    public_key: submit_request.take_public_key(),
+                    signature: submit_request.take_signature(),
+                })
+                .collect(),
         })
     }
 }
@@ -445,8 +456,18 @@ impl FromProto<authorization::AuthChallengeSubmitRequest> for AuthChallengeSubmi
 impl FromNative<AuthChallengeSubmitRequest> for authorization::AuthChallengeSubmitRequest {
     fn from_native(req: AuthChallengeSubmitRequest) -> Result<Self, ProtoConversionError> {
         let mut proto_request = authorization::AuthChallengeSubmitRequest::new();
-        proto_request.set_public_key(req.public_key);
-        proto_request.set_signature(req.signature);
+        let submit_requests = req
+            .submit_requests
+            .iter()
+            .map(|submit_request| {
+                let mut proto_submit_request = authorization::SubmitRequest::new();
+                proto_submit_request.set_public_key(submit_request.public_key.to_vec());
+                proto_submit_request.set_signature(submit_request.signature.to_vec());
+                proto_submit_request
+            })
+            .collect();
+
+        proto_request.set_submit_requests(submit_requests);
         Ok(proto_request)
     }
 }
