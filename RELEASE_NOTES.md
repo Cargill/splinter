@@ -1,5 +1,55 @@
 # Release Notes
 
+## Changes in Splinter 0.5.7
+
+### Highlights
+
+* A new version of Trust Authorization has been added. The v0 had a race
+  condition that has now been fixed in the new version. It is currently behind
+  an experimental feature `trust-authorization`.
+
+### libsplinter
+
+* Implement v1 Trust Authorization. This version makes room for adding Challenge
+  Authorization as well as fixes a race condition present in v0 Trust
+  Authorization. If a `ConnectRequest` is the first message received v0 trust
+  will be used. If `AuthProtocolRequest` is the first message v1 Trust will be
+  used. This is required to stay backwards compatible with 0.4. v1 is behind an
+  experimental features `trust-authorization`
+
+* Update the `RefMap` to take a generic key. The RefMap is used to keep track of
+  peers to know when the connection should be dropped. With the addition of
+  challenge authorization the peer id is going to be updated to be an Enum
+  instead of a String, as such the reference map needs to be updated to take
+  keys that are other types.
+
+* Add a default for YamlCircuitStatus in the `YamlAdminServiceStore`. If a
+  circuit status is not in the yaml state, it defaults to Active. This is
+  required for backwards compatibility with 0.4.
+
+* Add authorization type and public keys to the `RoutingTable`. This information
+  is required for properly routing a message once Challenge Authorization is
+  implemented.
+
+* Update the handling of proposed circuits to check node IDs in the list of
+  proposed disband members to verify nodes that have previously peered still
+  have an agreed upon protocol version.
+
+### splinterd
+
+* Changed logging libraries to the more flexible log4rs to enable future logging
+  expansions.
+
+* Add a feature "deprecate-yaml" that deprecates yaml state in splinterd in
+  favor of using sqlite or postgresql. If splinterd is run with yaml state, it
+  will abort and point the user to the "splinter upgrade" command, which imports
+  the yaml state into the specified database.
+
+### splinter CLI
+
+* Add experimental feature `upgrade` to the splinter CLI. This command will port
+  YAML state files to database state.
+
 ## Changes in Splinter 0.5.6
 
 ### Highlights
