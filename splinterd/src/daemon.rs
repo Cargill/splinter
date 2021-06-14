@@ -18,6 +18,10 @@ use std::error::Error;
 use std::fmt;
 #[cfg(feature = "deprecate-yaml")]
 use std::fs;
+#[cfg(any(
+    feature = "authorization-handler-allow-keys",
+    feature = "deprecate-yaml"
+))]
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc::channel, Arc};
@@ -34,8 +38,6 @@ use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService, AdminServiceBuilder};
-#[cfg(not(feature = "deprecate-yaml"))]
-use splinter::admin::store::yaml::YamlAdminServiceStore;
 #[cfg(feature = "biome-credentials")]
 use splinter::biome::credentials::rest_api::BiomeCredentialsRestResourceProviderBuilder;
 #[cfg(feature = "biome-key-management")]
@@ -130,7 +132,6 @@ pub struct SplinterDaemon {
     registries: Vec<String>,
     registry_auto_refresh: u64,
     registry_forced_refresh: u64,
-    storage_type: Option<String>,
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
@@ -201,60 +202,6 @@ impl SplinterDaemon {
                 )));
             }
         }
-
-        let admin_service_store = {
-            if let Some(storage) = &self.storage_type {
-                // Get state from the configured storage type and state directory, then
-                // create the new AdminServiceStore
-                match &storage as &str {
-                    #[cfg(not(feature = "deprecate-yaml"))]
-                    "yaml" => {
-                        let circuits_location = Path::new(&self.state_dir)
-                            .join("circuits.yaml")
-                            .to_str()
-                            .ok_or_else(|| {
-                                StartError::StorageError(
-                                    "'state_dir' is not a valid UTF-8 string".into(),
-                                )
-                            })?
-                            .to_string();
-                        let proposals_location = Path::new(&self.state_dir)
-                            .join("circuit_proposals.yaml")
-                            .to_str()
-                            .ok_or_else(|| {
-                                StartError::StorageError(
-                                    "'state_dir' is not a valid UTF-8 string".into(),
-                                )
-                            })?
-                            .to_string();
-
-                        Box::new(
-                            YamlAdminServiceStore::new(circuits_location, proposals_location)
-                                .map_err(|err| {
-                                    StartError::StorageError(format!(
-                                        "Unable to create YamlAdminServiceStore: {}",
-                                        err
-                                    ))
-                                })?,
-                        )
-                    }
-                    "memory" => {
-                        // this overrides the store factory version, as this may be different then
-                        // the DB URL value.
-                        let store_factory = create_store_factory("memory")?;
-                        store_factory.get_admin_service_store()
-                    }
-                    _ => {
-                        return Err(StartError::StorageError(format!(
-                            "storage type is not supported: {}",
-                            storage
-                        )))
-                    }
-                }
-            } else {
-                store_factory.get_admin_service_store()
-            }
-        };
 
         let table = RoutingTable::default();
         let routing_reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
@@ -519,7 +466,7 @@ impl SplinterDaemon {
             .with_node_id(self.node_id.clone())
             .with_service_orchestrator(orchestrator)
             .with_peer_manager_connector(peer_connector)
-            .with_admin_service_store(admin_service_store.clone())
+            .with_admin_service_store(store_factory.get_admin_service_store())
             .with_signature_verifier(admin_service_verifier)
             .with_admin_key_verifier(Box::new(registry.clone_box_as_reader()))
             .with_key_permission_manager(Box::new(AllowAllKeyPermissionManager))
@@ -547,8 +494,10 @@ impl SplinterDaemon {
         let network_endpoints = self.network_endpoints.clone();
         let advertised_endpoints = self.advertised_endpoints.clone();
 
-        let circuit_resource_provider =
-            CircuitResourceProvider::new(self.node_id.to_string(), admin_service_store);
+        let circuit_resource_provider = CircuitResourceProvider::new(
+            self.node_id.to_string(),
+            store_factory.get_admin_service_store(),
+        );
 
         #[cfg(not(feature = "https-bind"))]
         let bind = self
@@ -1059,7 +1008,6 @@ pub struct SplinterDaemonBuilder {
     registries: Vec<String>,
     registry_auto_refresh: Option<u64>,
     registry_forced_refresh: Option<u64>,
-    storage_type: Option<String>,
     heartbeat: Option<u64>,
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
@@ -1166,11 +1114,6 @@ impl SplinterDaemonBuilder {
 
     pub fn with_registry_forced_refresh(mut self, value: u64) -> Self {
         self.registry_forced_refresh = Some(value);
-        self
-    }
-
-    pub fn with_storage_type(mut self, value: Option<String>) -> Self {
-        self.storage_type = value;
         self
     }
 
@@ -1317,8 +1260,6 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: registry_forced_refresh".to_string())
         })?;
 
-        let storage_type = self.storage_type;
-
         #[cfg(feature = "biome-credentials")]
         let enable_biome_credentials = self.enable_biome_credentials.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: enable_biome_credentials".to_string())
@@ -1353,7 +1294,6 @@ impl SplinterDaemonBuilder {
             registries: self.registries,
             registry_auto_refresh,
             registry_forced_refresh,
-            storage_type,
             admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
