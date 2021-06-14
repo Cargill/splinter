@@ -29,6 +29,8 @@ pub mod permissions;
 #[cfg(feature = "authorization-handler-rbac")]
 pub mod rbac;
 pub mod registry;
+#[cfg(feature = "user-list")]
+pub mod user;
 
 use std::collections::HashMap;
 use std::ffi::CString;
