@@ -77,8 +77,8 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .takes_value(true)
                         .required(true)
                         .long_help(
-                            "How many batches to submit per second, either provide a number or \
-                     a range with the min and max separated by '-' ex: 5-15, default to 1",
+                            "Rate of batch submit, either provide a float, a rate in form <float>/<h,m,s> or \
+                     a range with the min and max separated by '-' ex: 5.0-15.0, 1/m, 15/s-2/m, defaults to 1/s",
                         ),
                 )
                 .arg(
@@ -274,8 +274,8 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .long("rate")
                                 .value_name("RATE")
                                 .long_help(
-                                    "The number of batches per second to submit to the target, \
-                                defaults to 1",
+                                    "Rate of batch submissions, either provice a float, or a rate in form <float>/<h,m,s> \
+                                defaults to 1/s",
                                 ),
                         )
                         .arg(

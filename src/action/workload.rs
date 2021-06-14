@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
+use crate::action::rate::{Rate, TimeUnit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -53,32 +54,40 @@ impl Action for WorkloadAction {
             .map(|target| target.split(';').map(String::from).collect::<Vec<String>>())
             .collect::<Vec<Vec<String>>>();
 
-        let rate = args.value_of("target_rate").unwrap_or("1").to_string();
+        let rate = args.value_of("target_rate").unwrap_or("1/s").to_string();
 
-        let (min, max): (f32, f32) = {
+        let (min, max): (Rate, Rate) = {
             if rate.contains('-') {
                 let split_rate: Vec<String> = rate.split('-').map(String::from).collect();
-                let min = split_rate
+                let min_string = split_rate
                     .get(0)
-                    .ok_or_else(|| CliError::ActionError("Min target rate not provided".into()))?
-                    .parse()
+                    .ok_or_else(|| CliError::ActionError("Min target rate not provided".into()))?;
+                let max_string = split_rate
+                    .get(1)
+                    .ok_or_else(|| CliError::ActionError("Max target rate not provided".into()))?;
+
+                let min = min_string
+                    .parse::<Rate>()
+                    .or_else(|_| min_string.parse::<f64>().map(Rate::from))
                     .map_err(|_| {
-                        CliError::ActionError("Unable to parse provided min target rate".into())
+                        CliError::UnparseableArg("Unable to parse provided min target rate".into())
                     })?;
 
-                let max = split_rate
-                    .get(1)
-                    .ok_or_else(|| CliError::ActionError("Max target rate not provided".into()))?
-                    .parse()
+                let max = max_string
+                    .parse::<Rate>()
+                    .or_else(|_| max_string.parse::<f64>().map(Rate::from))
                     .map_err(|_| {
-                        CliError::ActionError("Unable to parse provided max target rate".into())
+                        CliError::UnparseableArg("Unable to parse provided max target rate".into())
                     })?;
 
                 (min, max)
             } else {
-                let min = rate.parse().map_err(|_| {
-                    CliError::ActionError("Unable to parse provided target rate".into())
-                })?;
+                let min = rate
+                    .parse()
+                    .or_else(|_| rate.parse::<f64>().map(Rate::from))
+                    .map_err(|_| {
+                        CliError::ActionError("Unable to parse provided target rate".into())
+                    })?;
 
                 (min, min)
             }
@@ -173,8 +182,8 @@ impl Action for WorkloadAction {
 fn start_smallbank_workloads(
     workload_runner: &mut WorkloadRunner,
     targets: Vec<Vec<String>>,
-    target_rate_min: f32,
-    target_rate_max: f32,
+    target_rate_min: Rate,
+    target_rate_max: Rate,
     auth: String,
     signer: Box<dyn Signer>,
     update: u32,
@@ -189,23 +198,26 @@ fn start_smallbank_workloads(
             SmallbankTransactionWorkload::new(smallbank_generator, signer.clone());
         let smallbank_workload = SmallbankBatchWorkload::new(transaction_workload, signer.clone());
 
-        let rate = if (target_rate_min - target_rate_max).abs() < f32::EPSILON {
+        let rate = if target_rate_min < target_rate_max {
             target_rate_min
         } else {
-            rng.gen_range(target_rate_min..=target_rate_max)
+            let numeric = rng.gen_range(target_rate_min.to_milli()..=target_rate_max.to_milli());
+            Rate {
+                numeric: numeric / 1000.0,
+                unit: TimeUnit::Second,
+            }
         };
 
         info!(
             "Starting Smallbank-Workload-{} with target rate {}",
             i, rate
         );
-        let time_to_wait = std::time::Duration::from_secs(1).div_f32(rate);
         workload_runner
             .add_workload(
                 format!("Smallbank-Workload-{}", i),
                 Box::new(smallbank_workload),
                 target,
-                time_to_wait,
+                rate.into(),
                 auth.to_string(),
                 update,
             )
@@ -219,8 +231,8 @@ fn start_smallbank_workloads(
 fn start_command_workloads(
     workload_runner: &mut WorkloadRunner,
     targets: Vec<Vec<String>>,
-    target_rate_min: f32,
-    target_rate_max: f32,
+    target_rate_min: Rate,
+    target_rate_max: Rate,
     auth: String,
     signer: Box<dyn Signer>,
     update: u32,
@@ -234,21 +246,24 @@ fn start_command_workloads(
             CommandTransactionWorkload::new(command_generator, signer.clone());
         let command_workload = CommandBatchWorkload::new(transaction_workload, signer.clone());
 
-        let rate = if (target_rate_min - target_rate_max).abs() < f32::EPSILON {
+        let rate = if target_rate_min < target_rate_max {
             target_rate_min
         } else {
-            rng.gen_range(target_rate_min..=target_rate_max)
+            let numeric = rng.gen_range(target_rate_min.to_milli()..=target_rate_max.to_milli());
+            Rate {
+                numeric: numeric / 1000.0,
+                unit: TimeUnit::Second,
+            }
         };
 
         info!("Starting Command-Workload-{} with target rate {}", i, rate);
 
-        let time_to_wait = std::time::Duration::from_secs(1).div_f32(rate);
         workload_runner
             .add_workload(
                 format!("Command-Workload-{}", i),
                 Box::new(command_workload),
                 target,
-                time_to_wait,
+                rate.into(),
                 auth.to_string(),
                 update,
             )

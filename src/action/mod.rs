@@ -20,6 +20,8 @@ pub mod playlist;
 #[cfg(feature = "workload")]
 pub mod workload;
 
+pub mod rate;
+
 use std::collections::HashMap;
 #[cfg(any(feature = "workload", feature = "playlist", feature = "command"))]
 use std::path::Path;

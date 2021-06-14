@@ -51,7 +51,7 @@ OPTIONS
   sign the batches as well as generate a JWT for authentication.
 
 `--rate RATE`
-: How many batches to submit per second, ex `5`. (default: `1`)
+: Rate of batch submissions, either provide a float, or a rate in form <float>/<h,m,s>. ex `5/s`. (default: `1/s`)
 
 `--targets TARGETS`
 : Node URLS to submit batches to, combine groups with `;`. The URL should
@@ -72,7 +72,7 @@ scabbard.
 transact playlist submit\
   --input batches.txt \
   --key ./alice.priv \
-  --rate 1  \
+  --rate 1/s  \
   --target "http://0.0.0.0:8089/scabbard/XOHZe-GE1oY/a001"
 ```
 
