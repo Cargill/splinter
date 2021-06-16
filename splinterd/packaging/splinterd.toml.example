@@ -16,20 +16,20 @@
 version = "1"
 
 # Specifies the directory containing Splinter configuration files.
-config_dir = "/etc/splinter"
+#config_dir = "/etc/splinter"
 
 # Specifies the storage directory for Splinter state. This option overrides the
 # SPLINTER_STATE_DIR environment variable, if set.
-state_dir = "/var/lib/splinter"
+#state_dir = "/var/lib/splinter"
 
 # Specifies the database used for Splinter state.
-database = "splinter_state.db"
+#database = "splinter_state.db"
 
 # Identifier for this node. Must be unique on the network. This value will be
 # used to initialize a "node_id" file in the Splinter state directory. Once
 # node_id is created, the value in the configuration below must match the
 # contents of node_id. If they differ, splinterd will not start.
-node_id = ""
+#node_id = ""
 
 # Specifies a human-readable name for the node
 #display_name = ""
@@ -37,10 +37,10 @@ node_id = ""
 # Endpoints used for daemon to daemon communication. Transport type is
 # determined by the protocol prefix. Use tcp:// for TCP connections and tcps://
 # for TLS connections
-network_endpoints = ["tcps://127.0.0.1:8044"]
+#network_endpoints = ["tcps://127.0.0.1:8044"]
 
 # Specifies the connection endpoint for the REST API.
-rest_api_endpoint = "127.0.0.1:8080"
+#rest_api_endpoint = "127.0.0.1:8080"
 
 # Specifies the public network endpoint for daemon-to-daemon communication
 # between Splinter nodes, if the network endpoint is not public.
@@ -49,34 +49,34 @@ rest_api_endpoint = "127.0.0.1:8080"
 # A comma separated list of splinter nodes the daemon will automatically
 # attempt to connect to on start up
 # example: peers = ["tcps://acme-node-001:8044", "tcps://acme-node-002:8044"]
-peers = []
+#peers = []
 
 
 # Specifies how often, in seconds, to send a heartbeat. This heartbeat is used
 # to check the health of connections to other Splinter nodes. Use 0 to turn
 # off the heartbeat.
-heartbeat = 30
+#heartbeat = 30
 
 # Sets the coordinator timeout, in seconds, for admin service proposals. This
 # setting affects consensus-related activities for pending circuit changes
 # (functions that use the two-phase commit agreement protocol in the Scabbard
 # service).
-admin_timeout = 30
+#admin_timeout = 30
 
 #
 # Registry Options
 #
 
 # Specifies one or more read-only Splinter registry files.
-registries = ["file:///etc/splinter/registry.yaml"]
+#registries = ["file:///etc/splinter/registry.yaml"]
 
 # Specifies how often, in seconds, to fetch remote node registry changes in the
 # background. Use 0 to turn off automatic refreshes.
-registry_auto_refresh = 600
+#registry_auto_refresh = 600
 
 # Specifies how often, in seconds, to fetch remote node registry changes on
 # read. Use 0 to turn off forced refreshes.
-registry_forced_refresh = 10
+#registry_forced_refresh = 10
 
 
 #
@@ -84,24 +84,24 @@ registry_forced_refresh = 10
 #
 
 # Specifies the directory containing Splinter certificate files.
-tls_cert_dir = "/etc/splinter/certs"
+#tls_cert_dir = "/etc/splinter/certs"
 
 # List of certificate authority certificates (*.pem files).
-tls_ca_file = "/etc/splinter/certs/ca.pem"
+#tls_ca_file = "/etc/splinter/certs/ca.pem"
 
 # A certificate signed by a certificate authority. Used by the daemon when it
 # is acting as a client (sending messages)
-tls_client_cert = "/etc/splinter/certs/client.crt"
+#tls_client_cert = "/etc/splinter/certs/client.crt"
 
 # Private key used by daemon when it is acting as a client
-tls_client_key = "/etc/splinter/certs/private/client.key"
+#tls_client_key = "/etc/splinter/certs/private/client.key"
 
 # A certificate signed by a certificate authority. Used by the daemon when it
 # is acting as a server (receiving messages).
-tls_server_cert = "/etc/splinter/certs/server.crt"
+#tls_server_cert = "/etc/splinter/certs/server.crt"
 
 # Private key used by daemon when it is acting as a server.
-tls_server_key = "/etc/splinter/certs/private/server.key"
+#tls_server_key = "/etc/splinter/certs/private/server.key"
 
 
 #
