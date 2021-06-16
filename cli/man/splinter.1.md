@@ -87,6 +87,11 @@ Many `splinter` subcommands accept the following environment variable:
 
 SEE ALSO
 ========
+| `splinter-authid-create(1)`
+| `splinter-authid-delete(1)`
+| `splinter-authid-list(1)`
+| `splinter-authid-show(1)`
+| `splinter-authid-update(1)`
 | `splinter-cert-generate(1)`
 | `splinter-circuit-abandon(1)`
 | `splinter-circuit-disband(1)`
@@ -102,8 +107,11 @@ SEE ALSO
 | `splinter-database-migrate(1)`
 | `splinter-health-status(1)`
 | `splinter-keygen(1)`
+| `splinter-role-create(1)`
+| `splinter-role-delete(1)`
 | `splinter-role-list(1)`
 | `splinter-role-show(1)`
+| `splinter-role-update(1)`
 | `splinter-upgrade(1)`
 |
 | `splinterd(1)`
