@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Actions for handling role-based access control subcommands.
+
 mod assignments;
 mod roles;
 
@@ -30,6 +32,7 @@ pub use roles::{
     CreateRoleAction, DeleteRoleAction, ListRolesAction, ShowRoleAction, UpdateRoleAction,
 };
 
+/// Constructs a new Splinter REST client from the CLI arguments.
 fn new_client(arg_matches: &Option<&ArgMatches<'_>>) -> Result<SplinterRestClient, CliError> {
     let url = arg_matches
         .and_then(|args| args.value_of("url"))

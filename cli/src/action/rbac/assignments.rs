@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Actions to support the RBAC subcommands related to authorizing identities.
+
 use std::collections::BTreeSet;
 
 use clap::ArgMatches;
@@ -24,6 +26,11 @@ use crate::error::CliError;
 
 use super::new_client;
 
+/// The action responsible for listing authorized identities.
+///
+/// The specific args for this action:
+///
+/// * format: specifies the output format; one of "human" or "csv"
 pub struct ListAssignmentsAction;
 
 impl Action for ListAssignmentsAction {
@@ -68,6 +75,13 @@ impl Action for ListAssignmentsAction {
     }
 }
 
+/// The action responsible for creating authorized identities.
+///
+/// The specific args for this action:
+///
+/// * id_key: an identifier of type key; a public key
+/// * id_user: an identifier of type user; a user ID
+/// * role: a role to add to the assignment; repeated
 pub struct CreateAssignmentAction;
 
 impl Action for CreateAssignmentAction {
@@ -99,6 +113,13 @@ impl Action for CreateAssignmentAction {
     }
 }
 
+/// The action responsible for showing a specific authorized identity.
+///
+/// The specific args for this action:
+///
+/// * id_key: an identifier of type key; a public key
+/// * id_user: an identifier of type user; a user ID
+/// * format: specifies the output format; one of "human", "json", or "yaml"
 pub struct ShowAssignmentAction;
 
 impl Action for ShowAssignmentAction {
@@ -139,6 +160,17 @@ impl Action for ShowAssignmentAction {
     }
 }
 
+/// The action responsible for updating a specific authorized identity.
+///
+/// The specific args for this action:
+///
+/// * id_key: an identifier of type key; a public key
+/// * id_user: an identifier of type user; a user ID
+/// * add_role: a role to add to the assignment; repeated
+/// * rm_role: a role to remove from the assignment; repeated
+/// * rm_all: remove all the currently assigned roles
+/// * dry_run: validate the inputs but do not submit the changes
+/// * force: applies the changes, even if a role is added and removed
 pub struct UpdateAssignmentAction;
 
 impl Action for UpdateAssignmentAction {
@@ -259,6 +291,13 @@ fn update_assignment(
     }
 }
 
+/// The action responsible for deleting a specific authorized identity.
+///
+/// The specific args for this action:
+///
+/// * id_key: an identifier of type key; a public key
+/// * id_user: an identifier of type user; a user ID
+/// * dry_run: validate the inputs but do not submit the changes
 pub struct DeleteAssignmentAction;
 
 impl Action for DeleteAssignmentAction {

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Actions to support the RBAC subcommands related to roles.
+
 use std::collections::BTreeSet;
 
 use clap::ArgMatches;
@@ -24,6 +26,11 @@ use crate::error::CliError;
 
 use super::new_client;
 
+/// The action responsible for listing roles.
+///
+/// The specific args for this action:
+///
+/// * format: specifies the output format; one of "human" or "csv"
 pub struct ListRolesAction;
 
 impl Action for ListRolesAction {
@@ -56,6 +63,12 @@ impl Action for ListRolesAction {
     }
 }
 
+/// The action responsible for showing a specific role.
+///
+/// The specific args for this action:
+///
+/// * role_id: the specified role ID
+/// * format: specifies the output format; one of "human", "json", or "yaml"
 pub struct ShowRoleAction;
 
 impl Action for ShowRoleAction {
@@ -94,6 +107,14 @@ impl Action for ShowRoleAction {
     }
 }
 
+/// The action responsible for creating roles.
+///
+/// The specific args for this action:
+///
+/// * role_id: the specified role ID
+/// * display_name: the role's display name
+/// * permission: a permission granted by the resulting role; repeated
+/// * dry_run: validate the inputs but do not submit the role
 pub struct CreateRoleAction;
 
 impl Action for CreateRoleAction {
@@ -134,6 +155,17 @@ impl Action for CreateRoleAction {
     }
 }
 
+/// The action responsible for updating a specific role.
+///
+/// The specific args for this action:
+///
+/// * role_id: the specified role ID
+/// * display_name: the role's display name
+/// * add_permission: a permission to add to the role; repeated
+/// * rm_permission: a permission to remove from the role; repeated
+/// * rm_all: remove all the currently granted permissions from the role
+/// * force: applies the changes, even if a permission is added and removed
+/// * dry_run: validate the inputs but do not submit the changes
 pub struct UpdateRoleAction;
 
 impl Action for UpdateRoleAction {
@@ -257,6 +289,11 @@ fn update_role(
     }
 }
 
+/// The action responsible for deleting a specific role.
+///
+/// The specific args for this action:
+///
+/// * role_id: the specified role ID
 pub struct DeleteRoleAction;
 
 impl Action for DeleteRoleAction {
