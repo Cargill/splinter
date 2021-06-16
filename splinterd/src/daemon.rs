@@ -194,7 +194,7 @@ impl SplinterDaemon {
                 }
 
                 return Err(StartError::StorageError(format!(
-                    "Run the `splinter upgrade` command to update outdated state files to
+                    "Run the `splinter upgrade` command to update outdated state files to \
                         a Splinter {}.{} database",
                     env!("CARGO_PKG_VERSION_MAJOR", "unknown"),
                     env!("CARGO_PKG_VERSION_MINOR", "unknown")
