@@ -102,6 +102,8 @@ pub struct Config {
     metrics_password: Option<(String, ConfigSource)>,
     #[cfg(feature = "log-config")]
     log_config: Option<(LogConfig, ConfigSource)>,
+    #[cfg(feature = "log-config")]
+    verbosity: (log::Level, ConfigSource),
 }
 
 impl Config {
@@ -355,6 +357,16 @@ impl Config {
             Some((_, source)) => Some(source),
             _ => None,
         }
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn verbosity_source(&self) -> Option<&ConfigSource> {
+        Some(&self.verbosity.1)
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn verbosity(&self) -> Option<&log::Level> {
+        Some(&self.verbosity.0)
     }
 
     pub fn config_dir_source(&self) -> &ConfigSource {

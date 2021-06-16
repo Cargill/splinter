@@ -94,6 +94,8 @@ pub struct PartialConfig {
     metrics_password: Option<String>,
     #[cfg(feature = "log-config")]
     log_config: Option<LogConfig>,
+    #[cfg(feature = "log-config")]
+    verbosity: Option<log::Level>,
 }
 
 impl PartialConfig {
@@ -159,6 +161,8 @@ impl PartialConfig {
             metrics_password: None,
             #[cfg(feature = "log-config")]
             log_config: None,
+            #[cfg(feature = "log-config")]
+            verbosity: None,
         }
     }
 
@@ -345,6 +349,11 @@ impl PartialConfig {
     #[cfg(feature = "log-config")]
     pub fn log_config(&self) -> Option<LogConfig> {
         self.log_config.clone()
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn verbosity(&self) -> Option<log::Level> {
+        self.verbosity.clone()
     }
 
     /// Adds a `config_dir` value to the `PartialConfig` object.
@@ -824,6 +833,18 @@ impl PartialConfig {
     ///
     pub fn with_log_config(mut self, config: Option<LogConfig>) -> Self {
         self.log_config = config;
+        self
+    }
+
+    #[cfg(feature = "log-config")]
+    /// Sets verbosity
+    ///
+    /// # Arguments
+    ///
+    /// *'targets' - Vec of log target
+    ///
+    pub fn with_verbosity(mut self, verbosity: Option<log::Level>) -> Self {
+        self.verbosity = verbosity;
         self
     }
 }

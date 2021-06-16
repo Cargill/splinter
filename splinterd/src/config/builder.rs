@@ -204,6 +204,13 @@ impl ConfigBuilder {
             })
             .ok_or_else(|| ConfigError::MissingValue("log_config".to_string()))?;
 
+        #[cfg(feature = "log-config")]
+        let verbosity = self
+            .partial_configs
+            .iter()
+            .find_map(|p| p.verbosity().map(|v| (v, p.source())))
+            .ok_or_else(|| ConfigError::MissingValue("verbosity".to_string()))?;
+
         // Iterates over the list of `PartialConfig` objects to find the first config with a value
         // for the specific field. If no value is found, an error is returned.
         Ok(Config {
@@ -369,6 +376,8 @@ impl ConfigBuilder {
                 .find_map(|p| p.metrics_password().map(|v| (v, p.source()))),
             #[cfg(feature = "log-config")]
             log_config: Some(log_config),
+            #[cfg(feature = "log-config")]
+            verbosity: verbosity,
         })
     }
 }
