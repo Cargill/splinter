@@ -180,6 +180,17 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 .with_metrics_password(self.matches.value_of("metrics_password").map(String::from))
         }
 
+        #[cfg(feature = "log-config")]
+        {
+            partial_config =
+                partial_config.with_verbosity(Some(match self.matches.occurrences_of("verbose") {
+                    0 => log::Level::Warn,
+                    1 => log::Level::Info,
+                    2 => log::Level::Debug,
+                    _ => log::Level::Trace,
+                }));
+        }
+
         Ok(partial_config)
     }
 }
