@@ -140,7 +140,7 @@ impl Action for UpdateRoleAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let role_id = arg_matches
             .and_then(|args| args.value_of("role_id"))
-            .ok_or_else(|| CliError::ActionError("A role id must be provided.".into()))?;
+            .ok_or_else(|| CliError::ActionError("A role ID must be provided.".into()))?;
 
         let display_name = arg_matches
             .and_then(|args| args.value_of("display_name"))
