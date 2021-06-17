@@ -42,8 +42,20 @@ FLAGS
 SUBCOMMANDS
 ===========
 
+`create`
+: Creates a role on a Splinter node
+
+`delete`
+: Deletes a role from a splinter node
+
 `list`
 : Lists the available roles for a Splinter node
+
+`show`
+: Shows a role on a Splinter node
+
+`update`
+: Updates a role on a Splinter node
 
 SEE ALSO
 ========
