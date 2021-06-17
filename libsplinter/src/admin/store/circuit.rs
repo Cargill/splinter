@@ -17,6 +17,7 @@
 use std::convert::TryFrom;
 
 use crate::admin::messages::{self, is_valid_circuit_id};
+use crate::circuit::routing;
 use crate::error::InvalidStateError;
 use crate::protos::admin;
 
@@ -637,6 +638,16 @@ impl From<ProposedCircuit> for Circuit {
             display_name: circuit.display_name().clone(),
             circuit_version: circuit.circuit_version(),
             circuit_status: circuit.circuit_status().clone(),
+        }
+    }
+}
+
+impl From<&AuthorizationType> for routing::AuthorizationType {
+    fn from(auth_type: &AuthorizationType) -> Self {
+        match auth_type {
+            AuthorizationType::Trust => routing::AuthorizationType::Trust,
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationType::Challenge => routing::AuthorizationType::Challenge,
         }
     }
 }

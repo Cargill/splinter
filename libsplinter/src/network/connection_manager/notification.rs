@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use super::error::ConnectionManagerError;
+use super::ConnectionAuthorizationType;
 
 /// Messages that will be dispatched to all subscription handlers
 #[derive(Debug, PartialEq, Clone)]
@@ -20,7 +21,7 @@ pub enum ConnectionManagerNotification {
     Connected {
         endpoint: String,
         connection_id: String,
-        identity: String,
+        identity: ConnectionAuthorizationType,
     },
     FatalConnectionError {
         endpoint: String,
@@ -29,15 +30,15 @@ pub enum ConnectionManagerNotification {
     InboundConnection {
         endpoint: String,
         connection_id: String,
-        identity: String,
+        identity: ConnectionAuthorizationType,
     },
     Disconnected {
         endpoint: String,
-        identity: String,
+        identity: ConnectionAuthorizationType,
     },
     NonFatalConnectionError {
         endpoint: String,
         attempts: u64,
-        identity: String,
+        identity: ConnectionAuthorizationType,
     },
 }

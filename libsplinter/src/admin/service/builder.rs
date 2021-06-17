@@ -54,6 +54,8 @@ pub struct AdminServiceBuilder {
     coordinator_timeout: Option<Duration>,
     routing_table_writer: Option<Box<dyn RoutingTableWriter>>,
     event_store: Option<Box<dyn AdminServiceStore>>,
+    #[cfg(feature = "challenge-authorization")]
+    public_keys: Option<Vec<Vec<u8>>>,
 }
 
 impl AdminServiceBuilder {
@@ -150,6 +152,14 @@ impl AdminServiceBuilder {
         self
     }
 
+    /// Sets the public keys
+    #[cfg(feature = "challenge-authorization")]
+    pub fn with_public_keys(mut self, public_keys: Vec<Vec<u8>>) -> Self {
+        self.public_keys = Some(public_keys);
+
+        self
+    }
+
     /// Constructs the AdminServce.
     ///
     /// # Errors
@@ -212,6 +222,10 @@ impl AdminServiceBuilder {
         })?;
 
         let service_id = admin_service_id(&node_id);
+
+        #[cfg(feature = "challenge-authorization")]
+        let public_keys = self.public_keys.unwrap_or_default();
+
         let admin_service_shared = Arc::new(Mutex::new(AdminServiceShared::new(
             node_id.clone(),
             orchestrator.clone(),
@@ -224,6 +238,8 @@ impl AdminServiceBuilder {
             key_permission_manager,
             routing_table_writer,
             admin_event_store,
+            #[cfg(feature = "challenge-authorization")]
+            public_keys,
         )));
 
         Ok(AdminService {

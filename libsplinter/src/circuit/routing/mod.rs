@@ -42,6 +42,9 @@ use std::fmt;
 use self::error::RoutingTableReaderError;
 
 use crate::error::InternalError;
+#[cfg(feature = "challenge-authorization")]
+use crate::error::InvalidStateError;
+use crate::peer::PeerAuthorizationToken;
 
 /// Interface for updating the routing table
 pub trait RoutingTableWriter: Send {
@@ -271,6 +274,29 @@ impl CircuitNode {
             public_key: None,
         }
     }
+
+    pub fn get_peer_auth_token(
+        &self,
+        auth_type: &AuthorizationType,
+    ) -> Result<PeerAuthorizationToken, RoutingTableReaderError> {
+        match auth_type {
+            AuthorizationType::Trust => Ok(PeerAuthorizationToken::from_peer_id(&self.node_id)),
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationType::Challenge => {
+                let public_key = self.public_key.clone().ok_or_else(|| {
+                    RoutingTableReaderError::InvalidStateError(InvalidStateError::with_message(
+                        format!(
+                            "Circuit Node {} does not have public key and challenge
+                                authorization was requested",
+                            self.node_id
+                        ),
+                    ))
+                })?;
+                #[cfg(feature = "challenge-authorization")]
+                Ok(PeerAuthorizationToken::from_public_key(&public_key))
+            }
+        }
+    }
 }
 
 impl Ord for CircuitNode {
@@ -292,7 +318,7 @@ pub struct Service {
     service_type: String,
     node_id: String,
     arguments: Vec<(String, String)>,
-    peer_id: Option<String>,
+    peer_id: Option<PeerAuthorizationToken>,
 }
 
 impl Service {
@@ -340,11 +366,11 @@ impl Service {
     }
 
     /// Returns the local peer ID for the service
-    pub fn peer_id(&self) -> &Option<String> {
+    pub fn peer_id(&self) -> &Option<PeerAuthorizationToken> {
         &self.peer_id
     }
 
-    pub fn set_peer_id(&mut self, peer_id: String) {
+    pub fn set_peer_id(&mut self, peer_id: PeerAuthorizationToken) {
         self.peer_id = Some(peer_id)
     }
 

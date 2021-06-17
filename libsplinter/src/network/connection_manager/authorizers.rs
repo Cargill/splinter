@@ -23,7 +23,10 @@ use std::collections::HashMap;
 
 use crate::transport::Connection;
 
-use super::{AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError};
+use super::{
+    AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError,
+    ConnectionAuthorizationType,
+};
 
 /// Authorize Inproc Connections with predefined identities.
 ///
@@ -62,7 +65,7 @@ impl Authorizer for InprocAuthorizer {
         {
             (*on_complete)(AuthorizationResult::Authorized {
                 connection_id,
-                identity,
+                identity: ConnectionAuthorizationType::Trust { identity },
                 connection,
             })
             .map_err(|err| AuthorizerError(err.to_string()))
@@ -157,7 +160,12 @@ mod tests {
 
         match result {
             AuthorizationResult::Authorized { identity, .. } => {
-                assert_eq!("test-ident1", &identity)
+                assert_eq!(
+                    ConnectionAuthorizationType::Trust {
+                        identity: "test-ident1".into()
+                    },
+                    identity
+                )
             }
             AuthorizationResult::Unauthorized { .. } => panic!("should have been authorized"),
         }
@@ -230,7 +238,12 @@ mod tests {
 
         match result {
             AuthorizationResult::Authorized { identity, .. } => {
-                assert_eq!("test-ident1", &identity)
+                assert_eq!(
+                    ConnectionAuthorizationType::Trust {
+                        identity: "test-ident1".into()
+                    },
+                    identity
+                )
             }
             AuthorizationResult::Unauthorized { .. } => panic!("should have been authorized"),
         }
@@ -248,7 +261,12 @@ mod tests {
 
         match result {
             AuthorizationResult::Authorized { identity, .. } => {
-                assert_eq!("test-ident2", &identity)
+                assert_eq!(
+                    ConnectionAuthorizationType::Trust {
+                        identity: "test-ident2".into()
+                    },
+                    identity
+                )
             }
             AuthorizationResult::Unauthorized { .. } => panic!("should have been authorized"),
         }
@@ -266,7 +284,12 @@ mod tests {
 
         match result {
             AuthorizationResult::Authorized { identity, .. } => {
-                assert_eq!("test-ident3", &identity)
+                assert_eq!(
+                    ConnectionAuthorizationType::Trust {
+                        identity: "test-ident3".into()
+                    },
+                    identity
+                )
             }
             AuthorizationResult::Unauthorized { .. } => panic!("should have been authorized"),
         }
@@ -348,7 +371,9 @@ mod tests {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                identity: self.authorized_id.clone(),
+                identity: ConnectionAuthorizationType::Trust {
+                    identity: self.authorized_id.clone(),
+                },
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

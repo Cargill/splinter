@@ -52,7 +52,7 @@ pub trait Authorizer {
 pub enum AuthorizationResult {
     Authorized {
         connection_id: String,
-        identity: String,
+        identity: ConnectionAuthorizationType,
         connection: Box<dyn Connection>,
     },
     Unauthorized {
@@ -403,12 +403,23 @@ impl ShutdownHandle for ConnectionManager {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum ConnectionAuthorizationType {
+    Trust {
+        identity: String,
+    },
+    #[cfg(feature = "challenge-authorization")]
+    Challenge {
+        public_key: Vec<u8>,
+    },
+}
+
 /// Metadata describing a connection managed by the connection manager.
 #[derive(Clone, Debug)]
 struct ConnectionMetadata {
     connection_id: String,
     endpoint: String,
-    identity: String,
+    identity: ConnectionAuthorizationType,
     extended_metadata: ConnectionMetadataExt,
 }
 
@@ -428,7 +439,7 @@ impl ConnectionMetadata {
         &self.endpoint
     }
 
-    fn identity(&self) -> &str {
+    fn identity(&self) -> &ConnectionAuthorizationType {
         &self.identity
     }
 }
@@ -532,7 +543,7 @@ where
         subscribers: &mut SubscriberMap,
     ) {
         if let Some(connection) = self.connections.get(endpoint) {
-            let identity = connection.identity().to_string();
+            let identity = connection.identity().clone();
             // if this connection not reconnecting or disconnected, send Connected
             // notification.
             match connection.extended_metadata {
@@ -847,7 +858,7 @@ where
                 // We checked earlier that this was an outbound connection
                 _ => unreachable!(),
             };
-            let identity = meta.identity.to_string();
+            let identity = meta.identity.clone();
             self.connections.insert(endpoint.to_string(), meta);
 
             // Notify subscribers of reconnection failure
@@ -1076,7 +1087,9 @@ mod tests {
                 == ConnectionManagerNotification::Connected {
                     endpoint: endpoint.clone(),
                     connection_id: "test_id".to_string(),
-                    identity: "some-peer".to_string()
+                    identity: ConnectionAuthorizationType::Trust {
+                        identity: "some-peer".into()
+                    },
                 }
         );
 
@@ -1142,7 +1155,9 @@ mod tests {
                 == ConnectionManagerNotification::Connected {
                     endpoint: endpoint.clone(),
                     connection_id: "test_id".to_string(),
-                    identity: "some-peer".to_string()
+                    identity: ConnectionAuthorizationType::Trust {
+                        identity: "some-peer".into()
+                    },
                 }
         );
 
@@ -1285,7 +1300,9 @@ mod tests {
                 == ConnectionManagerNotification::Connected {
                     endpoint: endpoint.clone(),
                     connection_id: "test_id".to_string(),
-                    identity: "some-peer".to_string()
+                    identity: ConnectionAuthorizationType::Trust {
+                        identity: "some-peer".into()
+                    },
                 }
         );
 
@@ -1302,7 +1319,9 @@ mod tests {
             reconnecting_notification
                 == ConnectionManagerNotification::Disconnected {
                     endpoint: endpoint.clone(),
-                    identity: "some-peer".to_string()
+                    identity: ConnectionAuthorizationType::Trust {
+                        identity: "some-peer".into()
+                    },
                 }
         );
 
@@ -1316,7 +1335,9 @@ mod tests {
             ConnectionManagerNotification::Connected {
                 endpoint: endpoint.clone(),
                 connection_id: "test_id".to_string(),
-                identity: "some-peer".to_string()
+                identity: ConnectionAuthorizationType::Trust {
+                    identity: "some-peer".into()
+                },
             }
         );
 
@@ -1463,7 +1484,12 @@ mod tests {
 
         if let ConnectionManagerNotification::InboundConnection { ref identity, .. } = &notification
         {
-            assert_eq!(identity, "inbound-identity");
+            assert_eq!(
+                identity,
+                &ConnectionAuthorizationType::Trust {
+                    identity: "inbound-identity".into()
+                },
+            );
         } else {
             panic!(
                 "Did not receive the correct notification: {:?}",
@@ -1509,7 +1535,9 @@ mod tests {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                identity: self.authorized_id.clone(),
+                identity: ConnectionAuthorizationType::Trust {
+                    identity: self.authorized_id.clone(),
+                },
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

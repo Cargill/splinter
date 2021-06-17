@@ -29,6 +29,7 @@ pub mod interconnect;
 mod notification;
 mod peer_map;
 mod peer_ref;
+mod token;
 
 use std::cmp::min;
 use std::collections::HashMap;
@@ -57,6 +58,7 @@ pub use self::notification::{PeerManagerNotification, PeerNotificationIter, Subs
 use self::notification::{Subscriber, SubscriberMap};
 use self::peer_map::{PeerMap, PeerStatus};
 pub use self::peer_ref::{EndpointPeerRef, PeerRef};
+pub use self::token::PeerAuthorizationToken;
 
 /// Internal messages to drive management
 pub(crate) enum PeerManagerMessage {
@@ -82,7 +84,7 @@ impl From<ConnectionManagerNotification> for PeerManagerMessage {
 /// The requests that will be handled by the `PeerManager`
 pub(crate) enum PeerManagerRequest {
     AddPeer {
-        peer_id: String,
+        peer_id: PeerAuthorizationToken,
         endpoints: Vec<String>,
         sender: Sender<Result<PeerRef, PeerRefAddError>>,
     },
@@ -91,7 +93,7 @@ pub(crate) enum PeerManagerRequest {
         sender: Sender<Result<EndpointPeerRef, PeerUnknownAddError>>,
     },
     RemovePeer {
-        peer_id: String,
+        peer_id: PeerAuthorizationToken,
         sender: Sender<Result<(), PeerRefRemoveError>>,
     },
     RemovePeerByEndpoint {
@@ -99,21 +101,21 @@ pub(crate) enum PeerManagerRequest {
         sender: Sender<Result<(), PeerRefRemoveError>>,
     },
     ListPeers {
-        sender: Sender<Result<Vec<String>, PeerListError>>,
+        sender: Sender<Result<Vec<PeerAuthorizationToken>, PeerListError>>,
     },
     ListUnreferencedPeers {
-        sender: Sender<Result<Vec<String>, PeerListError>>,
+        sender: Sender<Result<Vec<PeerAuthorizationToken>, PeerListError>>,
     },
     ConnectionIds {
-        sender: Sender<Result<BiHashMap<String, String>, PeerConnectionIdError>>,
+        sender: Sender<Result<BiHashMap<PeerAuthorizationToken, String>, PeerConnectionIdError>>,
     },
     GetConnectionId {
-        peer_id: String,
+        peer_id: PeerAuthorizationToken,
         sender: Sender<Result<Option<String>, PeerLookupError>>,
     },
     GetPeerId {
         connection_id: String,
-        sender: Sender<Result<Option<String>, PeerLookupError>>,
+        sender: Sender<Result<Option<PeerAuthorizationToken>, PeerLookupError>>,
     },
     Subscribe {
         sender: Sender<Result<SubscriberId, PeerManagerError>>,
@@ -364,7 +366,7 @@ fn handle_request(
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
-    ref_map: &mut RefMap<String>,
+    ref_map: &mut RefMap<PeerAuthorizationToken>,
     subscribers: &mut SubscriberMap,
     strict_ref_counts: bool,
 ) {
@@ -516,7 +518,7 @@ struct UnreferencedPeer {
 }
 
 struct UnreferencedPeerState {
-    peers: HashMap<String, UnreferencedPeer>,
+    peers: HashMap<PeerAuthorizationToken, UnreferencedPeer>,
     // The list of endpoints that have been requested without an ID
     requested_endpoints: Vec<String>,
     // Last time connection to the requested endpoints was tried
@@ -540,16 +542,16 @@ impl UnreferencedPeerState {
 // to avoid needing a lock in the PeerManager.
 #[allow(clippy::too_many_arguments)]
 fn add_peer(
-    peer_id: String,
+    peer_id: PeerAuthorizationToken,
     endpoints: Vec<String>,
     connector: Connector,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
-    ref_map: &mut RefMap<String>,
+    ref_map: &mut RefMap<PeerAuthorizationToken>,
     subscribers: &mut SubscriberMap,
 ) -> Result<PeerRef, PeerRefAddError> {
-    let new_ref_count = ref_map.add_ref(peer_id.to_string());
+    let new_ref_count = ref_map.add_ref(peer_id.clone());
 
     // if this is not a new peer, return success
     if new_ref_count > 1 {
@@ -600,7 +602,7 @@ fn add_peer(
             if peer_metadata.status == PeerStatus::Connected {
                 // Update peer for new state
                 let notification = PeerManagerNotification::Connected {
-                    peer: peer_id.to_string(),
+                    peer: peer_id.clone(),
                 };
                 subscribers.broadcast(notification);
             }
@@ -684,12 +686,12 @@ fn add_unidentified(
     unreferenced_peers: &mut UnreferencedPeerState,
     peer_remover: &PeerRemover,
     peers: &PeerMap,
-    ref_map: &mut RefMap<String>,
+    ref_map: &mut RefMap<PeerAuthorizationToken>,
 ) -> EndpointPeerRef {
     info!("Attempting to peer with peer by endpoint {}", endpoint);
     if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
         // if there is peer in the peer_map, there is reference in the ref map
-        ref_map.add_ref(peer_metadata.id.to_string());
+        ref_map.add_ref(peer_metadata.id.clone());
         EndpointPeerRef::new(endpoint, peer_remover.clone())
     } else {
         let connection_id = format!("{}", Uuid::new_v4());
@@ -707,11 +709,11 @@ fn add_unidentified(
 }
 
 fn remove_peer(
-    peer_id: String,
+    peer_id: PeerAuthorizationToken,
     connector: Connector,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
-    ref_map: &mut RefMap<String>,
+    ref_map: &mut RefMap<PeerAuthorizationToken>,
     strict_ref_counts: bool,
 ) -> Result<(), PeerRefRemoveError> {
     debug!("Removing peer: {}", peer_id);
@@ -773,7 +775,7 @@ fn remove_peer_by_endpoint(
     endpoint: String,
     connector: Connector,
     peers: &mut PeerMap,
-    ref_map: &mut RefMap<String>,
+    ref_map: &mut RefMap<PeerAuthorizationToken>,
     strict_ref_counts: bool,
 ) -> Result<(), PeerRefRemoveError> {
     let peer_metadata = match peers.get_peer_from_endpoint(&endpoint) {
@@ -851,14 +853,14 @@ fn handle_notifications(
     subscribers: &mut SubscriberMap,
     max_retry_attempts: u64,
     local_identity: &str,
-    ref_map: &mut RefMap<String>,
+    ref_map: &mut RefMap<PeerAuthorizationToken>,
     retry_frequency: u64,
 ) {
     match notification {
         // If a connection has disconnected, forward notification to subscribers
         ConnectionManagerNotification::Disconnected { endpoint, identity } => handle_disconnection(
             endpoint,
-            identity,
+            PeerAuthorizationToken::from(identity),
             unreferenced_peers,
             peers,
             connector,
@@ -871,6 +873,7 @@ fn handle_notifications(
         } => {
             // Check if the disconnected peer has reached the retry limit, if so try to find a
             // different endpoint that can be connected to
+            let identity = PeerAuthorizationToken::from(identity);
             if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
                 info!(
                     "{} reconnection attempts have been made to peer {}",
@@ -916,7 +919,7 @@ fn handle_notifications(
             identity,
         } => handle_inbound_connection(
             endpoint,
-            identity,
+            PeerAuthorizationToken::from(identity),
             connection_id,
             unreferenced_peers,
             peers,
@@ -931,7 +934,7 @@ fn handle_notifications(
             connection_id,
         } => handle_connected(
             endpoint,
-            identity,
+            PeerAuthorizationToken::from(identity),
             connection_id,
             unreferenced_peers,
             peers,
@@ -955,7 +958,7 @@ fn handle_notifications(
 
 fn handle_disconnection(
     endpoint: String,
-    identity: String,
+    identity: PeerAuthorizationToken,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
@@ -972,7 +975,7 @@ fn handle_disconnection(
         }
 
         let notification = PeerManagerNotification::Disconnected {
-            peer: peer_metadata.id.to_string(),
+            peer: peer_metadata.id.clone(),
         };
         info!("Peer {} is currently disconnected", identity);
         if peer_metadata.endpoints.contains(&endpoint) {
@@ -1023,7 +1026,7 @@ fn handle_disconnection(
 #[allow(clippy::too_many_arguments)]
 fn handle_inbound_connection(
     endpoint: String,
-    identity: String,
+    identity: PeerAuthorizationToken,
     connection_id: String,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
@@ -1053,7 +1056,7 @@ fn handle_inbound_connection(
             PeerStatus::Connected => {
                 // Compare identities, if local identity is greater, close incoming connection
                 // otherwise, remove outbound connection and replace with inbound.
-                if local_identity > identity.as_str() {
+                if local_identity > identity.id_as_string().as_str() {
                     // if peer is already connected, remove the inbound connection
                     debug!(
                         "Removing inbound connection, already connected to {}",
@@ -1080,7 +1083,7 @@ fn handle_inbound_connection(
         peer_metadata.last_connection_attempt = Instant::now();
 
         let notification = PeerManagerNotification::Connected {
-            peer: peer_metadata.id.to_string(),
+            peer: peer_metadata.id.clone(),
         };
 
         peer_metadata.active_endpoint = endpoint.to_string();
@@ -1121,14 +1124,14 @@ fn handle_inbound_connection(
 #[allow(clippy::too_many_arguments, clippy::cognitive_complexity)]
 fn handle_connected(
     endpoint: String,
-    identity: String,
+    identity: PeerAuthorizationToken,
     connection_id: String,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut SubscriberMap,
     local_identity: &str,
-    ref_map: &mut RefMap<String>,
+    ref_map: &mut RefMap<PeerAuthorizationToken>,
     retry_frequency: u64,
 ) {
     if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
@@ -1148,7 +1151,7 @@ fn handle_connected(
             PeerStatus::Connected => {
                 // Compare identities, if remote identity is greater, remove outbound connection
                 // otherwise replace inbound connection with outbound.
-                if local_identity < identity.as_str() {
+                if local_identity < identity.id_as_string().as_str() {
                     info!(
                         "Removing outbound connection, peer {} is already connected",
                         peer_metadata.id
@@ -1182,7 +1185,7 @@ fn handle_connected(
 
             // tell subscribers this Peer is currently disconnected
             let notification = PeerManagerNotification::Disconnected {
-                peer: peer_metadata.id.to_string(),
+                peer: peer_metadata.id.clone(),
             };
 
             // set its status to pending, this will cause the endpoints to be retried at
@@ -1204,7 +1207,7 @@ fn handle_connected(
 
         // Update peer for new state
         let notification = PeerManagerNotification::Connected {
-            peer: peer_metadata.id.to_string(),
+            peer: peer_metadata.id.clone(),
         };
 
         let starting_status = peer_metadata.status;
@@ -1235,9 +1238,9 @@ fn handle_connected(
         // if this endpoint has been requested, add this connection to peers with the provided
         // endpoint
         if unreferenced_peers.requested_endpoints.contains(&endpoint) {
-            ref_map.add_ref(identity.to_string());
+            ref_map.add_ref(identity.clone());
             peers.insert(
-                identity.to_string(),
+                identity.clone(),
                 connection_id,
                 vec![endpoint.to_string()],
                 endpoint,
@@ -1282,7 +1285,7 @@ fn handle_fatal_connection(
 
         // Tell subscribers this peer is disconnected
         let notification = PeerManagerNotification::Disconnected {
-            peer: peer_metadata.id.to_string(),
+            peer: peer_metadata.id.clone(),
         };
 
         // reset retry settings
@@ -1386,7 +1389,11 @@ fn retry_pending(
     }
 }
 
-fn log_connect_request_err(err: ConnectionManagerError, peer_id: &str, endpoint: &str) {
+fn log_connect_request_err(
+    err: ConnectionManagerError,
+    peer_id: &PeerAuthorizationToken,
+    endpoint: &str,
+) {
     match err {
         ConnectionManagerError::ConnectionCreationError {
             context,
@@ -1431,7 +1438,8 @@ pub mod tests {
 
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
-        AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
+        AuthorizationResult, Authorizer, AuthorizerError, ConnectionAuthorizationType,
+        ConnectionManager,
     };
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
     use crate::threading::lifecycle::ShutdownHandle;
@@ -1479,10 +1487,16 @@ pub mod tests {
             .subscribe_sender(tx)
             .expect("Unable to get subscriber");
         let peer_ref = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                vec!["inproc://test".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer")
+        );
 
         // timeout after 60 seconds
         let timeout = Duration::from_secs(60);
@@ -1492,7 +1506,7 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: "test_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer"),
                 }
         );
 
@@ -1551,10 +1565,16 @@ pub mod tests {
             .expect("Unable to get subscriber");
 
         let peer_ref = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                vec!["inproc://test".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer")
+        );
 
         // timeout after 60 seconds
         let timeout = Duration::from_secs(60);
@@ -1564,7 +1584,7 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Disconnected {
-                    peer: "test_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
                 }
         );
 
@@ -1629,7 +1649,7 @@ pub mod tests {
             .expect("Unable to get subscriber");
         let peer_ref = peer_connector
             .add_peer_ref(
-                "test_peer".to_string(),
+                PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec![
                     "inproc://bad_endpoint".to_string(),
                     "inproc://test".to_string(),
@@ -1637,7 +1657,10 @@ pub mod tests {
             )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer")
+        );
 
         // timeout after 60 seconds
         let timeout = Duration::from_secs(60);
@@ -1647,7 +1670,7 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: "test_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
                 }
         );
 
@@ -1702,10 +1725,16 @@ pub mod tests {
             .subscribe_sender(tx)
             .expect("Unable to get subscriber");
         let peer_ref = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                vec!["inproc://test".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer")
+        );
 
         // timeout after 60 seconds
         let timeout = Duration::from_secs(60);
@@ -1715,15 +1744,21 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: "test_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer"),
                 }
         );
 
         let peer_ref = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                vec!["inproc://test".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer"),
+        );
 
         peer_manager.signal_shutdown();
         cm.signal_shutdown();
@@ -1787,10 +1822,16 @@ pub mod tests {
             .subscribe_sender(tx)
             .expect("Unable to get subscriber");
         let peer_ref_1 = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                vec!["inproc://test".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref_1.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref_1.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer"),
+        );
 
         // timeout after 60 seconds
         let timeout = Duration::from_secs(60);
@@ -1800,15 +1841,21 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: "test_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer"),
                 }
         );
 
         let peer_ref_2 = peer_connector
-            .add_peer_ref("next_peer".to_string(), vec!["inproc://test_2".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("next_peer"),
+                vec!["inproc://test_2".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref_2.peer_id(), "next_peer");
+        assert_eq!(
+            peer_ref_2.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("next_peer")
+        );
 
         let notification = notification_rx
             .recv_timeout(timeout)
@@ -1816,7 +1863,7 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: "next_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("next_peer")
                 }
         );
 
@@ -1828,7 +1875,10 @@ pub mod tests {
 
         assert_eq!(
             peer_list,
-            vec!["next_peer".to_string(), "test_peer".to_string()]
+            vec![
+                PeerAuthorizationToken::from_peer_id("next_peer"),
+                PeerAuthorizationToken::from_peer_id("test_peer")
+            ]
         );
 
         peer_manager.signal_shutdown();
@@ -1891,10 +1941,16 @@ pub mod tests {
             .subscribe_sender(tx)
             .expect("Unable to get subscriber");
         let peer_ref_1 = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                vec!["inproc://test".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref_1.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref_1.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer")
+        );
 
         // timeout after 60 seconds
         let timeout = Duration::from_secs(60);
@@ -1904,15 +1960,21 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: "test_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
                 }
         );
 
         let peer_ref_2 = peer_connector
-            .add_peer_ref("next_peer".to_string(), vec!["inproc://test_2".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("next_peer"),
+                vec!["inproc://test_2".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref_2.peer_id(), "next_peer");
+        assert_eq!(
+            peer_ref_2.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("next_peer")
+        );
 
         let notification = notification_rx
             .recv_timeout(timeout)
@@ -1920,7 +1982,7 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: "next_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("next_peer")
                 }
         );
 
@@ -1928,9 +1990,13 @@ pub mod tests {
             .connection_ids()
             .expect("Unable to get peer list");
 
-        assert!(peers.get_by_key("next_peer").is_some());
+        assert!(peers
+            .get_by_key(&PeerAuthorizationToken::from_peer_id("next_peer"))
+            .is_some());
 
-        assert!(peers.get_by_key("test_peer").is_some());
+        assert!(peers
+            .get_by_key(&PeerAuthorizationToken::from_peer_id("test_peer"))
+            .is_some());
 
         peer_manager.signal_shutdown();
         cm.signal_shutdown();
@@ -1989,10 +2055,16 @@ pub mod tests {
                 .subscribe_sender(tx)
                 .expect("Unable to get subscriber");
             let peer_ref = peer_connector
-                .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+                .add_peer_ref(
+                    PeerAuthorizationToken::from_peer_id("test_peer"),
+                    vec!["inproc://test".to_string()],
+                )
                 .expect("Unable to add peer");
 
-            assert_eq!(peer_ref.peer_id(), "test_peer");
+            assert_eq!(
+                peer_ref.peer_id(),
+                &PeerAuthorizationToken::from_peer_id("test_peer")
+            );
 
             // timeout after 60 seconds
             let timeout = Duration::from_secs(60);
@@ -2002,7 +2074,7 @@ pub mod tests {
             assert!(
                 notification
                     == PeerManagerNotification::Connected {
-                        peer: "test_peer".to_string(),
+                        peer: PeerAuthorizationToken::from_peer_id("test_peer")
                     }
             );
 
@@ -2010,7 +2082,10 @@ pub mod tests {
                 .list_peers()
                 .expect("Unable to get peer list");
 
-            assert_eq!(peer_list, vec!["test_peer".to_string()]);
+            assert_eq!(
+                peer_list,
+                vec![PeerAuthorizationToken::from_peer_id("test_peer")]
+            );
         }
         // drop peer_ref
 
@@ -2018,7 +2093,7 @@ pub mod tests {
             .list_peers()
             .expect("Unable to get peer list");
 
-        assert_eq!(peer_list, Vec::<String>::new());
+        assert_eq!(peer_list, Vec::<PeerAuthorizationToken>::new());
 
         peer_manager.signal_shutdown();
         cm.signal_shutdown();
@@ -2093,21 +2168,30 @@ pub mod tests {
             assert!(
                 notification
                     == PeerManagerNotification::Connected {
-                        peer: "test_peer".to_string(),
+                        peer: PeerAuthorizationToken::from_peer_id("test_peer")
                     }
             );
 
             let peer_ref = peer_connector
-                .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+                .add_peer_ref(
+                    PeerAuthorizationToken::from_peer_id("test_peer"),
+                    vec!["inproc://test".to_string()],
+                )
                 .expect("Unable to add peer");
 
-            assert_eq!(peer_ref.peer_id(), "test_peer");
+            assert_eq!(
+                peer_ref.peer_id(),
+                &PeerAuthorizationToken::from_peer_id("test_peer")
+            );
 
             let peer_list = peer_connector
                 .list_peers()
                 .expect("Unable to get peer list");
 
-            assert_eq!(peer_list, vec!["test_peer".to_string()]);
+            assert_eq!(
+                peer_list,
+                vec![PeerAuthorizationToken::from_peer_id("test_peer")]
+            );
 
             drop(peer_ref);
 
@@ -2115,7 +2199,10 @@ pub mod tests {
                 .list_peers()
                 .expect("Unable to get peer list");
 
-            assert_eq!(peer_list, vec!["test_peer".to_string()]);
+            assert_eq!(
+                peer_list,
+                vec![PeerAuthorizationToken::from_peer_id("test_peer")]
+            );
         }
         // drop endpoint_peer_ref
 
@@ -2123,7 +2210,7 @@ pub mod tests {
             .list_peers()
             .expect("Unable to get peer list");
 
-        assert_eq!(peer_list, Vec::<String>::new());
+        assert_eq!(peer_list, Vec::<PeerAuthorizationToken>::new());
 
         peer_manager.signal_shutdown();
         cm.signal_shutdown();
@@ -2228,10 +2315,16 @@ pub mod tests {
             .subscribe_sender(notification_tx)
             .expect("Unable to get subscriber");
         let peer_ref = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec![endpoint, endpoint2])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                vec![endpoint, endpoint2],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer")
+        );
 
         // timeout after 60 seconds
         let timeout = Duration::from_secs(60);
@@ -2241,7 +2334,7 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: "test_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
                 }
         );
 
@@ -2252,7 +2345,7 @@ pub mod tests {
         assert!(
             disconnected_notification
                 == PeerManagerNotification::Disconnected {
-                    peer: "test_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
                 }
         );
 
@@ -2264,7 +2357,7 @@ pub mod tests {
         assert!(
             connected_notification
                 == PeerManagerNotification::Connected {
-                    peer: "test_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
                 }
         );
 
@@ -2367,21 +2460,30 @@ pub mod tests {
         assert!(peer_connector.list_peers().unwrap().is_empty());
 
         assert_eq!(
-            vec!["test_peer".to_string()],
+            vec![PeerAuthorizationToken::from_peer_id("test_peer")],
             peer_connector.list_unreferenced_peers().unwrap()
         );
 
         let peer_ref = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                vec!["inproc://test".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer")
+        );
 
         let peer_list = peer_connector
             .list_peers()
             .expect("Unable to get peer list");
 
-        assert_eq!(peer_list, vec!["test_peer".to_string()]);
+        assert_eq!(
+            peer_list,
+            vec![PeerAuthorizationToken::from_peer_id("test_peer")]
+        );
 
         peer_manager.signal_shutdown();
         cm.signal_shutdown();
@@ -2467,10 +2569,16 @@ pub mod tests {
             .subscribe_sender(tx)
             .expect("Unable to get subscriber");
         let peer_ref = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                vec!["inproc://test".to_string()],
+            )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id(), "test_peer");
+        assert_eq!(
+            peer_ref.peer_id(),
+            &PeerAuthorizationToken::from_peer_id("test_peer")
+        );
 
         // timeout after 60 seconds
         let timeout = Duration::from_secs(60);
@@ -2480,7 +2588,7 @@ pub mod tests {
         assert!(
             notification
                 == TestEnum::Notification(PeerManagerNotification::Connected {
-                    peer: "test_peer".to_string(),
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
                 })
         );
 
@@ -2545,7 +2653,7 @@ pub mod tests {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                identity,
+                identity: ConnectionAuthorizationType::Trust { identity },
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

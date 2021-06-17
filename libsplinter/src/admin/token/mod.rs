@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "admin-service-client")]
-pub mod client;
-pub mod error;
-pub mod messages;
-#[cfg(feature = "rest-api")]
-pub mod rest_api;
-pub mod service;
-pub mod store;
-mod token;
+//! A trait to make it easier to get a list of PeerAuthorizationToken from Circuits and Proposals
+//!
+//! This module includes implementations for store and protobuf structs
+
+pub mod token_protobuf;
+pub mod token_protocol;
+
+use crate::error::InvalidStateError;
+use crate::peer::PeerAuthorizationToken;
+
+pub trait ListPeerAuthorizationTokens {
+    fn list_tokens(&self) -> Result<Vec<PeerAuthorizationToken>, InvalidStateError>;
+}

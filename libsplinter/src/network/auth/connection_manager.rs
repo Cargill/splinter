@@ -14,6 +14,7 @@
 
 use crate::network::connection_manager::{
     AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError,
+    ConnectionAuthorizationType,
 };
 use crate::transport::Connection;
 
@@ -45,7 +46,7 @@ impl From<ConnectionAuthorizationState> for AuthorizationResult {
             } => AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                identity,
+                identity: ConnectionAuthorizationType::Trust { identity },
             },
 
             ConnectionAuthorizationState::Unauthorized {

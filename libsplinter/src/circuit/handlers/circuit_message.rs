@@ -75,6 +75,7 @@ mod tests {
 
     use super::*;
     use crate::network::dispatch::{DispatchLoopBuilder, Dispatcher};
+    use crate::peer::PeerAuthorizationToken;
     use crate::protos::circuit::ServiceConnectRequest;
     use crate::protos::network::NetworkMessageType;
 
@@ -113,7 +114,7 @@ mod tests {
         // Dispatch network message
         network_dispatcher
             .dispatch(
-                "PEER".into(),
+                PeerAuthorizationToken::from_peer_id("PEER").into(),
                 &NetworkMessageType::CIRCUIT,
                 circuit_bytes.clone(),
             )
