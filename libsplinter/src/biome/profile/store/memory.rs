@@ -14,7 +14,7 @@
 
 //! A memory-backed implementation of the [UserProfileStore]
 
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 use std::sync::{Arc, Mutex};
 
 use crate::error::{InternalError, InvalidArgumentError, InvalidStateError};
@@ -50,20 +50,21 @@ impl UserProfileStore for MemoryUserProfileStore {
                 "Cannot access user profile store: mutex lock poisoned".to_string(),
             ))
         })?;
-        if inner.contains_key(&profile.user_id) {
-            let new_profile = ProfileBuilder::default()
-                .with_user_id(profile.user_id.clone())
-                .with_name(profile.name)
-                .with_given_name(profile.given_name)
-                .with_family_name(profile.family_name)
-                .with_email(profile.email)
-                .build()
-                .map_err(|_| {
-                    UserProfileStoreError::Internal(InternalError::with_message(
-                        "Failed to build profile with updated details".to_string(),
-                    ))
-                })?;
-            inner.insert(profile.user_id, new_profile);
+        if let Entry::Occupied(mut entry) = inner.entry(profile.user_id.clone()) {
+            entry.insert(
+                ProfileBuilder::default()
+                    .with_user_id(profile.user_id.clone())
+                    .with_name(profile.name)
+                    .with_given_name(profile.given_name)
+                    .with_family_name(profile.family_name)
+                    .with_email(profile.email)
+                    .build()
+                    .map_err(|_| {
+                        UserProfileStoreError::Internal(InternalError::with_message(
+                            "Failed to build profile with updated details".to_string(),
+                        ))
+                    })?,
+            );
             Ok(())
         } else {
             Err(UserProfileStoreError::InvalidArgument(
