@@ -134,7 +134,7 @@ impl std::str::FromStr for TimeUnit {
 }
 
 impl TimeUnit {
-    fn to_sec(&self) -> u64 {
+    fn to_sec(self) -> u64 {
         use TimeUnit::*;
         match self {
             Hour => 60 * 60,
