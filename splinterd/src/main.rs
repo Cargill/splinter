@@ -581,11 +581,7 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
     #[cfg(feature = "log-config")]
     if let Some(lc) = config.log_config() {
         // its safe to use unwrap here because all the defined LevelFilters map to Some
-        if let Ok(log_config) = lc
-            .to_owned()
-            .set_root_level(get_log_filter_level(&matches).to_level().unwrap())
-            .try_into_config()
-        {
+        if let Ok(log_config) = lc.to_owned().try_into_config() {
             _log_handle.set_config(log_config);
         }
     }
