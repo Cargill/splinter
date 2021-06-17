@@ -163,12 +163,11 @@ impl CircuitPredicate {
             }
             CircuitPredicate::MembersInclude(nodes) => {
                 for node_id in nodes {
-                    if proposal
+                    if !proposal
                         .circuit()
                         .members()
                         .iter()
-                        .find(|node| node_id == node.node_id())
-                        .is_none()
+                        .any(|node| node_id == node.node_id())
                     {
                         return false;
                     }
