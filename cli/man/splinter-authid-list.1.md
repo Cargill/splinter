@@ -21,7 +21,7 @@ This command lists all of the authorized identities with assigned roles the
 local node has configured. This command displays abbreviated information
 pertaining to assignments in columns, with the headers `ID`, `TYPE`, and
 `ROLES`. This allows the user to quickly see which identities have been assigned
-roles, as well as how many.  The information displayed is only relevant to the
+roles, as well as how many. The information displayed is only relevant to the
 queried splinter node.
 
 FLAGS
