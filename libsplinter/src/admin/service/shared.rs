@@ -368,8 +368,6 @@ impl AdminServiceShared {
                                     }
                                 }
                             }
-                            // add circuit as pending further service handling
-                            self.add_uninitialized_circuit(circuit_proposal.clone())?;
                         } else {
                             // commit new circuit
                             self.admin_store.upgrade_proposal_to_circuit(circuit_id)?;
@@ -465,10 +463,10 @@ impl AdminServiceShared {
                                     }
                                 }
                             }
-
-                            // add circuit as pending initialization
-                            self.add_uninitialized_circuit(circuit_proposal.clone())?;
                         }
+                        // add circuit as pending further service handling
+                        self.add_uninitialized_circuit(circuit_proposal.clone())?;
+
                         Ok(())
                     }
                     CircuitProposalStatus::Pending => {
