@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Actions for handling permissions subcommands.
+
 use clap::ArgMatches;
 
 use crate::error::CliError;
@@ -23,6 +25,13 @@ use super::{
     SPLINTER_REST_API_URL_ENV,
 };
 
+/// The action responsible for listing permissions.
+///
+/// The specific args for this action:
+///
+/// * url: specifies the URL of the splinter node to be queried; falls back to the environment
+///   variable SPLINTER_REST_API_URL
+/// * format: specifies the output format; one of "human", "json" or "csv"
 pub struct ListAction;
 
 impl Action for ListAction {
