@@ -62,7 +62,8 @@ default = [
 ]
 
 stable = [
-    "default"
+    "default",
+    "authorization-handler-rbac",
 ]
 
 experimental = [
@@ -70,7 +71,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization-handler-maintenance",
-    "authorization-handler-rbac",
     "challenge-authorization",
     "health",
     "upgrade",
