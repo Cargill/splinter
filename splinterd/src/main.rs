@@ -334,13 +334,6 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("storage")
-                .long("storage")
-                .help("Storage type used for the node; Deprecated. Use database instead")
-                .hidden(true)
-                .takes_value(true),
-        )
-        .arg(
             Arg::with_name("enable_biome")
                 .long("enable-biome")
                 .long_help("Enable the biome subsystem")
@@ -591,7 +584,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_node_id(node_id)
         .with_display_name(display_name)
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
-        .with_storage_type(config.storage().map(String::from))
         .with_db_url(config.database().to_string())
         .with_registries(config.registries().to_vec())
         .with_registry_auto_refresh(config.registry_auto_refresh())
