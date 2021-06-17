@@ -840,6 +840,11 @@ impl Config {
                 self.log_config(),
                 self.log_config_source()
             );
+            debug!(
+                "Config: verbosity: {:?} (source: {:?})",
+                self.verbosity(),
+                self.verbosity_source()
+            );
         }
     }
 
