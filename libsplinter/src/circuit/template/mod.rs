@@ -187,18 +187,19 @@ pub(in crate::circuit::template) fn find_template(
     // If the `paths` list is empty, populate this list with the `SPLINTER_CIRCUIT_TEMPLATE_PATH`
     // value, if set, and the default circuit template directory.
     let paths = if paths.is_empty() {
+        let mut paths = vec![];
         if let Ok(template_paths) = env::var(SPLINTER_CIRCUIT_TEMPLATE_PATH) {
-            paths.to_vec().extend(
+            paths.extend(
                 template_paths
                     .split(':')
                     .map(ToOwned::to_owned)
                     .collect::<Vec<String>>(),
             );
         }
-        paths.to_vec().push(DEFAULT_TEMPLATE_DIR.to_string());
+        paths.push(DEFAULT_TEMPLATE_DIR.to_string());
         paths
     } else {
-        paths
+        paths.to_vec()
     };
     // Check for the valid paths to the specified, using `name`, template file.
     let valid_paths: Vec<String> = paths
