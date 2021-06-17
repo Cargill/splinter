@@ -557,6 +557,7 @@ fn get_config_file<'a>(matches: &'a ArgMatches) -> &'a str {
         .unwrap_or("/etc/splinter/splinterd.toml")
 }
 
+#[cfg(not(feature = "log-config"))]
 fn get_log_filter_level(matches: &ArgMatches) -> log::LevelFilter {
     match matches.occurrences_of("verbose") {
         0 => log::LevelFilter::Warn,

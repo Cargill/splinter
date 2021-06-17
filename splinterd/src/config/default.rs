@@ -98,7 +98,9 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         }
         #[cfg(feature = "log-config")]
         {
-            partial_config = partial_config.with_log_config(Some(Default::default()));
+            partial_config = partial_config
+                .with_log_config(Some(Default::default()))
+                .with_verbosity(Some(log::Level::Info));
         }
 
         Ok(partial_config)
