@@ -54,16 +54,16 @@ CMD cargo login $CARGO_CRED \
  && cargo clean \
  && cargo test \
  && cargo publish \
- && bash -c '\
-    while true; do echo "Waiting for Splinter publishing to complete"; \
-    cargo search splinter | grep "splinter = " | grep -q $REPO_VERSION; \
-    if [ $? -eq 0 ]; \
-      then break; \
-    fi; \
-    sleep 0.5; done; ' \
  && cd /project/splinter/services/scabbard/libscabbard \
  && sed -i'' -e "s/splinter = {.*$/splinter\ =\ \"$REPO_VERSION\"/" Cargo.toml \
  && rm -f ../../../Cargo.lock ./Cargo.lock \
  && cargo clean \
+ && bash -c '\
+    while true; do echo "Waiting for Splinter publishing to complete"; \
+    cargo check; \
+    if [ $? -eq 0 ]; \
+      then break; \
+    fi; \
+    sleep 10; done; ' \
  && cargo test \
  && cargo publish --allow-dirty
