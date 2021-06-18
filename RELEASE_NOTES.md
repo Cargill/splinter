@@ -1,5 +1,43 @@
 # Release Notes
 
+## Changes in Splinter 0.5.8
+
+### Highlights
+
+* It is now possible to abandon and purge circuits and remove proposals that are
+  between a 0.5 node and a 0.4 node. This is allowed because the operations do
+  not require confirmation from the 0.4 node. The 0.4 node will print an error
+  and ignore the notification sent when the circuit is abandoned or a proposal
+  is removed.
+
+### libsplinter
+
+* Update `AuthChallengeSubmitRequest` to have multiple `SubmitRequests` that
+  have a signature and public key. This is required because a splinterd can
+  support multiple key pairs and it is not clear which one is the expected
+  public key without a proposal.
+
+* Update circuit abandon, circuit purge and proposal removal to work for
+  circuits and proposals that were created between a 0.5 node and a 0.4 node.
+
+* Replace string peer id with `PeerAuthorizationToken`. This enables routing
+  over the correct identity based on how the connection was authorized. The
+  layer that knows what authorization type is required is the admin service, as
+  such much of the public API of the `PeerManager`, `PeerManagerConnector`,
+  `PeerInterconnect`, and network dispatchers had to be updated to use
+  `PeerAuthorizationToken` instead of a string.
+
+* Fix an issue with default template paths when loading circuit template. In the
+  case where no paths were provided, the defaults would not be added to the
+  final set of search paths. This has been corrected to include the default
+  paths, both from configuration and constant values.
+
+### splinter CLI
+
+* Adds a `splinter user list` subcommand to the CLI, which should return all
+  users registered with Splinter, through Biome or OAuth. This command currently
+  returns all Splinter users, regardless of how the user registered.
+
 ## Changes in Splinter 0.5.7
 
 ### Highlights
