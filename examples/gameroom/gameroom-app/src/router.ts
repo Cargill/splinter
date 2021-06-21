@@ -110,15 +110,17 @@ const router = new Router({
 });
 
 router.beforeEach((to, from, next) => {
-  store.commit('pageLoading/setPageLoading', to.meta.loadingMessage);
-  if (to.meta.requiresAuth) {
-    if (!store.getters['user/isLoggedIn']) {
-      return next({ name: 'login' });
-    } else {
-      return next();
+  if (to && to.meta) {
+    store.commit('pageLoading/setPageLoading', to.meta.loadingMessage);
+    if (to.meta.requiresAuth) {
+      if (!store.getters['user/isLoggedIn']) {
+        return next({ name: 'login' });
+      } else {
+        return next();
+      }
     }
+    next();
   }
-  next();
 });
 
 router.afterEach((to, from) => {
