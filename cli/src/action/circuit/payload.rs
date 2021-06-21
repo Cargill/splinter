@@ -17,7 +17,6 @@ use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 use splinter::admin::messages::CreateCircuit;
 use splinter::protos::admin::CircuitAbandon;
-#[cfg(feature = "proposal-removal")]
 use splinter::protos::admin::ProposalRemoveRequest;
 use splinter::protos::admin::{
     CircuitCreateRequest, CircuitDisbandRequest, CircuitManagementPayload,
@@ -27,7 +26,6 @@ use splinter::protos::admin::{
 
 use crate::error::CliError;
 
-#[cfg(feature = "proposal-removal")]
 use super::RemoveProposal;
 use super::{AbandonedCircuit, CircuitDisband, CircuitPurge};
 use super::{CircuitVote, Vote};
@@ -196,7 +194,6 @@ impl ApplyToEnvelope for CircuitAbandon {
     }
 }
 
-#[cfg(feature = "proposal-removal")]
 impl CircuitAction<ProposalRemoveRequest> for RemoveProposal {
     fn action_type(&self) -> Action {
         Action::PROPOSAL_REMOVE_REQUEST
@@ -209,7 +206,6 @@ impl CircuitAction<ProposalRemoveRequest> for RemoveProposal {
     }
 }
 
-#[cfg(feature = "proposal-removal")]
 impl ApplyToEnvelope for ProposalRemoveRequest {
     fn apply(self, circuit_management_payload: &mut CircuitManagementPayload) {
         circuit_management_payload.set_proposal_remove_request(self);

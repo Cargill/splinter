@@ -881,15 +881,12 @@ fn request_abandon_circuit(
     }
 }
 
-#[cfg(feature = "proposal-removal")]
 struct RemoveProposal {
     circuit_id: String,
 }
 
-#[cfg(feature = "proposal-removal")]
 pub struct RemoveProposalAction;
 
-#[cfg(feature = "proposal-removal")]
 impl Action for RemoveProposalAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
@@ -909,7 +906,6 @@ impl Action for RemoveProposalAction {
     }
 }
 
-#[cfg(feature = "proposal-removal")]
 fn request_proposal_removal(
     url: &str,
     signer: Box<dyn Signer>,

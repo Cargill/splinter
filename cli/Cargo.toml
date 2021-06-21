@@ -77,7 +77,6 @@ experimental = [
     "https-certs",
     "user-list",
     "permissions",
-    "proposal-removal",
     "registry",
 ]
 
@@ -95,7 +94,6 @@ upgrade = ["database", "splinter/store-factory"]
 
 https-certs = []
 permissions = []
-proposal-removal = []
 
 database = ["diesel"]
 postgres = [
