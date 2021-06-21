@@ -16,6 +16,7 @@
 
 pub mod authorization;
 pub mod component;
+pub mod network;
 pub mod service;
 
 // Admin REST API protocol versions

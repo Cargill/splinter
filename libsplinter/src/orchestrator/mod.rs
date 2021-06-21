@@ -31,11 +31,12 @@ use crate::channel;
 use crate::error::InternalError;
 use crate::mesh::{Envelope, Mesh, RecvTimeoutError as MeshRecvTimeoutError, SendError};
 use crate::network::reply::InboundRouter;
+use crate::protocol::network::NetworkMessage;
 use crate::protos::circuit::{
     AdminDirectMessage, CircuitDirectMessage, CircuitError, CircuitMessage, CircuitMessageType,
     ServiceConnectResponse, ServiceDisconnectResponse,
 };
-use crate::protos::network::{NetworkMessage, NetworkMessageType};
+use crate::protos::prelude::*;
 use crate::service::{
     Service, ServiceFactory, ServiceMessageContext, StandardServiceNetworkRegistry,
 };
@@ -415,15 +416,15 @@ fn run_incoming_loop(
             }
         };
 
-        let msg: NetworkMessage = Message::parse_from_bytes(&message_bytes)
+        let msg = NetworkMessage::from_bytes(&message_bytes)
             .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
 
         // if a service is waiting on a reply the inbound router will
         // route back the reponse to the service based on the correlation id in
         // the message, otherwise it will be sent to the inbound thread
-        match msg.get_message_type() {
-            NetworkMessageType::CIRCUIT => {
-                let mut circuit_msg: CircuitMessage = Message::parse_from_bytes(&msg.get_payload())
+        match msg {
+            NetworkMessage::Circuit(payload) => {
+                let mut circuit_msg: CircuitMessage = Message::parse_from_bytes(&payload)
                     .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
 
                 match circuit_msg.get_message_type() {
@@ -492,7 +493,7 @@ fn run_incoming_loop(
                     msg_type => warn!("Received unimplemented message: {:?}", msg_type),
                 }
             }
-            NetworkMessageType::NETWORK_HEARTBEAT => trace!("Received network heartbeat"),
+            NetworkMessage::NetworkHeartbeat(_) => trace!("Received network heartbeat"),
             _ => warn!("Received unimplemented message"),
         }
     }

@@ -14,8 +14,6 @@
 
 //! Message handlers for v1 authorization messages
 
-use protobuf::Message;
-
 use crate::network::dispatch::{
     ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
 };
@@ -23,9 +21,10 @@ use crate::protocol::authorization::{
     AuthComplete, AuthProtocolRequest, AuthProtocolResponse, AuthTrustRequest, AuthTrustResponse,
     AuthorizationError, PeerAuthorizationType,
 };
+use crate::protocol::network::NetworkMessage;
 use crate::protocol::{PEER_AUTHORIZATION_PROTOCOL_MIN, PEER_AUTHORIZATION_PROTOCOL_VERSION};
 use crate::protos::authorization;
-use crate::protos::network::{NetworkMessage, NetworkMessageType};
+use crate::protos::network;
 use crate::protos::prelude::*;
 
 use crate::network::auth::{
@@ -92,14 +91,12 @@ impl Handler for AuthProtocolRequestHandler {
                         ),
                     );
 
-                    let mut msg = NetworkMessage::new();
-                    msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-                    msg.set_payload(
-                        IntoBytes::<authorization::AuthorizationMessage>::into_bytes(response)?,
-                    );
+                    let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
+                        NetworkMessage::from(response),
+                    )?;
 
                     sender
-                        .send(context.source_id().clone(), msg.write_to_bytes()?)
+                        .send(context.source_id().clone(), msg_bytes)
                         .map_err(|(recipient, payload)| {
                             DispatchError::NetworkSendError((recipient.into(), payload))
                         })?;
@@ -131,14 +128,12 @@ impl Handler for AuthProtocolRequestHandler {
                     accepted_authorization_type: vec![PeerAuthorizationType::Trust],
                 });
 
-                let mut msg = NetworkMessage::new();
-                msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-                msg.set_payload(
-                    IntoBytes::<authorization::AuthorizationMessage>::into_bytes(response)?,
-                );
+                let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
+                    NetworkMessage::from(response),
+                )?;
 
                 sender
-                    .send(context.source_id().clone(), msg.write_to_bytes()?)
+                    .send(context.source_id().clone(), msg_bytes)
                     .map_err(|(recipient, payload)| {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
@@ -239,15 +234,13 @@ impl Handler for AuthProtocolResponseHandler {
                     let trust_request = AuthorizationMessage::AuthTrustRequest(AuthTrustRequest {
                         identity: self.identity.clone(),
                     });
-                    let mut msg = NetworkMessage::new();
-                    msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-                    msg.set_payload(
-                        IntoBytes::<authorization::AuthorizationMessage>::into_bytes(
-                            trust_request,
-                        )?,
-                    );
+
+                    let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
+                        NetworkMessage::from(trust_request),
+                    )?;
+
                     sender
-                        .send(context.source_id().clone(), msg.write_to_bytes()?)
+                        .send(context.source_id().clone(), msg_bytes)
                         .map_err(|(recipient, payload)| {
                             DispatchError::NetworkSendError((recipient.into(), payload))
                         })?;
@@ -311,13 +304,11 @@ impl Handler for AuthTrustRequestHandler {
                     identity,
                 );
                 let auth_msg = AuthorizationMessage::AuthTrustResponse(AuthTrustResponse);
-                let mut msg = NetworkMessage::new();
-                msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-                msg.set_payload(
-                    IntoBytes::<authorization::AuthorizationMessage>::into_bytes(auth_msg)?,
-                );
+                let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
+                    NetworkMessage::from(auth_msg),
+                )?;
                 sender
-                    .send(context.source_id().clone(), msg.write_to_bytes()?)
+                    .send(context.source_id().clone(), msg_bytes)
                     .map_err(|(recipient, payload)| {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
@@ -337,11 +328,10 @@ impl Handler for AuthTrustRequestHandler {
         };
 
         let auth_msg = AuthorizationMessage::AuthComplete(AuthComplete);
-        let mut msg = NetworkMessage::new();
-        msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-        msg.set_payload(IntoBytes::<authorization::AuthorizationMessage>::into_bytes(auth_msg)?);
+        let msg_bytes =
+            IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(auth_msg))?;
         sender
-            .send(context.source_id().clone(), msg.write_to_bytes()?)
+            .send(context.source_id().clone(), msg_bytes)
             .map_err(|(recipient, payload)| {
                 DispatchError::NetworkSendError((recipient.into(), payload))
             })?;

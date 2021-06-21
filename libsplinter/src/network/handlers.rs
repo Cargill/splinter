@@ -14,9 +14,9 @@
 
 use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
 use crate::peer::PeerAuthorizationToken;
-use crate::protos::network::{NetworkEcho, NetworkHeartbeat, NetworkMessage, NetworkMessageType};
-
-use protobuf::Message;
+use crate::protocol::network::{NetworkEcho, NetworkMessage};
+use crate::protos::network;
+use crate::protos::prelude::*;
 
 // Implements a handler that handles NetworkEcho Messages
 pub struct NetworkEchoHandler {
@@ -25,44 +25,44 @@ pub struct NetworkEchoHandler {
 
 impl Handler for NetworkEchoHandler {
     type Source = PeerId;
-    type MessageType = NetworkMessageType;
-    type Message = NetworkEcho;
+    type MessageType = network::NetworkMessageType;
+    type Message = network::NetworkEcho;
 
     fn match_type(&self) -> Self::MessageType {
-        NetworkMessageType::NETWORK_ECHO
+        network::NetworkMessageType::NETWORK_ECHO
     }
 
     fn handle(
         &self,
-        mut msg: Self::Message,
+        msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!("ECHO: {:?}", msg);
-
+        let mut echo_message = NetworkEcho::from_proto(msg)?;
         let recipient = {
             // if the recipient is us forward back to sender else forward on to the intended
             // recipient
-            if msg.get_recipient() == self.node_id {
+            if echo_message.recipient == self.node_id {
                 context.source_peer_id().clone()
             } else {
                 // NetworkEcho currently only can be sent to peers who are using Trust
                 // authorization
-                PeerAuthorizationToken::from_peer_id(msg.get_recipient()).into()
+                PeerAuthorizationToken::from_peer_id(&echo_message.recipient).into()
             }
         };
 
-        msg.set_time_to_live(msg.get_time_to_live() - 1);
-        if msg.get_time_to_live() <= 0 {
+        echo_message.time_to_live -= 1;
+        if echo_message.time_to_live <= 0 {
             return Ok(());
         };
 
-        let echo_bytes = msg.write_to_bytes().unwrap();
-
-        let mut network_msg = NetworkMessage::new();
-        network_msg.set_message_type(NetworkMessageType::NETWORK_ECHO);
-        network_msg.set_payload(echo_bytes);
-        let network_msg_bytes = network_msg.write_to_bytes().unwrap();
+        let network_msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
+            NetworkMessage::NetworkEcho(echo_message),
+        )
+        .map_err(|err| {
+            DispatchError::SerializationError(format!("cannot get bytes of NetworkEcho: {}", err))
+        })?;
 
         sender
             .send(recipient, network_msg_bytes)
@@ -85,11 +85,11 @@ pub struct NetworkHeartbeatHandler {}
 
 impl Handler for NetworkHeartbeatHandler {
     type Source = PeerId;
-    type MessageType = NetworkMessageType;
-    type Message = NetworkHeartbeat;
+    type MessageType = network::NetworkMessageType;
+    type Message = network::NetworkHeartbeat;
 
     fn match_type(&self) -> Self::MessageType {
-        NetworkMessageType::NETWORK_HEARTBEAT
+        network::NetworkMessageType::NETWORK_HEARTBEAT
     }
 
     fn handle(
@@ -113,11 +113,13 @@ impl NetworkHeartbeatHandler {
 mod tests {
     use super::*;
 
+    use protobuf::Message;
+
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
     use crate::network::dispatch::Dispatcher;
-    use crate::protos::network::{NetworkEcho, NetworkMessageType};
+    use crate::protos::network::{NetworkEcho, NetworkMessage, NetworkMessageType};
 
     #[test]
     fn dispatch_to_handler() {

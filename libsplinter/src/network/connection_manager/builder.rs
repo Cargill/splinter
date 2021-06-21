@@ -15,9 +15,9 @@
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
-use protobuf::Message;
-
-use crate::protos::network::{NetworkHeartbeat, NetworkMessage, NetworkMessageType};
+use crate::protocol::network::{NetworkHeartbeat, NetworkMessage};
+use crate::protos::network;
+use crate::protos::prelude::*;
 use crate::threading::pacemaker;
 use crate::transport::matrix::{ConnectionMatrixLifeCycle, ConnectionMatrixSender};
 use crate::transport::Transport;
@@ -383,14 +383,10 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
 
 /// Creates NetworkHeartbeat message and serializes it into a byte array.
 fn create_heartbeat() -> Result<Vec<u8>, ConnectionManagerError> {
-    let heartbeat = NetworkHeartbeat::new().write_to_bytes().map_err(|_| {
+    IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::NetworkHeartbeat(
+        NetworkHeartbeat,
+    ))
+    .map_err(|_| {
         ConnectionManagerError::HeartbeatError("cannot create NetworkHeartbeat message".to_string())
-    })?;
-    let mut heartbeat_message = NetworkMessage::new();
-    heartbeat_message.set_message_type(NetworkMessageType::NETWORK_HEARTBEAT);
-    heartbeat_message.set_payload(heartbeat);
-    let heartbeat_bytes = heartbeat_message.write_to_bytes().map_err(|_| {
-        ConnectionManagerError::HeartbeatError("cannot create NetworkMessage".to_string())
-    })?;
-    Ok(heartbeat_bytes)
+    })
 }

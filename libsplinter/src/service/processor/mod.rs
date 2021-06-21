@@ -29,11 +29,12 @@ use std::time::Duration;
 use crate::channel;
 use crate::mesh::{Envelope, Mesh, RecvTimeoutError as MeshRecvTimeoutError};
 use crate::network::reply::InboundRouter;
+use crate::protocol::network::NetworkMessage;
 use crate::protos::circuit::{
     AdminDirectMessage, CircuitDirectMessage, CircuitError, CircuitMessage, CircuitMessageType,
     ServiceConnectResponse, ServiceDisconnectResponse,
 };
-use crate::protos::network::{NetworkMessage, NetworkMessageType};
+use crate::protos::prelude::*;
 use crate::service::error::ServiceProcessorError;
 use crate::service::{Service, ServiceMessageContext};
 use crate::threading::lifecycle::ShutdownHandle;
@@ -351,15 +352,15 @@ fn process_incoming_msg(
     message_bytes: &[u8],
     inbound_router: &mut InboundRouter<CircuitMessageType>,
 ) -> Result<(), ServiceProcessorError> {
-    let msg: NetworkMessage = Message::parse_from_bytes(message_bytes)
+    let msg = NetworkMessage::from_bytes(message_bytes)
         .map_err(to_process_err!("unable parse network message"))?;
 
     // if a service is waiting on a reply the inbound router will
     // route back the reponse to the service based on the correlation id in
     // the message, otherwise it will be sent to the inbound thread
-    match msg.get_message_type() {
-        NetworkMessageType::CIRCUIT => {
-            let mut circuit_msg: CircuitMessage = Message::parse_from_bytes(&msg.get_payload())
+    match msg {
+        NetworkMessage::Circuit(payload) => {
+            let mut circuit_msg: CircuitMessage = Message::parse_from_bytes(&payload)
                 .map_err(to_process_err!("unable to parse circuit message"))?;
 
             match circuit_msg.get_message_type() {
@@ -423,7 +424,7 @@ fn process_incoming_msg(
                 msg_type => warn!("Received unimplemented message: {:?}", msg_type),
             }
         }
-        NetworkMessageType::NETWORK_HEARTBEAT => trace!("Received network heartbeat"),
+        NetworkMessage::NetworkHeartbeat(_) => trace!("Received network heartbeat"),
         _ => warn!("Received unimplemented message"),
     }
 
@@ -649,6 +650,7 @@ pub mod tests {
         ServiceConnectRequest, ServiceConnectResponse_Status, ServiceDisconnectRequest,
         ServiceDisconnectResponse_Status,
     };
+    use crate::protos::network::NetworkMessage;
     use crate::service::error::{
         ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError,
     };

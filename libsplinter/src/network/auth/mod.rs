@@ -30,10 +30,10 @@ use crate::protocol::authorization::AuthProtocolRequest;
 use crate::protocol::authorization::AuthorizationMessage;
 #[cfg(not(feature = "trust-authorization"))]
 use crate::protocol::authorization::ConnectRequest;
+use crate::protocol::network::NetworkMessage;
 #[cfg(feature = "trust-authorization")]
 use crate::protocol::{PEER_AUTHORIZATION_PROTOCOL_MIN, PEER_AUTHORIZATION_PROTOCOL_VERSION};
-use crate::protos::authorization;
-use crate::protos::network::{NetworkMessage, NetworkMessageType};
+use crate::protos::network;
 use crate::protos::prelude::*;
 use crate::transport::{Connection, RecvError};
 
@@ -210,13 +210,14 @@ impl AuthorizationConnector {
             let authed_identity = 'main: loop {
                 match connection.recv() {
                     Ok(bytes) => {
-                        let mut msg: NetworkMessage = match Message::parse_from_bytes(&bytes) {
-                            Ok(msg) => msg,
-                            Err(err) => {
-                                warn!("Received invalid network message: {}", err);
-                                continue;
-                            }
-                        };
+                        let mut msg: network::NetworkMessage =
+                            match Message::parse_from_bytes(&bytes) {
+                                Ok(msg) => msg,
+                                Err(err) => {
+                                    warn!("Received invalid network message: {}", err);
+                                    continue;
+                                }
+                            };
 
                         let message_type = msg.get_message_type();
                         if let Err(err) = dispatcher.dispatch(
@@ -295,39 +296,23 @@ impl AuthorizationConnector {
 
 #[cfg(not(feature = "trust-authorization"))]
 fn connect_msg_bytes() -> Result<Vec<u8>, AuthorizationManagerError> {
-    let mut network_msg = NetworkMessage::new();
-    network_msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-
     let connect_msg = AuthorizationMessage::ConnectRequest(ConnectRequest::Bidirectional);
-    network_msg.set_payload(
-        IntoBytes::<authorization::AuthorizationMessage>::into_bytes(connect_msg).map_err(
-            |err| AuthorizationManagerError(format!("Unable to send connect request: {}", err)),
-        )?,
-    );
 
-    network_msg.write_to_bytes().map_err(|err| {
-        AuthorizationManagerError(format!("Unable to send connect request: {}", err))
-    })
+    IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(connect_msg)).map_err(
+        |err| AuthorizationManagerError(format!("Unable to send connect request: {}", err)),
+    )
 }
 
 #[cfg(feature = "trust-authorization")]
 fn protocol_msg_bytes() -> Result<Vec<u8>, AuthorizationManagerError> {
-    let mut network_msg = NetworkMessage::new();
-    network_msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-
     let connect_msg = AuthorizationMessage::AuthProtocolRequest(AuthProtocolRequest {
         auth_protocol_min: PEER_AUTHORIZATION_PROTOCOL_MIN,
         auth_protocol_max: PEER_AUTHORIZATION_PROTOCOL_VERSION,
     });
-    network_msg.set_payload(
-        IntoBytes::<authorization::AuthorizationMessage>::into_bytes(connect_msg).map_err(
-            |err| AuthorizationManagerError(format!("Unable to send connect request: {}", err)),
-        )?,
-    );
 
-    network_msg.write_to_bytes().map_err(|err| {
-        AuthorizationManagerError(format!("Unable to send connect request: {}", err))
-    })
+    IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(connect_msg)).map_err(
+        |err| AuthorizationManagerError(format!("Unable to send connect request: {}", err)),
+    )
 }
 
 #[derive(Clone)]

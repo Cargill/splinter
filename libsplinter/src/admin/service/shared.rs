@@ -3362,7 +3362,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use cylinder::{secp256k1::Secp256k1Context, Context};
-    use protobuf::{Message, RepeatedField};
+    use protobuf::RepeatedField;
 
     use diesel::{
         r2d2::{ConnectionManager as DieselConnectionManager, Pool},
@@ -3385,12 +3385,12 @@ mod tests {
         AuthorizationMessage, AuthorizationType, Authorized, ConnectRequest, ConnectResponse,
         TrustRequest,
     };
+    use crate::protocol::network::NetworkMessage;
     use crate::protos::admin;
     use crate::protos::admin::{
         CircuitProposalVote_Vote, CircuitProposal_VoteRecord, SplinterNode, SplinterService,
     };
-    use crate::protos::authorization;
-    use crate::protos::network::{NetworkMessage, NetworkMessageType};
+    use crate::protos::network;
     use crate::protos::prelude::*;
     use crate::service::{ServiceMessageContext, ServiceSendError};
     use crate::threading::lifecycle::ShutdownHandle;
@@ -7308,16 +7308,12 @@ mod tests {
     }
 
     fn write_auth_message(connection_id: &str, auth_msg: AuthorizationMessage) -> Envelope {
-        let mut msg = NetworkMessage::new();
-        msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-        msg.set_payload(
-            IntoBytes::<authorization::AuthorizationMessage>::into_bytes(auth_msg)
-                .expect("Unable to convert into bytes"),
-        );
+        let msg = NetworkMessage::from(auth_msg);
 
         Envelope::new(
             connection_id.to_string(),
-            msg.write_to_bytes().expect("Unable to write to bytes"),
+            IntoBytes::<network::NetworkMessage>::into_bytes(msg)
+                .expect("Unable to write to bytes"),
         )
     }
 }
