@@ -1524,7 +1524,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         );
     }
 
-    #[cfg(feature = "permissions")]
     {
         app = app.subcommand(
             SubCommand::with_name("permissions")
@@ -1727,7 +1726,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             )
     }
 
-    #[cfg(feature = "permissions")]
     {
         use action::permissions;
         subcommands = subcommands.with_command("permissions", permissions::ListAction)

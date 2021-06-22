@@ -189,7 +189,6 @@ impl SplinterRestClient {
     }
 
     /// Lists all REST API permissions for a Splinter node.
-    #[cfg(feature = "permissions")]
     pub fn list_permissions(&self) -> Result<Vec<Permission>, CliError> {
         Client::new()
             .get(&format!("{}/authorization/permissions", self.url))
