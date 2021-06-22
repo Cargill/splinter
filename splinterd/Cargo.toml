@@ -104,7 +104,6 @@ experimental = [
     "metrics",
     "node",
     "oauth-user-list",
-    "proposal-removal",
     "scabbard-back-pressure",
     "service-arg-validation",
     "service-endpoint",
@@ -162,7 +161,6 @@ oauth = [
     "splinter/oauth"
 ]
 oauth-user-list = ["splinter/oauth-user-list"]
-proposal-removal = []
 rest-api-cors = ["splinter/rest-api-cors"]
 scabbard-back-pressure = ["scabbard/back-pressure"]
 service-arg-validation = [

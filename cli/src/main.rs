@@ -568,7 +568,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             ),
     );
 
-    #[cfg(feature = "proposal-removal")]
     let circuit_command = circuit_command.subcommand(
         SubCommand::with_name("remove-proposal")
             .about("Remove a circuit proposal")
@@ -1647,7 +1646,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         .with_command("abandon", circuit::CircuitAbandonAction)
         .with_command("purge", circuit::CircuitPurgeAction);
 
-    #[cfg(feature = "proposal-removal")]
     let circuit_command =
         circuit_command.with_command("remove-proposal", circuit::RemoveProposalAction);
 
