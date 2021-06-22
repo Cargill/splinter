@@ -34,7 +34,7 @@ use flexi_logger::FlexiLoggerError;
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
 
-use action::{admin, certs, circuit, keygen, registry, Action, SubcommandActions};
+use action::{admin, certs, circuit, keygen, permissions, registry, Action, SubcommandActions};
 use error::CliError;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
@@ -1524,36 +1524,34 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         );
     }
 
-    {
-        app = app.subcommand(
-            SubCommand::with_name("permissions")
-                .about("Lists REST API permissions for a Splinter node")
-                .arg(
-                    Arg::with_name("format")
-                        .short("F")
-                        .long("format")
-                        .help("Output format")
-                        .possible_values(&["human", "csv", "json"])
-                        .default_value("human")
-                        .takes_value(true),
-                )
-                .arg(
-                    Arg::with_name("url")
-                        .short("U")
-                        .long("url")
-                        .help("URL of the Splinter daemon REST API")
-                        .takes_value(true),
-                )
-                .arg(
-                    Arg::with_name("private_key_file")
-                        .value_name("private-key-file")
-                        .short("k")
-                        .long("key")
-                        .takes_value(true)
-                        .help("Name or path of private key"),
-                ),
-        )
-    }
+    app = app.subcommand(
+        SubCommand::with_name("permissions")
+            .about("Lists REST API permissions for a Splinter node")
+            .arg(
+                Arg::with_name("format")
+                    .short("F")
+                    .long("format")
+                    .help("Output format")
+                    .possible_values(&["human", "csv", "json"])
+                    .default_value("human")
+                    .takes_value(true),
+            )
+            .arg(
+                Arg::with_name("url")
+                    .short("U")
+                    .long("url")
+                    .help("URL of the Splinter daemon REST API")
+                    .takes_value(true),
+            )
+            .arg(
+                Arg::with_name("private_key_file")
+                    .value_name("private-key-file")
+                    .short("k")
+                    .long("key")
+                    .takes_value(true)
+                    .help("Name or path of private key"),
+            ),
+    );
 
     #[cfg(feature = "user-list")]
     {
@@ -1726,10 +1724,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             )
     }
 
-    {
-        use action::permissions;
-        subcommands = subcommands.with_command("permissions", permissions::ListAction)
-    }
+    subcommands = subcommands.with_command("permissions", permissions::ListAction);
 
     #[cfg(feature = "user-list")]
     {
