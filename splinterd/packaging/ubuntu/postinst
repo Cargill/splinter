@@ -34,7 +34,7 @@ case "$1" in
         # are correct
         mkdir /var/lib/splinter
         chown $user:$group /var/lib/splinter
-        chmod 775 /var/lib/splinter
+        chmod 770 /var/lib/splinter
         mkdir -p /etc/splinter/certs/private
         chown -R root:root /etc/splinter
         chmod 755 /etc/splinter
