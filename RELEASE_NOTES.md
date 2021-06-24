@@ -1,5 +1,35 @@
 # Release Notes
 
+## Changes in Splinter 0.5.9
+
+### Highlights
+
+* The splinter CLI subcommands `splinter authid`, `splinter role`, `splinter
+  permissions`, and `splinter remove-proposal` have been stabilized.  
+
+### libsplinter
+
+* Add native protocol structs for `NetworkMessages`. This reduces the need to
+  use protobuf structs directly. 
+
+* Updated sawtooth-sabre to fix a memory leak.
+
+### splinter CLI
+
+* Stabilize the feature "permissions" by removing it.  This makes the subcommand
+  `splinter permission list` available in the default stable builds.
+
+* Stabilize the feature "authorization-handler-rbac".  This makes the Role-based
+  Access Control subcommands `splinter role` and `splinter authid` available in
+  stable builds.
+
+* Stabilize the features "proposal-removal". This makes the subcommand `splinter
+  remove-proposal` available in the default builds.
+
+### splinterd
+
+* Update example config files with new configuration options and documentation.
+
 ## Changes in Splinter 0.5.8
 
 ### Highlights
