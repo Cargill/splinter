@@ -30,7 +30,7 @@ case "$1" in
             adduser --quiet --system --ingroup $group $user
         fi
 
-        # Create some required directories and make sure permissions
+        # Create some required directories and files and make sure permissions
         # are correct
         mkdir /var/lib/splinter
         chown $user:$group /var/lib/splinter
@@ -44,6 +44,7 @@ case "$1" in
         chown root:$group /etc/splinter/*.yaml*
         chown -R root:$group /etc/splinter/certs
         chmod 750 /etc/splinter/certs/private
+        install -m 640 -g splinterd /dev/null /etc/splinter/allow_keys
     else
         true
     fi
