@@ -27,7 +27,7 @@ use crate::admin::store::{
     CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus, ProposalType,
     ProposedCircuit, Service as StoreService, Vote, VoteRecordBuilder,
 };
-use crate::admin::token::ListPeerAuthorizationTokens;
+use crate::admin::token::{PeerAuthorizationTokenReader, PeerNode};
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
 use crate::hex::to_hex;

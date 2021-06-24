@@ -22,6 +22,26 @@ pub mod token_protocol;
 use crate::error::InvalidStateError;
 use crate::peer::PeerAuthorizationToken;
 
-pub trait ListPeerAuthorizationTokens {
+/// Struct used to correlate a `PeerAuthorizationToken` with node information
+#[derive(Clone, Debug, PartialEq)]
+pub struct PeerNode {
+    pub token: PeerAuthorizationToken,
+    pub node_id: String,
+    pub endpoints: Vec<String>,
+    pub admin_service: String,
+}
+
+pub trait PeerAuthorizationTokenReader {
     fn list_tokens(&self) -> Result<Vec<PeerAuthorizationToken>, InvalidStateError>;
+
+    fn list_nodes(&self) -> Result<Vec<PeerNode>, InvalidStateError>;
+
+    fn get_node_token(
+        &self,
+        node_id: &str,
+    ) -> Result<Option<PeerAuthorizationToken>, InvalidStateError>;
+}
+
+pub fn admin_service_id(node_id: &str) -> String {
+    format!("admin::{}", node_id)
 }

@@ -31,7 +31,8 @@ use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::{self, Message};
 
-use crate::admin::store::{self, AdminServiceStore, AuthorizationType};
+use crate::admin::store::{self, AdminServiceStore};
+use crate::admin::token::PeerAuthorizationTokenReader;
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::Proposal;
 use crate::hex::to_hex;
