@@ -8,7 +8,7 @@
 NAME
 ====
 
-**splinter-upgrade** — Upgrades splinter yaml state to database state
+**splinter-upgrade** — Upgrades splinter YAML state to database state
 
 SYNOPSIS
 ========
@@ -17,21 +17,21 @@ SYNOPSIS
 
 DESCRIPTION
 ===========
-Upgrades splinter by importing data from the deprecated yaml state file format
+Upgrades splinter by importing data from the deprecated YAML state file format
 to a database. This tool searches for data in the `circuits.yaml` and
 `circuit-proposals.yaml` state definitions from the state directory. When the
-upgrade is complete, the yaml state definitions will be renamed to
+upgrade is complete, the YAML state definitions will be renamed to
 `circuits.yaml.old` and `circuit-proposals.yaml.old` respectively.
 
 OPTIONS
 =======
 `-S`, `--state-dir` `STATE-DIR`
-: Specifies the storage directory.  (Defaults to `/var/lib/splinter`, unless
+: Specifies the storage directory. (Defaults to `/var/lib/splinter`, unless
 `SPLINTER_STATE_DIR` or `SPLINTER_HOME` is set.)
 
 `-C`, `--connect` `DB-URL`
 : Specifies the URL or connection string for the PostgreSQL or SQLite database
-used for Splinter state, The default SQLite database will go in the directory,
+used for Splinter state. The default SQLite database will go in the directory,
 `/var/lib/splinter`, unless `SPLINTER_STATE_DIR` or `SPLINTER_HOME` is set.
 
 EXAMPLES
@@ -43,8 +43,8 @@ with the example hostname and port `splinter-db-alpha:5432`.
 splinter upgrade -C postgres://admin:admin@splinter-db-alpha:5432/splinter
 ```
 
-This example upgrades splinter connecting to the SQLite database `./custom-sqlite.db`
-and using YAML state files from `./custom/dir`.
+This example upgrades splinter connecting to the SQLite database
+`./custom-sqlite.db` and using YAML state files from `./custom/dir`.
 
 ```
 splinter upgrade -S ./custom/dir -C ./custom-sqlite.db
@@ -56,7 +56,7 @@ The following environment variables affect the execution of the command.
 
 **SPLINTER_STATE_DIR**
 
-: Defines the default state directory for yaml state and SQLite. This is
+: Defines the default state directory for YAML state and SQLite. This is
 overridden by the `--state-dir` flag
 
 **SPLINTER_HOME**

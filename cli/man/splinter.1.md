@@ -56,7 +56,7 @@ SUBCOMMANDS
 : Provides commands to create and manage Splinter registry information.
 
 `upgrade`
-: Upgrades splinter yaml state to database state
+: Upgrades splinter YAML state to database state
 
 FLAGS
 =====
