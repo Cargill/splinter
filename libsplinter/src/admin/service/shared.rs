@@ -80,6 +80,12 @@ pub struct PendingPayload {
     pub members: Vec<PeerAuthorizationToken>,
 }
 
+#[derive(Clone, Debug)]
+pub struct PeerNodePair {
+    pub peer_node: PeerNode,
+    pub local_peer_token: PeerAuthorizationToken,
+}
+
 enum CircuitProposalStatus {
     Accepted,
     Rejected,
@@ -146,6 +152,7 @@ pub struct AdminServiceShared {
     event_store: Box<dyn AdminServiceStore>,
     #[cfg(feature = "challenge-authorization")]
     public_keys: Vec<Vec<u8>>,
+    token_to_peer: HashMap<PeerAuthorizationToken, PeerNodePair>,
 }
 
 impl AdminServiceShared {
@@ -193,6 +200,7 @@ impl AdminServiceShared {
             event_store: admin_service_event_store,
             #[cfg(feature = "challenge-authorization")]
             public_keys,
+            token_to_peer: HashMap::new(),
         }
     }
 
@@ -219,6 +227,17 @@ impl AdminServiceShared {
             #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { .. } => false,
         }
+    }
+
+    pub fn set_token_to_peer(
+        &mut self,
+        token_to_peer: HashMap<PeerAuthorizationToken, PeerNodePair>,
+    ) {
+        self.token_to_peer = token_to_peer;
+    }
+
+    pub fn token_to_peer(&self) -> &HashMap<PeerAuthorizationToken, PeerNodePair> {
+        &self.token_to_peer
     }
 
     pub fn network_sender(&self) -> &Option<Box<dyn ServiceNetworkSender>> {
