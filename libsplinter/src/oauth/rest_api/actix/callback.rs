@@ -123,7 +123,11 @@ pub fn make_callback_route(
                                         ) {
                                             Ok(_) => debug!("User profile saved"),
                                             Err(err) => {
-                                                error!("Failed to save profile: {}", err);
+                                                error!(
+                                                    "Failed to save profile for account: {}, {}",
+                                                    user_info.subject.clone(),
+                                                    err
+                                                );
                                                 return Box::new(
                                                     HttpResponse::InternalServerError()
                                                         .json(ErrorResponse::internal_error())
@@ -229,7 +233,11 @@ pub fn make_callback_route(
                                     ) {
                                         Ok(_) => debug!("User profile saved"),
                                         Err(err) => {
-                                            error!("Failed to save profile: {}", err);
+                                            error!(
+                                                "Failed to save profile for account: {}, {}",
+                                                user_info.subject.clone(),
+                                                err
+                                            );
                                             return Box::new(
                                                 HttpResponse::InternalServerError()
                                                     .json(ErrorResponse::internal_error())
