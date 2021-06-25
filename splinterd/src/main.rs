@@ -324,7 +324,7 @@ fn main() {
         .arg(
             Arg::with_name("state_dir")
                 .long("state-dir")
-                .help("Storage directory when storage is YAML")
+                .help("Path to the directory containing state files")
                 .takes_value(true),
         )
         .arg(
