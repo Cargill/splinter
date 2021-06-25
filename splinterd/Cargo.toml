@@ -125,7 +125,7 @@ authorization-handler-rbac = [
 ]
 biome-credentials = ["splinter/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management"]
-biome-profile = ["splinter/biome-profile", "splinter/oauth-profile"]
+biome-profile = ["splinter/biome-profile"]
 challenge-authorization = [
   "cylinder/key-load",
   "splinter/challenge-authorization"

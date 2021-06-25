@@ -194,7 +194,6 @@ mod tests {
     use crate::oauth::{
         store::MemoryInflightOAuthRequestStore, OAuthClientBuilder, SubjectProvider,
     };
-    #[cfg(feature = "oauth-profile")]
     use crate::oauth::{Profile, ProfileProvider};
 
     const TOKEN_ENDPOINT: &str = "/token";
@@ -459,12 +458,10 @@ mod tests {
             .with_redirect_url("http://test.com/redirect".into())
             .with_token_url(format!("{}{}", address, TOKEN_ENDPOINT))
             .with_subject_provider(Box::new(RefreshedTokenSubjectProvider))
-            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
-
-        #[cfg(feature = "oauth-profile")]
-        let client = client.with_profile_provider(Box::new(RefreshedTokenProfileProvider));
-
-        let client = client.build().expect("Failed to build OAuth client");
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
+            .with_profile_provider(Box::new(RefreshedTokenProfileProvider))
+            .build()
+            .expect("Failed to build OAuth client");
 
         let identity_provider = OAuthUserIdentityProvider::new(
             client,
@@ -535,12 +532,10 @@ mod tests {
             .with_redirect_url("http://test.com/redirect".into())
             .with_token_url(format!("{}{}", address, TOKEN_ENDPOINT))
             .with_subject_provider(Box::new(RefreshedTokenSubjectProvider))
-            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
-
-        #[cfg(feature = "oauth-profile")]
-        let client = client.with_profile_provider(Box::new(RefreshedTokenProfileProvider));
-
-        let client = client.build().expect("Failed to build OAuth client");
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
+            .with_profile_provider(Box::new(RefreshedTokenProfileProvider))
+            .build()
+            .expect("Failed to build OAuth client");
 
         let identity_provider = OAuthUserIdentityProvider::new(
             client,
@@ -565,20 +560,17 @@ mod tests {
 
     /// Returns a mock OAuth client that wraps an `AlwaysSomeSubjectProvider`
     fn always_some_client() -> OAuthClient {
-        let client = OAuthClientBuilder::new()
+        OAuthClientBuilder::new()
             .with_client_id("client_id".into())
             .with_client_secret("client_secret".into())
             .with_auth_url("http://test.com/auth".into())
             .with_redirect_url("http://test.com/redirect".into())
             .with_token_url("http://test.com/token".into())
             .with_subject_provider(Box::new(AlwaysSomeSubjectProvider))
-            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
-
-        #[cfg(feature = "oauth-profile")]
-        let client = client.with_profile_provider(Box::new(AlwaysSomeProfileProvider));
-
-        let client = client.build().expect("Failed to build OAuth client");
-        client
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
+            .with_profile_provider(Box::new(AlwaysSomeProfileProvider))
+            .build()
+            .expect("Failed to build OAuth client")
     }
 
     /// Subject provider that always returns a subject
@@ -596,11 +588,9 @@ mod tests {
     }
 
     /// Profile provider that always returns a profile
-    #[cfg(feature = "oauth-profile")]
     #[derive(Clone)]
     struct AlwaysSomeProfileProvider;
 
-    #[cfg(feature = "oauth-profile")]
     impl ProfileProvider for AlwaysSomeProfileProvider {
         fn get_profile(&self, _access_token: &str) -> Result<Option<Profile>, InternalError> {
             let profile = Profile {
@@ -621,20 +611,17 @@ mod tests {
 
     /// Returns a mock OAuth client that wraps an `AlwaysNoneSubjectProvider`
     fn always_none_client() -> OAuthClient {
-        let client = OAuthClientBuilder::new()
+        OAuthClientBuilder::new()
             .with_client_id("client_id".into())
             .with_client_secret("client_secret".into())
             .with_auth_url("http://test.com/auth".into())
             .with_redirect_url("http://test.com/redirect".into())
             .with_token_url("http://test.com/token".into())
             .with_subject_provider(Box::new(AlwaysNoneSubjectProvider))
-            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
-
-        #[cfg(feature = "oauth-profile")]
-        let client = client.with_profile_provider(Box::new(AlwaysNoneProfileProvider));
-
-        let client = client.build().expect("Failed to build OAuth client");
-        client
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
+            .with_profile_provider(Box::new(AlwaysNoneProfileProvider))
+            .build()
+            .expect("Failed to build OAuth client")
     }
 
     /// Subject provider that always returns `Ok(None)`
@@ -652,11 +639,9 @@ mod tests {
     }
 
     /// Profile provider that always returns `Ok(None)`
-    #[cfg(feature = "oauth-profile")]
     #[derive(Clone)]
     struct AlwaysNoneProfileProvider;
 
-    #[cfg(feature = "oauth-profile")]
     impl ProfileProvider for AlwaysNoneProfileProvider {
         fn get_profile(&self, _access_token: &str) -> Result<Option<Profile>, InternalError> {
             Ok(None)
@@ -669,20 +654,17 @@ mod tests {
 
     /// Returns a mock OAuth client that wraps an `AlwaysErrSubjectProvider`
     fn always_err_client() -> OAuthClient {
-        let client = OAuthClientBuilder::new()
+        OAuthClientBuilder::new()
             .with_client_id("client_id".into())
             .with_client_secret("client_secret".into())
             .with_auth_url("http://test.com/auth".into())
             .with_redirect_url("http://test.com/redirect".into())
             .with_token_url("http://test.com/token".into())
             .with_subject_provider(Box::new(AlwaysErrSubjectProvider))
-            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
-
-        #[cfg(feature = "oauth-profile")]
-        let client = client.with_profile_provider(Box::new(AlwaysErrProfileProvider));
-
-        let client = client.build().expect("Failed to build OAuth client");
-        client
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
+            .with_profile_provider(Box::new(AlwaysErrProfileProvider))
+            .build()
+            .expect("Failed to build OAuth client")
     }
 
     /// Subject provider that always returns `Err`
@@ -700,11 +682,9 @@ mod tests {
     }
 
     /// Profile provider that always returns `Err`
-    #[cfg(feature = "oauth-profile")]
     #[derive(Clone)]
     struct AlwaysErrProfileProvider;
 
-    #[cfg(feature = "oauth-profile")]
     impl ProfileProvider for AlwaysErrProfileProvider {
         fn get_profile(&self, _access_token: &str) -> Result<Option<Profile>, InternalError> {
             Err(InternalError::with_message("error".into()))
@@ -736,11 +716,9 @@ mod tests {
 
     /// Profile provider that returns a profile when the new `NEW_OAUTH_ACCESS_TOKEN` is provided;
     /// returns `Ok(None)` otherwise.
-    #[cfg(feature = "oauth-profile")]
     #[derive(Clone)]
     struct RefreshedTokenProfileProvider;
 
-    #[cfg(feature = "oauth-profile")]
     impl ProfileProvider for RefreshedTokenProfileProvider {
         fn get_profile(&self, access_token: &str) -> Result<Option<Profile>, InternalError> {
             if access_token == NEW_OAUTH_ACCESS_TOKEN {
