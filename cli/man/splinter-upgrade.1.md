@@ -26,7 +26,7 @@ upgrade is complete, the YAML state definitions will be renamed to
 OPTIONS
 =======
 `-S`, `--state-dir` `STATE-DIR`
-: Specifies the storage directory.  (Defaults to `/var/lib/splinter`, unless
+: Specifies the storage directory. (Defaults to `/var/lib/splinter`, unless
 `SPLINTER_STATE_DIR` or `SPLINTER_HOME` is set.)
 
 `-C`, `--connect` `DB-URL`
