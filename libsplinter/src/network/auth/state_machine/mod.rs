@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#[cfg(feature = "challenge-authorization")]
+pub mod challenge_v1;
 pub mod trust_v0;
 #[cfg(feature = "trust-authorization")]
 pub mod trust_v1;
@@ -18,6 +20,11 @@ pub mod trust_v1;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "challenge-authorization")]
+use self::challenge_v1::{
+    ChallengeAuthorizationLocalAction, ChallengeAuthorizationLocalState,
+    ChallengeAuthorizationRemoteAction, ChallengeAuthorizationRemoteState,
+};
 use self::trust_v0::{TrustV0AuthorizationAction, TrustV0AuthorizationState};
 #[cfg(feature = "trust-authorization")]
 use self::trust_v1::{
@@ -44,14 +51,16 @@ pub(crate) enum AuthorizationRemoteState {
     Done(Identity),
     Unauthorized,
 
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     ReceivedAuthProtocolRequest,
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     SentAuthProtocolResponse,
 
     TrustV0(TrustV0AuthorizationState),
     #[cfg(feature = "trust-authorization")]
     Trust(TrustAuthorizationRemoteState),
+    #[cfg(feature = "challenge-authorization")]
+    Challenge(ChallengeAuthorizationRemoteState),
 }
 
 impl fmt::Display for AuthorizationRemoteState {
@@ -61,17 +70,19 @@ impl fmt::Display for AuthorizationRemoteState {
             AuthorizationRemoteState::Done(_) => f.write_str("Done"),
             AuthorizationRemoteState::Unauthorized => f.write_str("Unauthorized"),
 
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationRemoteState::ReceivedAuthProtocolRequest => {
                 f.write_str("ReceivedAuthProtocolRequest")
             }
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationRemoteState::SentAuthProtocolResponse => {
                 f.write_str("SentAuthProtocolResponse")
             }
             AuthorizationRemoteState::TrustV0(state) => write!(f, "TrustV0: {}", state),
             #[cfg(feature = "trust-authorization")]
             AuthorizationRemoteState::Trust(state) => write!(f, "Trust: {}", state),
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationRemoteState::Challenge(state) => write!(f, "Challenge: {}", state),
         }
     }
 }
@@ -79,42 +90,47 @@ impl fmt::Display for AuthorizationRemoteState {
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum AuthorizationLocalState {
     Start,
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     WaitingForAuthProtocolResponse,
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     ReceivedAuthProtocolResponse,
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     Authorized,
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     WaitForComplete,
     AuthorizedAndComplete,
     Unauthorized,
 
     #[cfg(feature = "trust-authorization")]
     Trust(TrustAuthorizationLocalState),
+
+    #[cfg(feature = "challenge-authorization")]
+    Challenge(ChallengeAuthorizationLocalState),
 }
 
 impl fmt::Display for AuthorizationLocalState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             AuthorizationLocalState::Start => f.write_str("Start"),
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationLocalState::Authorized => f.write_str("Authorized"),
             AuthorizationLocalState::Unauthorized => f.write_str("Unauthorized"),
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationLocalState::WaitingForAuthProtocolResponse => {
                 f.write_str("WaitingForAuthProtocolResponse")
             }
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationLocalState::ReceivedAuthProtocolResponse => {
                 f.write_str("ReceivedAuthProtocolResponse")
             }
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationLocalState::WaitForComplete => f.write_str("WaitForComplete"),
             AuthorizationLocalState::AuthorizedAndComplete => f.write_str("AuthorizedAndComplete"),
 
             #[cfg(feature = "trust-authorization")]
             AuthorizationLocalState::Trust(action) => write!(f, "Trust: {}", action),
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationLocalState::Challenge(action) => write!(f, "Challenge: {}", action),
         }
     }
 }
@@ -124,14 +140,16 @@ impl fmt::Display for AuthorizationLocalState {
 pub(crate) enum AuthorizationRemoteAction {
     Connecting,
 
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     ReceiveAuthProtocolRequest,
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     SendAuthProtocolResponse,
 
     TrustV0(TrustV0AuthorizationAction),
     #[cfg(feature = "trust-authorization")]
     Trust(TrustAuthorizationRemoteAction),
+    #[cfg(feature = "challenge-authorization")]
+    Challenge(ChallengeAuthorizationRemoteAction),
 
     Unauthorizing,
 }
@@ -140,17 +158,19 @@ impl fmt::Display for AuthorizationRemoteAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             AuthorizationRemoteAction::Connecting => f.write_str("Connecting"),
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationRemoteAction::ReceiveAuthProtocolRequest => {
                 f.write_str("ReceiveAuthProtocolRequest")
             }
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationRemoteAction::SendAuthProtocolResponse => {
                 f.write_str("SendAuthProtocolResponse")
             }
             AuthorizationRemoteAction::TrustV0(action) => write!(f, "TrusV0t: {}", action),
             #[cfg(feature = "trust-authorization")]
             AuthorizationRemoteAction::Trust(action) => write!(f, "Trust: {}", action),
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationRemoteAction::Challenge(action) => write!(f, "Challenge: {}", action),
 
             AuthorizationRemoteAction::Unauthorizing => f.write_str("Unauthorizing"),
         }
@@ -159,19 +179,21 @@ impl fmt::Display for AuthorizationRemoteAction {
 
 /// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
-#[cfg(feature = "trust-authorization")]
+#[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 pub(crate) enum AuthorizationLocalAction {
     SendAuthProtocolRequest,
     ReceiveAuthProtocolResponse,
 
     #[cfg(feature = "trust-authorization")]
     Trust(TrustAuthorizationLocalAction),
+    #[cfg(feature = "challenge-authorization")]
+    Challenge(ChallengeAuthorizationLocalAction),
 
     SendAuthComplete,
     Unauthorizing,
 }
 
-#[cfg(feature = "trust-authorization")]
+#[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 impl fmt::Display for AuthorizationLocalAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -184,7 +206,8 @@ impl fmt::Display for AuthorizationLocalAction {
 
             #[cfg(feature = "trust-authorization")]
             AuthorizationLocalAction::Trust(action) => write!(f, "Trust: {}", action),
-
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationLocalAction::Challenge(action) => write!(f, "Challenge: {}", action),
             AuthorizationLocalAction::SendAuthComplete => f.write_str("SendAuthComplete"),
             AuthorizationLocalAction::Unauthorizing => f.write_str("Unauthorizing"),
         }
@@ -196,7 +219,7 @@ impl fmt::Display for AuthorizationLocalAction {
 pub(crate) enum AuthorizationActionError {
     AlreadyConnecting,
     InvalidRemoteMessageOrder(AuthorizationRemoteState, AuthorizationRemoteAction),
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     InvalidLocalMessageOrder(AuthorizationLocalState, AuthorizationLocalAction),
     InternalError(String),
 }
@@ -214,7 +237,7 @@ impl fmt::Display for AuthorizationActionError {
                     start, action
                 )
             }
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationActionError::InvalidLocalMessageOrder(start, action) => {
                 write!(
                     f,
@@ -238,7 +261,7 @@ impl AuthorizationManagerStateMachine {
     /// Errors
     ///
     /// The errors are error messages that should be returned on the appropriate message
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     pub(crate) fn next_local_state(
         &self,
         connection_id: &str,
@@ -293,6 +316,12 @@ impl AuthorizationManagerStateMachine {
                         .next_local_state(action, cur_state)?;
                     Ok(new_state)
                 }
+                #[cfg(feature = "challenge-authorization")]
+                AuthorizationLocalAction::Challenge(action) => {
+                    let new_state = ChallengeAuthorizationLocalState::ChallengeConnecting
+                        .next_local_state(action, cur_state)?;
+                    Ok(new_state)
+                }
                 _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
                     AuthorizationLocalState::WaitingForAuthProtocolResponse,
                     action,
@@ -306,6 +335,17 @@ impl AuthorizationManagerStateMachine {
                 }
                 _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
                     AuthorizationLocalState::Trust(state),
+                    action,
+                )),
+            },
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationLocalState::Challenge(state) => match action {
+                AuthorizationLocalAction::Challenge(action) => {
+                    let new_state = state.next_local_state(action, cur_state)?;
+                    Ok(new_state)
+                }
+                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
+                    AuthorizationLocalState::Challenge(state),
                     action,
                 )),
             },
@@ -378,7 +418,7 @@ impl AuthorizationManagerStateMachine {
                         TrustV0AuthorizationState::Connecting,
                     ))
                 }
-                #[cfg(feature = "trust-authorization")]
+                #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
                 AuthorizationRemoteAction::ReceiveAuthProtocolRequest => {
                     cur_state.remote_state = AuthorizationRemoteState::ReceivedAuthProtocolRequest;
                     Ok(AuthorizationRemoteState::ReceivedAuthProtocolRequest)
@@ -388,7 +428,7 @@ impl AuthorizationManagerStateMachine {
                     action,
                 )),
             },
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationRemoteState::ReceivedAuthProtocolRequest => match action {
                 AuthorizationRemoteAction::SendAuthProtocolResponse => {
                     cur_state.remote_state = AuthorizationRemoteState::SentAuthProtocolResponse;
@@ -411,11 +451,18 @@ impl AuthorizationManagerStateMachine {
                 )),
             },
             // v1 state transitions
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             AuthorizationRemoteState::SentAuthProtocolResponse => match action {
                 #[cfg(feature = "trust-authorization")]
                 AuthorizationRemoteAction::Trust(action) => {
                     let new_state = TrustAuthorizationRemoteState::TrustConnecting
+                        .next_remote_state(action, cur_state)?;
+                    cur_state.remote_state = new_state.clone();
+                    Ok(new_state)
+                }
+                #[cfg(feature = "challenge-authorization")]
+                AuthorizationRemoteAction::Challenge(action) => {
+                    let new_state = ChallengeAuthorizationRemoteState::ChallengeConnecting
                         .next_remote_state(action, cur_state)?;
                     cur_state.remote_state = new_state.clone();
                     Ok(new_state)
@@ -437,6 +484,18 @@ impl AuthorizationManagerStateMachine {
                     action,
                 )),
             },
+            #[cfg(feature = "challenge-authorization")]
+            AuthorizationRemoteState::Challenge(state) => match action {
+                AuthorizationRemoteAction::Challenge(action) => {
+                    let new_state = state.next_remote_state(action, cur_state)?;
+                    cur_state.remote_state = new_state.clone();
+                    Ok(new_state)
+                }
+                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
+                    AuthorizationRemoteState::Challenge(state),
+                    action,
+                )),
+            },
             _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
                 cur_state.remote_state.clone(),
                 action,
@@ -444,7 +503,7 @@ impl AuthorizationManagerStateMachine {
         }
     }
 
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     pub(crate) fn received_complete(
         &self,
         connection_id: &str,
