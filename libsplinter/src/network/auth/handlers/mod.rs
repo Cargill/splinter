@@ -15,7 +15,7 @@
 //! Message handlers for authorization messages
 
 mod v0_handlers;
-#[cfg(feature = "trust-authorization")]
+#[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 mod v1_handlers;
 
 #[cfg(feature = "challenge-authorization")]
@@ -36,11 +36,17 @@ use crate::protos::prelude::*;
 use self::v0_handlers::{
     AuthorizedHandler, ConnectRequestHandler, ConnectResponseHandler, TrustRequestHandler,
 };
-#[cfg(feature = "trust-authorization")]
+#[cfg(feature = "challenge-authorization")]
+use self::v1_handlers::{
+    AuthChallengeNonceRequestHandler, AuthChallengeNonceResponseHandler,
+    AuthChallengeSubmitRequestHandler, AuthChallengeSubmitResponseHandler,
+};
+#[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 use self::v1_handlers::{
     AuthCompleteHandler, AuthProtocolRequestHandler, AuthProtocolResponseHandler,
-    AuthTrustRequestHandler, AuthTrustResponseHandler,
 };
+#[cfg(feature = "trust-authorization")]
+use self::v1_handlers::{AuthTrustRequestHandler, AuthTrustResponseHandler};
 
 /// Create a Dispatcher for Authorization messages
 ///
