@@ -31,7 +31,7 @@ OPTIONS
 
 `-C`, `--connect` `DB-URL`
 : Specifies the URL or connection string for the PostgreSQL or SQLite database
-used for Splinter state, The default SQLite database will go in the directory,
+used for Splinter state. The default SQLite database will go in the directory,
 `/var/lib/splinter`, unless `SPLINTER_STATE_DIR` or `SPLINTER_HOME` is set.
 
 EXAMPLES
