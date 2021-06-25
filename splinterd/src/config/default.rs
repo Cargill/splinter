@@ -109,7 +109,6 @@ mod tests {
 
     /// Asserts config values based on the default values.
     fn assert_default_values(config: PartialConfig) {
-        assert_eq!(config.storage(), None);
         assert_eq!(config.tls_cert_dir(), Some(String::from(TLS_CERT_DIR)));
         assert_eq!(config.tls_ca_file(), Some(String::from(TLS_CA_FILE)));
         assert_eq!(

@@ -34,7 +34,6 @@ pub enum ConfigSource {
 pub struct PartialConfig {
     source: ConfigSource,
     config_dir: Option<String>,
-    storage: Option<String>,
     tls_cert_dir: Option<String>,
     tls_ca_file: Option<String>,
     tls_client_cert: Option<String>,
@@ -97,7 +96,6 @@ impl PartialConfig {
         PartialConfig {
             source,
             config_dir: None,
-            storage: None,
             tls_cert_dir: None,
             tls_ca_file: None,
             tls_client_cert: None,
@@ -161,10 +159,6 @@ impl PartialConfig {
 
     pub fn config_dir(&self) -> Option<String> {
         self.config_dir.clone()
-    }
-
-    pub fn storage(&self) -> Option<String> {
-        self.storage.clone()
     }
 
     pub fn tls_cert_dir(&self) -> Option<String> {
@@ -343,17 +337,6 @@ impl PartialConfig {
     ///
     pub fn with_config_dir(mut self, config_dir: Option<String>) -> Self {
         self.config_dir = config_dir;
-        self
-    }
-
-    /// Adds a `storage` value to the `PartialConfig` object.
-    ///
-    /// # Arguments
-    ///
-    /// * `storage` - The type of storage that should be used to store circuit state.
-    ///
-    pub fn with_storage(mut self, storage: Option<String>) -> Self {
-        self.storage = storage;
         self
     }
 

@@ -47,7 +47,6 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
 
         partial_config = partial_config
             .with_config_dir(self.matches.value_of("config_dir").map(String::from))
-            .with_storage(self.matches.value_of("storage").map(String::from))
             .with_tls_cert_dir(self.matches.value_of("tls_cert_dir").map(String::from))
             .with_tls_ca_file(self.matches.value_of("tls_ca_file").map(String::from))
             .with_tls_client_cert(self.matches.value_of("tls_client_cert").map(String::from))
@@ -190,7 +189,6 @@ mod tests {
     use clap::ArgMatches;
 
     /// Example configuration values.
-    static EXAMPLE_STORAGE: &str = "yaml";
     static EXAMPLE_CA_CERTS: &str = "certs/ca.pem";
     static EXAMPLE_CLIENT_CERT: &str = "certs/client.crt";
     static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
@@ -210,7 +208,6 @@ mod tests {
 
     /// Asserts config values based on the example values.
     fn assert_config_values(config: PartialConfig) {
-        assert_eq!(config.storage(), Some(EXAMPLE_STORAGE.to_string()));
         assert_eq!(config.tls_cert_dir(), None);
         assert_eq!(config.tls_ca_file(), Some(EXAMPLE_CA_CERTS.to_string()));
         assert_eq!(
@@ -281,7 +278,6 @@ mod tests {
                 (@arg config: -c --config +takes_value)
                 (@arg node_id: --("node-id") +takes_value)
                 (@arg display_name: --("display-name") +takes_value)
-                (@arg storage: --("storage") +takes_value)
                 (@arg network_endpoints: -n --("network-endpoints") +takes_value +multiple)
                 (@arg advertised_endpoints: -a --("advertised-endpoints") +takes_value +multiple)
                 (@arg service_endpoint: --("service-endpoint") +takes_value)
@@ -307,7 +303,6 @@ mod tests {
                 (@arg config: -c --config +takes_value)
                 (@arg node_id: --("node-id") +takes_value)
                 (@arg display_name: --("display-name") +takes_value)
-                (@arg storage: --("storage") +takes_value)
                 (@arg network_endpoints: -n --("network-endpoints") +takes_value +multiple)
                 (@arg advertised_endpoints: -a --("advertised-endpoints") +takes_value +multiple)
                 (@arg service_endpoint: --("service-endpoint") +takes_value)
@@ -347,8 +342,6 @@ mod tests {
             EXAMPLE_NODE_ID,
             "--display-name",
             EXAMPLE_DISPLAY_NAME,
-            "--storage",
-            EXAMPLE_STORAGE,
             "--network-endpoints",
             EXAMPLE_NETWORK_ENDPOINT,
             "--advertised-endpoints",

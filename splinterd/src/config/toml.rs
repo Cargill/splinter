@@ -28,7 +28,6 @@ const TOML_VERSION: &str = "1";
 /// will impact the valid format of the config file.
 #[derive(Deserialize, Default, Debug)]
 struct TomlConfig {
-    storage: Option<String>,
     tls_cert_dir: Option<String>,
     tls_ca_file: Option<String>,
     tls_client_cert: Option<String>,
@@ -140,7 +139,6 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
 
         partial_config = partial_config
             // with current values
-            .with_storage(self.toml_config.storage)
             .with_tls_cert_dir(self.toml_config.tls_cert_dir)
             .with_tls_ca_file(self.toml_config.tls_ca_file)
             .with_tls_client_cert(self.toml_config.tls_client_cert)
@@ -252,7 +250,6 @@ mod tests {
     static TEST_TOML: &str = "config_test.toml";
 
     /// Example configuration values.
-    static EXAMPLE_STORAGE: &str = "yaml";
     static EXAMPLE_CERT_DIR: &str = "/cert_dir";
     static EXAMPLE_CA_CERTS: &str = "certs/ca.pem";
     static EXAMPLE_CLIENT_CERT: &str = "certs/client.crt";
@@ -281,7 +278,6 @@ mod tests {
     /// Converts a list of tuples to a toml `Table` `Value` used to write a toml file.
     fn get_toml_value() -> Value {
         let values = vec![
-            ("storage".to_string(), EXAMPLE_STORAGE.to_string()),
             ("tls_ca_file".to_string(), EXAMPLE_CA_CERTS.to_string()),
             (
                 "tls_client_cert".to_string(),
@@ -379,7 +375,6 @@ mod tests {
 
     /// Asserts config values based on the example configuration values.
     fn assert_config_values(config: PartialConfig) {
-        assert_eq!(config.storage(), Some(EXAMPLE_STORAGE.to_string()));
         assert_eq!(config.tls_cert_dir(), None);
         assert_eq!(config.tls_ca_file(), Some(EXAMPLE_CA_CERTS.to_string()));
         assert_eq!(
@@ -446,7 +441,6 @@ mod tests {
 
     /// Asserts config values based on the example configuration values.
     fn assert_deprecated_config_values(config: PartialConfig) {
-        assert_eq!(config.storage(), None);
         assert_eq!(config.tls_cert_dir(), Some(EXAMPLE_CERT_DIR.to_string()));
         assert_eq!(config.tls_ca_file(), Some(EXAMPLE_CA_CERTS.to_string()));
         assert_eq!(
