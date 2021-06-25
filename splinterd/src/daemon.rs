@@ -173,7 +173,7 @@ impl SplinterDaemon {
             let proposals_location = Path::new(&self.state_dir).join("circuit_proposals.yaml");
 
             let circuits_location_exists = circuits_location.exists();
-            let proposals_location_exists = circuits_location.exists();
+            let proposals_location_exists = proposals_location.exists();
 
             if circuits_location_exists || proposals_location_exists {
                 if circuits_location_exists {
