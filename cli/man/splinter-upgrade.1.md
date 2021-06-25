@@ -43,8 +43,8 @@ with the example hostname and port `splinter-db-alpha:5432`.
 splinter upgrade -C postgres://admin:admin@splinter-db-alpha:5432/splinter
 ```
 
-This example upgrades splinter connecting to the SQLite database `./custom-sqlite.db`
-and using YAML state files from `./custom/dir`.
+This example upgrades splinter connecting to the SQLite database
+`./custom-sqlite.db` and using YAML state files from `./custom/dir`.
 
 ```
 splinter upgrade -S ./custom/dir -C ./custom-sqlite.db
