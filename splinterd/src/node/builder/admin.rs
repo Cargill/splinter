@@ -14,9 +14,10 @@
 
 //! Builder for the AdminSubsystem
 
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use cylinder::{secp256k1::Secp256k1Context, Context, VerifierFactory};
+use cylinder::VerifierFactory;
 use scabbard::service::ScabbardFactoryBuilder;
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
@@ -42,7 +43,7 @@ pub struct AdminSubsystemBuilder {
     peer_connector: Option<PeerManagerConnector>,
     routing_writer: Option<Box<dyn RoutingTableWriter>>,
     service_transport: Option<InprocTransport>,
-    signing_context: Option<Box<dyn Context>>,
+    signing_context: Option<Arc<Mutex<Box<dyn VerifierFactory>>>>,
     scabbard_config: Option<ScabbardConfig>,
     registries: Option<Vec<String>>,
     admin_service_event_client_variant: AdminServiceEventClientVariant,
@@ -101,7 +102,10 @@ impl AdminSubsystemBuilder {
     }
 
     /// Configure a signing context. Defaults to [cylinder::secp256k1::Secp256k1Context].
-    pub fn with_signing_context(mut self, signing_context: Box<dyn Context>) -> Self {
+    pub fn with_signing_context(
+        mut self,
+        signing_context: Arc<Mutex<Box<dyn VerifierFactory>>>,
+    ) -> Self {
         self.signing_context = Some(signing_context);
         self
     }
@@ -157,11 +161,20 @@ impl AdminSubsystemBuilder {
             )
         })?;
 
-        let signing_context = self
-            .signing_context
-            .unwrap_or_else(|| Box::new(Secp256k1Context::new()));
+        let signing_context = self.signing_context.take().ok_or_else(|| {
+            InternalError::with_message(
+                "Cannot build AdminSubsystem without a signing context".to_string(),
+            )
+        })?;
 
-        let admin_service_verifier = signing_context.new_verifier();
+        let admin_service_verifier = signing_context
+            .lock()
+            .map_err(|_| {
+                InternalError::with_message(
+                    "Cannot build AdminSubsystem, signing context lock poisoned".to_string(),
+                )
+            })?
+            .new_verifier();
 
         let scabbard_service_factory = self
             .scabbard_config
@@ -171,9 +184,7 @@ impl AdminSubsystemBuilder {
                     .with_state_db_size(config.database_size)
                     .with_receipt_db_dir(config.data_dir.to_string_lossy().into())
                     .with_receipt_db_size(config.database_size)
-                    .with_signature_verifier_factory(Box::new(VerifierFactoryWrapper(
-                        signing_context,
-                    )))
+                    .with_signature_verifier_factory(signing_context.clone())
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))
             })
@@ -194,13 +205,5 @@ impl AdminSubsystemBuilder {
             registries,
             admin_service_event_client_variant,
         })
-    }
-}
-
-struct VerifierFactoryWrapper(Box<dyn Context>);
-
-impl VerifierFactory for VerifierFactoryWrapper {
-    fn new_verifier(&self) -> Box<dyn cylinder::Verifier> {
-        self.0.new_verifier()
     }
 }

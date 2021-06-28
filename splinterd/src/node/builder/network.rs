@@ -14,6 +14,7 @@
 
 //! Builder for the NetworkSubsystem
 
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use splinter::error::InternalError;
@@ -30,6 +31,7 @@ pub struct NetworkSubsystemBuilder {
     heartbeat_interval: Option<Duration>,
     strict_ref_counts: bool,
     network_endpoints: Option<Vec<String>>,
+    signing_context: Option<Arc<Mutex<Box<dyn cylinder::VerifierFactory>>>>,
 }
 
 impl NetworkSubsystemBuilder {
@@ -62,10 +64,25 @@ impl NetworkSubsystemBuilder {
         self
     }
 
+    /// Specifies the signing context for the node
+    pub fn with_signing_context(
+        mut self,
+        signing_context: Arc<Mutex<Box<dyn cylinder::VerifierFactory>>>,
+    ) -> Self {
+        self.signing_context = Some(signing_context);
+        self
+    }
+
     pub fn build(mut self) -> Result<RunnableNetworkSubsystem, InternalError> {
         let node_id = self.node_id.take().ok_or_else(|| {
             InternalError::with_message(
                 "Cannot build NetworkSubsystem without a node id".to_string(),
+            )
+        })?;
+
+        let signing_context = self.signing_context.take().ok_or_else(|| {
+            InternalError::with_message(
+                "Cannot build NetworkSubsystem without a signing context".to_string(),
             )
         })?;
 
@@ -85,6 +102,7 @@ impl NetworkSubsystemBuilder {
             heartbeat_interval,
             strict_ref_counts: self.strict_ref_counts,
             network_endpoints,
+            signing_context,
         })
     }
 }

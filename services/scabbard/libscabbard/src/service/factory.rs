@@ -15,6 +15,7 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use cylinder::VerifierFactory;
@@ -25,6 +26,7 @@ use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 #[cfg(feature = "service-arg-validation")]
 use crate::hex::parse_hex;
 
+use super::error::ScabbardError;
 use super::{Scabbard, ScabbardVersion, SERVICE_TYPE};
 
 const DEFAULT_STATE_DB_DIR: &str = "/var/lib/splinter";
@@ -40,7 +42,7 @@ pub struct ScabbardFactoryBuilder {
     state_db_size: Option<usize>,
     receipt_db_dir: Option<String>,
     receipt_db_size: Option<usize>,
-    signature_verifier_factory: Option<Box<dyn VerifierFactory>>,
+    signature_verifier_factory: Option<Arc<Mutex<Box<dyn VerifierFactory>>>>,
 }
 
 #[cfg(feature = "factory-builder")]
@@ -78,7 +80,7 @@ impl ScabbardFactoryBuilder {
     /// value, and omitting it will result in an [splinter::error::InvalidStateError] at build-time.
     pub fn with_signature_verifier_factory(
         mut self,
-        signature_verifier_factory: Box<dyn VerifierFactory>,
+        signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
     ) -> Self {
         self.signature_verifier_factory = Some(signature_verifier_factory);
         self
@@ -117,7 +119,7 @@ pub struct ScabbardFactory {
     state_db_size: usize,
     receipt_db_dir: String,
     receipt_db_size: usize,
-    signature_verifier_factory: Box<dyn VerifierFactory>,
+    signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
 impl ScabbardFactory {
@@ -126,7 +128,7 @@ impl ScabbardFactory {
         state_db_size: Option<usize>,
         receipt_db_dir: Option<String>,
         receipt_db_size: Option<usize>,
-        signature_verifier_factory: Box<dyn VerifierFactory>,
+        signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
     ) -> Self {
         ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
@@ -253,7 +255,12 @@ impl ServiceFactory for ScabbardFactory {
             self.state_db_size,
             &receipt_db_dir,
             self.receipt_db_size,
-            self.signature_verifier_factory.new_verifier(),
+            self.signature_verifier_factory
+                .lock()
+                .map_err(|_| {
+                    FactoryCreateError::CreationFailed(Box::new(ScabbardError::LockPoisoned))
+                })?
+                .new_verifier(),
             admin_keys,
             coordinator_timeout,
         )
@@ -408,7 +415,7 @@ mod tests {
             Some(1024 * 1024),
             Some("/tmp".into()),
             Some(1024 * 1024),
-            Box::new(Secp256k1Context::new()),
+            Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
         )
     }
 

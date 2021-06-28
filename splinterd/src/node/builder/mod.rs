@@ -18,9 +18,10 @@ pub(super) mod admin;
 pub(super) mod network;
 pub(super) mod scabbard;
 
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+use cylinder::{secp256k1::Secp256k1Context, Context, Signer, VerifierFactory};
 use rand::{thread_rng, Rng};
 use splinter::error::InternalError;
 use splinter::rest_api::actix_web_1::RestApiBuilder as RestApiBuilder1;
@@ -184,21 +185,25 @@ impl NodeBuilder {
             .take()
             .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>().to_string()));
 
-        let network_subsystem_builder =
-            self.network_subsystem_builder.with_node_id(node_id.clone());
-
-        let runnable_network_subsystem = network_subsystem_builder.build()?;
-
         let context = Secp256k1Context::new();
         let admin_signer = self.admin_signer.take().unwrap_or_else(|| {
             let pk = context.new_random_private_key();
             context.new_signer(pk)
         });
 
+        let signing_context: Arc<Mutex<Box<dyn VerifierFactory>>> =
+            Arc::new(Mutex::new(Box::new(context)));
+
+        let runnable_network_subsystem = self
+            .network_subsystem_builder
+            .with_node_id(node_id.clone())
+            .with_signing_context(signing_context.clone())
+            .build()?;
+
         let admin_subsystem_builder = self
             .admin_subsystem_builder
             .with_node_id(node_id.clone())
-            .with_signing_context(Box::new(context));
+            .with_signing_context(signing_context.clone());
 
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => RunnableNodeRestApiVariant::ActixWeb1(
