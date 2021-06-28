@@ -350,7 +350,6 @@ mod tests {
         PendingAuthorization,
     };
 
-    #[cfg(feature = "oauth-profile")]
     use crate::oauth::tests::TestProfileProvider;
 
     const TOKEN_ENDPOINT: &str = "/token";
@@ -406,7 +405,6 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
@@ -515,7 +513,6 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(MemoryInflightOAuthRequestStore::new()),
-            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
@@ -596,7 +593,6 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
@@ -679,7 +675,6 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 

@@ -148,7 +148,6 @@ mod tests {
 
     use reqwest::{blocking::Client, redirect, StatusCode, Url};
 
-    #[cfg(feature = "oauth-profile")]
     use crate::oauth::tests::TestProfileProvider;
     use crate::oauth::{
         new_basic_client,
@@ -196,7 +195,6 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(TestInflightOAuthRequestStore),
-            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
@@ -261,7 +259,6 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(TestInflightOAuthRequestStore),
-            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
@@ -320,7 +317,6 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(MemoryInflightOAuthRequestStore::new()),
-            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 

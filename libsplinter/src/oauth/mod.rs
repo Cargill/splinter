@@ -16,7 +16,6 @@
 
 mod builder;
 mod error;
-#[cfg(feature = "oauth-profile")]
 mod profile;
 #[cfg(feature = "rest-api")]
 pub(crate) mod rest_api;
@@ -37,7 +36,6 @@ use store::InflightOAuthRequestStore;
 
 pub use builder::{GithubOAuthClientBuilder, OAuthClientBuilder, OpenIdOAuthClientBuilder};
 pub use error::OAuthClientBuildError;
-#[cfg(feature = "oauth-profile")]
 pub use profile::{GithubProfileProvider, OpenIdProfileProvider, ProfileProvider};
 pub use subject::{GithubSubjectProvider, OpenIdSubjectProvider, SubjectProvider};
 
@@ -61,7 +59,6 @@ pub struct OAuthClient {
     inflight_request_store: Box<dyn InflightOAuthRequestStore>,
 
     /// OAuth2 profile provider used to retrieve user's profile details
-    #[cfg(feature = "oauth-profile")]
     profile_provider: Box<dyn ProfileProvider>,
 }
 
@@ -85,7 +82,7 @@ impl OAuthClient {
         scopes: Vec<String>,
         subject_provider: Box<dyn SubjectProvider>,
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
-        #[cfg(feature = "oauth-profile")] profile_provider: Box<dyn ProfileProvider>,
+        profile_provider: Box<dyn ProfileProvider>,
     ) -> Self {
         Self {
             client,
@@ -93,7 +90,6 @@ impl OAuthClient {
             scopes,
             subject_provider,
             inflight_request_store,
-            #[cfg(feature = "oauth-profile")]
             profile_provider,
         }
     }
@@ -170,7 +166,6 @@ impl OAuthClient {
                 ))
             })?;
 
-        #[cfg(feature = "oauth-profile")]
         let profile = self
             .profile_provider
             .get_profile(token_response.access_token().secret())
@@ -191,7 +186,6 @@ impl OAuthClient {
                 .refresh_token()
                 .map(|token| token.secret().into()),
             subject,
-            #[cfg(feature = "oauth-profile")]
             profile,
         };
 
@@ -262,7 +256,6 @@ pub struct UserInfo {
     /// The user's subject identifier
     subject: String,
     /// The user's profile details
-    #[cfg(feature = "oauth-profile")]
     profile: Profile,
 }
 
@@ -290,7 +283,6 @@ impl UserInfo {
     }
 
     /// Gets the user's profile details
-    #[cfg(feature = "oauth-profile")]
     pub fn profile(&self) -> &Profile {
         &self.profile
     }
@@ -309,14 +301,12 @@ impl std::fmt::Debug for UserInfo {
             )
             .field("subject", &self.subject);
 
-        #[cfg(feature = "oauth-profile")]
         debug_struct.field("profile", &self.profile);
 
         debug_struct.finish()
     }
 }
 
-#[cfg(feature = "oauth-profile")]
 #[derive(Clone, Debug)]
 pub struct Profile {
     pub subject: String,
@@ -422,7 +412,6 @@ mod tests {
             vec![SCOPE1.into(), SCOPE2.into()],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
@@ -502,11 +491,9 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "oauth-profile")]
     #[derive(Clone)]
     pub struct TestProfileProvider;
 
-    #[cfg(feature = "oauth-profile")]
     impl ProfileProvider for TestProfileProvider {
         fn get_profile(&self, _: &str) -> Result<Option<Profile>, InternalError> {
             Ok(Some(Profile {
@@ -564,7 +551,6 @@ mod actix_tests {
 
     use crate::oauth::store::MemoryInflightOAuthRequestStore;
 
-    #[cfg(feature = "oauth-profile")]
     use super::tests::TestProfileProvider;
     use super::tests::TestSubjectProvider;
 
@@ -623,7 +609,6 @@ mod actix_tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
@@ -681,7 +666,6 @@ mod actix_tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(MemoryInflightOAuthRequestStore::new()),
-            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
