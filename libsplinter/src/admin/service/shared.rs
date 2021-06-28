@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::iter::ExactSizeIterator;
 use std::sync::mpsc::Sender;
@@ -22,10 +22,9 @@ use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::{Message, RepeatedField};
 
 use crate::admin::store::{
-    AdminServiceStore, AuthorizationType, Circuit as StoreCircuit,
-    CircuitBuilder as StoreCircuitBuilder, CircuitNode, CircuitPredicate,
-    CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus, ProposalType,
-    ProposedCircuit, Service as StoreService, Vote, VoteRecordBuilder,
+    AdminServiceStore, Circuit as StoreCircuit, CircuitBuilder as StoreCircuitBuilder,
+    CircuitPredicate, CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus,
+    ProposalType, ProposedCircuit, Service as StoreService, Vote, VoteRecordBuilder,
 };
 use crate::admin::token::{PeerAuthorizationTokenReader, PeerNode};
 use crate::circuit::routing::{self, RoutingTableWriter};
@@ -3520,16 +3519,6 @@ impl AdminServiceShared {
             .map_err(AdminSharedError::from)
     }
 
-    pub fn get_nodes(&self) -> Result<BTreeMap<String, CircuitNode>, AdminSharedError> {
-        Ok(self
-            .admin_store
-            .list_nodes()
-            .map_err(AdminSharedError::from)?
-            .into_iter()
-            .map(|node| (node.node_id().into(), node))
-            .collect())
-    }
-
     fn verify_signature(&self, payload: &CircuitManagementPayload) -> Result<bool, ServiceError> {
         let header: CircuitManagementPayload_Header =
             Message::parse_from_bytes(payload.get_header())?;
@@ -3617,6 +3606,7 @@ mod tests {
     use crate::admin::service::AdminKeyVerifierError;
     use crate::admin::store;
     use crate::admin::store::diesel::DieselAdminServiceStore;
+    use crate::admin::store::CircuitNode;
     use crate::circuit::routing::memory::RoutingTable;
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::{Envelope, Mesh};
