@@ -753,7 +753,7 @@ impl Service for AdminService {
                     .network_sender()
                     .as_ref()
                     .ok_or(ServiceError::NotStarted)?
-                    .send(&message_context.sender.to_string(), &envelope_bytes)
+                    .send(&message_context.sender, &envelope_bytes)
                     .map_err(|err| ServiceError::UnableToSendMessage(Box::new(err)))?;
                 admin_service_shared
                     .on_protocol_agreement(&message_context.sender, protocol)
