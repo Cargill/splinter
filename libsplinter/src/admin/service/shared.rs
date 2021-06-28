@@ -3473,6 +3473,7 @@ mod tests {
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
             splinter_node("test-node", &["inproc://someplace:8000".to_string()]),
             splinter_node("other-node", &["inproc://otherplace:8000".to_string()]),
+            splinter_node("my_peer_id", &["inproc://myplace:8000".to_string()]),
         ]));
         circuit.set_roster(protobuf::RepeatedField::from_vec(vec![
             splinter_service("0123", "sabre"),
