@@ -98,7 +98,6 @@ experimental = [
     # The following features are experimental:
     "authorization-handler-maintenance",
     "challenge-authorization",
-    "deprecate-yaml",
     "health-service",
     "https-bind",
     "metrics",
@@ -132,7 +131,6 @@ challenge-authorization = [
 ]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
-deprecate-yaml = []
 health-service = ["health"]
 https-bind = ["splinter/https-bind"]
 metrics = [
