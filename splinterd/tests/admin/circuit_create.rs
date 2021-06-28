@@ -17,6 +17,7 @@
 use std::collections::HashMap;
 
 use splinter::admin::client::event::{EventType, PublicKey};
+use splinter::admin::messages::AuthorizationType;
 use splinterd::node::{Node, RestApiVariant};
 
 use crate::admin::circuit_commit::{commit_2_party_circuit, commit_3_party_circuit};
@@ -114,15 +115,29 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            node_a.network_endpoints().to_vec(),
+            (
+                node_a.network_endpoints().to_vec(),
+                node_a
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
         ),
         (
             node_b.node_id().to_string(),
-            node_b.network_endpoints().to_vec(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get seconds node's public key"),
+            ),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, Vec<String>>>();
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
     let circuit_id = "ABCDE-01234";
 
     let node_a_event_client = node_a
@@ -142,6 +157,7 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
             .public_key()
             .expect("Unable to get first node's public key")
             .as_hex()],
+        AuthorizationType::Trust,
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
@@ -246,19 +262,40 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            node_a.network_endpoints().to_vec(),
+            (
+                node_a.network_endpoints().to_vec(),
+                node_a
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
         ),
         (
             node_b.node_id().to_string(),
-            node_b.network_endpoints().to_vec(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get seconds node's public key"),
+            ),
         ),
         (
             node_c.node_id().to_string(),
-            node_c.network_endpoints().to_vec(),
+            (
+                node_c.network_endpoints().to_vec(),
+                node_c
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get third node's public key"),
+            ),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, Vec<String>>>();
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
     let circuit_id = "ABCDE-01234";
 
     let node_a_event_client = node_a
@@ -282,6 +319,7 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
             .public_key()
             .expect("Unable to get first node's public key")
             .as_hex()],
+        AuthorizationType::Trust,
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
@@ -450,15 +488,29 @@ pub fn test_2_party_circuit_creation_stop() {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            node_a.network_endpoints().to_vec(),
+            (
+                node_a.network_endpoints().to_vec(),
+                node_a
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
         ),
         (
             node_b.node_id().to_string(),
-            node_b.network_endpoints().to_vec(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get seconds node's public key"),
+            ),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, Vec<String>>>();
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
     let circuit_id = "ABCDE-01234";
     // Stop the second node in the network
     network = network.stop(1).expect("Unable to stop second node");
@@ -474,6 +526,7 @@ pub fn test_2_party_circuit_creation_stop() {
             .public_key()
             .expect("Unable to get first node's public key")
             .as_hex()],
+        AuthorizationType::Trust,
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
@@ -609,15 +662,29 @@ pub fn test_2_party_circuit_proposal_rejected_stop() {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            node_a.network_endpoints().to_vec(),
+            (
+                node_a.network_endpoints().to_vec(),
+                node_a
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
         ),
         (
             node_b.node_id().to_string(),
-            node_b.network_endpoints().to_vec(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get seconds node's public key"),
+            ),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, Vec<String>>>();
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
     let circuit_id = "ABCDE-01234";
     // Stop the second node in the network
     network = network.stop(1).expect("Unable to stop second node");
@@ -633,6 +700,7 @@ pub fn test_2_party_circuit_proposal_rejected_stop() {
             .public_key()
             .expect("Unable to get first node's public key")
             .as_hex()],
+        AuthorizationType::Trust,
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
@@ -766,19 +834,40 @@ pub fn test_3_party_circuit_creation_stop() {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            node_a.network_endpoints().to_vec(),
+            (
+                node_a.network_endpoints().to_vec(),
+                node_a
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
         ),
         (
             node_b.node_id().to_string(),
-            node_b.network_endpoints().to_vec(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get seconds node's public key"),
+            ),
         ),
         (
             node_c.node_id().to_string(),
-            node_c.network_endpoints().to_vec(),
+            (
+                node_c.network_endpoints().to_vec(),
+                node_c
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get third node's public key"),
+            ),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, Vec<String>>>();
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
     // Stop the second node in the network
     network = network.stop(1).expect("Unable to stop second node");
     node_a = network.node(0).expect("Unable to get first node");
@@ -793,6 +882,7 @@ pub fn test_3_party_circuit_creation_stop() {
             .public_key()
             .expect("Unable to get first node's public key")
             .as_hex()],
+        AuthorizationType::Trust,
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
@@ -1026,19 +1116,40 @@ pub fn test_3_party_circuit_proposal_rejected_stop() {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            node_a.network_endpoints().to_vec(),
+            (
+                node_a.network_endpoints().to_vec(),
+                node_a
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
         ),
         (
             node_b.node_id().to_string(),
-            node_b.network_endpoints().to_vec(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get seconds node's public key"),
+            ),
         ),
         (
             node_c.node_id().to_string(),
-            node_c.network_endpoints().to_vec(),
+            (
+                node_c.network_endpoints().to_vec(),
+                node_c
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get third node's public key"),
+            ),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, Vec<String>>>();
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
     // Stop the second node in the network
     network = network.stop(1).expect("Unable to stop second node");
     node_a = network.node(0).expect("Unable to get first node");
@@ -1053,6 +1164,7 @@ pub fn test_3_party_circuit_proposal_rejected_stop() {
             .public_key()
             .expect("Unable to get first node's public key")
             .as_hex()],
+        AuthorizationType::Trust,
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node

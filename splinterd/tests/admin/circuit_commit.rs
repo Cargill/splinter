@@ -17,6 +17,7 @@
 use std::collections::HashMap;
 
 use splinter::admin::client::event::{EventType, PublicKey};
+use splinter::admin::messages::AuthorizationType;
 use splinterd::node::Node;
 
 use crate::admin::payload::{make_circuit_proposal_vote_payload, make_create_circuit_payload};
@@ -24,20 +25,37 @@ use crate::admin::payload::{make_circuit_proposal_vote_payload, make_create_circ
 /// Commit a 2-party circuit on a network that is already running
 /// This function also validates that a duplicate proposal of the circuit being created is
 /// rejected when submitted.
-pub(in crate::admin) fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
+pub(in crate::admin) fn commit_2_party_circuit(
+    circuit_id: &str,
+    node_a: &Node,
+    node_b: &Node,
+    auth_type: AuthorizationType,
+) {
     // Create the list of node details needed to build the `CircuitCreateRequest`
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            node_a.network_endpoints().to_vec(),
+            (
+                node_a.network_endpoints().to_vec(),
+                node_a
+                    .admin_signer()
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
         ),
         (
             node_b.node_id().to_string(),
-            node_b.network_endpoints().to_vec(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .admin_signer()
+                    .public_key()
+                    .expect("Unable to get seconds node's public key"),
+            ),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, Vec<String>>>();
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
 
     let node_b_admin_pubkey = admin_pubkey(node_b);
 
@@ -65,6 +83,7 @@ pub(in crate::admin) fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, 
                 .expect("Unable to get second node's public key")
                 .as_hex(),
         ],
+        auth_type,
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
@@ -168,19 +187,40 @@ pub(in crate::admin) fn commit_3_party_circuit(
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            node_a.network_endpoints().to_vec(),
+            (
+                node_a.network_endpoints().to_vec(),
+                node_a
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
         ),
         (
             node_b.node_id().to_string(),
-            node_b.network_endpoints().to_vec(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get second node's public key"),
+            ),
         ),
         (
             node_c.node_id().to_string(),
-            node_c.network_endpoints().to_vec(),
+            (
+                node_c.network_endpoints().to_vec(),
+                node_c
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get third node's public key"),
+            ),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, Vec<String>>>();
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
 
     let node_b_admin_pubkey = admin_pubkey(node_b);
     let node_c_admin_pubkey = admin_pubkey(node_c);
@@ -218,6 +258,7 @@ pub(in crate::admin) fn commit_3_party_circuit(
                 .expect("Unable to get third node's public key")
                 .as_hex(),
         ],
+        AuthorizationType::Trust,
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
