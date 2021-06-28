@@ -5848,7 +5848,7 @@ mod tests {
 
         // Set `node_a` to peered
         shared
-            .on_peer_connected(&PeerAuthorizationToken::from_peer_id("other_a"))
+            .on_peer_connected(&PeerAuthorizationToken::from_peer_id("node_a"))
             .expect("Unable to set peer to peered");
 
         shared
