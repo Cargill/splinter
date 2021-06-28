@@ -58,6 +58,7 @@ default = [
     "circuit-template",
     "database",
     "postgres",
+    "upgrade",
     "sqlite",
 ]
 
@@ -73,7 +74,6 @@ experimental = [
     "authorization-handler-maintenance",
     "challenge-authorization",
     "health",
-    "upgrade",
     "https-certs",
     "user-list",
     "registry",
