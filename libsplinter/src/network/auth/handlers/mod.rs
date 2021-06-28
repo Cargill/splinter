@@ -19,8 +19,11 @@ mod v0_handlers;
 mod v1_handlers;
 
 #[cfg(feature = "challenge-authorization")]
-use cylinder::Signer;
+use cylinder::{Signer, Verifier};
 
+use crate::error::InvalidStateError;
+#[cfg(feature = "challenge-authorization")]
+use crate::network::auth::ConnectionAuthorizationType;
 use crate::network::auth::{
     AuthorizationManagerStateMachine, AuthorizationMessageSender, AuthorizationRemoteAction,
     AuthorizationRemoteState,
@@ -55,12 +58,21 @@ use self::v1_handlers::{AuthTrustRequestHandler, AuthTrustResponseHandler};
 /// itself to handle updating identities (or removing connections with authorization failures).
 ///
 /// The identity provided is sent to connections for Trust authorizations.
+#[allow(clippy::too_many_arguments)]
 pub fn create_authorization_dispatcher(
     identity: String,
-    #[cfg(feature = "challenge-authorization")] _signers: Vec<Box<dyn Signer>>,
+    #[cfg(feature = "challenge-authorization")] signers: Vec<Box<dyn Signer>>,
     auth_manager: AuthorizationManagerStateMachine,
     auth_msg_sender: impl MessageSender<ConnectionId> + Clone + 'static,
-) -> Dispatcher<NetworkMessageType, ConnectionId> {
+    #[cfg(feature = "challenge-authorization")] nonce: Vec<u8>,
+    #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+        ConnectionAuthorizationType,
+    >,
+    #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+        ConnectionAuthorizationType,
+    >,
+    #[cfg(feature = "challenge-authorization")] verifer: Box<dyn Verifier>,
+) -> Result<Dispatcher<NetworkMessageType, ConnectionId>, InvalidStateError> {
     let mut auth_dispatcher = Dispatcher::new(Box::new(auth_msg_sender.clone()));
 
     // v0 message handlers
@@ -77,7 +89,7 @@ pub fn create_authorization_dispatcher(
     auth_dispatcher.set_handler(Box::new(AuthorizedHandler::new(auth_manager.clone())));
 
     // v1 message handlers
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     {
         auth_dispatcher.set_handler(Box::new(AuthProtocolRequestHandler::new(
             auth_manager.clone(),
@@ -85,16 +97,75 @@ pub fn create_authorization_dispatcher(
 
         auth_dispatcher.set_handler(Box::new(AuthProtocolResponseHandler::new(
             auth_manager.clone(),
+            #[cfg(feature = "trust-authorization")]
             identity,
+            #[cfg(feature = "challenge-authorization")]
+            local_authorization.clone(),
+            #[cfg(not(feature = "challenge-authorization"))]
+            None,
         )));
 
+        auth_dispatcher.set_handler(Box::new(AuthCompleteHandler::new(auth_manager.clone())));
+    }
+
+    #[cfg(feature = "trust-authorization")]
+    {
         auth_dispatcher.set_handler(Box::new(AuthTrustRequestHandler::new(auth_manager.clone())));
 
         auth_dispatcher.set_handler(Box::new(AuthTrustResponseHandler::new(
             auth_manager.clone(),
         )));
+    }
 
-        auth_dispatcher.set_handler(Box::new(AuthCompleteHandler::new(auth_manager.clone())));
+    // If no signers are configured do not configure challenge authorization
+    #[cfg(feature = "challenge-authorization")]
+    if !signers.is_empty() {
+        auth_dispatcher.set_handler(Box::new(AuthChallengeNonceRequestHandler::new(
+            auth_manager.clone(),
+            nonce.clone(),
+        )));
+
+        let signers_to_use = match &local_authorization {
+            Some(ConnectionAuthorizationType::Challenge { public_key }) => {
+                let signer = signers.iter().find(|signer| match signer.public_key() {
+                    Ok(signer_public_key) => signer_public_key.as_slice() == public_key,
+                    Err(_) => false,
+                });
+
+                match signer {
+                    Some(signer) => vec![signer.clone()],
+                    None => {
+                        return Err(InvalidStateError::with_message(
+                            "Required local authorization is not supported".to_string(),
+                        ));
+                    }
+                }
+            }
+
+            // if there is no local_authorization which key is used here does not matter
+            _ => signers.clone(),
+        };
+
+        auth_dispatcher.set_handler(Box::new(AuthChallengeNonceResponseHandler::new(
+            auth_manager.clone(),
+            signers_to_use,
+        )));
+
+        let expected_public_key = match expected_authorization {
+            Some(ConnectionAuthorizationType::Challenge { public_key }) => Some(public_key),
+            _ => None,
+        };
+
+        auth_dispatcher.set_handler(Box::new(AuthChallengeSubmitRequestHandler::new(
+            auth_manager.clone(),
+            verifer,
+            nonce,
+            expected_public_key,
+        )));
+
+        auth_dispatcher.set_handler(Box::new(AuthChallengeSubmitResponseHandler::new(
+            auth_manager.clone(),
+        )));
     }
 
     auth_dispatcher.set_handler(Box::new(AuthorizationErrorHandler::new(auth_manager)));
@@ -103,7 +174,7 @@ pub fn create_authorization_dispatcher(
 
     network_msg_dispatcher.set_handler(Box::new(AuthorizationMessageHandler::new(auth_dispatcher)));
 
-    network_msg_dispatcher
+    Ok(network_msg_dispatcher)
 }
 
 /// The Handler for authorization network messages.

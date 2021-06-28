@@ -55,6 +55,12 @@ impl Authorizer for InprocAuthorizer {
         connection_id: String,
         connection: Box<dyn Connection>,
         on_complete: AuthorizerCallback,
+        #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
+        #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
     ) -> Result<(), AuthorizerError> {
         if let Some(identity) = self
             .endpoint_to_identities
@@ -65,6 +71,10 @@ impl Authorizer for InprocAuthorizer {
                 connection_id,
                 identity: ConnectionAuthorizationType::Trust { identity },
                 connection,
+                #[cfg(feature = "challenge-authorization")]
+                expected_authorization,
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
             })
             .map_err(|err| AuthorizerError(err.to_string()))
         } else {
@@ -114,10 +124,24 @@ impl Authorizer for Authorizers {
         connection_id: String,
         connection: Box<dyn Connection>,
         on_complete: AuthorizerCallback,
+        #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
+        #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
     ) -> Result<(), AuthorizerError> {
         for (match_prefix, authorizer) in &self.authorizers {
             if connection.remote_endpoint().starts_with(match_prefix) {
-                return authorizer.authorize_connection(connection_id, connection, on_complete);
+                return authorizer.authorize_connection(
+                    connection_id,
+                    connection,
+                    on_complete,
+                    #[cfg(feature = "challenge-authorization")]
+                    expected_authorization,
+                    #[cfg(feature = "challenge-authorization")]
+                    local_authorization,
+                );
             }
         }
 
@@ -151,6 +175,10 @@ mod tests {
                 "abcd-1234".into(),
                 Box::new(MockConnection::new("inproc://test-conn")),
                 Box::new(move |result| tx.send(result).map_err(Box::from)),
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
             )
             .unwrap();
 
@@ -183,6 +211,10 @@ mod tests {
                 "abcd-1234".into(),
                 Box::new(MockConnection::new("inproc://bad-inproc-conn")),
                 Box::new(move |result| tx.send(result).map_err(Box::from)),
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
             )
             .unwrap();
 
@@ -229,6 +261,10 @@ mod tests {
                 "abcd-1234".into(),
                 Box::new(MockConnection::new("inproc://test-conn")),
                 Box::new(move |result| tx1.send(result).map_err(Box::from)),
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
             )
             .unwrap();
 
@@ -252,6 +288,10 @@ mod tests {
                 "abcd-1234".into(),
                 Box::new(MockConnection::new("inproc2://test-conn")),
                 Box::new(move |result| tx2.send(result).map_err(Box::from)),
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
             )
             .unwrap();
 
@@ -275,6 +315,10 @@ mod tests {
                 "abcd-1234".into(),
                 Box::new(MockConnection::new("protocol://other-conn")),
                 Box::new(move |result| tx3.send(result).map_err(Box::from)),
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
             )
             .unwrap();
 
@@ -298,6 +342,10 @@ mod tests {
                 "abcd-1234".into(),
                 Box::new(MockConnection::new("tcp://some-tcp:4444")),
                 Box::new(move |result| tx4.send(result).map_err(Box::from)),
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
             )
             .unwrap();
 
@@ -365,6 +413,12 @@ mod tests {
             connection_id: String,
             connection: Box<dyn Connection>,
             callback: AuthorizerCallback,
+            #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+                ConnectionAuthorizationType,
+            >,
+            #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+                ConnectionAuthorizationType,
+            >,
         ) -> Result<(), AuthorizerError> {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
@@ -372,6 +426,10 @@ mod tests {
                 identity: ConnectionAuthorizationType::Trust {
                     identity: self.authorized_id.clone(),
                 },
+                #[cfg(feature = "challenge-authorization")]
+                expected_authorization,
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

@@ -21,7 +21,6 @@ mod shared;
 mod subscriber;
 
 use std::any::Any;
-#[cfg(feature = "service-arg-validation")]
 use std::collections::HashMap;
 use std::sync::{mpsc::channel, Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -38,7 +37,7 @@ use crate::consensus::Proposal;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
-use crate::peer::{PeerAuthorizationToken, PeerManagerConnector, PeerManagerNotification};
+use crate::peer::{PeerManagerConnector, PeerManagerNotification};
 use crate::protocol::{ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION};
 use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
@@ -55,7 +54,7 @@ use crate::service::{
 use self::consensus::AdminConsensusManager;
 use self::error::{AdminError, Sha256Error};
 use self::proposal_store::{AdminServiceProposals, ProposalStore};
-use self::shared::AdminServiceShared;
+use self::shared::{AdminServiceShared, PeerNodePair};
 
 pub use self::builder::AdminServiceBuilder;
 pub use self::error::AdminKeyVerifierError;
@@ -248,15 +247,6 @@ impl AdminService {
             }
         }
 
-        let nodes = self
-            .admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .get_nodes()
-            .map_err(|err| ServiceStartError::Internal(format!("Unable to get nodes: {}", err)))?;
-
         let orchestrator = self.orchestrator.lock().map_err(|_| {
             ServiceStartError::PoisonedLock("the admin orchestrator lock was poisoned".into())
         })?;
@@ -270,43 +260,46 @@ impl AdminService {
             })?
             .routing_table_writer();
 
+        let mut token_to_peer = HashMap::new();
         for circuit in active_circuits {
-            // restart all peer in the circuit
-            for member in circuit.members().iter() {
-                if member.node_id() != self.node_id {
-                    if let Some(node) = nodes.get(member.node_id()) {
-                        // Need to manually get peer token here because we also need the endpoints
-                        // for requesting the peer ref
-                        let peer_token = match circuit.authorization_type() {
-                            AuthorizationType::Trust => {
-                                PeerAuthorizationToken::from_peer_id(member.node_id())
-                            }
-                            #[cfg(feature = "challenge-authorization")]
-                            AuthorizationType::Challenge => {
-                                if let Some(public_key) = member.public_key() {
-                                    PeerAuthorizationToken::from_public_key(public_key)
-                                } else {
-                                    error!(
-                                        "No public key set when circuit requries challenge \
-                                        authorization: {}",
-                                        circuit.circuit_id()
-                                    );
-                                    continue;
-                                }
-                            }
-                        };
+            let local_required_auth = circuit
+                .get_node_token(&self.node_id)
+                .map_err(|err| {
+                    ServiceStartError::Internal(format!("Unable to get local nodes token: {}", err))
+                })?
+                .ok_or_else(|| {
+                    ServiceStartError::Internal("Circuit does not have the local node".to_string())
+                })?;
 
-                        let peer_ref = self
-                            .peer_connector
-                            .add_peer_ref(peer_token.clone(), node.endpoints().to_vec());
-                        if let Ok(peer_ref) = peer_ref {
-                            peer_refs.push(peer_ref);
-                        } else {
-                            info!("Unable to peer with {} at this time", member.node_id());
-                        }
+            let members = circuit.list_nodes().map_err(|err| {
+                ServiceStartError::Internal(format!(
+                    "Unable to get peer tokens for members: {}",
+                    err
+                ))
+            })?;
+
+            // restart all peer in the circuit
+            for member in members {
+                if member.node_id != self.node_id {
+                    let peer_ref = self.peer_connector.add_peer_ref(
+                        member.token.clone(),
+                        member.endpoints.to_vec(),
+                        #[cfg(feature = "challenge-authorization")]
+                        local_required_auth.clone(),
+                    );
+                    if let Ok(peer_ref) = peer_ref {
+                        peer_refs.push(peer_ref);
                     } else {
-                        error!("Missing node information for {}", member.node_id());
+                        info!("Unable to peer with {} at this time", member.node_id);
                     }
+
+                    token_to_peer.insert(
+                        member.token.clone(),
+                        PeerNodePair {
+                            peer_node: member.clone(),
+                            local_peer_token: local_required_auth.clone(),
+                        },
+                    );
                 }
             }
 
@@ -445,39 +438,46 @@ impl AdminService {
             })?;
 
         for proposal in proposals {
-            // connect to all peers in the circuit proposal
-            for member in proposal.circuit().members().iter() {
-                if member.node_id() != self.node_id {
-                    // Need to manually get peer token here because we also need the endpoints
-                    // for requesting the peer ref
-                    let peer_token = match proposal.circuit().authorization_type() {
-                        AuthorizationType::Trust => {
-                            PeerAuthorizationToken::from_peer_id(member.node_id())
-                        }
-                        #[cfg(feature = "challenge-authorization")]
-                        AuthorizationType::Challenge => {
-                            if let Some(public_key) = member.public_key() {
-                                PeerAuthorizationToken::from_public_key(public_key)
-                            } else {
-                                error!(
-                                    "No public key set when circuit requries challenge \
-                                    authorization: {}",
-                                    proposal.circuit().circuit_id()
-                                );
-                                continue;
-                            }
-                        }
-                    };
+            let local_required_auth = proposal
+                .circuit()
+                .get_node_token(&self.node_id)
+                .map_err(|err| {
+                    ServiceStartError::Internal(format!("Unable to get local nodes token: {}", err))
+                })?
+                .ok_or_else(|| {
+                    ServiceStartError::Internal("Circuit does not have the local node".to_string())
+                })?;
 
-                    let peer_ref = self
-                        .peer_connector
-                        .add_peer_ref(peer_token, member.endpoints().to_vec());
+            let members = proposal.circuit().list_nodes().map_err(|err| {
+                ServiceStartError::Internal(format!(
+                    "Unable to get peer tokens for members: {}",
+                    err
+                ))
+            })?;
+
+            // connect to all peers in the circuit proposal
+            for member in members.iter() {
+                if member.node_id != self.node_id {
+                    let peer_ref = self.peer_connector.add_peer_ref(
+                        member.token.clone(),
+                        member.endpoints.to_vec(),
+                        #[cfg(feature = "challenge-authorization")]
+                        local_required_auth.clone(),
+                    );
 
                     if let Ok(peer_ref) = peer_ref {
                         peer_refs.push(peer_ref);
                     } else {
-                        info!("Unable to peer with {} at this time", member.node_id());
+                        info!("Unable to peer with {} at this time", member.node_id);
                     }
+
+                    token_to_peer.insert(
+                        member.token.clone(),
+                        PeerNodePair {
+                            peer_node: member.clone(),
+                            local_peer_token: local_required_auth.clone(),
+                        },
+                    );
                 }
             }
         }
@@ -488,6 +488,14 @@ impl AdminService {
                 ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
             })?
             .add_peer_refs(peer_refs);
+
+        self.admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .set_token_to_peer(token_to_peer);
+
         Ok(())
     }
 }
@@ -994,6 +1002,8 @@ mod tests {
             "test-node".into(),
             #[cfg(feature = "challenge-authorization")]
             vec![],
+            #[cfg(feature = "challenge-authorization")]
+            Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
         )
         .expect("Unable to create authorization pool");
         let mut authorizers = Authorizers::new();

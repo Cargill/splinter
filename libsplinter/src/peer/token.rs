@@ -127,6 +127,20 @@ impl From<ConnectionAuthorizationType> for PeerAuthorizationToken {
     }
 }
 
+impl From<PeerAuthorizationToken> for ConnectionAuthorizationType {
+    fn from(peer_token: PeerAuthorizationToken) -> Self {
+        match peer_token {
+            PeerAuthorizationToken::Trust { peer_id } => {
+                ConnectionAuthorizationType::Trust { identity: peer_id }
+            }
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::Challenge { public_key } => {
+                ConnectionAuthorizationType::Challenge { public_key }
+            }
+        }
+    }
+}
+
 impl Ord for PeerAuthorizationToken {
     fn cmp(&self, other: &Self) -> Ordering {
         self.id_as_string().cmp(&other.id_as_string())

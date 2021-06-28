@@ -50,6 +50,9 @@ pub struct PeerMetadata {
     pub last_connection_attempt: Instant,
     /// How long to wait before trying to reconnect to a peer
     pub retry_frequency: u64,
+    /// The required way the local node must be identified, this is required on retry
+    #[cfg(feature = "challenge-authorization")]
+    pub required_local_auth: Option<PeerAuthorizationToken>,
 }
 
 /// A map of peer IDs to peer metadata, which also maintains a redirect table for updated peer IDs.
@@ -113,6 +116,9 @@ impl PeerMap {
         endpoints: Vec<String>,
         active_endpoint: String,
         status: PeerStatus,
+        #[cfg(feature = "challenge-authorization")] required_local_auth: Option<
+            PeerAuthorizationToken,
+        >,
     ) {
         let peer_metadata = PeerMetadata {
             id: peer_id.clone(),
@@ -122,6 +128,8 @@ impl PeerMap {
             connection_id,
             last_connection_attempt: Instant::now(),
             retry_frequency: self.initial_retry_frequency,
+            #[cfg(feature = "challenge-authorization")]
+            required_local_auth,
         };
 
         self.peers.insert(peer_id.clone(), peer_metadata);
@@ -234,6 +242,8 @@ pub mod tests {
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
             PeerStatus::Connected,
+            #[cfg(feature = "challenge-authorization")]
+            None,
         );
 
         peer_map.insert(
@@ -244,6 +254,8 @@ pub mod tests {
             vec!["endpoint1".to_string(), "endpoint2".to_string()],
             "next_endpoint1".to_string(),
             PeerStatus::Connected,
+            #[cfg(feature = "challenge-authorization")]
+            None,
         );
 
         let mut peers = peer_map.peer_ids();
@@ -279,6 +291,8 @@ pub mod tests {
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
             PeerStatus::Connected,
+            #[cfg(feature = "challenge-authorization")]
+            None,
         );
 
         peer_map.insert(
@@ -289,6 +303,8 @@ pub mod tests {
             vec!["endpoint1".to_string(), "endpoint2".to_string()],
             "next_endpoint1".to_string(),
             PeerStatus::Connected,
+            #[cfg(feature = "challenge-authorization")]
+            None,
         );
 
         let peers = peer_map.connection_ids();
@@ -327,6 +343,8 @@ pub mod tests {
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
             PeerStatus::Pending,
+            #[cfg(feature = "challenge-authorization")]
+            None,
         );
 
         let peer_metadata = peer_map
@@ -368,6 +386,8 @@ pub mod tests {
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
             PeerStatus::Pending,
+            #[cfg(feature = "challenge-authorization")]
+            None,
         );
         assert!(peer_map.peers.contains_key(&PeerAuthorizationToken::Trust {
             peer_id: "test_peer".to_string(),
@@ -415,6 +435,8 @@ pub mod tests {
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
             PeerStatus::Pending,
+            #[cfg(feature = "challenge-authorization")]
+            None,
         );
         assert!(peer_map.peers.contains_key(&PeerAuthorizationToken::Trust {
             peer_id: "test_peer".to_string()
@@ -459,6 +481,8 @@ pub mod tests {
             status: PeerStatus::Connected,
             last_connection_attempt: Instant::now(),
             retry_frequency: 10,
+            #[cfg(feature = "challenge-authorization")]
+            required_local_auth: None,
         };
 
         if let Ok(()) = peer_map.update_peer(no_peer_metadata) {
@@ -473,6 +497,8 @@ pub mod tests {
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
             PeerStatus::Connected,
+            #[cfg(feature = "challenge-authorization")]
+            None,
         );
         assert!(peer_map.peers.contains_key(&PeerAuthorizationToken::Trust {
             peer_id: "test_peer".to_string(),

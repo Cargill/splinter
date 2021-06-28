@@ -299,6 +299,7 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
+    use cylinder::{PublicKey, Signature, VerificationError, Verifier};
     use protobuf::Message;
 
     use crate::network::auth::create_authorization_dispatcher;
@@ -323,7 +324,16 @@ mod tests {
             vec![],
             auth_mgr,
             dispatch_sender,
-        );
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+            #[cfg(feature = "challenge-authorization")]
+            None,
+            #[cfg(feature = "challenge-authorization")]
+            None,
+            #[cfg(feature = "challenge-authorization")]
+            Box::new(NoopVerifier),
+        )
+        .expect("Unable to build create_authorization_dispatcher");
 
         let connection_id = "test_connection".to_string();
         let mut msg = authorization::ConnectRequest::new();
@@ -387,7 +397,16 @@ mod tests {
             vec![],
             auth_mgr,
             dispatch_sender,
-        );
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+            #[cfg(feature = "challenge-authorization")]
+            None,
+            #[cfg(feature = "challenge-authorization")]
+            None,
+            #[cfg(feature = "challenge-authorization")]
+            Box::new(NoopVerifier),
+        )
+        .expect("Unable to build create_authorization_dispatcher");
         let connection_id = "test_connection".to_string();
         let mut msg = authorization::ConnectResponse::new();
         msg.set_accepted_authorization_types(
@@ -436,7 +455,16 @@ mod tests {
             vec![],
             auth_mgr,
             dispatch_sender,
-        );
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+            #[cfg(feature = "challenge-authorization")]
+            None,
+            #[cfg(feature = "challenge-authorization")]
+            None,
+            #[cfg(feature = "challenge-authorization")]
+            Box::new(NoopVerifier),
+        )
+        .expect("Unable to build create_authorization_dispatcher");
         let connection_id = "test_connection".to_string();
         // Begin the connection process, otherwise, the response will fail
         let mut msg = authorization::ConnectRequest::new();
@@ -537,6 +565,23 @@ mod tests {
                 .push_back((id, message));
 
             Ok(())
+        }
+    }
+
+    struct NoopVerifier;
+
+    impl Verifier for NoopVerifier {
+        fn algorithm_name(&self) -> &str {
+            unimplemented!()
+        }
+
+        fn verify(
+            &self,
+            _message: &[u8],
+            _signature: &Signature,
+            _public_key: &PublicKey,
+        ) -> Result<bool, VerificationError> {
+            unimplemented!()
         }
     }
 }
