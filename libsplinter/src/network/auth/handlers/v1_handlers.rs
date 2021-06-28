@@ -30,7 +30,7 @@ use crate::protos::prelude::*;
 use crate::network::auth::{
     state_machine::trust_v1::{TrustAuthorizationAction, TrustAuthorizationState},
     AuthorizationAction, AuthorizationManagerStateMachine, AuthorizationMessage,
-    AuthorizationState,
+    AuthorizationState, Identity,
 };
 
 /// Handler for the Authorization Protocol Request Message Type
@@ -286,7 +286,9 @@ impl Handler for AuthTrustRequestHandler {
         match self.auth_manager.next_remote_state(
             context.source_connection_id(),
             AuthorizationAction::Trust(TrustAuthorizationAction::TrustIdentifying(
-                trust_request.identity,
+                Identity::Trust {
+                    identity: trust_request.identity.to_string(),
+                },
             )),
         ) {
             Err(err) => {
@@ -297,11 +299,11 @@ impl Handler for AuthTrustRequestHandler {
                 );
                 return Ok(());
             }
-            Ok(AuthorizationState::Trust(TrustAuthorizationState::Identified(identity))) => {
+            Ok(AuthorizationState::Trust(TrustAuthorizationState::Identified(_))) => {
                 debug!(
                     "Sending trust response to connection {} after receiving identity {}",
                     context.source_connection_id(),
-                    identity,
+                    trust_request.identity,
                 );
                 let auth_msg = AuthorizationMessage::AuthTrustResponse(AuthTrustResponse);
                 let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
@@ -377,7 +379,9 @@ impl Handler for AuthTrustResponseHandler {
         match self.auth_manager.next_state(
             context.source_connection_id(),
             AuthorizationAction::Trust(TrustAuthorizationAction::TrustIdentifying(
-                self.identity.clone(),
+                Identity::Trust {
+                    identity: self.identity.to_string(),
+                },
             )),
         ) {
             Err(err) => {

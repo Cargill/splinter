@@ -21,8 +21,8 @@ use super::{AuthorizationAction, AuthorizationActionError, AuthorizationState, I
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum TrustAuthorizationState {
     TrustConnecting,
-    Identified(String),
-    Authorized(String),
+    Identified(Identity),
+    Authorized(Identity),
 }
 
 impl fmt::Display for TrustAuthorizationState {
@@ -83,11 +83,12 @@ impl TrustAuthorizationState {
                                 local_id,
                             )) => {
                                 cur_state.remote_state =
-                                    AuthorizationState::AuthComplete(Some(local_id.to_string()));
-                                AuthorizationState::AuthComplete(Some(identity.to_string()))
+                                    AuthorizationState::AuthComplete(Some(local_id.clone()));
+
+                                AuthorizationState::AuthComplete(Some(identity.clone()))
                             }
                             _ => AuthorizationState::Trust(TrustAuthorizationState::Authorized(
-                                identity.to_string(),
+                                identity.clone(),
                             )),
                         }
                     };
@@ -138,11 +139,11 @@ impl TrustAuthorizationState {
                                 local_id,
                             )) => {
                                 cur_state.local_state =
-                                    AuthorizationState::AuthComplete(Some(local_id.to_string()));
-                                AuthorizationState::AuthComplete(Some(identity.to_string()))
+                                    AuthorizationState::AuthComplete(Some(local_id.clone()));
+                                AuthorizationState::AuthComplete(Some(identity.clone()))
                             }
                             _ => AuthorizationState::Trust(TrustAuthorizationState::Authorized(
-                                identity.to_string(),
+                                identity.clone(),
                             )),
                         }
                     };

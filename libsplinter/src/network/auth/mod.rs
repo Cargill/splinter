@@ -41,7 +41,7 @@ use self::handlers::create_authorization_dispatcher;
 use self::pool::{ThreadPool, ThreadPoolBuilder};
 pub(crate) use self::state_machine::{
     AuthorizationAction, AuthorizationActionError, AuthorizationManagerStateMachine,
-    AuthorizationState,
+    AuthorizationState, Identity,
 };
 
 const AUTHORIZATION_THREAD_POOL_SIZE: usize = 8;
@@ -272,11 +272,13 @@ impl AuthorizationConnector {
                 }
             };
 
-            let auth_state = if let Some(identity) = authed_identity {
-                ConnectionAuthorizationState::Authorized {
-                    connection_id,
-                    connection,
-                    identity,
+            let auth_state = if let Some(auth_identity) = authed_identity {
+                match auth_identity {
+                    Identity::Trust { identity } => ConnectionAuthorizationState::Authorized {
+                        connection_id,
+                        connection,
+                        identity: ConnectionAuthorizationType::Trust { identity },
+                    },
                 }
             } else {
                 ConnectionAuthorizationState::Unauthorized {
@@ -338,7 +340,7 @@ impl ManagedAuthorizations {
         }
     }
 
-    fn take_connection_identity(&mut self, connection_id: &str) -> Option<String> {
+    fn take_connection_identity(&mut self, connection_id: &str) -> Option<Identity> {
         self.states.remove(connection_id).and_then(|managed_state| {
             match managed_state.remote_state {
                 AuthorizationState::AuthComplete(Some(identity)) => Some(identity),
@@ -381,7 +383,7 @@ pub enum ConnectionAuthorizationType {
 pub enum ConnectionAuthorizationState {
     Authorized {
         connection_id: String,
-        identity: String,
+        identity: ConnectionAuthorizationType,
         connection: Box<dyn Connection>,
     },
     Unauthorized {

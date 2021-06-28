@@ -20,7 +20,7 @@ use super::{AuthorizationAction, AuthorizationActionError, AuthorizationState, I
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum TrustV0AuthorizationState {
     Connecting,
-    RemoteIdentified(String),
+    RemoteIdentified(Identity),
     RemoteAccepted,
 }
 

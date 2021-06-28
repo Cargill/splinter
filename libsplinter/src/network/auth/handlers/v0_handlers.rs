@@ -27,7 +27,7 @@ use crate::protos::prelude::*;
 use crate::network::auth::{
     state_machine::trust_v0::{TrustV0AuthorizationAction, TrustV0AuthorizationState},
     AuthorizationAction, AuthorizationActionError, AuthorizationManagerStateMachine,
-    AuthorizationState,
+    AuthorizationState, Identity,
 };
 
 pub struct AuthorizedHandler {
@@ -255,7 +255,9 @@ impl Handler for TrustRequestHandler {
         match self.auth_manager.next_state(
             context.source_connection_id(),
             AuthorizationAction::TrustV0(TrustV0AuthorizationAction::TrustIdentifyingV0(
-                trust_request.identity,
+                Identity::Trust {
+                    identity: trust_request.identity,
+                },
             )),
         ) {
             Err(err) => {
@@ -266,13 +268,13 @@ impl Handler for TrustRequestHandler {
                 );
             }
             Ok(AuthorizationState::TrustV0(TrustV0AuthorizationState::RemoteIdentified(
-                identity,
+                Identity::Trust { identity },
             )))
-            | Ok(AuthorizationState::AuthComplete(Some(identity))) => {
+            | Ok(AuthorizationState::AuthComplete(Some(Identity::Trust { identity }))) => {
                 debug!(
                     "Sending Authorized message to connection {} after receiving identity {}",
                     context.source_connection_id(),
-                    identity,
+                    identity
                 );
                 let auth_msg = AuthorizationMessage::Authorized(Authorized);
                 let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
