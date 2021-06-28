@@ -78,6 +78,7 @@ features = [
 default = [
     "biome-credentials",
     "biome-key-management",
+    "biome-profile",
     "database-postgres",
     "database-sqlite",
     "oauth",
@@ -96,7 +97,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization-handler-maintenance",
-    "biome-profile",
     "challenge-authorization",
     "deprecate-yaml",
     "health-service",
