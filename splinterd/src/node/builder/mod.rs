@@ -186,6 +186,7 @@ impl NodeBuilder {
             .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>().to_string()));
 
         let context = Secp256k1Context::new();
+
         let admin_signer = self.admin_signer.take().unwrap_or_else(|| {
             let pk = context.new_random_private_key();
             context.new_signer(pk)
@@ -198,12 +199,17 @@ impl NodeBuilder {
             .network_subsystem_builder
             .with_node_id(node_id.clone())
             .with_signing_context(signing_context.clone())
+            .with_signers(vec![admin_signer.clone()])
             .build()?;
 
         let admin_subsystem_builder = self
             .admin_subsystem_builder
             .with_node_id(node_id.clone())
-            .with_signing_context(signing_context.clone());
+            .with_signing_context(signing_context.clone())
+            .with_public_keys(vec![admin_signer
+                .public_key()
+                .map_err(|err| InternalError::from_source(Box::new(err)))?
+                .into_bytes()]);
 
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => RunnableNodeRestApiVariant::ActixWeb1(

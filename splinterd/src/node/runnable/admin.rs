@@ -49,6 +49,7 @@ pub struct RunnableAdminSubsystem {
     pub scabbard_service_factory: Option<ScabbardFactory>,
     pub registries: Option<Vec<String>>,
     pub admin_service_event_client_variant: AdminServiceEventClientVariant,
+    pub public_keys: Vec<Vec<u8>>,
 }
 
 impl RunnableAdminSubsystem {
@@ -136,7 +137,8 @@ impl RunnableAdminSubsystem {
             ))
             .with_coordinator_timeout(admin_timeout)
             .with_routing_table_writer(routing_writer)
-            .with_admin_event_store(store_factory.get_admin_service_store());
+            .with_admin_event_store(store_factory.get_admin_service_store())
+            .with_public_keys(self.public_keys.to_vec());
 
         let circuit_resource_provider =
             CircuitResourceProvider::new(node_id, store_factory.get_admin_service_store());

@@ -32,6 +32,7 @@ pub struct NetworkSubsystemBuilder {
     strict_ref_counts: bool,
     network_endpoints: Option<Vec<String>>,
     signing_context: Option<Arc<Mutex<Box<dyn cylinder::VerifierFactory>>>>,
+    signers: Option<Vec<Box<dyn cylinder::Signer>>>,
 }
 
 impl NetworkSubsystemBuilder {
@@ -73,6 +74,12 @@ impl NetworkSubsystemBuilder {
         self
     }
 
+    /// Specifies the signers for the node to use in challenge_authorization
+    pub fn with_signers(mut self, signers: Vec<Box<dyn cylinder::Signer>>) -> Self {
+        self.signers = Some(signers);
+        self
+    }
+
     pub fn build(mut self) -> Result<RunnableNetworkSubsystem, InternalError> {
         let node_id = self.node_id.take().ok_or_else(|| {
             InternalError::with_message(
@@ -85,6 +92,8 @@ impl NetworkSubsystemBuilder {
                 "Cannot build NetworkSubsystem without a signing context".to_string(),
             )
         })?;
+
+        let signers = self.signers.unwrap_or_default();
 
         // keep as option, if not provided will be set to tcp://127.0.0.1:0
         let network_endpoints = self.network_endpoints;
@@ -103,6 +112,7 @@ impl NetworkSubsystemBuilder {
             strict_ref_counts: self.strict_ref_counts,
             network_endpoints,
             signing_context,
+            signers,
         })
     }
 }

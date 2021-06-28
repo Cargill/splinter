@@ -47,6 +47,7 @@ pub struct AdminSubsystemBuilder {
     scabbard_config: Option<ScabbardConfig>,
     registries: Option<Vec<String>>,
     admin_service_event_client_variant: AdminServiceEventClientVariant,
+    public_keys: Option<Vec<Vec<u8>>>,
 }
 
 impl AdminSubsystemBuilder {
@@ -62,6 +63,7 @@ impl AdminSubsystemBuilder {
             scabbard_config: None,
             registries: None,
             admin_service_event_client_variant: AdminServiceEventClientVariant::ActixWebClient,
+            public_keys: None,
         }
     }
 
@@ -131,6 +133,12 @@ impl AdminSubsystemBuilder {
         self
     }
 
+    /// Specifies the public keys set in the admin service
+    pub fn with_public_keys(mut self, public_keys: Vec<Vec<u8>>) -> Self {
+        self.public_keys = Some(public_keys);
+        self
+    }
+
     pub fn build(mut self) -> Result<RunnableAdminSubsystem, InternalError> {
         let node_id = self.node_id.take().ok_or_else(|| {
             InternalError::with_message("Cannot build AdminSubsystem without a node id".to_string())
@@ -176,6 +184,8 @@ impl AdminSubsystemBuilder {
             })?
             .new_verifier();
 
+        let public_keys = self.public_keys.unwrap_or_default();
+
         let scabbard_service_factory = self
             .scabbard_config
             .map(|config| {
@@ -204,6 +214,7 @@ impl AdminSubsystemBuilder {
             scabbard_service_factory,
             registries,
             admin_service_event_client_variant,
+            public_keys,
         })
     }
 }

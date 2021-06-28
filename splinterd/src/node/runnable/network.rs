@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use cylinder::VerifierFactory;
+use cylinder::{Signer, VerifierFactory};
 use splinter::admin::service::admin_service_id;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
@@ -50,6 +50,7 @@ pub struct RunnableNetworkSubsystem {
     pub strict_ref_counts: bool,
     pub network_endpoints: Option<Vec<String>>,
     pub signing_context: Arc<Mutex<Box<dyn VerifierFactory>>>,
+    pub signers: Vec<Box<dyn cylinder::Signer>>,
 }
 
 impl RunnableNetworkSubsystem {
@@ -91,6 +92,8 @@ impl RunnableNetworkSubsystem {
             Box::new(transport),
             &mesh,
             heartbeat_interval,
+            self.signing_context.clone(),
+            self.signers.clone(),
         )?;
         let connection_connector = connection_manager.connector();
 
@@ -114,12 +117,24 @@ impl RunnableNetworkSubsystem {
         let routing_writer: Box<dyn RoutingTableWriter> = Box::new(routing_table.clone());
         let routing_reader: Box<dyn RoutingTableReader> = Box::new(routing_table.clone());
 
+        let public_keys = self
+            .signers
+            .iter()
+            .map(|signer| {
+                Ok(signer
+                    .public_key()
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?
+                    .as_hex())
+            })
+            .collect::<Result<Vec<String>, InternalError>>()?;
+
         // Set up the Circuit dispatcher
         let circuit_dispatcher = Self::set_up_circuit_dispatcher(
             network_sender.clone(),
             &node_id,
             routing_reader,
             routing_writer,
+            public_keys,
         );
         let circuit_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(circuit_dispatcher)
@@ -197,6 +212,8 @@ impl RunnableNetworkSubsystem {
         transport: Box<dyn Transport + Send>,
         mesh: &Mesh,
         heartbeat_interval: Duration,
+        signing_context: Arc<Mutex<Box<dyn VerifierFactory>>>,
+        signers: Vec<Box<dyn Signer>>,
     ) -> Result<ConnectionManager, InternalError> {
         let inproc_ids = vec![
             (
@@ -212,12 +229,9 @@ impl RunnableNetworkSubsystem {
         // Set up Authorization
         let inproc_authorizer = InprocAuthorizer::new(inproc_ids);
 
-        let authorization_manager = AuthorizationManager::new(
-            node_id.to_string(),
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-        )
-        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let authorization_manager =
+            AuthorizationManager::new(node_id.to_string(), signers, signing_context)
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         let mut authorizers = Authorizers::new();
         authorizers.add_authorizer("inproc", inproc_authorizer);
@@ -251,6 +265,7 @@ impl RunnableNetworkSubsystem {
         node_id: &str,
         routing_reader: Box<dyn RoutingTableReader>,
         routing_writer: Box<dyn RoutingTableWriter>,
+        public_keys: Vec<String>,
     ) -> Dispatcher<CircuitMessageType> {
         let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(network_sender));
 
@@ -274,12 +289,8 @@ impl RunnableNetworkSubsystem {
         dispatcher.set_handler(Box::new(circuit_error_handler));
 
         // Circuit Admin handlers
-        let admin_direct_message_handler = AdminDirectMessageHandler::new(
-            node_id.to_string(),
-            routing_reader,
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-        );
+        let admin_direct_message_handler =
+            AdminDirectMessageHandler::new(node_id.to_string(), routing_reader, public_keys);
         dispatcher.set_handler(Box::new(admin_direct_message_handler));
 
         dispatcher
