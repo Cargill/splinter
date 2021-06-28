@@ -48,7 +48,36 @@ pub fn test_2_party_circuit_creation() {
 
     let circuit_id = "ABCDE-01234";
 
-    commit_2_party_circuit(circuit_id, node_a, node_b);
+    commit_2_party_circuit(circuit_id, node_a, node_b, AuthorizationType::Trust);
+
+    shutdown!(network).expect("Unable to shutdown network");
+}
+
+/// Test that a 2-party circuit may be created on a 2-node network using challenge authorization.
+///
+/// 1. Create and submit a `CircuitCreateRequest` from the first node
+/// 2. Wait until the proposal is available to the second node, using `list_proposals`
+/// 3. Verify the same proposal is available on each node
+/// 4. Submit the same `CircuitCreateRequest` created in the first step from the second node
+/// 5. Validate the duplicate proposal submitted in the previous step results in an error
+/// 6. Create and submit a `CircuitProposalVote` from the second node to accept the proposal
+/// 7. Wait until the circuit is available on the first node, using `list_circuits`
+/// 8. Verify the same circuit is available to each node
+#[test]
+pub fn test_2_party_circuit_creation_challenge_authorization() {
+    // Start a 2-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .add_nodes_with_defaults(2)
+        .expect("Unable to start 2-node ActixWeb1 network");
+    // Get the first node in the network
+    let node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node in the network
+    let node_b = network.node(1).expect("Unable to get second node");
+
+    let circuit_id = "ABCDE-01234";
+
+    commit_2_party_circuit(circuit_id, node_a, node_b, AuthorizationType::Challenge);
 
     shutdown!(network).expect("Unable to shutdown network");
 }
