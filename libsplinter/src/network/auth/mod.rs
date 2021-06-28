@@ -300,6 +300,14 @@ impl AuthorizationConnector {
                         connection,
                         identity: ConnectionAuthorizationType::Trust { identity },
                     },
+                    #[cfg(feature = "challenge-authorization")]
+                    Identity::Challenge { public_key } => {
+                        ConnectionAuthorizationState::Authorized {
+                            connection_id: connection_id.clone(),
+                            connection,
+                            identity: ConnectionAuthorizationType::Challenge { public_key },
+                        }
+                    }
                 }
             } else {
                 ConnectionAuthorizationState::Unauthorized {

@@ -29,7 +29,13 @@ use super::{ManagedAuthorizationState, ManagedAuthorizations};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Identity {
-    Trust { identity: String },
+    Trust {
+        identity: String,
+    },
+    #[cfg(feature = "challenge-authorization")]
+    Challenge {
+        public_key: Vec<u8>,
+    },
 }
 
 #[derive(PartialEq, Debug, Clone)]
