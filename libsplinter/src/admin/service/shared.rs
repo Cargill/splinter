@@ -7272,6 +7272,20 @@ mod tests {
         fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
             Box::new(self.clone())
         }
+
+        #[cfg(feature = "challenge-authorization")]
+        fn send_with_sender(
+            &mut self,
+            recipient: &str,
+            message: &[u8],
+            _sender: &str,
+        ) -> Result<(), ServiceSendError> {
+            self.sent
+                .lock()
+                .expect("sent lock poisoned")
+                .push((recipient.to_string(), message.to_vec()));
+            Ok(())
+        }
     }
 
     struct MockAdminKeyVerifier(bool);

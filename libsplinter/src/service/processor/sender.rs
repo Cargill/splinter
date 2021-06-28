@@ -144,6 +144,34 @@ impl ServiceNetworkSender for AdminServiceNetworkSender {
     fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
         Box::new(self.clone())
     }
+
+    /// Send the message bytes to the given recipient (another service) with a configurable
+    /// message sender
+    #[cfg(feature = "challenge-authorization")]
+    fn send_with_sender(
+        &mut self,
+        recipient: &str,
+        message: &[u8],
+        sender: &str,
+    ) -> Result<(), ServiceSendError> {
+        let mut admin_direct_message = AdminDirectMessage::new();
+        admin_direct_message.set_circuit("admin".into());
+        admin_direct_message.set_sender(sender.to_string());
+        admin_direct_message.set_recipient(recipient.into());
+        admin_direct_message.set_payload(message.to_vec());
+
+        let bytes = admin_direct_message
+            .write_to_bytes()
+            .map_err(|err| ServiceSendError(Box::new(err)))?;
+
+        let msg = create_message(bytes, CircuitMessageType::ADMIN_DIRECT_MESSAGE)
+            .map_err(|err| ServiceSendError(Box::new(err)))?;
+
+        self.outgoing_sender
+            .send(msg)
+            .map_err(|err| ServiceSendError(Box::new(err)))?;
+        Ok(())
+    }
 }
 
 /// This implementation of ServiceNetworkSender can be used by any service that does not require
@@ -256,6 +284,34 @@ impl ServiceNetworkSender for StandardServiceNetworkSender {
 
     fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
         Box::new(self.clone())
+    }
+
+    /// Send the message bytes to the given recipient (another service) with a configurable
+    /// message sender
+    #[cfg(feature = "challenge-authorization")]
+    fn send_with_sender(
+        &mut self,
+        recipient: &str,
+        message: &[u8],
+        sender: &str,
+    ) -> Result<(), ServiceSendError> {
+        let mut direct_message = CircuitDirectMessage::new();
+        direct_message.set_circuit(self.circuit.to_string());
+        direct_message.set_sender(sender.to_string());
+        direct_message.set_recipient(recipient.to_string());
+        direct_message.set_payload(message.to_vec());
+
+        let bytes = direct_message
+            .write_to_bytes()
+            .map_err(|err| ServiceSendError(Box::new(err)))?;
+
+        let message = create_message(bytes, CircuitMessageType::CIRCUIT_DIRECT_MESSAGE)
+            .map_err(|err| ServiceSendError(Box::new(err)))?;
+
+        self.outgoing_sender
+            .send(message)
+            .map_err(|err| ServiceSendError(Box::new(err)))?;
+        Ok(())
     }
 }
 

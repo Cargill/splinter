@@ -730,6 +730,16 @@ pub mod tests {
         fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
             Box::new(self.clone())
         }
+
+        #[cfg(feature = "challenge-authorization")]
+        fn send_with_sender(
+            &mut self,
+            _recipient: &str,
+            _message: &[u8],
+            _sender: &str,
+        ) -> Result<(), ServiceSendError> {
+            Ok(())
+        }
     }
 
     /// Verifies that the given service connects on start and disconnects on stop.
