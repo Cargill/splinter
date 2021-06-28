@@ -197,10 +197,6 @@ impl ConfigBuilder {
         // for the specific field. If no value is found, an error is returned.
         Ok(Config {
             config_dir,
-            storage: self
-                .partial_configs
-                .iter()
-                .find_map(|p| p.storage().map(|v| (v, p.source()))),
             tls_cert_dir,
             tls_ca_file,
             tls_client_cert,
@@ -365,7 +361,6 @@ mod tests {
     use super::*;
 
     /// Example configuration values.
-    static EXAMPLE_STORAGE: &str = "yaml";
     static EXAMPLE_CA_CERTS: &str = "/etc/splinter/certs/ca.pem";
     static EXAMPLE_CLIENT_CERT: &str = "/etc/splinter/certs/client.crt";
     static EXAMPLE_CLIENT_KEY: &str = "/etc/splinter/certs/client.key";
@@ -384,7 +379,6 @@ mod tests {
 
     /// Asserts the example configuration values.
     fn assert_config_values(config: PartialConfig) {
-        assert_eq!(config.storage(), Some(EXAMPLE_STORAGE.to_string()));
         assert_eq!(config.tls_cert_dir(), None);
         assert_eq!(config.tls_ca_file(), Some(EXAMPLE_CA_CERTS.to_string()));
         assert_eq!(
@@ -454,7 +448,6 @@ mod tests {
         let mut partial_config = PartialConfig::new(ConfigSource::Default);
         // Populate the `PartialConfig` fields by chaining the builder methods.
         partial_config = partial_config
-            .with_storage(Some(EXAMPLE_STORAGE.to_string()))
             .with_tls_cert_dir(None)
             .with_tls_ca_file(Some(EXAMPLE_CA_CERTS.to_string()))
             .with_tls_client_cert(Some(EXAMPLE_CLIENT_CERT.to_string()))
@@ -501,7 +494,6 @@ mod tests {
         // Create a new `PartialConfig` object.
         let mut partial_config = PartialConfig::new(ConfigSource::Default);
         // Populate the `PartialConfig` fields by separately applying the builder methods.
-        partial_config = partial_config.with_storage(Some(EXAMPLE_STORAGE.to_string()));
         partial_config = partial_config.with_tls_ca_file(Some(EXAMPLE_CA_CERTS.to_string()));
         partial_config = partial_config.with_tls_client_cert(Some(EXAMPLE_CLIENT_CERT.to_string()));
         partial_config = partial_config.with_tls_client_key(Some(EXAMPLE_CLIENT_KEY.to_string()));

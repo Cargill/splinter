@@ -41,7 +41,6 @@ pub use partial::{ConfigSource, PartialConfig};
 #[derive(Debug)]
 pub struct Config {
     config_dir: (String, ConfigSource),
-    storage: Option<(String, ConfigSource)>,
     tls_cert_dir: (String, ConfigSource),
     tls_ca_file: (String, ConfigSource),
     tls_client_cert: (String, ConfigSource),
@@ -101,14 +100,6 @@ pub struct Config {
 impl Config {
     pub fn config_dir(&self) -> &str {
         &self.config_dir.0
-    }
-
-    pub fn storage(&self) -> Option<&str> {
-        if let Some((storage, _)) = &self.storage {
-            Some(storage)
-        } else {
-            None
-        }
     }
 
     pub fn tls_cert_dir(&self) -> &str {
@@ -337,14 +328,6 @@ impl Config {
 
     pub fn config_dir_source(&self) -> &ConfigSource {
         &self.config_dir.1
-    }
-
-    fn storage_source(&self) -> Option<&ConfigSource> {
-        if let Some((_, source)) = &self.storage {
-            Some(source)
-        } else {
-            None
-        }
     }
 
     fn tls_cert_dir_source(&self) -> &ConfigSource {
@@ -579,9 +562,6 @@ impl Config {
             self.config_dir(),
             self.config_dir_source()
         );
-        if let (Some(id), Some(source)) = (self.storage(), self.storage_source()) {
-            debug!("Config: storage: {} (source: {:?})", id, source,);
-        }
         debug!(
             "Config: tls_ca_file: {} (source: {:?})",
             self.tls_ca_file(),
@@ -830,7 +810,6 @@ mod tests {
     static EXAMPLE_TLS_CERT_DIR: &str = "test/certs/";
 
     /// Values present in the example config TEST_TOML file.
-    static EXAMPLE_STORAGE: &str = "memory";
     static EXAMPLE_CA_CERTS: &str = "ca.pem";
     static EXAMPLE_CLIENT_CERT: &str = "client.crt";
     static EXAMPLE_CLIENT_KEY: &str = "private/client.key";
@@ -852,7 +831,6 @@ mod tests {
     /// Converts a list of tuples to a toml `Table` `Value` used to write a toml file.
     pub fn get_toml_value() -> Value {
         let values = vec![
-            ("storage".to_string(), EXAMPLE_STORAGE.to_string()),
             ("tls_ca_file".to_string(), EXAMPLE_CA_CERTS.to_string()),
             (
                 "tls_client_cert".to_string(),
@@ -889,7 +867,6 @@ mod tests {
         (@arg config: -c --config +takes_value)
         (@arg node_id: --("node-id") +takes_value)
         (@arg display_name: --("display-name") +takes_value)
-        (@arg storage: --("storage") +takes_value)
         (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
         (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
         (@arg service_endpoint: --("service-endpoint") +takes_value)
@@ -990,8 +967,6 @@ mod tests {
             EXAMPLE_NODE_ID,
             "--display-name",
             EXAMPLE_DISPLAY_NAME,
-            "--storage",
-            EXAMPLE_STORAGE,
             "--network-endpoint",
             EXAMPLE_NETWORK_ENDPOINT,
             "--advertised-endpoint",
@@ -1101,20 +1076,6 @@ mod tests {
             .with_partial_config(default_config)
             .build()
             .expect("Unable to build final Config.");
-
-        // Assert the final configuration values.
-        // Both the `DefaultPartialConfigBuilder` and `TomlPartialConfigBuilder` had values for
-        // `storage`, but the `TomlPartialConfigBuilder` value should have precedence (source should
-        // be `Toml`).
-        assert_eq!(
-            (final_config.storage(), final_config.storage_source()),
-            (
-                Some(EXAMPLE_STORAGE),
-                Some(&ConfigSource::Toml {
-                    file: TEST_TOML.to_string()
-                })
-            )
-        );
 
         // Both the `DefaultPartialConfigBuilder` and `ClapPartialConfigBuilder` had values for
         // `no-tls`, but the `ClapPartialConfigBuilder` value should have precedence (source
