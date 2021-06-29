@@ -19,11 +19,11 @@ use std::fmt;
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc::channel, Arc};
+use std::sync::{mpsc::channel, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use cylinder::{secp256k1::Secp256k1Context, Context};
+use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
 #[cfg(feature = "challenge-authorization")]
 use cylinder::{Signer, SigningError};
 #[cfg(feature = "health-service")]
@@ -232,6 +232,11 @@ impl SplinterDaemon {
             transport.listen("inproc://health_service")?,
         ];
 
+        let secp256k1_context: Box<dyn VerifierFactory> = Box::new(Secp256k1Context::new());
+        let admin_service_verifier = secp256k1_context.new_verifier();
+        let auth_config_verifier = secp256k1_context.new_verifier();
+        let signing_context = Arc::new(Mutex::new(secp256k1_context));
+
         info!("Starting SpinterNode with ID {}", self.node_id);
         let authorization_manager = AuthorizationManager::new(
             self.node_id.clone(),
@@ -427,9 +432,6 @@ impl SplinterDaemon {
             }
         }
 
-        let signing_context = Secp256k1Context::new();
-        let admin_service_verifier = signing_context.new_verifier();
-
         let mut orchestrator = ServiceOrchestratorBuilder::new()
             .with_connection(orchestrator_connection)
             .with_service_factory(Box::new(ScabbardFactory::new(
@@ -437,7 +439,7 @@ impl SplinterDaemon {
                 None,
                 Some(self.state_dir.to_string()),
                 None,
-                Box::new(signing_context),
+                signing_context,
             )))
             .build()
             .map_err(|err| {
@@ -629,7 +631,7 @@ impl SplinterDaemon {
         let mut auth_configs = vec![
             // Add Cylinder JWT as an auth provider
             AuthConfig::Cylinder {
-                verifier: Secp256k1Context::new().new_verifier(),
+                verifier: auth_config_verifier,
             },
         ];
 

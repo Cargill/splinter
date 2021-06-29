@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use cylinder::VerifierFactory;
 use splinter::admin::service::admin_service_id;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
@@ -47,6 +49,7 @@ pub struct RunnableNetworkSubsystem {
     pub heartbeat_interval: Duration,
     pub strict_ref_counts: bool,
     pub network_endpoints: Option<Vec<String>>,
+    pub signing_context: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
 impl RunnableNetworkSubsystem {
