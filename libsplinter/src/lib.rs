@@ -83,6 +83,8 @@ pub mod keys;
 pub mod mesh;
 pub mod migrations;
 pub mod network;
+#[cfg(feature = "node-id-store")]
+pub mod node_id;
 #[cfg(feature = "oauth")]
 pub mod oauth;
 pub mod orchestrator;
