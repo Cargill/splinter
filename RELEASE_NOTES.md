@@ -1,5 +1,57 @@
 # Release Notes
 
+## Changes in Splinter 0.5.10
+
+### Highlights
+
+* splinterd YAML ciruit state is no longer supported, and the splinter CLI subcommand `upgrade` has been stabilized to help users port their legacy YAML circuit state to a database
+
+### libsplinter
+
+* Stabilize the feature `oauth-profile` by removing it. This feature allows for user profile information to be collected from OAuth providers.
+
+* Add user subject to oauth-profile log error message
+
+### splinter CLI
+
+* Stabilize the feature `upgrade`. This feature allows a user to upgrade from 0.4 to 0.6 by upgrading the circuit YAML store to a database store.
+
+* Fix typos in upgrade feature documentation.
+
+### splinterd
+
+* Stabilize the feature `biome-profile`. This feature allows for user profile information to be saved to the user profile store.
+
+* Stabilize the feature `deprecate-yaml` by removing it. This feature deprecates the circuit YAML store, directing the user to upgrade using `splinter upgrade`.
+
+* Remove references to `--storage` from configuration and tests
+
+* Update `--state-dir` help to not reference YAML storage
+
+* Correct the proposals location for YAML store detection
+
+* Wrap signing context in `Arc<Mutex>` so it can be shared with scabbard
+
+### scabbard
+
+* Wrap signing context in `Arc<Mutex>` so it can be shared with splinterd
+
+### Packaging
+
+* Change splinterd `/var/lib/splinter` file ownership to `splinterd:splinterd`
+
+* Change splinterd `/var/lib/splinter` file permissions to disallow global read
+
+* Add splinterd postinstall script to create `/etc/splinter/allow_keys` with correct permissions
+
+### Build
+
+* Add a justfile recipe to build Docker images
+
+* Add Docker build to GitHub Actions workflows
+
+* Reduce failure emails when pushing to forks
+
 ## Changes in Splinter 0.5.9
 
 ### Highlights
