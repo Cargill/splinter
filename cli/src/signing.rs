@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{env, path::Path};
+use std::{env, path::Path, path::PathBuf};
 
 use cylinder::{
     current_user_key_name, current_user_search_path, jwt::JsonWebTokenBuilder, load_key,
@@ -21,14 +21,33 @@ use cylinder::{
 
 use crate::error::CliError;
 
+// If the `CYLINDER_PATH` environment variable is not set, add `$HOME/.splinter/keys`
+// to the vector of paths to search. This is for backwards compatibility.
+fn splinter_user_search_path() -> Vec<PathBuf> {
+    match env::var("CYLINDER_PATH") {
+        Ok(_) => current_user_search_path(),
+        Err(_) => {
+            let mut splinter_path = match dirs::home_dir() {
+                Some(dir) => dir,
+                None => Path::new(".").to_path_buf(),
+            };
+            splinter_path.push(".splinter");
+            splinter_path.push("keys");
+            let mut paths = current_user_search_path();
+            paths.push(splinter_path);
+            paths
+        }
+    }
+}
+
 fn load_private_key(key_name: Option<&str>) -> Result<PrivateKey, CliError> {
     let private_key = if let Some(key_name) = key_name {
         if key_name.contains('/') {
             load_key_from_path(Path::new(key_name))
                 .map_err(|err| CliError::ActionError(err.to_string()))?
         } else {
-            let path = &current_user_search_path();
-            load_key(key_name, path)
+            let path = splinter_user_search_path();
+            load_key(key_name, &path)
                 .map_err(|err| CliError::ActionError(err.to_string()))?
                 .ok_or_else(|| {
                     CliError::ActionError({
@@ -44,22 +63,7 @@ fn load_private_key(key_name: Option<&str>) -> Result<PrivateKey, CliError> {
                 })?
         }
     } else {
-        // If the `CYLINDER_PATH` environment variable is not set, add `$HOME/.splinter/keys`
-        // to the vector of paths to search. This is for backwards compatibility.
-        let path = match env::var("CYLINDER_PATH") {
-            Ok(_) => current_user_search_path(),
-            Err(_) => {
-                let mut splinter_path = match dirs::home_dir() {
-                    Some(dir) => dir,
-                    None => Path::new(".").to_path_buf(),
-                };
-                splinter_path.push(".splinter");
-                splinter_path.push("keys");
-                let mut paths = current_user_search_path();
-                paths.push(splinter_path);
-                paths
-            }
-        };
+        let path = splinter_user_search_path();
         load_key(&current_user_key_name(), &path)
             .map_err(|err| CliError::ActionError(err.to_string()))?
             .ok_or_else(|| {
