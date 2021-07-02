@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::borrow::Borrow;
 use std::env;
 use std::fs::{self, metadata, OpenOptions};
 use std::io;
@@ -245,7 +246,6 @@ impl Action for CertGenAction {
                 ));
             } else {
                 // if all files need to be generated log what will be written and generate all
-                log_writing(&cert_path, &private_cert_path)?;
                 create_all_certs(
                     &cert_path,
                     &private_cert_path,
@@ -256,7 +256,6 @@ impl Action for CertGenAction {
             }
         } else {
             // if force is true, overwrite all existing files
-            log_overwriting(&cert_path, &private_cert_path)?;
             create_all_certs(
                 &cert_dir.to_path_buf(),
                 &private_cert_path,
@@ -382,12 +381,6 @@ fn handle_skip(
         ca = Some((ca_key, ca_cert));
     } else {
         // if the ca files do not exist, generate them
-        info!("Writing file: {}/{}", absolute_path(&cert_path)?, CA_CERT);
-        info!(
-            "Writing file: {}/{}",
-            absolute_path(&private_cert_path)?,
-            CA_KEY
-        );
         let (genearte_ca_key, generate_ca_cert) = write_ca(&cert_path, &private_cert_path)?;
         ca = Some((genearte_ca_key, generate_ca_cert));
     }
@@ -404,16 +397,6 @@ fn handle_skip(
         );
     } else {
         // if the client files do not exist, generate them using the ca
-        info!(
-            "Writing file: {}/{}",
-            absolute_path(&cert_path)?,
-            CLIENT_CERT
-        );
-        info!(
-            "Writing file: {}/{}",
-            absolute_path(&private_cert_path)?,
-            CLIENT_KEY
-        );
         if let Some((ca_key, ca_cert)) = ca {
             write_cert_and_key(
                 &cert_path,
@@ -442,16 +425,6 @@ fn handle_skip(
         );
     } else {
         // if the server files do not exist, generate them using the ca
-        info!(
-            "Writing file: {}/{}",
-            absolute_path(&cert_path)?,
-            SERVER_CERT
-        );
-        info!(
-            "Writing file: {}/{}",
-            absolute_path(&private_cert_path)?,
-            SERVER_KEY
-        );
         if let Some((ca_key, ca_cert)) = ca.as_ref() {
             write_cert_and_key(
                 &cert_path,
@@ -480,16 +453,6 @@ fn handle_skip(
         );
     } else {
         // if the rest_api files do not exist, generate them using the ca
-        info!(
-            "Writing file: {}/{}",
-            absolute_path(&cert_path)?,
-            REST_API_CERT
-        );
-        info!(
-            "Writing file: {}/{}",
-            absolute_path(&private_cert_path)?,
-            REST_API_KEY
-        );
         if let Some((ca_key, ca_cert)) = ca.as_ref() {
             write_cert_and_key(
                 &cert_path,
@@ -699,6 +662,14 @@ fn write_file(path: &Path, file_name: &str, bytes: &[u8]) -> Result<(), CliError
         }
     };
 
+    let final_path_absolute =
+        absolute_path(final_path_buf.borrow()).unwrap_or_else(|_| final_path.clone());
+    if final_path_buf.exists() {
+        info!("Overwriting file: {}", final_path_absolute);
+    } else {
+        info!("Writing file: {}", final_path_absolute);
+    }
+
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
@@ -746,104 +717,6 @@ fn get_ca_key(key_path: &Path) -> Result<PKey<Private>, CliError> {
     let rsa = Rsa::private_key_from_pem(&key)?;
     let privkey = PKey::from_rsa(rsa)?;
     Ok(privkey)
-}
-
-// helper function to log what files will be written
-fn log_writing(cert_path: &Path, private_cert_path: &Path) -> Result<(), CliError> {
-    info!("Writing file: {}/{}", absolute_path(cert_path)?, CA_CERT);
-    info!(
-        "Writing file: {}/{}",
-        absolute_path(private_cert_path)?,
-        CA_KEY
-    );
-
-    info!(
-        "Writing file: {}/{}",
-        absolute_path(cert_path)?,
-        CLIENT_CERT
-    );
-    info!(
-        "Writing file: {}/{}",
-        absolute_path(private_cert_path)?,
-        CLIENT_KEY
-    );
-
-    info!(
-        "Writing file: {}/{}",
-        absolute_path(cert_path)?,
-        SERVER_CERT
-    );
-    info!(
-        "Writing file: {}/{}",
-        absolute_path(private_cert_path)?,
-        SERVER_KEY
-    );
-
-    #[cfg(feature = "https-certs")]
-    {
-        info!(
-            "Writing file: {}/{}",
-            absolute_path(cert_path)?,
-            REST_API_CERT
-        );
-        info!(
-            "Writing file: {}/{}",
-            absolute_path(private_cert_path)?,
-            REST_API_KEY
-        );
-    }
-    Ok(())
-}
-
-// helper function to log what files will be overwritten
-fn log_overwriting(cert_path: &Path, private_cert_path: &Path) -> Result<(), CliError> {
-    info!(
-        "Overwriting file: {}/{}",
-        absolute_path(cert_path)?,
-        CA_CERT
-    );
-    info!(
-        "Overwriting file: {}/{}",
-        absolute_path(private_cert_path)?,
-        CA_KEY
-    );
-
-    info!(
-        "Overwriting file: {}/{}",
-        absolute_path(cert_path)?,
-        CLIENT_CERT
-    );
-    info!(
-        "Overwriting file: {}/{}",
-        absolute_path(private_cert_path)?,
-        CLIENT_KEY
-    );
-
-    info!(
-        "Overwriting file: {}/{}",
-        absolute_path(cert_path)?,
-        SERVER_CERT
-    );
-    info!(
-        "Overwriting file: {}/{}",
-        absolute_path(private_cert_path)?,
-        SERVER_KEY
-    );
-
-    #[cfg(feature = "https-certs")]
-    {
-        info!(
-            "Overwriting file: {}/{}",
-            absolute_path(cert_path)?,
-            REST_API_CERT
-        );
-        info!(
-            "Overwriting file: {}/{}",
-            absolute_path(private_cert_path)?,
-            REST_API_KEY
-        );
-    }
-    Ok(())
 }
 
 impl From<io::Error> for CliError {
