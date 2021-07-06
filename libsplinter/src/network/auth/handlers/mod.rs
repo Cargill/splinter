@@ -22,8 +22,8 @@ mod v1_handlers;
 use cylinder::Signer;
 
 use crate::network::auth::{
-    AuthorizationAction, AuthorizationManagerStateMachine, AuthorizationMessageSender,
-    AuthorizationState,
+    AuthorizationManagerStateMachine, AuthorizationMessageSender, AuthorizationRemoteAction,
+    AuthorizationRemoteState,
 };
 use crate::network::dispatch::{
     ConnectionId, DispatchError, Dispatcher, Handler, MessageContext, MessageSender,
@@ -79,14 +79,13 @@ pub fn create_authorization_dispatcher(
 
         auth_dispatcher.set_handler(Box::new(AuthProtocolResponseHandler::new(
             auth_manager.clone(),
-            identity.to_string(),
+            identity,
         )));
 
         auth_dispatcher.set_handler(Box::new(AuthTrustRequestHandler::new(auth_manager.clone())));
 
         auth_dispatcher.set_handler(Box::new(AuthTrustResponseHandler::new(
             auth_manager.clone(),
-            identity,
         )));
 
         auth_dispatcher.set_handler(Box::new(AuthCompleteHandler::new(auth_manager.clone())));
@@ -172,11 +171,11 @@ impl Handler for AuthorizationErrorHandler {
         let auth_error = AuthorizationError::from_proto(msg)?;
         match auth_error {
             AuthorizationError::AuthorizationRejected(err_msg) => {
-                match self.auth_manager.next_state(
+                match self.auth_manager.next_remote_state(
                     context.source_connection_id(),
-                    AuthorizationAction::Unauthorizing,
+                    AuthorizationRemoteAction::Unauthorizing,
                 ) {
-                    Ok(AuthorizationState::Unauthorized) => {
+                    Ok(AuthorizationRemoteState::Unauthorized) => {
                         info!(
                             "Connection unauthorized by connection {}: {}",
                             context.source_connection_id(),

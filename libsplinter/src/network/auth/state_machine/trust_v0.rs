@@ -14,7 +14,9 @@
 
 use std::fmt;
 
-use super::{AuthorizationAction, AuthorizationActionError, AuthorizationState, Identity};
+use super::{
+    AuthorizationActionError, AuthorizationRemoteAction, AuthorizationRemoteState, Identity,
+};
 
 /// The states of a connection during v0 trust authorization.
 #[derive(PartialEq, Debug, Clone)]
@@ -55,40 +57,40 @@ impl TrustV0AuthorizationState {
     /// Errors
     ///
     /// The errors are error messages that should be returned on the appropriate message
-    pub(crate) fn next_state(
+    pub(crate) fn next_local_state(
         &self,
         action: TrustV0AuthorizationAction,
-    ) -> Result<AuthorizationState, AuthorizationActionError> {
+    ) -> Result<AuthorizationRemoteState, AuthorizationActionError> {
         match &self {
             // v0 state transitions
             TrustV0AuthorizationState::Connecting => match action {
                 TrustV0AuthorizationAction::TrustIdentifyingV0(identity) => {
-                    Ok(AuthorizationState::TrustV0(
+                    Ok(AuthorizationRemoteState::TrustV0(
                         TrustV0AuthorizationState::RemoteIdentified(identity),
                     ))
                 }
-                TrustV0AuthorizationAction::RemoteAuthorizing => Ok(AuthorizationState::TrustV0(
-                    TrustV0AuthorizationState::RemoteAccepted,
-                )),
+                TrustV0AuthorizationAction::RemoteAuthorizing => Ok(
+                    AuthorizationRemoteState::TrustV0(TrustV0AuthorizationState::RemoteAccepted),
+                ),
             },
             TrustV0AuthorizationState::RemoteIdentified(identity) => match action {
                 TrustV0AuthorizationAction::RemoteAuthorizing => {
-                    Ok(AuthorizationState::AuthComplete(Some(identity.clone())))
+                    Ok(AuthorizationRemoteState::Done(identity.clone()))
                 }
-                _ => Err(AuthorizationActionError::InvalidMessageOrder(
-                    AuthorizationState::TrustV0(TrustV0AuthorizationState::RemoteIdentified(
+                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
+                    AuthorizationRemoteState::TrustV0(TrustV0AuthorizationState::RemoteIdentified(
                         identity.clone(),
                     )),
-                    AuthorizationAction::TrustV0(action),
+                    AuthorizationRemoteAction::TrustV0(action),
                 )),
             },
             TrustV0AuthorizationState::RemoteAccepted => match action {
                 TrustV0AuthorizationAction::TrustIdentifyingV0(identity) => {
-                    Ok(AuthorizationState::AuthComplete(Some(identity)))
+                    Ok(AuthorizationRemoteState::Done(identity))
                 }
-                _ => Err(AuthorizationActionError::InvalidMessageOrder(
-                    AuthorizationState::TrustV0(TrustV0AuthorizationState::RemoteAccepted),
-                    AuthorizationAction::TrustV0(action),
+                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
+                    AuthorizationRemoteState::TrustV0(TrustV0AuthorizationState::RemoteAccepted),
+                    AuthorizationRemoteAction::TrustV0(action),
                 )),
             },
         }

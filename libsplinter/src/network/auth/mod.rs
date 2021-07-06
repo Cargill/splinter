@@ -39,9 +39,11 @@ use crate::transport::{Connection, RecvError};
 
 use self::handlers::create_authorization_dispatcher;
 use self::pool::{ThreadPool, ThreadPoolBuilder};
+#[cfg(feature = "trust-authorization")]
+pub(crate) use self::state_machine::AuthorizationLocalAction;
 pub(crate) use self::state_machine::{
-    AuthorizationAction, AuthorizationActionError, AuthorizationManagerStateMachine,
-    AuthorizationState, Identity,
+    AuthorizationActionError, AuthorizationLocalState, AuthorizationManagerStateMachine,
+    AuthorizationRemoteAction, AuthorizationRemoteState, Identity,
 };
 
 const AUTHORIZATION_THREAD_POOL_SIZE: usize = 8;
@@ -51,10 +53,13 @@ const AUTHORIZATION_THREAD_POOL_SIZE: usize = 8;
 /// separately.
 #[derive(Debug, Clone)]
 pub(crate) struct ManagedAuthorizationState {
-    // Local node state
-    local_state: AuthorizationState,
+    // Local node state while authorizing with remote node
+    local_state: AuthorizationLocalState,
     // Remote node state
-    remote_state: AuthorizationState,
+    remote_state: AuthorizationRemoteState,
+
+    // Tracks whether the local node has completed authorization with the remote node
+    received_complete: bool,
 }
 
 #[derive(Debug)]
@@ -161,9 +166,12 @@ impl AuthorizationConnector {
             self.local_identity.clone(),
             #[cfg(feature = "challenge-authorization")]
             self.signers.clone(),
-            state_machine,
+            // need to allow clone because it is required if trust authorization is enabled
+            #[allow(clippy::redundant_clone)]
+            state_machine.clone(),
             msg_sender,
         );
+
         self.executor.execute(move || {
             #[cfg(not(feature = "trust-authorization"))]
             {
@@ -205,6 +213,19 @@ impl AuthorizationConnector {
                     );
                     return;
                 }
+
+                if state_machine
+                    .next_local_state(
+                        &connection_id,
+                        AuthorizationLocalAction::SendAuthProtocolRequest,
+                    )
+                    .is_err()
+                {
+                    error!(
+                        "Unable to update state from Start to WaitingForAuthProtocolResponse for {}",
+                        &connection_id,
+                    )
+                };
             }
 
             let authed_identity = 'main: loop {
@@ -343,11 +364,7 @@ impl ManagedAuthorizations {
     fn take_connection_identity(&mut self, connection_id: &str) -> Option<Identity> {
         self.states.remove(connection_id).and_then(|managed_state| {
             match managed_state.remote_state {
-                AuthorizationState::AuthComplete(Some(identity)) => Some(identity),
-                AuthorizationState::AuthComplete(None) => match managed_state.local_state {
-                    AuthorizationState::AuthComplete(Some(identity)) => Some(identity),
-                    _ => None,
-                },
+                AuthorizationRemoteState::Done(identity) => Some(identity),
                 _ => None,
             }
         })
@@ -358,11 +375,11 @@ impl ManagedAuthorizations {
             matches!(
                 (&managed_state.local_state, &managed_state.remote_state),
                 (
-                    AuthorizationState::AuthComplete(_),
-                    AuthorizationState::AuthComplete(_)
+                    AuthorizationLocalState::AuthorizedAndComplete,
+                    AuthorizationRemoteState::Done(_),
                 ) | (
-                    AuthorizationState::Unauthorized,
-                    AuthorizationState::Unauthorized
+                    AuthorizationLocalState::Unauthorized,
+                    AuthorizationRemoteState::Unauthorized
                 )
             )
         })
@@ -569,12 +586,14 @@ pub(in crate::network) mod tests {
         );
         mesh.send(env).expect("unable to send authorized");
 
-        // send auth complete
-        let env = write_auth_message(
-            connection_id,
-            AuthorizationMessage::AuthComplete(AuthComplete),
-        );
-        mesh.send(env).expect("unable to send authorized");
+        // receive authorized
+        let env = mesh.recv().expect("unable to receive from mesh");
+        assert_eq!(connection_id, env.id());
+        let auth_complete = read_auth_message(env.payload());
+        assert!(matches!(
+            auth_complete,
+            AuthorizationMessage::AuthComplete(_)
+        ));
 
         // send trust request
         let env = write_auth_message(
@@ -594,14 +613,12 @@ pub(in crate::network) mod tests {
             AuthorizationMessage::AuthTrustResponse(_)
         ));
 
-        // receive authorized
-        let env = mesh.recv().expect("unable to receive from mesh");
-        assert_eq!(connection_id, env.id());
-        let auth_complete = read_auth_message(env.payload());
-        assert!(matches!(
-            auth_complete,
-            AuthorizationMessage::AuthComplete(_)
-        ));
+        // send auth complete
+        let env = write_auth_message(
+            connection_id,
+            AuthorizationMessage::AuthComplete(AuthComplete),
+        );
+        mesh.send(env).expect("unable to send authorized");
     }
 
     fn read_auth_message(bytes: &[u8]) -> AuthorizationMessage {

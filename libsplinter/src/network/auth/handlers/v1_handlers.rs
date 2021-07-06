@@ -28,9 +28,12 @@ use crate::protos::network;
 use crate::protos::prelude::*;
 
 use crate::network::auth::{
-    state_machine::trust_v1::{TrustAuthorizationAction, TrustAuthorizationState},
-    AuthorizationAction, AuthorizationManagerStateMachine, AuthorizationMessage,
-    AuthorizationState, Identity,
+    state_machine::trust_v1::{
+        TrustAuthorizationLocalAction, TrustAuthorizationRemoteAction,
+        TrustAuthorizationRemoteState,
+    },
+    AuthorizationLocalAction, AuthorizationLocalState, AuthorizationManagerStateMachine,
+    AuthorizationMessage, AuthorizationRemoteAction, AuthorizationRemoteState, Identity,
 };
 
 /// Handler for the Authorization Protocol Request Message Type
@@ -67,7 +70,7 @@ impl Handler for AuthProtocolRequestHandler {
 
         match self.auth_manager.next_remote_state(
             context.source_connection_id(),
-            AuthorizationAction::ProtocolAgreeing,
+            AuthorizationRemoteAction::ReceiveAuthProtocolRequest,
         ) {
             Err(err) => {
                 warn!(
@@ -77,7 +80,7 @@ impl Handler for AuthProtocolRequestHandler {
                 );
             }
 
-            Ok(AuthorizationState::ProtocolAgreeing) => {
+            Ok(AuthorizationRemoteState::ReceivedAuthProtocolRequest) => {
                 let version = supported_protocol_version(
                     protocol_request.auth_protocol_min,
                     protocol_request.auth_protocol_max,
@@ -105,7 +108,7 @@ impl Handler for AuthProtocolRequestHandler {
                         .auth_manager
                         .next_remote_state(
                             context.source_connection_id(),
-                            AuthorizationAction::Unauthorizing,
+                            AuthorizationRemoteAction::Unauthorizing,
                         )
                         .is_err()
                     {
@@ -137,6 +140,20 @@ impl Handler for AuthProtocolRequestHandler {
                     .map_err(|(recipient, payload)| {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
+
+                if self
+                    .auth_manager
+                    .next_remote_state(
+                        context.source_connection_id(),
+                        AuthorizationRemoteAction::SendAuthProtocolResponse,
+                    )
+                    .is_err()
+                {
+                    error!(
+                        "Unable to transition from ReceivedAuthProtocolRequest to \
+                        SentAuthProtocolResponse"
+                    )
+                };
             }
             Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
         }
@@ -213,9 +230,9 @@ impl Handler for AuthProtocolResponseHandler {
         );
         let protocol_request = AuthProtocolResponse::from_proto(msg)?;
 
-        match self.auth_manager.next_state(
+        match self.auth_manager.next_local_state(
             context.source_connection_id(),
-            AuthorizationAction::ProtocolAgreeing,
+            AuthorizationLocalAction::ReceiveAuthProtocolResponse,
         ) {
             Err(err) => {
                 warn!(
@@ -224,8 +241,7 @@ impl Handler for AuthProtocolResponseHandler {
                     err
                 );
             }
-
-            Ok(AuthorizationState::ProtocolAgreeing) => {
+            Ok(AuthorizationLocalState::ReceivedAuthProtocolResponse) => {
                 if protocol_request
                     .accepted_authorization_type
                     .iter()
@@ -234,6 +250,22 @@ impl Handler for AuthProtocolResponseHandler {
                     let trust_request = AuthorizationMessage::AuthTrustRequest(AuthTrustRequest {
                         identity: self.identity.clone(),
                     });
+
+                    if self
+                        .auth_manager
+                        .next_local_state(
+                            context.source_connection_id(),
+                            AuthorizationLocalAction::Trust(
+                                TrustAuthorizationLocalAction::SendAuthTrustRequest,
+                            ),
+                        )
+                        .is_err()
+                    {
+                        error!(
+                            "Unable to transition from ReceivedAuthProtocolResponse to \
+                            WaitingForAuthTrustResponse"
+                        )
+                    };
 
                     let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
                         NetworkMessage::from(trust_request),
@@ -285,11 +317,11 @@ impl Handler for AuthTrustRequestHandler {
         let trust_request = AuthTrustRequest::from_proto(msg)?;
         match self.auth_manager.next_remote_state(
             context.source_connection_id(),
-            AuthorizationAction::Trust(TrustAuthorizationAction::TrustIdentifying(
-                Identity::Trust {
+            AuthorizationRemoteAction::Trust(
+                TrustAuthorizationRemoteAction::ReceiveAuthTrustRequest(Identity::Trust {
                     identity: trust_request.identity.to_string(),
-                },
-            )),
+                }),
+            ),
         ) {
             Err(err) => {
                 warn!(
@@ -299,7 +331,9 @@ impl Handler for AuthTrustRequestHandler {
                 );
                 return Ok(());
             }
-            Ok(AuthorizationState::Trust(TrustAuthorizationState::Identified(_))) => {
+            Ok(AuthorizationRemoteState::Trust(
+                TrustAuthorizationRemoteState::ReceivedAuthTrustRequest(_),
+            )) => {
                 debug!(
                     "Sending trust response to connection {} after receiving identity {}",
                     context.source_connection_id(),
@@ -322,21 +356,14 @@ impl Handler for AuthTrustRequestHandler {
             .auth_manager
             .next_remote_state(
                 context.source_connection_id(),
-                AuthorizationAction::Trust(TrustAuthorizationAction::Authorizing),
+                AuthorizationRemoteAction::Trust(
+                    TrustAuthorizationRemoteAction::SendAuthTrustResponse,
+                ),
             )
             .is_err()
         {
-            error!("Unable to transition from TrustIdentified to Authorized")
+            error!("Unable to transition from ReceivedAuthTrustRequest to Done")
         };
-
-        let auth_msg = AuthorizationMessage::AuthComplete(AuthComplete);
-        let msg_bytes =
-            IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(auth_msg))?;
-        sender
-            .send(context.source_id().clone(), msg_bytes)
-            .map_err(|(recipient, payload)| {
-                DispatchError::NetworkSendError((recipient.into(), payload))
-            })?;
 
         Ok(())
     }
@@ -345,15 +372,11 @@ impl Handler for AuthTrustRequestHandler {
 /// Handler for the Authorization Trust Response Message Type
 pub struct AuthTrustResponseHandler {
     auth_manager: AuthorizationManagerStateMachine,
-    identity: String,
 }
 
 impl AuthTrustResponseHandler {
-    pub fn new(auth_manager: AuthorizationManagerStateMachine, identity: String) -> Self {
-        Self {
-            auth_manager,
-            identity,
-        }
+    pub fn new(auth_manager: AuthorizationManagerStateMachine) -> Self {
+        Self { auth_manager }
     }
 }
 
@@ -370,19 +393,17 @@ impl Handler for AuthTrustResponseHandler {
         &self,
         _msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        _sender: &dyn MessageSender<Self::Source>,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!(
             "Received authorization trust response from {}",
             context.source_connection_id()
         );
-        match self.auth_manager.next_state(
+        match self.auth_manager.next_local_state(
             context.source_connection_id(),
-            AuthorizationAction::Trust(TrustAuthorizationAction::TrustIdentifying(
-                Identity::Trust {
-                    identity: self.identity.to_string(),
-                },
-            )),
+            AuthorizationLocalAction::Trust(
+                TrustAuthorizationLocalAction::ReceiveAuthTrustResponse,
+            ),
         ) {
             Err(err) => {
                 warn!(
@@ -391,9 +412,34 @@ impl Handler for AuthTrustResponseHandler {
                     err
                 );
             }
-            Ok(AuthorizationState::Trust(TrustAuthorizationState::Identified(_))) => (),
+            Ok(AuthorizationLocalState::Authorized) => (),
             Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
         }
+
+        let auth_msg = AuthorizationMessage::AuthComplete(AuthComplete);
+        let msg_bytes =
+            IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(auth_msg))?;
+        sender
+            .send(context.source_id().clone(), msg_bytes)
+            .map_err(|(recipient, payload)| {
+                DispatchError::NetworkSendError((recipient.into(), payload))
+            })?;
+
+        match self.auth_manager.next_local_state(
+            context.source_connection_id(),
+            AuthorizationLocalAction::SendAuthComplete,
+        ) {
+            Err(err) => {
+                warn!(
+                    "Cannot transition connection from Authorized {}: {}",
+                    context.source_connection_id(),
+                    err
+                );
+            }
+            Ok(AuthorizationLocalState::WaitForComplete) => (),
+            Ok(AuthorizationLocalState::AuthorizedAndComplete) => (),
+            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+        };
 
         Ok(())
     }
@@ -429,10 +475,10 @@ impl Handler for AuthCompleteHandler {
             "Received authorization complete from {}",
             context.source_connection_id()
         );
-        match self.auth_manager.next_state(
-            context.source_connection_id(),
-            AuthorizationAction::Trust(TrustAuthorizationAction::Authorizing),
-        ) {
+        match self
+            .auth_manager
+            .received_complete(context.source_connection_id())
+        {
             Err(err) => {
                 warn!(
                     "Ignoring authorization complete message from connection {}: {}",
@@ -440,9 +486,7 @@ impl Handler for AuthCompleteHandler {
                     err
                 );
             }
-            Ok(AuthorizationState::Trust(TrustAuthorizationState::Authorized(_)))
-            | Ok(AuthorizationState::AuthComplete(_)) => (),
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(()) => (),
         }
 
         Ok(())
