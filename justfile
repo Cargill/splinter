@@ -89,7 +89,14 @@ copy-env:
     set -e
     find . -name .env | xargs -I '{}' sh -c "echo 'Copying to {}'; rsync .env {}"
 
-lint: clean
+docker-build:
+    #!/usr/bin/env sh
+    set -e
+    export VERSION=AUTO_STRICT
+    export REPO_VERSION=$(./bin/get_version)
+    docker-compose -f docker-compose-installed.yaml build
+
+lint:
     #!/usr/bin/env sh
     set -e
     echo "\033[1mcargo fmt -- --check\033[0m"

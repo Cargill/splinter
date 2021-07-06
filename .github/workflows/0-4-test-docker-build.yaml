@@ -1,9 +1,8 @@
-name: 0-4 Lint Gameroom Client
+name: 0-4 Build Docker
 
 on:
   pull_request:
-    branches:
-      - 0-4
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -12,10 +11,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint_gameroom_client:
+  build_docker:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Display envvars
         run: env
@@ -23,5 +24,5 @@ jobs:
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
-      - name: Lint Gameroom Client
-        run: just ci-lint-client
+      - name: Test Docker Build
+        run: just docker-build
