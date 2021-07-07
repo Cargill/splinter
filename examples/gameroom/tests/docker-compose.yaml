@@ -66,7 +66,7 @@ services:
     entrypoint: |
       bash -c "
         # Grant permissions to the Cylinder key used for authorization by the tests
-        if [ ! -f /etc/splinter/allow_keys ]
+        if [ ! -s /etc/splinter/allow_keys ]
         then
           echo "02091a06cc46c5e0d88e89284936edb16800b03b56a8f1b7ec292f232b7c8385a2" > /etc/splinter/allow_keys
         fi && \
