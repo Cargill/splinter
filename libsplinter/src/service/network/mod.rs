@@ -23,9 +23,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
-use crate::network::connection_manager::{
-    ConnectionAuthorizationType, ConnectionManagerNotification, Connector,
-};
+use crate::network::auth::ConnectionAuthorizationType;
+use crate::network::connection_manager::{ConnectionManagerNotification, Connector};
 
 use self::error::ServiceConnectionAgentError;
 pub use self::error::ServiceConnectionError;
@@ -654,8 +653,7 @@ mod tests {
 
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
-        AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError,
-        ConnectionAuthorizationType, ConnectionManager,
+        AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError, ConnectionManager,
     };
     use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Connection, Transport};

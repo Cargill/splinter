@@ -1437,9 +1437,9 @@ pub mod tests {
     use protobuf::Message;
 
     use crate::mesh::Mesh;
+    use crate::network::auth::ConnectionAuthorizationType;
     use crate::network::connection_manager::{
-        AuthorizationResult, Authorizer, AuthorizerError, ConnectionAuthorizationType,
-        ConnectionManager,
+        AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
     };
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
     use crate::threading::lifecycle::ShutdownHandle;

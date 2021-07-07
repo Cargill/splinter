@@ -30,6 +30,7 @@ pub use error::{AuthorizerError, ConnectionManagerError};
 pub use notification::ConnectionManagerNotification;
 
 use crate::error::InternalError;
+use crate::network::auth::ConnectionAuthorizationType;
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::threading::pacemaker;
 use crate::transport::matrix::{ConnectionMatrixLifeCycle, ConnectionMatrixSender};
@@ -401,17 +402,6 @@ impl ShutdownHandle for ConnectionManager {
             ))
         })
     }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum ConnectionAuthorizationType {
-    Trust {
-        identity: String,
-    },
-    #[cfg(feature = "challenge-authorization")]
-    Challenge {
-        public_key: Vec<u8>,
-    },
 }
 
 /// Metadata describing a connection managed by the connection manager.

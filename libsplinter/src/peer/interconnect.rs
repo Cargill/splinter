@@ -638,9 +638,9 @@ pub mod tests {
     use std::time::Duration;
 
     use crate::mesh::{Envelope, Mesh};
+    use crate::network::auth::ConnectionAuthorizationType;
     use crate::network::connection_manager::{
-        AuthorizationResult, Authorizer, AuthorizerError, ConnectionAuthorizationType,
-        ConnectionManager,
+        AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
     };
     use crate::network::dispatch::{
         dispatch_channel, DispatchError, DispatchLoopBuilder, Dispatcher, Handler, MessageContext,

@@ -21,12 +21,10 @@
 
 use std::collections::HashMap;
 
+use crate::network::auth::ConnectionAuthorizationType;
 use crate::transport::Connection;
 
-use super::{
-    AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError,
-    ConnectionAuthorizationType,
-};
+use super::{AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError};
 
 /// Authorize Inproc Connections with predefined identities.
 ///

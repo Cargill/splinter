@@ -367,6 +367,17 @@ impl ManagedAuthorizations {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum ConnectionAuthorizationType {
+    Trust {
+        identity: String,
+    },
+    #[cfg(feature = "challenge-authorization")]
+    Challenge {
+        public_key: Vec<u8>,
+    },
+}
+
 pub enum ConnectionAuthorizationState {
     Authorized {
         connection_id: String,
