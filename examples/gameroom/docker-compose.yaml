@@ -211,7 +211,7 @@ services:
           then
             splinter admin keygen acme -d /keys
           fi && \
-          if [ ! -f /etc/splinter/allow_keys ]
+          if [ ! -s /etc/splinter/allow_keys ]
           then
             echo $$(cat /keys/acme.pub) > /etc/splinter/allow_keys
           fi && \
@@ -360,7 +360,7 @@ services:
           then
             splinter admin keygen bubba -d /keys
           fi && \
-          if [ ! -f /etc/splinter/allow_keys ]
+          if [ ! -s /etc/splinter/allow_keys ]
           then
             echo $$(cat /keys/bubba.pub) > /etc/splinter/allow_keys
           fi && \

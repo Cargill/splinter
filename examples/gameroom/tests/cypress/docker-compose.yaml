@@ -111,7 +111,7 @@ services:
         then
           splinter admin keygen cypress -d /keys
         fi && \
-        if [ ! -f /etc/splinter/allow_keys ]
+        if [ ! -s /etc/splinter/allow_keys ]
         then
           echo $$(cat /keys/cypress.pub) > /etc/splinter/allow_keys
         fi && \

@@ -39,7 +39,7 @@ services:
         then
           splinter admin keygen acme
         fi && \
-        if [ ! -f /etc/splinter/allow_keys ]
+        if [ ! -s /etc/splinter/allow_keys ]
         then
           echo $$(cat /acme.pub) > /etc/splinter/allow_keys
         fi && \
