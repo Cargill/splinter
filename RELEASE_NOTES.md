@@ -1,5 +1,12 @@
 # Release Notes
 
+## Changes in Splinter 0.5.11
+
+### splinter CLI
+
+*  Fix CLI signing path for `--key`. `current_user_search_path()` now searches
+  `root/.splinter/keys` as expected instead of `root/.cylinder/keys`
+
 ## Changes in Splinter 0.5.10
 
 ### Highlights
