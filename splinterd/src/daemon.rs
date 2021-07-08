@@ -58,6 +58,8 @@ use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
 use splinter::orchestrator::ServiceOrchestratorBuilder;
 use splinter::peer::interconnect::NetworkMessageSender;
 use splinter::peer::interconnect::PeerInterconnectBuilder;
+#[cfg(feature = "challenge-authorization")]
+use splinter::peer::PeerAuthorizationToken;
 use splinter::peer::PeerManager;
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::NetworkMessageType;
@@ -430,7 +432,11 @@ impl SplinterDaemon {
         // hold on to peer refs for the peers provided to ensure the connections are kept around
         let mut peer_refs = vec![];
         for endpoint in self.initial_peers.iter() {
-            match peer_connector.add_unidentified_peer(endpoint.into()) {
+            match peer_connector.add_unidentified_peer(
+                endpoint.into(),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id(&self.node_id),
+            ) {
                 Ok(peer_ref) => peer_refs.push(peer_ref),
                 Err(err) => error!("Connect Error: {}", err),
             }
