@@ -51,7 +51,6 @@ pub struct PeerMetadata {
     /// How long to wait before trying to reconnect to a peer
     pub retry_frequency: u64,
     /// The required way the local node must be identified, this is required on retry
-    #[cfg(feature = "challenge-authorization")]
     pub required_local_auth: PeerAuthorizationToken,
 }
 
@@ -63,6 +62,8 @@ pub struct PeerMap {
     // Endpoint to peer id
     endpoints: HashMap<String, PeerAuthorizationToken>,
     initial_retry_frequency: u64,
+    #[cfg(not(feature = "challenge-authorization"))]
+    local_identity: PeerAuthorizationToken,
 }
 
 impl PeerMap {
@@ -71,7 +72,12 @@ impl PeerMap {
     /// # Arguments
     ///
     /// * `initial_retry_frequency` - The value to set as the retry frequency for a new peer
-    pub fn new(initial_retry_frequency: u64) -> Self {
+    /// * `local_identity` - The default required local authorization if the
+    ///  `challenge-authorization` features is not enabled
+    pub fn new(
+        initial_retry_frequency: u64,
+        #[cfg(not(feature = "challenge-authorization"))] local_identity: PeerAuthorizationToken,
+    ) -> Self {
         // initialize peers metric
         gauge!("splinter.peer_manager.peers", 0);
 
@@ -79,6 +85,8 @@ impl PeerMap {
             peers: HashMap::new(),
             endpoints: HashMap::new(),
             initial_retry_frequency,
+            #[cfg(not(feature = "challenge-authorization"))]
+            local_identity,
         }
     }
 
@@ -128,6 +136,8 @@ impl PeerMap {
             retry_frequency: self.initial_retry_frequency,
             #[cfg(feature = "challenge-authorization")]
             required_local_auth,
+            #[cfg(not(feature = "challenge-authorization"))]
+            required_local_auth: self.local_identity.clone(),
         };
 
         self.peers.insert(peer_id.clone(), peer_metadata);
@@ -227,7 +237,11 @@ pub mod tests {
     //  3. Update the first peer and test the updated peer id is returned in place of the old id.
     #[test]
     fn test_get_peer_ids() {
-        let mut peer_map = PeerMap::new(10);
+        let mut peer_map = PeerMap::new(
+            10,
+            #[cfg(not(feature = "challenge-authorization"))]
+            PeerAuthorizationToken::from_peer_id("my_id"),
+        );
 
         let peers = peer_map.peer_ids();
         assert_eq!(peers, Vec::<PeerAuthorizationToken>::new());
@@ -276,7 +290,11 @@ pub mod tests {
     //  2. Add two peers and test that their ids are returned from connection_ids()
     #[test]
     fn test_get_connection_ids() {
-        let mut peer_map = PeerMap::new(10);
+        let mut peer_map = PeerMap::new(
+            10,
+            #[cfg(not(feature = "challenge-authorization"))]
+            PeerAuthorizationToken::from_peer_id("my_id"),
+        );
 
         let peers = peer_map.peer_ids();
         assert_eq!(peers, Vec::<PeerAuthorizationToken>::new());
@@ -328,7 +346,11 @@ pub mod tests {
     //  4. Validate same metadata is returned from get_peer_from_endpoint("test_endpoint2")
     #[test]
     fn test_get_peer_by_endpoint() {
-        let mut peer_map = PeerMap::new(10);
+        let mut peer_map = PeerMap::new(
+            10,
+            #[cfg(not(feature = "challenge-authorization"))]
+            PeerAuthorizationToken::from_peer_id("my_id"),
+        );
 
         let peer_metadata = peer_map.get_peer_from_endpoint("bad_endpoint");
         assert_eq!(peer_metadata, None);
@@ -374,7 +396,11 @@ pub mod tests {
     //  3. Check that the correct metadata is returned from self.peers.get()
     #[test]
     fn test_insert_peer() {
-        let mut peer_map = PeerMap::new(10);
+        let mut peer_map = PeerMap::new(
+            10,
+            #[cfg(not(feature = "challenge-authorization"))]
+            PeerAuthorizationToken::from_peer_id("my_id"),
+        );
 
         peer_map.insert(
             PeerAuthorizationToken::Trust {
@@ -417,7 +443,11 @@ pub mod tests {
     //  3. Verify that the correct peer_metadata is returned when removing test_peer
     #[test]
     fn test_remove_peer() {
-        let mut peer_map = PeerMap::new(10);
+        let mut peer_map = PeerMap::new(
+            10,
+            #[cfg(not(feature = "challenge-authorization"))]
+            PeerAuthorizationToken::from_peer_id("my_id"),
+        );
 
         let peer_metdata = peer_map.remove(&PeerAuthorizationToken::Trust {
             peer_id: "test_peer".to_string(),
@@ -468,7 +498,11 @@ pub mod tests {
     //  4. Check that the peer's metadata now points to test_endpoint1 and the peer is disconnected
     #[test]
     fn test_get_update_active_endpoint() {
-        let mut peer_map = PeerMap::new(10);
+        let mut peer_map = PeerMap::new(
+            10,
+            #[cfg(not(feature = "challenge-authorization"))]
+            PeerAuthorizationToken::from_peer_id("my_id"),
+        );
         let no_peer_metadata = PeerMetadata {
             id: PeerAuthorizationToken::Trust {
                 peer_id: "test_peer".to_string(),
@@ -479,7 +513,6 @@ pub mod tests {
             status: PeerStatus::Connected,
             last_connection_attempt: Instant::now(),
             retry_frequency: 10,
-            #[cfg(feature = "challenge-authorization")]
             required_local_auth: PeerAuthorizationToken::from_peer_id("my_id"),
         };
 

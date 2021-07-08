@@ -213,7 +213,8 @@ impl PeerManager {
         retry_interval: u64,
         max_retry_attempts: u64,
         strict_ref_counts: bool,
-        identity: String,
+        // identity is not used if challenge-authorization is enabled
+        #[allow(unused_variables)] identity: String,
         connector: Connector,
         retry_frequency: u64,
         max_retry_frequency: u64,
@@ -261,7 +262,11 @@ impl PeerManager {
         let join_handle = thread::Builder::new()
             .name("Peer Manager".into())
             .spawn(move || {
-                let mut peers = PeerMap::new(retry_frequency);
+                let mut peers = PeerMap::new(
+                    retry_frequency,
+                    #[cfg(not(feature = "challenge-authorization"))]
+                    PeerAuthorizationToken::from_peer_id(&identity),
+                );
                 // a map of identities to unreferenced peers.
                 // and a list of endpoints that should be turned into peers
                 let mut unreferenced_peers = UnreferencedPeerState::new(endpoint_retry_frequency);
@@ -296,7 +301,6 @@ impl PeerManager {
                                 connector.clone(),
                                 &mut subscribers,
                                 max_retry_attempts,
-                                &identity,
                                 &mut ref_map,
                                 retry_frequency,
                             )
@@ -904,7 +908,6 @@ fn handle_notifications(
     connector: Connector,
     subscribers: &mut SubscriberMap,
     max_retry_attempts: u64,
-    local_identity: &str,
     ref_map: &mut RefMap<PeerAuthorizationToken>,
     retry_frequency: u64,
 ) {
@@ -983,7 +986,6 @@ fn handle_notifications(
             peers,
             connector,
             subscribers,
-            local_identity,
             retry_frequency,
         ),
         ConnectionManagerNotification::Connected {
@@ -998,7 +1000,6 @@ fn handle_notifications(
             peers,
             connector,
             subscribers,
-            local_identity,
             ref_map,
             retry_frequency,
         ),
@@ -1097,7 +1098,6 @@ fn handle_inbound_connection(
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut SubscriberMap,
-    local_identity: &str,
     retry_frequency: u64,
 ) {
     info!(
@@ -1121,7 +1121,7 @@ fn handle_inbound_connection(
             PeerStatus::Connected => {
                 // Compare identities, if local identity is greater, close incoming connection
                 // otherwise, remove outbound connection and replace with inbound.
-                if local_identity > identity.id_as_string().as_str() {
+                if peer_metadata.required_local_auth > identity {
                     // if peer is already connected, remove the inbound connection
                     debug!(
                         "Removing inbound connection, already connected to {}",
@@ -1196,7 +1196,6 @@ fn handle_connected(
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut SubscriberMap,
-    local_identity: &str,
     ref_map: &mut RefMap<PeerAuthorizationToken>,
     retry_frequency: u64,
 ) {
@@ -1217,7 +1216,7 @@ fn handle_connected(
             PeerStatus::Connected => {
                 // Compare identities, if remote identity is greater, remove outbound connection
                 // otherwise replace inbound connection with outbound.
-                if local_identity < identity.id_as_string().as_str() {
+                if peer_metadata.required_local_auth < identity {
                     info!(
                         "Removing outbound connection, peer {} is already connected",
                         peer_metadata.id
