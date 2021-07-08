@@ -92,6 +92,8 @@ pub(crate) enum PeerManagerRequest {
     },
     AddUnidentified {
         endpoint: String,
+        #[cfg(feature = "challenge-authorization")]
+        local_authorization: PeerAuthorizationToken,
         sender: Sender<Result<EndpointPeerRef, PeerUnknownAddError>>,
     },
     RemovePeer {
@@ -398,7 +400,12 @@ fn handle_request(
                 warn!("Connector dropped before receiving result of adding peer");
             }
         }
-        PeerManagerRequest::AddUnidentified { endpoint, sender } => {
+        PeerManagerRequest::AddUnidentified {
+            endpoint,
+            #[cfg(feature = "challenge-authorization")]
+            local_authorization,
+            sender,
+        } => {
             if sender
                 .send(Ok(add_unidentified(
                     endpoint,
@@ -407,6 +414,8 @@ fn handle_request(
                     peer_remover,
                     peers,
                     ref_map,
+                    #[cfg(feature = "challenge-authorization")]
+                    local_authorization,
                 )))
                 .is_err()
             {
@@ -521,12 +530,21 @@ fn handle_request(
 struct UnreferencedPeer {
     endpoint: String,
     connection_id: String,
+    local_authorization: Option<PeerAuthorizationToken>,
+}
+
+/// An entry for a peer that was only requested by endpoint.
+#[derive(Debug)]
+struct RequestedEndpoint {
+    endpoint: String,
+    #[cfg(feature = "challenge-authorization")]
+    local_authorization: PeerAuthorizationToken,
 }
 
 struct UnreferencedPeerState {
     peers: HashMap<PeerAuthorizationToken, UnreferencedPeer>,
     // The list of endpoints that have been requested without an ID
-    requested_endpoints: Vec<String>,
+    requested_endpoints: HashMap<String, RequestedEndpoint>,
     // Last time connection to the requested endpoints was tried
     last_connection_attempt: Instant,
     // How often to try to connect to requested endpoints
@@ -537,7 +555,7 @@ impl UnreferencedPeerState {
     fn new(retry_frequency: u64) -> Self {
         UnreferencedPeerState {
             peers: HashMap::default(),
-            requested_endpoints: Vec::default(),
+            requested_endpoints: HashMap::default(),
             last_connection_attempt: Instant::now(),
             retry_frequency,
         }
@@ -568,7 +586,9 @@ fn add_peer(
                 if let Some(endpoint) = peer_metadata.endpoints.get(0) {
                     // if peer was added by endpoint, its peer metadata should be updated to
                     // include the full list of endpoints in this request
-                    if unreferenced_peers.requested_endpoints.contains(endpoint)
+                    if unreferenced_peers
+                        .requested_endpoints
+                        .contains_key(endpoint)
                         && endpoints.contains(&endpoint)
                     {
                         info!(
@@ -628,6 +648,7 @@ fn add_peer(
     if let Some(UnreferencedPeer {
         connection_id,
         endpoint,
+        ..
     }) = unreferenced_peers.peers.remove(&peer_id)
     {
         peers.insert(
@@ -705,6 +726,7 @@ fn add_unidentified(
     peer_remover: &PeerRemover,
     peers: &PeerMap,
     ref_map: &mut RefMap<PeerAuthorizationToken>,
+    #[cfg(feature = "challenge-authorization")] local_authorization: PeerAuthorizationToken,
 ) -> EndpointPeerRef {
     info!("Attempting to peer with peer by endpoint {}", endpoint);
     if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
@@ -719,16 +741,21 @@ fn add_unidentified(
             #[cfg(feature = "challenge-authorization")]
             None,
             #[cfg(feature = "challenge-authorization")]
-            None,
+            Some(local_authorization.clone().into()),
         ) {
             Ok(()) => (),
             Err(err) => {
                 warn!("Unable to peer with peer at {}: {}", endpoint, err);
             }
         };
-        unreferenced_peers
-            .requested_endpoints
-            .push(endpoint.to_string());
+        unreferenced_peers.requested_endpoints.insert(
+            endpoint.to_string(),
+            RequestedEndpoint {
+                endpoint: endpoint.to_string(),
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
+            },
+        );
         EndpointPeerRef::new(endpoint, peer_remover.clone())
     }
 }
@@ -1151,6 +1178,7 @@ fn handle_inbound_connection(
             UnreferencedPeer {
                 connection_id,
                 endpoint: endpoint.to_string(),
+                local_authorization: None,
             },
         ) {
             if old_peer.endpoint != endpoint {
@@ -1281,7 +1309,9 @@ fn handle_connected(
 
         // if this endpoint has been requested, add this connection to peers with the provided
         // endpoint
-        if unreferenced_peers.requested_endpoints.contains(&endpoint) {
+        // allow unused-variables, variable required if challenge-authorization is enabled
+        #[allow(unused_variables)]
+        if let Some(requested_endpoint) = unreferenced_peers.requested_endpoints.get(&endpoint) {
             ref_map.add_ref(identity.clone());
             peers.insert(
                 identity.clone(),
@@ -1290,7 +1320,7 @@ fn handle_connected(
                 endpoint,
                 PeerStatus::Connected,
                 #[cfg(feature = "challenge-authorization")]
-                None,
+                Some(requested_endpoint.local_authorization.clone()),
             );
 
             let notification = PeerManagerNotification::Connected { peer: identity };
@@ -1304,6 +1334,7 @@ fn handle_connected(
             UnreferencedPeer {
                 connection_id,
                 endpoint: endpoint.to_string(),
+                local_authorization: None,
             },
         ) {
             if old_peer.endpoint != endpoint {
@@ -1399,19 +1430,19 @@ fn retry_pending(
         .as_secs()
         > unreferenced_peers.retry_frequency
     {
-        for endpoint in unreferenced_peers.requested_endpoints.iter() {
-            if peers.contains_endpoint(endpoint) {
+        for (endpoint, requested_endpoint) in unreferenced_peers.requested_endpoints.iter() {
+            if peers.contains_endpoint(&requested_endpoint.endpoint) {
                 continue;
             }
             info!("Attempting to peer with peer by {}", endpoint);
             let connection_id = format!("{}", Uuid::new_v4());
             match connector.request_connection(
-                &endpoint,
+                &requested_endpoint.endpoint,
                 &connection_id,
                 #[cfg(feature = "challenge-authorization")]
                 None,
                 #[cfg(feature = "challenge-authorization")]
-                None,
+                Some(requested_endpoint.local_authorization.clone().into()),
             ) {
                 Ok(()) => (),
                 // If request_connection errored we will retry in the future
@@ -2240,7 +2271,11 @@ pub mod tests {
                 .subscribe_sender(tx)
                 .expect("Unable to get subscriber");
             let endpoint_peer_ref = peer_connector
-                .add_unidentified_peer("inproc://test".to_string())
+                .add_unidentified_peer(
+                    "inproc://test".to_string(),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("my_id"),
+                )
                 .expect("Unable to add peer by endpoint");
             assert_eq!(endpoint_peer_ref.endpoint(), "inproc://test".to_string());
             // timeout after 60 seconds

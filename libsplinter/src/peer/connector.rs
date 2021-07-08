@@ -121,14 +121,21 @@ impl PeerManagerConnector {
     /// # Arguments
     ///
     /// * `endpoint` - The endpoint associated with the peer.
+    /// * `local_authorization` - The required PeerAuthorizationToken that will be used to identify
+    /// *  the local node.
     pub fn add_unidentified_peer(
         &self,
         endpoint: String,
+        #[cfg(feature = "challenge-authorization")] local_authorization: PeerAuthorizationToken,
     ) -> Result<EndpointPeerRef, PeerUnknownAddError> {
         let (sender, recv) = channel();
 
-        let message =
-            PeerManagerMessage::Request(PeerManagerRequest::AddUnidentified { endpoint, sender });
+        let message = PeerManagerMessage::Request(PeerManagerRequest::AddUnidentified {
+            endpoint,
+            #[cfg(feature = "challenge-authorization")]
+            local_authorization,
+            sender,
+        });
 
         match self.sender.send(message) {
             Ok(()) => (),
