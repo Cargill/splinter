@@ -658,7 +658,7 @@ fn add_peer(
             endpoint,
             PeerStatus::Connected,
             #[cfg(feature = "challenge-authorization")]
-            Some(required_local_auth),
+            required_local_auth,
         );
 
         let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
@@ -712,7 +712,7 @@ fn add_peer(
         active_endpoint,
         PeerStatus::Pending,
         #[cfg(feature = "challenge-authorization")]
-        Some(required_local_auth),
+        required_local_auth,
     );
     let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
     Ok(peer_ref)
@@ -952,10 +952,7 @@ fn handle_notifications(
                             #[cfg(feature = "challenge-authorization")]
                             Some(peer_metadata.id.clone().into()),
                             #[cfg(feature = "challenge-authorization")]
-                            peer_metadata
-                                .required_local_auth
-                                .clone()
-                                .map(|auth_type| auth_type.into()),
+                            Some(peer_metadata.required_local_auth.clone().into()),
                         ) {
                             Ok(()) => break,
                             Err(err) => {
@@ -1064,10 +1061,7 @@ fn handle_disconnection(
                     #[cfg(feature = "challenge-authorization")]
                     Some(identity.clone().into()),
                     #[cfg(feature = "challenge-authorization")]
-                    peer_metadata
-                        .required_local_auth
-                        .clone()
-                        .map(|auth_type| auth_type.into()),
+                    Some(peer_metadata.required_local_auth.clone().into()),
                 ) {
                     Ok(()) => break,
                     Err(err) => {
@@ -1320,7 +1314,7 @@ fn handle_connected(
                 endpoint,
                 PeerStatus::Connected,
                 #[cfg(feature = "challenge-authorization")]
-                Some(requested_endpoint.local_authorization.clone()),
+                requested_endpoint.local_authorization.clone(),
             );
 
             let notification = PeerManagerNotification::Connected { peer: identity };
@@ -1404,10 +1398,7 @@ fn retry_pending(
                 #[cfg(feature = "challenge-authorization")]
                 Some(peer_metadata.id.clone().into()),
                 #[cfg(feature = "challenge-authorization")]
-                peer_metadata
-                    .required_local_auth
-                    .clone()
-                    .map(|auth_type| auth_type.into()),
+                Some(peer_metadata.required_local_auth.clone().into()),
             ) {
                 Ok(()) => peer_metadata.active_endpoint = endpoint.to_string(),
                 // If request_connection errored we will retry in the future
