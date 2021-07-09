@@ -434,10 +434,15 @@ impl SplinterDaemon {
         // hold on to peer refs for the peers provided to ensure the connections are kept around
         let mut peer_refs = vec![];
         for endpoint in self.initial_peers.iter() {
+            #[cfg(feature = "challenge-authorization")]
+            let (endpoint, token) =
+                parse_peer_endpoint(endpoint, &self.peering_token, &self.node_id);
+            #[cfg(not(feature = "challenge-authorization"))]
+            let endpoint = endpoint.to_string();
             match peer_connector.add_unidentified_peer(
-                endpoint.into(),
+                endpoint,
                 #[cfg(feature = "challenge-authorization")]
-                self.peering_token.clone(),
+                token,
             ) {
                 Ok(peer_ref) => peer_refs.push(peer_ref),
                 Err(err) => error!("Connect Error: {}", err),
@@ -1638,6 +1643,26 @@ fn create_allow_keys_authorization_handler(
             ))
         })?,
     ))
+}
+
+/// Parse the peer endpoint that we want to connect to regardless of a circuit. The endpoint will
+/// either be in normal form impling it should use the configured peer authorization token for
+/// peering (usally challenge, unless no keys were provided) or includes +trust after the
+/// transport type which means a trust token should be used
+#[cfg(feature = "challenge-authorization")]
+fn parse_peer_endpoint(
+    endpoint: &str,
+    peering_token: &PeerAuthorizationToken,
+    node_id: &str,
+) -> (String, PeerAuthorizationToken) {
+    // if endpoint is in the form tcp+trust://ipaddr:port Trust authorization must be used
+    if endpoint.contains("+trust://") {
+        // set endpoint to the form tcp://ipaddr:port, removing the +trust and return a trust token
+        let endpoint = endpoint.replace("+trust://", "://");
+        (endpoint, PeerAuthorizationToken::from_peer_id(node_id))
+    } else {
+        (endpoint.to_string(), peering_token.clone())
+    }
 }
 
 #[derive(Debug)]

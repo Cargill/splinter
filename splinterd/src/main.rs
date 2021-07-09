@@ -335,7 +335,10 @@ fn main() {
         .arg(
             Arg::with_name("peers")
                 .long("peers")
-                .help("Endpoint that service will connect to, protocol-prefix://ip:port")
+                .help(
+                    "Endpoint that service will connect to, protocol-prefix://ip:port or \
+                    protocol-prefix+trust://ip:port to require trust authorization",
+                )
                 .takes_value(true)
                 .multiple(true)
                 .alias("peer"),
