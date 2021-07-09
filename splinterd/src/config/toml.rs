@@ -81,6 +81,8 @@ struct TomlConfig {
     metrics_username: Option<String>,
     #[cfg(feature = "metrics")]
     metrics_password: Option<String>,
+    #[cfg(feature = "challenge-authorization")]
+    peering_key: Option<String>,
     #[cfg(feature = "log-config")]
     appenders: Option<HashMap<String, UnnamedAppenderConfig>>,
     #[cfg(feature = "log-config")]
@@ -217,6 +219,11 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 partial_config = partial_config.with_loggers(self.toml_config.loggers)
             }
             partial_config = partial_config.with_appenders(self.toml_config.appenders);
+        }
+
+        #[cfg(feature = "challenge-authorization")]
+        {
+            partial_config = partial_config.with_peering_key(self.toml_config.peering_key);
         }
 
         // deprecated values, only set if the current value was not set

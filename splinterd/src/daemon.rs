@@ -154,6 +154,8 @@ pub struct SplinterDaemon {
     strict_ref_counts: bool,
     #[cfg(feature = "challenge-authorization")]
     signers: Vec<Box<dyn Signer>>,
+    #[cfg(feature = "challenge-authorization")]
+    peering_token: PeerAuthorizationToken,
 }
 
 impl SplinterDaemon {
@@ -435,7 +437,7 @@ impl SplinterDaemon {
             match peer_connector.add_unidentified_peer(
                 endpoint.into(),
                 #[cfg(feature = "challenge-authorization")]
-                PeerAuthorizationToken::from_peer_id(&self.node_id),
+                self.peering_token.clone(),
             ) {
                 Ok(peer_ref) => peer_refs.push(peer_ref),
                 Err(err) => error!("Connect Error: {}", err),
@@ -1064,6 +1066,8 @@ pub struct SplinterDaemonBuilder {
     strict_ref_counts: Option<bool>,
     #[cfg(feature = "challenge-authorization")]
     signers: Option<Vec<Box<dyn Signer>>>,
+    #[cfg(feature = "challenge-authorization")]
+    peering_token: Option<PeerAuthorizationToken>,
 }
 
 impl SplinterDaemonBuilder {
@@ -1225,6 +1229,12 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "challenge-authorization")]
+    pub fn with_peering_token(mut self, value: Option<PeerAuthorizationToken>) -> Self {
+        self.peering_token = value;
+        self
+    }
+
     pub fn build(self) -> Result<SplinterDaemon, CreateError> {
         let heartbeat = self.heartbeat.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
@@ -1308,6 +1318,11 @@ impl SplinterDaemonBuilder {
             vec![]
         });
 
+        #[cfg(feature = "challenge-authorization")]
+        let peering_token = self
+            .peering_token
+            .unwrap_or_else(|| PeerAuthorizationToken::from_peer_id(&node_id));
+
         Ok(SplinterDaemon {
             #[cfg(feature = "authorization-handler-allow-keys")]
             config_dir,
@@ -1350,6 +1365,8 @@ impl SplinterDaemonBuilder {
             strict_ref_counts,
             #[cfg(feature = "challenge-authorization")]
             signers,
+            #[cfg(feature = "challenge-authorization")]
+            peering_token,
         })
     }
 }
