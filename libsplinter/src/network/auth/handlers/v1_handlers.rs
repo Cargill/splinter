@@ -984,25 +984,17 @@ impl Handler for AuthChallengeSubmitRequestHandler {
 
                 return Ok(());
             }
-        } else if public_keys.len() == 1 {
+        } else if !public_keys.is_empty() {
             // we know this is safe because of above length check
             // defaults to the first key in the list
             public_key::PublicKey::from_bytes(public_keys[0].clone())
         } else {
-            let error_string = {
-                if public_keys.is_empty() {
-                    "No public keys submitted".to_string()
-                } else {
-                    "Too many public keys submitted".to_string()
-                }
-            };
-
             send_authorization_error(
                 &self.auth_manager,
                 context.source_id(),
                 context.source_connection_id(),
                 sender,
-                &error_string,
+                "No public keys submitted",
             )?;
 
             return Ok(());
