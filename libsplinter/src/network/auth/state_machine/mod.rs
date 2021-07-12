@@ -20,64 +20,167 @@ use std::sync::{Arc, Mutex};
 
 use self::trust_v0::{TrustV0AuthorizationAction, TrustV0AuthorizationState};
 #[cfg(feature = "trust-authorization")]
-use self::trust_v1::{TrustAuthorizationAction, TrustAuthorizationState};
+use self::trust_v1::{
+    TrustAuthorizationLocalAction, TrustAuthorizationLocalState, TrustAuthorizationRemoteAction,
+    TrustAuthorizationRemoteState,
+};
 
 use super::{ManagedAuthorizationState, ManagedAuthorizations};
 
-type Identity = String;
+#[derive(Debug, PartialEq, Clone)]
+pub enum Identity {
+    Trust { identity: String },
+}
 
 #[derive(PartialEq, Debug, Clone)]
-pub(crate) enum AuthorizationState {
-    Unknown,
-    AuthComplete(Option<String>),
+pub(crate) enum AuthorizationRemoteState {
+    Start,
+    Done(Identity),
     Unauthorized,
 
     #[cfg(feature = "trust-authorization")]
-    ProtocolAgreeing,
+    ReceivedAuthProtocolRequest,
+    #[cfg(feature = "trust-authorization")]
+    SentAuthProtocolResponse,
+
     TrustV0(TrustV0AuthorizationState),
     #[cfg(feature = "trust-authorization")]
-    Trust(TrustAuthorizationState),
+    Trust(TrustAuthorizationRemoteState),
 }
 
-impl fmt::Display for AuthorizationState {
+impl fmt::Display for AuthorizationRemoteState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AuthorizationState::Unknown => f.write_str("Unknown"),
-            #[cfg(feature = "trust-authorization")]
-            AuthorizationState::ProtocolAgreeing => f.write_str("ProtocolAgreeing"),
-            AuthorizationState::TrustV0(action) => write!(f, "TrustV0: {}", action),
-            #[cfg(feature = "trust-authorization")]
-            AuthorizationState::Trust(action) => write!(f, "Trust: {}", action),
+            AuthorizationRemoteState::Start => f.write_str("Start"),
+            AuthorizationRemoteState::Done(_) => f.write_str("Done"),
+            AuthorizationRemoteState::Unauthorized => f.write_str("Unauthorized"),
 
-            AuthorizationState::AuthComplete(_) => f.write_str("Authorization Complete"),
-            AuthorizationState::Unauthorized => f.write_str("Unauthorized"),
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationRemoteState::ReceivedAuthProtocolRequest => {
+                f.write_str("ReceivedAuthProtocolRequest")
+            }
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationRemoteState::SentAuthProtocolResponse => {
+                f.write_str("SentAuthProtocolResponse")
+            }
+            AuthorizationRemoteState::TrustV0(state) => write!(f, "TrustV0: {}", state),
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationRemoteState::Trust(state) => write!(f, "Trust: {}", state),
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub(crate) enum AuthorizationLocalState {
+    Start,
+    #[cfg(feature = "trust-authorization")]
+    WaitingForAuthProtocolResponse,
+    #[cfg(feature = "trust-authorization")]
+    ReceivedAuthProtocolResponse,
+    #[cfg(feature = "trust-authorization")]
+    Authorized,
+    #[cfg(feature = "trust-authorization")]
+    WaitForComplete,
+    AuthorizedAndComplete,
+    Unauthorized,
+
+    #[cfg(feature = "trust-authorization")]
+    Trust(TrustAuthorizationLocalState),
+}
+
+impl fmt::Display for AuthorizationLocalState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AuthorizationLocalState::Start => f.write_str("Start"),
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationLocalState::Authorized => f.write_str("Authorized"),
+            AuthorizationLocalState::Unauthorized => f.write_str("Unauthorized"),
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationLocalState::WaitingForAuthProtocolResponse => {
+                f.write_str("WaitingForAuthProtocolResponse")
+            }
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationLocalState::ReceivedAuthProtocolResponse => {
+                f.write_str("ReceivedAuthProtocolResponse")
+            }
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationLocalState::WaitForComplete => f.write_str("WaitForComplete"),
+            AuthorizationLocalState::AuthorizedAndComplete => f.write_str("AuthorizedAndComplete"),
+
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationLocalState::Trust(action) => write!(f, "Trust: {}", action),
         }
     }
 }
 
 /// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
-pub(crate) enum AuthorizationAction {
+pub(crate) enum AuthorizationRemoteAction {
     Connecting,
+
     #[cfg(feature = "trust-authorization")]
-    ProtocolAgreeing,
+    ReceiveAuthProtocolRequest,
+    #[cfg(feature = "trust-authorization")]
+    SendAuthProtocolResponse,
+
     TrustV0(TrustV0AuthorizationAction),
     #[cfg(feature = "trust-authorization")]
-    Trust(TrustAuthorizationAction),
+    Trust(TrustAuthorizationRemoteAction),
 
     Unauthorizing,
 }
 
-impl fmt::Display for AuthorizationAction {
+impl fmt::Display for AuthorizationRemoteAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AuthorizationAction::Connecting => f.write_str("Connecting"),
-            AuthorizationAction::Unauthorizing => f.write_str("Unauthorizing"),
+            AuthorizationRemoteAction::Connecting => f.write_str("Connecting"),
             #[cfg(feature = "trust-authorization")]
-            AuthorizationAction::ProtocolAgreeing => f.write_str("ProtocolAgreeing"),
-            AuthorizationAction::TrustV0(_) => f.write_str("TrustV0"),
+            AuthorizationRemoteAction::ReceiveAuthProtocolRequest => {
+                f.write_str("ReceiveAuthProtocolRequest")
+            }
             #[cfg(feature = "trust-authorization")]
-            AuthorizationAction::Trust(_) => f.write_str("Trust"),
+            AuthorizationRemoteAction::SendAuthProtocolResponse => {
+                f.write_str("SendAuthProtocolResponse")
+            }
+            AuthorizationRemoteAction::TrustV0(action) => write!(f, "TrusV0t: {}", action),
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationRemoteAction::Trust(action) => write!(f, "Trust: {}", action),
+
+            AuthorizationRemoteAction::Unauthorizing => f.write_str("Unauthorizing"),
+        }
+    }
+}
+
+/// The state transitions that can be applied on a connection during authorization.
+#[derive(PartialEq, Debug)]
+#[cfg(feature = "trust-authorization")]
+pub(crate) enum AuthorizationLocalAction {
+    SendAuthProtocolRequest,
+    ReceiveAuthProtocolResponse,
+
+    #[cfg(feature = "trust-authorization")]
+    Trust(TrustAuthorizationLocalAction),
+
+    SendAuthComplete,
+    Unauthorizing,
+}
+
+#[cfg(feature = "trust-authorization")]
+impl fmt::Display for AuthorizationLocalAction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AuthorizationLocalAction::SendAuthProtocolRequest => {
+                f.write_str("SendAuthProtocolRequest")
+            }
+            AuthorizationLocalAction::ReceiveAuthProtocolResponse => {
+                f.write_str("SendAuthProtocolResponse")
+            }
+
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationLocalAction::Trust(action) => write!(f, "Trust: {}", action),
+
+            AuthorizationLocalAction::SendAuthComplete => f.write_str("SendAuthComplete"),
+            AuthorizationLocalAction::Unauthorizing => f.write_str("Unauthorizing"),
         }
     }
 }
@@ -86,7 +189,9 @@ impl fmt::Display for AuthorizationAction {
 #[derive(PartialEq, Debug)]
 pub(crate) enum AuthorizationActionError {
     AlreadyConnecting,
-    InvalidMessageOrder(AuthorizationState, AuthorizationAction),
+    InvalidRemoteMessageOrder(AuthorizationRemoteState, AuthorizationRemoteAction),
+    #[cfg(feature = "trust-authorization")]
+    InvalidLocalMessageOrder(AuthorizationLocalState, AuthorizationLocalAction),
     InternalError(String),
 }
 
@@ -96,8 +201,20 @@ impl fmt::Display for AuthorizationActionError {
             AuthorizationActionError::AlreadyConnecting => {
                 f.write_str("Already attempting to connect")
             }
-            AuthorizationActionError::InvalidMessageOrder(start, action) => {
-                write!(f, "Attempting to transition from {} via {}", start, action)
+            AuthorizationActionError::InvalidRemoteMessageOrder(start, action) => {
+                write!(
+                    f,
+                    "Attempting to transition from remote state {} via {}",
+                    start, action
+                )
+            }
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationActionError::InvalidLocalMessageOrder(start, action) => {
+                write!(
+                    f,
+                    "Attempting to transition from locale state {} via {}",
+                    start, action
+                )
             }
             AuthorizationActionError::InternalError(msg) => f.write_str(&msg),
         }
@@ -115,11 +232,12 @@ impl AuthorizationManagerStateMachine {
     /// Errors
     ///
     /// The errors are error messages that should be returned on the appropriate message
-    pub(crate) fn next_state(
+    #[cfg(feature = "trust-authorization")]
+    pub(crate) fn next_local_state(
         &self,
         connection_id: &str,
-        action: AuthorizationAction,
-    ) -> Result<AuthorizationState, AuthorizationActionError> {
+        action: AuthorizationLocalAction,
+    ) -> Result<AuthorizationLocalState, AuthorizationActionError> {
         let mut shared = self.shared.lock().map_err(|_| {
             AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
         })?;
@@ -129,77 +247,79 @@ impl AuthorizationManagerStateMachine {
                 .states
                 .entry(connection_id.to_string())
                 .or_insert(ManagedAuthorizationState {
-                    local_state: AuthorizationState::Unknown,
-                    remote_state: AuthorizationState::Unknown,
+                    local_state: AuthorizationLocalState::Start,
+                    remote_state: AuthorizationRemoteState::Start,
+                    received_complete: false,
                 });
 
-        if action == AuthorizationAction::Unauthorizing {
-            cur_state.local_state = AuthorizationState::Unauthorized;
-            cur_state.remote_state = AuthorizationState::Unauthorized;
-            return Ok(AuthorizationState::Unauthorized);
+        if action == AuthorizationLocalAction::Unauthorizing {
+            cur_state.local_state = AuthorizationLocalState::Unauthorized;
+            cur_state.remote_state = AuthorizationRemoteState::Unauthorized;
+            return Ok(AuthorizationLocalState::Unauthorized);
         }
 
         match cur_state.local_state.clone() {
-            AuthorizationState::Unknown => match action {
-                AuthorizationAction::Connecting => {
-                    if cur_state.local_state
-                        == AuthorizationState::TrustV0(TrustV0AuthorizationState::Connecting)
-                    {
-                        return Err(AuthorizationActionError::AlreadyConnecting);
-                    };
-                    cur_state.local_state =
-                        AuthorizationState::TrustV0(TrustV0AuthorizationState::Connecting);
-                    cur_state.remote_state = AuthorizationState::AuthComplete(None);
-                    Ok(AuthorizationState::TrustV0(
-                        TrustV0AuthorizationState::Connecting,
-                    ))
+            AuthorizationLocalState::Start => match action {
+                AuthorizationLocalAction::SendAuthProtocolRequest => {
+                    cur_state.local_state = AuthorizationLocalState::WaitingForAuthProtocolResponse;
+                    Ok(AuthorizationLocalState::WaitingForAuthProtocolResponse)
                 }
-                #[cfg(feature = "trust-authorization")]
-                AuthorizationAction::ProtocolAgreeing => {
-                    cur_state.local_state = AuthorizationState::ProtocolAgreeing;
-                    Ok(AuthorizationState::ProtocolAgreeing)
-                }
-                _ => Err(AuthorizationActionError::InvalidMessageOrder(
-                    AuthorizationState::Unknown,
-                    action,
-                )),
-            },
-            AuthorizationState::TrustV0(state) => match action {
-                AuthorizationAction::TrustV0(action) => {
-                    let new_state = state.next_state(action)?;
-                    cur_state.local_state = new_state.clone();
-                    Ok(new_state)
-                }
-                _ => Err(AuthorizationActionError::InvalidMessageOrder(
-                    AuthorizationState::TrustV0(state),
+                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
+                    AuthorizationLocalState::Start,
                     action,
                 )),
             },
             // v1 state transitions
-            #[cfg(feature = "trust-authorization")]
-            AuthorizationState::ProtocolAgreeing => match action {
-                AuthorizationAction::Trust(action) => {
-                    let new_state =
-                        TrustAuthorizationState::TrustConnecting.next_state(action, cur_state)?;
+            AuthorizationLocalState::WaitingForAuthProtocolResponse => match action {
+                AuthorizationLocalAction::ReceiveAuthProtocolResponse => {
+                    cur_state.local_state = AuthorizationLocalState::ReceivedAuthProtocolResponse;
+                    Ok(AuthorizationLocalState::ReceivedAuthProtocolResponse)
+                }
+                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
+                    AuthorizationLocalState::Start,
+                    action,
+                )),
+            },
+            AuthorizationLocalState::ReceivedAuthProtocolResponse => match action {
+                #[cfg(feature = "trust-authorization")]
+                AuthorizationLocalAction::Trust(action) => {
+                    let new_state = TrustAuthorizationLocalState::TrustConnecting
+                        .next_local_state(action, cur_state)?;
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidMessageOrder(
-                    AuthorizationState::ProtocolAgreeing,
+                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
+                    AuthorizationLocalState::WaitingForAuthProtocolResponse,
                     action,
                 )),
             },
             #[cfg(feature = "trust-authorization")]
-            AuthorizationState::Trust(state) => match action {
-                AuthorizationAction::Trust(action) => {
-                    let new_state = state.next_state(action, cur_state)?;
+            AuthorizationLocalState::Trust(state) => match action {
+                AuthorizationLocalAction::Trust(action) => {
+                    let new_state = state.next_local_state(action, cur_state)?;
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidMessageOrder(
-                    AuthorizationState::Trust(state),
+                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
+                    AuthorizationLocalState::Trust(state),
                     action,
                 )),
             },
-            _ => Err(AuthorizationActionError::InvalidMessageOrder(
+            AuthorizationLocalState::Authorized => match action {
+                AuthorizationLocalAction::SendAuthComplete => {
+                    let new_state = if cur_state.received_complete {
+                        AuthorizationLocalState::AuthorizedAndComplete
+                    } else {
+                        AuthorizationLocalState::WaitForComplete
+                    };
+
+                    cur_state.local_state = new_state.clone();
+                    Ok(new_state)
+                }
+                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
+                    AuthorizationLocalState::Authorized,
+                    action,
+                )),
+            },
+            _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
                 cur_state.local_state.clone(),
                 action,
             )),
@@ -211,12 +331,11 @@ impl AuthorizationManagerStateMachine {
     /// Errors
     ///
     /// The errors are error messages that should be returned on the appropriate message
-    #[cfg(feature = "trust-authorization")]
     pub(crate) fn next_remote_state(
         &self,
         connection_id: &str,
-        action: AuthorizationAction,
-    ) -> Result<AuthorizationState, AuthorizationActionError> {
+        action: AuthorizationRemoteAction,
+    ) -> Result<AuthorizationRemoteState, AuthorizationActionError> {
         let mut shared = self.shared.lock().map_err(|_| {
             AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
         })?;
@@ -226,56 +345,123 @@ impl AuthorizationManagerStateMachine {
                 .states
                 .entry(connection_id.to_string())
                 .or_insert(ManagedAuthorizationState {
-                    local_state: AuthorizationState::Unknown,
-                    remote_state: AuthorizationState::Unknown,
+                    local_state: AuthorizationLocalState::Start,
+                    remote_state: AuthorizationRemoteState::Start,
+                    received_complete: false,
                 });
 
-        if action == AuthorizationAction::Unauthorizing {
-            cur_state.local_state = AuthorizationState::Unauthorized;
-            cur_state.remote_state = AuthorizationState::Unauthorized;
-            return Ok(AuthorizationState::Unauthorized);
+        if action == AuthorizationRemoteAction::Unauthorizing {
+            cur_state.local_state = AuthorizationLocalState::Unauthorized;
+            cur_state.remote_state = AuthorizationRemoteState::Unauthorized;
+            return Ok(AuthorizationRemoteState::Unauthorized);
         }
 
         match cur_state.remote_state.clone() {
-            AuthorizationState::Unknown => match action {
-                AuthorizationAction::ProtocolAgreeing => {
-                    cur_state.remote_state = AuthorizationState::ProtocolAgreeing;
-                    Ok(AuthorizationState::ProtocolAgreeing)
+            AuthorizationRemoteState::Start => match action {
+                AuthorizationRemoteAction::Connecting => {
+                    if cur_state.remote_state
+                        == AuthorizationRemoteState::TrustV0(TrustV0AuthorizationState::Connecting)
+                    {
+                        return Err(AuthorizationActionError::AlreadyConnecting);
+                    };
+                    // this state is not used in trust v0 so send to finished
+                    cur_state.local_state = AuthorizationLocalState::AuthorizedAndComplete;
+                    cur_state.remote_state =
+                        AuthorizationRemoteState::TrustV0(TrustV0AuthorizationState::Connecting);
+                    Ok(AuthorizationRemoteState::TrustV0(
+                        TrustV0AuthorizationState::Connecting,
+                    ))
                 }
-                _ => Err(AuthorizationActionError::InvalidMessageOrder(
-                    AuthorizationState::Unknown,
-                    action,
-                )),
-            },
-            // v1 state transitions
-            AuthorizationState::ProtocolAgreeing => match action {
-                AuthorizationAction::Trust(action) => {
-                    let new_state = TrustAuthorizationState::TrustConnecting
-                        .next_remote_state(action, cur_state)?;
-                    cur_state.remote_state = new_state.clone();
-                    Ok(new_state)
+                #[cfg(feature = "trust-authorization")]
+                AuthorizationRemoteAction::ReceiveAuthProtocolRequest => {
+                    cur_state.remote_state = AuthorizationRemoteState::ReceivedAuthProtocolRequest;
+                    Ok(AuthorizationRemoteState::ReceivedAuthProtocolRequest)
                 }
-                _ => Err(AuthorizationActionError::InvalidMessageOrder(
-                    AuthorizationState::ProtocolAgreeing,
+                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
+                    AuthorizationRemoteState::Start,
                     action,
                 )),
             },
             #[cfg(feature = "trust-authorization")]
-            AuthorizationState::Trust(state) => match action {
-                AuthorizationAction::Trust(action) => {
+            AuthorizationRemoteState::ReceivedAuthProtocolRequest => match action {
+                AuthorizationRemoteAction::SendAuthProtocolResponse => {
+                    cur_state.remote_state = AuthorizationRemoteState::SentAuthProtocolResponse;
+                    Ok(AuthorizationRemoteState::SentAuthProtocolResponse)
+                }
+                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
+                    AuthorizationRemoteState::Start,
+                    action,
+                )),
+            },
+            AuthorizationRemoteState::TrustV0(state) => match action {
+                AuthorizationRemoteAction::TrustV0(action) => {
+                    let new_state = state.next_local_state(action)?;
+                    cur_state.remote_state = new_state.clone();
+                    Ok(new_state)
+                }
+                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
+                    AuthorizationRemoteState::TrustV0(state),
+                    action,
+                )),
+            },
+            // v1 state transitions
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationRemoteState::SentAuthProtocolResponse => match action {
+                #[cfg(feature = "trust-authorization")]
+                AuthorizationRemoteAction::Trust(action) => {
+                    let new_state = TrustAuthorizationRemoteState::TrustConnecting
+                        .next_remote_state(action, cur_state)?;
+                    cur_state.remote_state = new_state.clone();
+                    Ok(new_state)
+                }
+                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
+                    AuthorizationRemoteState::SentAuthProtocolResponse,
+                    action,
+                )),
+            },
+            #[cfg(feature = "trust-authorization")]
+            AuthorizationRemoteState::Trust(state) => match action {
+                AuthorizationRemoteAction::Trust(action) => {
                     let new_state = state.next_remote_state(action, cur_state)?;
                     cur_state.remote_state = new_state.clone();
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidMessageOrder(
-                    AuthorizationState::Trust(state),
+                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
+                    AuthorizationRemoteState::Trust(state),
                     action,
                 )),
             },
-            _ => Err(AuthorizationActionError::InvalidMessageOrder(
+            _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
                 cur_state.remote_state.clone(),
                 action,
             )),
         }
+    }
+
+    #[cfg(feature = "trust-authorization")]
+    pub(crate) fn received_complete(
+        &self,
+        connection_id: &str,
+    ) -> Result<(), AuthorizationActionError> {
+        let mut shared = self.shared.lock().map_err(|_| {
+            AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
+        })?;
+
+        let mut cur_state =
+            shared
+                .states
+                .entry(connection_id.to_string())
+                .or_insert(ManagedAuthorizationState {
+                    local_state: AuthorizationLocalState::Start,
+                    remote_state: AuthorizationRemoteState::Start,
+                    received_complete: false,
+                });
+
+        cur_state.received_complete = true;
+
+        if cur_state.local_state == AuthorizationLocalState::WaitForComplete {
+            cur_state.local_state = AuthorizationLocalState::AuthorizedAndComplete;
+        }
+        Ok(())
     }
 }

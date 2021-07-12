@@ -21,7 +21,7 @@ use std::fmt;
 
 #[cfg(feature = "challenge-authorization")]
 use crate::hex::to_hex;
-use crate::network::connection_manager::ConnectionAuthorizationType;
+use crate::network::auth::ConnectionAuthorizationType;
 
 /// The authorization type specific peer ID
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

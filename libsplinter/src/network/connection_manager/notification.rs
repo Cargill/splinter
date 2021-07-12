@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::network::auth::ConnectionAuthorizationType;
+
 use super::error::ConnectionManagerError;
-use super::ConnectionAuthorizationType;
 
 /// Messages that will be dispatched to all subscription handlers
 #[derive(Debug, PartialEq, Clone)]
