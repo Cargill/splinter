@@ -1071,20 +1071,13 @@ impl Handler for AuthChallengeSubmitRequestHandler {
 
                 return Ok(());
             }
-        } else if public_keys.len() == 1 {
+        } else if !public_keys.is_empty() {
             // we know this is safe because of above length check
+            // defaults to the first key in the list
             &public_keys[0]
         } else {
-            let error_string = {
-                if public_keys.is_empty() {
-                    "No public keys submitted".to_string()
-                } else {
-                    "Too many public keys submitted".to_string()
-                }
-            };
-
             let response = AuthorizationMessage::AuthorizationError(
-                AuthorizationError::AuthorizationRejected(error_string),
+                AuthorizationError::AuthorizationRejected("No public keys submitted".to_string()),
             );
 
             let msg_bytes =
