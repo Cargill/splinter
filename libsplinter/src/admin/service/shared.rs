@@ -1930,12 +1930,16 @@ impl AdminServiceShared {
             return Ok(());
         }
 
-        let peer_node_pair = self.token_to_peer.get(peer_id).ok_or_else(|| {
-            AdminSharedError::ServiceProtocolError(format!(
-                "Missing service information for peer token : {}",
-                peer_id
-            ))
-        })?;
+        let peer_node_pair = match self.token_to_peer.get(peer_id) {
+            Some(peer_node_pair) => peer_node_pair,
+            None => {
+                warn!(
+                    "Ignoring connection, Missing service information for peer token {}",
+                    peer_id
+                );
+                return Ok(());
+            }
+        };
 
         // We have already received a service protocol request, don't sent another request
         if self
