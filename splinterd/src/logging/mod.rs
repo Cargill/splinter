@@ -14,6 +14,7 @@
 
 use log::Level;
 
+#[allow(dead_code)]
 pub const DEFAULT_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
 
 #[derive(Clone, Debug)]
@@ -43,6 +44,7 @@ pub struct AppenderConfig {
     pub kind: LogTarget,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum LogTarget {
     Stdout,
