@@ -187,6 +187,8 @@ impl AuthorizationDispatchBuilder {
                 !signers.is_empty(),
                 #[cfg(feature = "challenge-authorization")]
                 self.expected_authorization.clone(),
+                #[cfg(feature = "challenge-authorization")]
+                self.local_authorization.clone(),
             )));
 
             auth_dispatcher.set_handler(Box::new(AuthProtocolResponseHandler::new(
