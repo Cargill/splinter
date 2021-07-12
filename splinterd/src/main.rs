@@ -22,6 +22,8 @@ extern crate clap;
 mod config;
 mod daemon;
 mod error;
+#[cfg(feature = "log-config")]
+mod logging;
 mod routes;
 mod transport;
 
