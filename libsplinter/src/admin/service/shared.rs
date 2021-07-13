@@ -961,6 +961,15 @@ impl AdminServiceShared {
                 )))
             })?;
 
+        if !self.is_local_node(&local_required_auth) {
+            return Err(ServiceError::UnableToHandleMessage(Box::new(
+                AdminSharedError::ValidationFailed(format!(
+                    "Circuit contains unsupported token for local node: {}",
+                    local_required_auth
+                )),
+            )));
+        }
+
         let members = proposed_circuit.list_nodes().map_err(|err| {
             ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
                 format!("Unable to get peer tokens for members: {}", err),
@@ -1647,6 +1656,15 @@ impl AdminServiceShared {
                         ),
                     ))
                 })?;
+
+            if !self.is_local_node(&local_required_auth) {
+                return Err(ServiceError::UnableToHandleMessage(Box::new(
+                    AdminSharedError::ValidationFailed(format!(
+                        "Circuit contains unsupported token for local node: {}",
+                        local_required_auth
+                    )),
+                )));
+            }
 
             let peer_members = store_proposed_circuit.list_nodes().map_err(|err| {
                 ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
