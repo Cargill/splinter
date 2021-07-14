@@ -111,7 +111,6 @@ experimental = [
 ]
 
 authorization = [
-    "health/authorization",
     "scabbard/authorization",
     "splinter/authorization",
 ]
@@ -131,7 +130,7 @@ challenge-authorization = [
 ]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
-health-service = ["health"]
+health-service = ["health", "health/authorization"]
 https-bind = ["splinter/https-bind"]
 metrics = [
   "splinter/admin-service-count",
