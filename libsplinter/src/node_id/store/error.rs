@@ -15,6 +15,7 @@
 //! Error types and logic for NodeIdStores
 
 use crate::error::InternalError;
+use std::convert::From;
 use std::error::Error;
 use std::fmt::Display;
 
@@ -41,5 +42,18 @@ impl Error for NodeIdStoreError {
         match self {
             NodeIdStoreError::InternalError(e) => Some(e),
         }
+    }
+}
+
+impl From<diesel::result::Error> for NodeIdStoreError {
+    fn from(err: diesel::result::Error) -> Self {
+        Self::InternalError(InternalError::from_source(Box::new(err)))
+    }
+}
+
+#[cfg(feature = "diesel")]
+impl From<diesel::r2d2::PoolError> for NodeIdStoreError {
+    fn from(err: diesel::r2d2::PoolError) -> Self {
+        Self::InternalError(InternalError::from_source(Box::new(err)))
     }
 }
