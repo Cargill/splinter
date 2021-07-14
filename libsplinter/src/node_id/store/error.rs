@@ -14,9 +14,12 @@
 
 //! Error types and logic for NodeIdStores
 
-use crate::error::InternalError;
+use std::convert::From;
 use std::error::Error;
 use std::fmt::Display;
+
+use crate::error::InternalError;
+use crate::error::ResourceTemporarilyUnavailableError;
 
 /// Error type for the NodeIdStore trait.
 /// Any errors implimentations of NodeIdStore can generate must be convertable
@@ -26,12 +29,14 @@ use std::fmt::Display;
 /// NodeIdStore error enum
 pub enum NodeIdStoreError {
     InternalError(InternalError),
+    ResourceTemporarilyUnavailableError(ResourceTemporarilyUnavailableError),
 }
 
 impl Display for NodeIdStoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             NodeIdStoreError::InternalError(e) => e.fmt(f),
+            NodeIdStoreError::ResourceTemporarilyUnavailableError(e) => e.fmt(f),
         }
     }
 }
@@ -40,6 +45,22 @@ impl Error for NodeIdStoreError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             NodeIdStoreError::InternalError(e) => Some(e),
+            NodeIdStoreError::ResourceTemporarilyUnavailableError(e) => Some(e),
         }
+    }
+}
+
+impl From<diesel::result::Error> for NodeIdStoreError {
+    fn from(err: diesel::result::Error) -> Self {
+        Self::InternalError(InternalError::from_source(Box::new(err)))
+    }
+}
+
+#[cfg(feature = "diesel")]
+impl From<diesel::r2d2::PoolError> for NodeIdStoreError {
+    fn from(err: diesel::r2d2::PoolError) -> Self {
+        Self::ResourceTemporarilyUnavailableError(ResourceTemporarilyUnavailableError::from_source(
+            Box::new(err),
+        ))
     }
 }
