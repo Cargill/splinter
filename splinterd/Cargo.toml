@@ -76,6 +76,9 @@ features = [
 
 [features]
 default = [
+    "authorization",
+    "authorization-handler-allow-keys",
+    "authorization-handler-rbac",
     "biome-credentials",
     "biome-key-management",
     "biome-profile",
@@ -85,9 +88,6 @@ default = [
 ]
 
 stable = [
-    "authorization",
-    "authorization-handler-allow-keys",
-    "authorization-handler-rbac",
     "default",
     "rest-api-cors",
 ]
@@ -111,7 +111,6 @@ experimental = [
 ]
 
 authorization = [
-    "health/authorization",
     "scabbard/authorization",
     "splinter/authorization",
 ]
@@ -131,7 +130,7 @@ challenge-authorization = [
 ]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
-health-service = ["health"]
+health-service = ["health", "health/authorization"]
 https-bind = ["splinter/https-bind"]
 metrics = [
   "splinter/admin-service-count",
