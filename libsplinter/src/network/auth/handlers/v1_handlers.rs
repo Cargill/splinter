@@ -383,34 +383,6 @@ impl Handler for AuthProtocolResponseHandler {
                         }
                     }
                     _ => {
-                        #[cfg(feature = "challenge-authorization")]
-                        if protocol_request
-                            .accepted_authorization_type
-                            .iter()
-                            .any(|t| matches!(t, PeerAuthorizationType::Challenge))
-                        {
-                            let nonce_request = AuthorizationMessage::AuthChallengeNonceRequest(
-                                AuthChallengeNonceRequest,
-                            );
-
-                            let action = AuthorizationLocalAction::Challenge(
-                                ChallengeAuthorizationLocalAction::SendAuthChallengeNonceRequest,
-                            );
-                            if self
-                                .auth_manager
-                                .next_local_state(context.source_connection_id(), action)
-                                .is_err()
-                            {
-                                error!(
-                                    "Unable to transition from ReceivedAuthProtocolResponse to \
-                                    WaitingForAuthChallengeNonceResponse"
-                                )
-                            };
-
-                            msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
-                                NetworkMessage::from(nonce_request),
-                            )?;
-                        }
                         #[cfg(feature = "trust-authorization")]
                         if protocol_request
                             .accepted_authorization_type
@@ -440,6 +412,35 @@ impl Handler for AuthProtocolResponseHandler {
 
                             msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
                                 NetworkMessage::from(trust_request),
+                            )?;
+                        }
+
+                        #[cfg(feature = "challenge-authorization")]
+                        if protocol_request
+                            .accepted_authorization_type
+                            .iter()
+                            .any(|t| matches!(t, PeerAuthorizationType::Challenge))
+                        {
+                            let nonce_request = AuthorizationMessage::AuthChallengeNonceRequest(
+                                AuthChallengeNonceRequest,
+                            );
+
+                            let action = AuthorizationLocalAction::Challenge(
+                                ChallengeAuthorizationLocalAction::SendAuthChallengeNonceRequest,
+                            );
+                            if self
+                                .auth_manager
+                                .next_local_state(context.source_connection_id(), action)
+                                .is_err()
+                            {
+                                error!(
+                                    "Unable to transition from ReceivedAuthProtocolResponse to \
+                                    WaitingForAuthChallengeNonceResponse"
+                                )
+                            };
+
+                            msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
+                                NetworkMessage::from(nonce_request),
                             )?;
                         }
 
