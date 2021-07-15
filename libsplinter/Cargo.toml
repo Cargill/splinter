@@ -126,6 +126,7 @@ experimental = [
     "client-reqwest",
     "https-bind",
     "metrics",
+    "node-id-store",
     "oauth-user-list",
     "registry-client",
     "registry-client-reqwest",
@@ -168,6 +169,7 @@ events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
 memory = ["sqlite"]
 metrics = ["chrono", "futures-0-3", "influxdb", "metrics-lib", "tokio-0-2"]
+node-id-store = []
 oauth = ["biome", "base64", "oauth2", "reqwest", "rest-api"]
 oauth-user-list = ["oauth"]
 postgres = ["diesel/postgres", "diesel_migrations"]
