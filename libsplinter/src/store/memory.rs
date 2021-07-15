@@ -157,4 +157,11 @@ impl StoreFactory for MemoryStoreFactory {
     fn get_biome_user_profile_store(&self) -> Box<dyn UserProfileStore> {
         Box::new(self.biome_profile_store.clone())
     }
+
+    #[cfg(feature = "node-id-store")]
+    fn get_node_id_store(&self) -> Box<dyn crate::node_id::store::NodeIdStore> {
+        Box::new(crate::node_id::store::diesel::DieselNodeIdStore::new(
+            self.pool.clone(),
+        ))
+    }
 }

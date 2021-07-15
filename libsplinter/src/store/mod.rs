@@ -68,6 +68,9 @@ pub trait StoreFactory {
 
     #[cfg(feature = "biome-profile")]
     fn get_biome_user_profile_store(&self) -> Box<dyn crate::biome::UserProfileStore>;
+
+    #[cfg(feature = "node-id-store")]
+    fn get_node_id_store(&self) -> Box<dyn crate::node_id::store::NodeIdStore>;
 }
 
 /// Creates a `StoreFactory` backed by the given connection
