@@ -1,5 +1,29 @@
 # Release Notes
 
+## Changes in Splinter 0.5.12
+
+### Highlights
+
+* The "authorization", "authorization-handler-allow-keys" and
+  "authorization-handler-rbac" features have been moved to default. This ensures
+  that authorization is included in default builds of splinterd.
+
+### libsplinter
+
+* Update the authorization state machine for trust v0 and trust v1 to more
+  closely match the design in [Challenge Authorization](https://www.splinter.dev/community/planning/challenge_authorization.html)
+
+* Add a node id store trait for getting and setting the instances node_id, this
+  trait is behind the experimental feature "node-id-store"
+
+### splinterd
+
+* Add integration tests around circuit creation while stopping and restarting
+  nodes throughout the process
+
+* Move stable authorization features to default to ensure default builds of
+  splinterd will include authorization
+
 ## Changes in Splinter 0.5.11
 
 ### splinter CLI
