@@ -179,6 +179,12 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 .with_metrics_password(self.matches.value_of("metrics_password").map(String::from))
         }
 
+        #[cfg(feature = "challenge-authorization")]
+        {
+            partial_config = partial_config
+                .with_peering_key(self.matches.value_of("peering_key").map(String::from))
+        }
+
         Ok(partial_config)
     }
 }

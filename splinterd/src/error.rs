@@ -16,9 +16,7 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 
-#[cfg(feature = "challenge-authorization")]
-use cylinder::KeyLoadError;
-#[cfg(feature = "metrics")]
+#[cfg(any(feature = "metrics", feature = "challenge-authorization"))]
 use splinter::error::InternalError;
 use splinter::transport::socket::TlsInitError;
 
@@ -43,7 +41,7 @@ pub enum UserError {
     #[cfg(feature = "metrics")]
     MetricsError(InternalError),
     #[cfg(feature = "challenge-authorization")]
-    KeyLoadError(KeyLoadError),
+    KeyError(InternalError),
 }
 
 impl UserError {
@@ -75,7 +73,7 @@ impl Error for UserError {
             #[cfg(feature = "metrics")]
             UserError::MetricsError(err) => Some(err),
             #[cfg(feature = "challenge-authorization")]
-            UserError::KeyLoadError(err) => Some(err),
+            UserError::KeyError(err) => Some(err),
         }
     }
 }
@@ -107,7 +105,7 @@ impl fmt::Display for UserError {
             #[cfg(feature = "metrics")]
             UserError::MetricsError(msg) => write!(f, "{}", msg),
             #[cfg(feature = "challenge-authorization")]
-            UserError::KeyLoadError(err) => write!(f, "{}", err),
+            UserError::KeyError(err) => write!(f, "{}", err),
         }
     }
 }

@@ -95,6 +95,8 @@ pub struct Config {
     metrics_username: Option<(String, ConfigSource)>,
     #[cfg(feature = "metrics")]
     metrics_password: Option<(String, ConfigSource)>,
+    #[cfg(feature = "challenge-authorization")]
+    peering_key: (String, ConfigSource),
 }
 
 impl Config {
@@ -326,6 +328,11 @@ impl Config {
         }
     }
 
+    #[cfg(feature = "challenge-authorization")]
+    pub fn peering_key(&self) -> &str {
+        &self.peering_key.0
+    }
+
     pub fn config_dir_source(&self) -> &ConfigSource {
         &self.config_dir.1
     }
@@ -554,6 +561,11 @@ impl Config {
         }
     }
 
+    #[cfg(feature = "challenge-authorization")]
+    fn peering_key_source(&self) -> &ConfigSource {
+        &self.peering_key.1
+    }
+
     #[allow(clippy::cognitive_complexity)]
     /// Displays the configuration value along with where the value was sourced from.
     pub fn log_as_debug(&self) {
@@ -625,6 +637,12 @@ impl Config {
             "Config: peers: {:?} (source: {:?})",
             self.peers(),
             self.peers_source()
+        );
+        #[cfg(feature = "challenge-authorization")]
+        debug!(
+            "Config: peering_key: {:?} (source: {:?})",
+            self.peering_key(),
+            self.peering_key_source()
         );
         if let (Some(id), Some(source)) = (self.node_id(), self.node_id_source()) {
             debug!("Config: node_id: {} (source: {:?})", id, source,);

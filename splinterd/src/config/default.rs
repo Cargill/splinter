@@ -44,6 +44,9 @@ const REGISTRY_FORCED_REFRESH: u64 = 10; // 10 seconds
 const HEARTBEAT: u64 = 30; // 30 seconds
 const ADMIN_TIMEOUT: u64 = 30; // 30 seconds
 
+#[cfg(feature = "challenge-authorization")]
+const PEERING_KEY_NAME: &str = "splinterd";
+
 pub struct DefaultPartialConfigBuilder;
 
 impl DefaultPartialConfigBuilder {
@@ -95,6 +98,11 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         #[cfg(feature = "biome-credentials")]
         {
             partial_config = partial_config.with_enable_biome_credentials(Some(false))
+        }
+
+        #[cfg(feature = "challenge-authorization")]
+        {
+            partial_config = partial_config.with_peering_key(Some(String::from(PEERING_KEY_NAME)))
         }
 
         Ok(partial_config)

@@ -47,10 +47,17 @@ version = "1"
 #advertised_endpoints = ""
 
 # A comma separated list of splinter nodes the daemon will automatically
-# attempt to connect to on start up
-# example: peers = ["tcps://acme-node-001:8044", "tcps://acme-node-002:8044"]
+# attempt to connect to on start up. If the authorization type used must be
+# trust add +trust after the protocol prefix.
+# example: peers = [
+#   "tcps://acme-node-001:8044",
+#   "tcps+trust://acme-node-002:8044"
+# ]
 #peers = []
 
+# The name of the key that should be used to connect to the peers using
+# challenge authorization
+#peering_key = "splinterd"
 
 # Specifies how often, in seconds, to send a heartbeat. This heartbeat is used
 # to check the health of connections to other Splinter nodes. Use 0 to turn
