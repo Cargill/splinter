@@ -271,6 +271,23 @@ impl AdminService {
                     ServiceStartError::Internal("Circuit does not have the local node".to_string())
                 })?;
 
+            let is_local = self
+                .admin_service_shared
+                .lock()
+                .map_err(|_| {
+                    ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+                })?
+                .is_local_node(&local_required_auth);
+
+            if !is_local {
+                return Err(ServiceStartError::Internal(format!(
+                    "Circuit {} contains unsupported token for \
+                    local node: {}",
+                    circuit.circuit_id(),
+                    local_required_auth
+                )));
+            }
+
             let members = circuit.list_nodes().map_err(|err| {
                 ServiceStartError::Internal(format!(
                     "Unable to get peer tokens for members: {}",
@@ -447,6 +464,23 @@ impl AdminService {
                 .ok_or_else(|| {
                     ServiceStartError::Internal("Circuit does not have the local node".to_string())
                 })?;
+
+            let is_local = self
+                .admin_service_shared
+                .lock()
+                .map_err(|_| {
+                    ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+                })?
+                .is_local_node(&local_required_auth);
+
+            if !is_local {
+                return Err(ServiceStartError::Internal(format!(
+                    "Proposal {} contains unsupported token for \
+                    local node: {}",
+                    proposal.circuit_id(),
+                    local_required_auth
+                )));
+            }
 
             let members = proposal.circuit().list_nodes().map_err(|err| {
                 ServiceStartError::Internal(format!(
