@@ -12,20 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod diesel;
-/// NodeIdStore error types
-pub mod error;
-use error::NodeIdStoreError;
+//! Provides NodeIdStore Operations to NodeIdStore implementors
 
-/// Trait for interacting with the instances node_id.
-pub trait NodeIdStore {
-    /// Gets node_id for the instance
-    fn get_node_id(&self) -> Result<Option<String>, NodeIdStoreError>;
+pub(super) mod get_node_id;
+pub(super) mod set_node_id;
 
-    /// Sets node_id for the instance
+pub struct NodeIdOperator<'a, C> {
+    connection: &'a C,
+}
+
+impl<'a, C> NodeIdOperator<'a, C>
+where
+    C: diesel::Connection,
+{
+    /// Constructs new NodeIdOperator struct
     ///
     /// # Arguments
     ///
-    /// * `node_id` - the desired node_id
-    fn set_node_id(&self, node_id: String) -> Result<(), NodeIdStoreError>;
+    ///  * 'connection' - Database connection
+    pub fn new(connection: &'a C) -> Self {
+        Self { connection }
+    }
 }
