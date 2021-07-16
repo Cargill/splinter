@@ -252,12 +252,25 @@ impl ScabbardState {
         self.executor
             .execute(scheduler.take_task_iterator()?, scheduler.new_notifier()?)?;
 
+        let mut recv_result: Option<BatchExecutionResult> = None;
+
         // Get the results and shutdown the scheduler
-        let recv_result = result_rx.recv_timeout(Duration::from_secs(EXECUTION_TIMEOUT));
+        // after receiving the batch result wait until the receiver gets a `None` response
+        // from the scheduler before shutting down
+        loop {
+            match result_rx.recv_timeout(Duration::from_secs(EXECUTION_TIMEOUT)) {
+                Ok(Some(res)) => recv_result = Some(res),
+                Ok(None) => break,
+                Err(_) => {
+                    return Err(ScabbardStateError(
+                        "Failed to receive result in reasonable time".into(),
+                    ))
+                }
+            }
+        }
 
         let batch_result = recv_result
-            .map_err(|_| ScabbardStateError("failed to receive result in reasonable time".into()))?
-            .ok_or_else(|| ScabbardStateError("no result returned from executor".into()))?;
+            .ok_or_else(|| ScabbardStateError("No batch result returned from executor".into()))?;
 
         let batch_status = batch_result.clone().into();
         let signature = batch.batch().header_signature();
