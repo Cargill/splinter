@@ -242,6 +242,8 @@ impl SplinterDaemon {
             self.node_id.clone(),
             #[cfg(feature = "challenge-authorization")]
             self.signers.clone(),
+            #[cfg(feature = "challenge-authorization")]
+            signing_context.clone(),
         )
         .map_err(|err| {
             StartError::NetworkError(format!("Unable to create authorization manager: {}", err))

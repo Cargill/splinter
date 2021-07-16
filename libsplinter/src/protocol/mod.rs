@@ -115,8 +115,8 @@ pub(crate) const BIOME_FETCH_PROFILES_PROTOCOL_MIN: u32 = 1;
 pub(crate) const BIOME_LIST_PROFILES_PROTOCOL_MIN: u32 = 1;
 
 // Peer authorization protocol versions
-#[cfg(feature = "trust-authorization")]
+#[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 pub const PEER_AUTHORIZATION_PROTOCOL_VERSION: u32 = 1;
 
-#[cfg(feature = "trust-authorization")]
+#[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 pub(crate) const PEER_AUTHORIZATION_PROTOCOL_MIN: u32 = 1;

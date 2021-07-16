@@ -106,6 +106,10 @@ impl AdminDirectMessageHandler {
         let msg_sender = msg.get_sender();
         let recipient = msg.get_recipient();
 
+        // this needs to be mutable if challenge authorization is enabled
+        #[allow(unused_mut)]
+        let mut msg_bytes = context.message_bytes().to_vec();
+
         if !is_admin_service_id(msg_sender) {
             let err_msg_bytes = create_circuit_error_msg(
                 &msg,
@@ -187,7 +191,11 @@ impl AdminDirectMessageHandler {
 
                 if self.public_keys.contains(&public_key) {
                     // The internal admin service is at the node and connected using trust
-                    PeerAuthorizationToken::from_peer_id(recipient).into()
+                    let mut msg = msg.clone();
+                    let recipient = admin_service_id(&self.node_id);
+                    msg.set_recipient(recipient.clone());
+                    msg_bytes = msg.write_to_bytes().map_err(DispatchError::from)?;
+                    PeerAuthorizationToken::from_peer_id(&recipient).into()
                 } else {
                     // The admin service is on another node and connected via challenge
                     PeerAuthorizationToken::from_public_key(
@@ -217,7 +225,6 @@ impl AdminDirectMessageHandler {
                 PeerAuthorizationToken::from_peer_id(recipient).into()
             };
 
-            let msg_bytes = context.message_bytes().to_vec();
             let network_msg_bytes =
                 create_message(msg_bytes, CircuitMessageType::ADMIN_DIRECT_MESSAGE)?;
             (network_msg_bytes, target_node)
@@ -254,6 +261,11 @@ fn create_circuit_error_msg(
 
 fn is_admin_service_id(service_id: &str) -> bool {
     service_id.starts_with(ADMIN_SERVICE_ID_PREFIX)
+}
+
+#[cfg(feature = "challenge-authorization")]
+fn admin_service_id(node_id: &str) -> String {
+    format!("{}{}", ADMIN_SERVICE_ID_PREFIX, node_id)
 }
 
 #[cfg(test)]

@@ -17,6 +17,7 @@
 
 use std::time::Duration;
 
+use splinter::admin::messages::AuthorizationType;
 use splinterd::node::RestApiVariant;
 
 use crate::admin::circuit_commit::{commit_2_party_circuit, commit_3_party_circuit};
@@ -66,7 +67,7 @@ pub fn test_2_party_circuit_abandon() {
     let node_b = network.node(1).expect("Unable to get second node");
     let circuit_id = "ABCDE-01234";
     // Commit the circuit to state
-    commit_2_party_circuit(&circuit_id, node_a, node_b);
+    commit_2_party_circuit(&circuit_id, node_a, node_b, AuthorizationType::Trust);
 
     // Create the `ServiceId` struct based on the first node's associated `service_id` and the
     // committed `circuit_id`
@@ -90,7 +91,7 @@ pub fn test_2_party_circuit_abandon() {
     // abandoned
     let active_circuit_id = "FGHIJ-56789";
     // Commit the circuit to state
-    commit_2_party_circuit(&active_circuit_id, node_a, node_b);
+    commit_2_party_circuit(&active_circuit_id, node_a, node_b, AuthorizationType::Trust);
 
     // Create the `ServiceId` struct based on the first node's associated `service_id` and the
     // committed `circuit_id`
@@ -513,12 +514,12 @@ pub fn test_2_party_circuit_abandon_stop() {
     let mut node_b = network.node(1).expect("Unable to get second node");
     let circuit_id = "ABCDE-01234";
     // Commit the circuit to state
-    commit_2_party_circuit(&circuit_id, node_a, node_b);
+    commit_2_party_circuit(&circuit_id, node_a, node_b, AuthorizationType::Trust);
     // Commit a circuit between the 2 nodes that will remain active while the other circuit is
     // abandoned
     let active_circuit_id = "FGHIJ-56789";
     // Commit the circuit to state
-    commit_2_party_circuit(&active_circuit_id, node_a, node_b);
+    commit_2_party_circuit(&active_circuit_id, node_a, node_b, AuthorizationType::Trust);
 
     // Stop the second node in the network
     network = network.stop(1).expect("Unable to stop second node");

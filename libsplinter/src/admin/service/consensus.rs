@@ -21,6 +21,7 @@ use std::time::Duration;
 
 use protobuf::{Message, RepeatedField};
 
+use crate::admin::token::PeerAuthorizationTokenReader;
 use crate::consensus::two_phase::v1::TwoPhaseEngine;
 use crate::consensus::{
     error::{ConsensusSendError, ProposalManagerError},
@@ -207,10 +208,17 @@ impl ProposalManager for AdminProposalManager {
             msg.set_proposed_circuit(proposed_circuit);
 
             let envelope_bytes = msg.write_to_bytes().unwrap();
-            for member in members {
-                if member.get_node_id() != shared.node_id() {
+            let peer_node = circuit_proposal
+                .get_circuit_proposal()
+                .list_nodes()
+                .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?;
+            for node in peer_node {
+                if node.node_id != shared.node_id() {
                     network_sender
-                        .send(&admin_service_id(member.get_node_id()), &envelope_bytes)
+                        .send(
+                            &admin_service_id(&node.token.id_as_string()),
+                            &envelope_bytes,
+                        )
                         .unwrap();
                 }
             }
@@ -345,8 +353,15 @@ impl ConsensusNetworkSender for AdminConsensusNetworkSender {
             .clone()
             .ok_or(ConsensusSendError::NotReady)?;
 
+        let service_id = shared
+            .token_to_peer()
+            .iter()
+            .find(|(_, node)| node.peer_node.admin_service == peer_id_string)
+            .map(|(token, _)| admin_service_id(&token.id_as_string()))
+            .unwrap_or(peer_id_string);
+
         network_sender
-            .send(&peer_id_string, msg.write_to_bytes()?.as_slice())
+            .send(&service_id, msg.write_to_bytes()?.as_slice())
             .map_err(|err| ConsensusSendError::Internal(Box::new(err)))?;
 
         Ok(())
@@ -374,9 +389,12 @@ impl ConsensusNetworkSender for AdminConsensusNetworkSender {
         for verifier in shared.current_consensus_verifiers() {
             {
                 // don't send a message back to this service
-                if verifier != &admin_service_id(shared.node_id()) {
+                if !shared.is_local_node(verifier) {
                     network_sender
-                        .send(verifier, msg.write_to_bytes()?.as_slice())
+                        .send(
+                            &admin_service_id(&verifier.id_as_string()),
+                            msg.write_to_bytes()?.as_slice(),
+                        )
                         .map_err(|err| ConsensusSendError::Internal(Box::new(err)))?;
                 }
             }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::iter::ExactSizeIterator;
 use std::sync::mpsc::Sender;
@@ -22,14 +22,16 @@ use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::{Message, RepeatedField};
 
 use crate::admin::store::{
-    AdminServiceStore, AuthorizationType, Circuit as StoreCircuit,
-    CircuitBuilder as StoreCircuitBuilder, CircuitNode, CircuitPredicate,
-    CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus, ProposalType,
-    ProposedCircuit, Service as StoreService, Vote, VoteRecordBuilder,
+    AdminServiceStore, Circuit as StoreCircuit, CircuitBuilder as StoreCircuitBuilder,
+    CircuitPredicate, CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus,
+    ProposalType, ProposedCircuit, Service as StoreService, Vote, VoteRecordBuilder,
 };
-use crate::admin::token::ListPeerAuthorizationTokens;
+use crate::admin::token::{PeerAuthorizationTokenReader, PeerNode};
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
+use crate::error::InternalError;
+#[cfg(feature = "challenge-authorization")]
+use crate::hex::parse_hex;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
@@ -58,6 +60,8 @@ use super::{admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscri
 
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";
+#[cfg(feature = "challenge-authorization")]
+const ADMIN_SERVICE_PUBLIC_KEY_PREFIX: &str = "public_key";
 
 pub enum PayloadType {
     Circuit(CircuitManagementPayload),
@@ -74,10 +78,16 @@ pub enum AdminServiceStatus {
 
 pub struct PendingPayload {
     pub unpeered_ids: Vec<PeerAuthorizationToken>,
-    pub missing_protocol_ids: Vec<String>,
+    pub missing_protocol_ids: Vec<PeerNode>,
     pub payload_type: PayloadType,
     pub message_sender: String,
     pub members: Vec<PeerAuthorizationToken>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PeerNodePair {
+    pub peer_node: PeerNode,
+    pub local_peer_token: PeerAuthorizationToken,
 }
 
 enum CircuitProposalStatus {
@@ -129,7 +139,7 @@ pub struct AdminServiceShared {
     // the pending changes for the current proposal
     pending_changes: Option<CircuitProposalContext>,
     // the verifiers that should be broadcasted for the pending change
-    current_consensus_verifiers: Vec<String>,
+    current_consensus_verifiers: Vec<PeerAuthorizationToken>,
     // Admin Service Event Subscribers
     event_subscribers: SubscriberMap,
     // AdminServiceStore
@@ -146,6 +156,7 @@ pub struct AdminServiceShared {
     event_store: Box<dyn AdminServiceStore>,
     #[cfg(feature = "challenge-authorization")]
     public_keys: Vec<Vec<u8>>,
+    token_to_peer: HashMap<PeerAuthorizationToken, PeerNodePair>,
 }
 
 impl AdminServiceShared {
@@ -193,6 +204,7 @@ impl AdminServiceShared {
             event_store: admin_service_event_store,
             #[cfg(feature = "challenge-authorization")]
             public_keys,
+            token_to_peer: HashMap::new(),
         }
     }
 
@@ -200,7 +212,7 @@ impl AdminServiceShared {
         &self.node_id
     }
 
-    fn is_local_node(&self, peer_id: &PeerAuthorizationToken) -> bool {
+    pub fn is_local_node(&self, peer_id: &PeerAuthorizationToken) -> bool {
         match peer_id {
             PeerAuthorizationToken::Trust { peer_id } => peer_id == self.node_id(),
             #[cfg(feature = "challenge-authorization")]
@@ -219,6 +231,17 @@ impl AdminServiceShared {
             #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { .. } => false,
         }
+    }
+
+    pub fn set_token_to_peer(
+        &mut self,
+        token_to_peer: HashMap<PeerAuthorizationToken, PeerNodePair>,
+    ) {
+        self.token_to_peer = token_to_peer;
+    }
+
+    pub fn token_to_peer(&self) -> &HashMap<PeerAuthorizationToken, PeerNodePair> {
+        &self.token_to_peer
     }
 
     pub fn network_sender(&self) -> &Option<Box<dyn ServiceNetworkSender>> {
@@ -263,7 +286,7 @@ impl AdminServiceShared {
         self.pending_consensus_proposals.insert(id, proposal);
     }
 
-    pub fn current_consensus_verifiers(&self) -> &Vec<String> {
+    pub fn current_consensus_verifiers(&self) -> &Vec<PeerAuthorizationToken> {
         &self.current_consensus_verifiers
     }
 
@@ -291,8 +314,10 @@ impl AdminServiceShared {
                 } else {
                     // If we have no other peer refs for this peer, the connection will be closed.
                     // On reconnection, the peer must go through protocol agreement again
-                    self.service_protocols
-                        .remove(&admin_service_id(&peer_id.id_as_string()));
+                    if let Some(peer_node_pair) = self.token_to_peer.remove(&peer_id) {
+                        self.service_protocols
+                            .remove(&peer_node_pair.peer_node.admin_service);
+                    }
                 }
             }
         }
@@ -390,10 +415,19 @@ impl AdminServiceShared {
 
                                 let envelope_bytes =
                                     msg.write_to_bytes().map_err(MarshallingError::from)?;
-                                for member in store_circuit.members().iter() {
-                                    if member.node_id() != self.node_id {
+                                for token in store_circuit
+                                    .list_tokens()
+                                    .map_err(|_| {
+                                        AdminSharedError::SplinterStateError(format!(
+                                            "Unable to get member peer tokens from {}",
+                                            circuit_id
+                                        ))
+                                    })?
+                                    .iter()
+                                {
+                                    if !self.is_local_node(&token) {
                                         network_sender.send(
-                                            &admin_service_id(member.node_id()),
+                                            &admin_service_id(&token.id_as_string()),
                                             &envelope_bytes,
                                         )?;
                                     }
@@ -489,10 +523,20 @@ impl AdminServiceShared {
 
                                 let envelope_bytes =
                                     msg.write_to_bytes().map_err(MarshallingError::from)?;
-                                for member in circuit.members().iter() {
-                                    if member.node_id() != self.node_id {
+
+                                for token in circuit
+                                    .list_tokens()
+                                    .map_err(|_| {
+                                        AdminSharedError::SplinterStateError(format!(
+                                            "Unable to get member peer tokens from {}",
+                                            circuit.circuit_id()
+                                        ))
+                                    })?
+                                    .iter()
+                                {
+                                    if !self.is_local_node(&token) {
                                         network_sender.send(
-                                            &admin_service_id(member.node_id()),
+                                            &admin_service_id(&token.id_as_string()),
                                             &envelope_bytes,
                                         )?;
                                     }
@@ -631,12 +675,16 @@ impl AdminServiceShared {
                 let proposed_circuit = create_request.take_circuit();
                 let mut verifiers = vec![];
                 let mut protocol = ADMIN_SERVICE_PROTOCOL_VERSION;
-                for member in proposed_circuit.get_members() {
-                    verifiers.push(admin_service_id(member.get_node_id()));
+                for member in proposed_circuit.list_nodes().map_err(|_| {
+                    AdminSharedError::SplinterStateError(format!(
+                        "Unable to get tokens for proposal: {}",
+                        proposed_circuit.get_circuit_id()
+                    ))
+                })? {
+                    verifiers.push(member.admin_service.clone());
                     // Figure out what protocol version should be used for this proposal
-                    if let Some(protocol_version) = self
-                        .service_protocols
-                        .get(&admin_service_id(member.get_node_id()))
+                    if let Some(protocol_version) =
+                        self.service_protocols.get(&member.admin_service)
                     {
                         if protocol_version < &protocol {
                             protocol = *protocol_version
@@ -673,7 +721,7 @@ impl AdminServiceShared {
                 circuit_proposal.set_proposal_type(CircuitProposal_ProposalType::CREATE);
                 circuit_proposal.set_circuit_id(proposed_circuit.get_circuit_id().into());
                 circuit_proposal.set_circuit_hash(sha256(&proposed_circuit)?);
-                circuit_proposal.set_circuit_proposal(proposed_circuit);
+                circuit_proposal.set_circuit_proposal(proposed_circuit.clone());
                 circuit_proposal.set_requester(header.get_requester().to_vec());
                 circuit_proposal.set_requester_node_id(header.get_requester_node_id().to_string());
 
@@ -683,7 +731,13 @@ impl AdminServiceShared {
                     signer_public_key: header.get_requester().to_vec(),
                     action: CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST,
                 });
-                self.current_consensus_verifiers = verifiers;
+                self.current_consensus_verifiers =
+                    proposed_circuit.list_tokens().map_err(|_| {
+                        AdminSharedError::SplinterStateError(format!(
+                            "Unable to get tokens for proposal: {}",
+                            proposed_circuit.get_circuit_id()
+                        ))
+                    })?;
 
                 Ok((expected_hash, circuit_proposal))
             }
@@ -770,6 +824,14 @@ impl AdminServiceShared {
                         ))
                     })?;
 
+                self.current_consensus_verifiers =
+                    circuit_proposal.circuit().list_tokens().map_err(|_| {
+                        AdminSharedError::SplinterStateError(format!(
+                            "Unable to get tokens for proposal: {}",
+                            circuit_proposal.circuit_id()
+                        ))
+                    })?;
+
                 let proto_circuit_proposal = circuit_proposal.into_proto();
 
                 let expected_hash = sha256(&proto_circuit_proposal)?;
@@ -778,7 +840,7 @@ impl AdminServiceShared {
                     signer_public_key: header.get_requester().to_vec(),
                     action: CircuitManagementPayload_Action::CIRCUIT_PROPOSAL_VOTE,
                 });
-                self.current_consensus_verifiers = verifiers;
+
                 Ok((expected_hash, proto_circuit_proposal))
             }
             CircuitManagementPayload_Action::CIRCUIT_DISBAND_REQUEST => {
@@ -838,7 +900,15 @@ impl AdminServiceShared {
                     signer_public_key: header.get_requester().to_vec(),
                     action: CircuitManagementPayload_Action::CIRCUIT_DISBAND_REQUEST,
                 });
-                self.current_consensus_verifiers = verifiers;
+                self.current_consensus_verifiers = circuit_proposal
+                    .get_circuit_proposal()
+                    .list_tokens()
+                    .map_err(|_| {
+                        AdminSharedError::SplinterStateError(format!(
+                            "Unable to get tokens for proposal: {}",
+                            circuit_proposal.get_circuit_id()
+                        ))
+                    })?;
 
                 Ok((expected_hash, circuit_proposal))
             }
@@ -876,36 +946,31 @@ impl AdminServiceShared {
             ProposedCircuit::from_proto(payload.get_circuit_create_request().get_circuit().clone())
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
-        // Need to gather the tokens here because the endpoints are also required
-        let members = proposed_circuit
-            .members()
-            .iter()
-            .map(|member| match proposed_circuit.authorization_type() {
-                AuthorizationType::Trust => Ok((
-                    PeerAuthorizationToken::from_peer_id(member.node_id()),
-                    member.endpoints().to_vec(),
-                )),
-                #[cfg(feature = "challenge-authorization")]
-                AuthorizationType::Challenge => {
-                    if let Some(public_key) = member.public_key() {
-                        Ok((
-                            PeerAuthorizationToken::from_public_key(public_key),
-                            member.endpoints().to_vec(),
-                        ))
-                    } else {
-                        Err(ServiceError::UnableToHandleMessage(Box::new(
-                            AdminSharedError::ValidationFailed(format!(
-                                "No public key set when circuit requries challenge \
-                                    authorization: {}",
-                                proposed_circuit.circuit_id()
-                            )),
-                        )))
-                    }
-                }
-            })
-            .collect::<Result<Vec<(PeerAuthorizationToken, Vec<String>)>, ServiceError>>()?;
+        let local_required_auth = proposed_circuit
+            .get_node_token(&self.node_id)
+            .map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
+                    format!("Unable to get local nodes token: {}", err),
+                )))
+            })?
+            .ok_or_else(|| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
+                    "Circuit does not have the local node".to_string(),
+                )))
+            })?;
 
-        self.check_connected_peers_payload_create(&members, payload, message_sender)
+        let members = proposed_circuit.list_nodes().map_err(|err| {
+            ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
+                format!("Unable to get peer tokens for members: {}", err),
+            )))
+        })?;
+
+        self.check_connected_peers_payload_create(
+            &members,
+            payload,
+            message_sender,
+            local_required_auth,
+        )
     }
 
     pub fn propose_vote(
@@ -934,7 +999,7 @@ impl AdminServiceShared {
                 )))
             })?;
 
-        let members = proposal.circuit().list_tokens().map_err(|err| {
+        let members = proposal.circuit().list_nodes().map_err(|err| {
             ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
                 format!("Unable to get peer tokens for members: {}", err),
             )))
@@ -963,7 +1028,7 @@ impl AdminServiceShared {
 
         let members = circuit_proposal
             .get_circuit_proposal()
-            .list_tokens()
+            .list_nodes()
             .map_err(|err| {
                 ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
                     format!("Unable to get peer tokens for members: {}", err),
@@ -1063,9 +1128,22 @@ impl AdminServiceShared {
             let envelope_bytes = msg.write_to_bytes().map_err(|err| {
                 ServiceError::UnableToHandleMessage(Box::new(MarshallingError::ProtobufError(err)))
             })?;
-            for member in stored_circuit.members().iter() {
-                if member.node_id() != self.node_id {
-                    network_sender.send(&admin_service_id(member.node_id()), &envelope_bytes)?;
+
+            for token in stored_circuit
+                .list_tokens()
+                .map_err(|_| {
+                    ServiceError::UnableToHandleMessage(Box::new(
+                        AdminSharedError::SplinterStateError(format!(
+                            "Unable to get member peer tokens from {}",
+                            circuit_id
+                        )),
+                    ))
+                })?
+                .iter()
+            {
+                if !self.is_local_node(&token) {
+                    network_sender
+                        .send(&admin_service_id(&token.id_as_string()), &envelope_bytes)?;
                 }
             }
         }
@@ -1146,10 +1224,23 @@ impl AdminServiceShared {
                         err,
                     )))
                 })?;
-                for member in proposal.circuit().members().iter() {
-                    if member.node_id() != self.node_id {
+
+                for token in proposal
+                    .circuit()
+                    .list_tokens()
+                    .map_err(|_| {
+                        ServiceError::UnableToHandleMessage(Box::new(
+                            AdminSharedError::SplinterStateError(format!(
+                                "Unable to get member peer tokens from {}",
+                                circuit_id
+                            )),
+                        ))
+                    })?
+                    .iter()
+                {
+                    if !self.is_local_node(&token) {
                         network_sender
-                            .send(&admin_service_id(member.node_id()), &envelope_bytes)?;
+                            .send(&admin_service_id(&token.id_as_string()), &envelope_bytes)?;
                     }
                 }
             }
@@ -1191,19 +1282,13 @@ impl AdminServiceShared {
 
     pub fn send_protocol_request(
         &mut self,
-        node_id: &PeerAuthorizationToken,
+        token: &PeerAuthorizationToken,
+        admin_service: &str,
     ) -> Result<(), ServiceError> {
-        if self
-            .service_protocols
-            .get(&admin_service_id(&node_id.id_as_string()))
-            .is_none()
-        {
+        if self.service_protocols.get(admin_service).is_none() {
             // we will always have the network sender at this point
             if let Some(ref network_sender) = self.network_sender {
-                debug!(
-                    "Sending service protocol request to {}",
-                    admin_service_id(&node_id.id_as_string())
-                );
+                debug!("Sending service protocol request to {}", admin_service);
                 let mut request = ServiceProtocolVersionRequest::new();
                 request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
                 request.set_protocol_max(ADMIN_SERVICE_PROTOCOL_VERSION);
@@ -1212,36 +1297,30 @@ impl AdminServiceShared {
                 msg.set_protocol_request(request);
 
                 let envelope_bytes = msg.write_to_bytes()?;
-                network_sender.send(&admin_service_id(&node_id.id_as_string()), &envelope_bytes)?;
+                network_sender.send(&admin_service_id(&token.id_as_string()), &envelope_bytes)?;
             }
         } else {
-            debug!(
-                "Already agreed on protocol version with {}",
-                admin_service_id(&node_id.id_as_string())
-            );
+            debug!("Already agreed on protocol version with {}", admin_service);
         }
         Ok(())
     }
 
     fn check_connected_peers_payload_vote(
         &mut self,
-        members: &[PeerAuthorizationToken],
+        members: &[PeerNode],
         payload: CircuitManagementPayload,
         message_sender: String,
     ) -> Result<(), ServiceError> {
         let mut missing_protocol_ids = vec![];
         let mut pending_members = vec![];
         for node in members {
-            if !self.is_local_node(node)
-                && self
-                    .service_protocols
-                    .get(&admin_service_id(&node.id_as_string()))
-                    .is_none()
+            if !self.is_local_node(&node.token)
+                && self.service_protocols.get(&node.admin_service).is_none()
             {
-                self.send_protocol_request(node)?;
-                missing_protocol_ids.push(admin_service_id(&node.id_as_string()))
+                self.send_protocol_request(&node.token, &node.admin_service)?;
+                missing_protocol_ids.push(node.clone())
             }
-            pending_members.push(node.clone());
+            pending_members.push(node.token.clone());
         }
 
         if missing_protocol_ids.is_empty() {
@@ -1265,20 +1344,26 @@ impl AdminServiceShared {
 
     fn check_connected_peers_payload_create(
         &mut self,
-        members: &[(PeerAuthorizationToken, Vec<String>)],
+        members: &[PeerNode],
         payload: CircuitManagementPayload,
         message_sender: String,
+        local_required_auth: PeerAuthorizationToken,
     ) -> Result<(), ServiceError> {
         let mut missing_protocol_ids = vec![];
         let mut pending_peers = vec![];
         let mut pending_members = vec![];
         let mut added_peers: Vec<PeerAuthorizationToken> = vec![];
-        for (node_id, endpoints) in members {
-            if !self.is_local_node(node_id) {
-                debug!("Referencing node {:?}", node_id);
+        for node in members {
+            if !self.is_local_node(&node.token) {
+                debug!("Referencing node {:?}", &node.token);
                 let peer_ref = self
                     .peer_connector
-                    .add_peer_ref(node_id.clone(), endpoints.to_vec())
+                    .add_peer_ref(
+                        node.token.clone(),
+                        node.endpoints.to_vec(),
+                        #[cfg(feature = "challenge-authorization")]
+                        local_required_auth.clone(),
+                    )
                     .map_err(|err| {
                         // remove all peer refs added for this proposal
                         self.remove_peer_refs(added_peers.to_vec());
@@ -1287,19 +1372,44 @@ impl AdminServiceShared {
                     })?;
 
                 self.add_peer_ref(peer_ref);
-                added_peers.push(node_id.clone());
+                added_peers.push(node.token.clone());
 
                 // if we have a protocol the connection exists for the peer already
-                if self
-                    .service_protocols
-                    .get(&admin_service_id(&node_id.id_as_string()))
-                    .is_none()
+                if self.service_protocols.get(&node.admin_service).is_none()
+                    && self
+                        .service_protocols
+                        .get(&admin_service_id(&node.token.id_as_string()))
+                        .is_some()
                 {
-                    pending_peers.push(node_id.clone());
-                    missing_protocol_ids.push(admin_service_id(&node_id.id_as_string()))
+                    info!(
+                        "Replacing {} with protocol for {}",
+                        node.admin_service,
+                        &admin_service_id(&node.token.id_as_string())
+                    );
+
+                    if let Some(protocol) = self
+                        .service_protocols
+                        .remove(&admin_service_id(&node.token.id_as_string()))
+                    {
+                        self.update_pending_for_protocol_agreement(
+                            node.admin_service.to_string(),
+                            protocol,
+                        )
+                        .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+                    }
+                } else if self.service_protocols.get(&node.admin_service).is_none() {
+                    pending_peers.push(node.token.clone());
+                    missing_protocol_ids.push(node.clone())
                 }
             }
-            pending_members.push(node_id.clone())
+            pending_members.push(node.token.clone());
+            self.token_to_peer.insert(
+                node.token.clone(),
+                PeerNodePair {
+                    peer_node: node.clone(),
+                    local_peer_token: local_required_auth.clone(),
+                },
+            );
         }
 
         if missing_protocol_ids.is_empty() {
@@ -1328,23 +1438,20 @@ impl AdminServiceShared {
     /// added to the `pending_protocol_payloads` list to await all nodes' protocol agreement.
     fn check_connected_peers_payload_disband(
         &mut self,
-        members: &[PeerAuthorizationToken],
+        members: &[PeerNode],
         payload: CircuitManagementPayload,
         message_sender: String,
     ) -> Result<(), ServiceError> {
         let mut missing_protocol_ids = vec![];
         let mut pending_members = vec![];
         for node in members {
-            if !self.is_local_node(node)
-                && self
-                    .service_protocols
-                    .get(&admin_service_id(&node.id_as_string()))
-                    .is_none()
+            if !self.is_local_node(&node.token)
+                && self.service_protocols.get(&node.admin_service).is_none()
             {
-                self.send_protocol_request(node)?;
-                missing_protocol_ids.push(admin_service_id(&node.id_as_string()))
+                self.send_protocol_request(&node.token, &node.admin_service)?;
+                missing_protocol_ids.push(node.clone())
             }
-            pending_members.push(node.clone());
+            pending_members.push(node.token.clone());
         }
 
         if missing_protocol_ids.is_empty() {
@@ -1511,7 +1618,7 @@ impl AdminServiceShared {
         let mut pending_peers = vec![];
         let mut added_peers: Vec<PeerAuthorizationToken> = vec![];
         let mut pending_members = vec![];
-        let mut members = vec![];
+        let mut members: Vec<PeerNode> = vec![];
 
         // Check if that payload is to create a circuit, in which case PeerRefs for the new
         // members must be added.
@@ -1521,41 +1628,41 @@ impl AdminServiceShared {
             )
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
-            // Need to gather the tokens here because the endpoints are also required
-            let create_request_members = store_proposed_circuit
-                .members()
-                .iter()
-                .map(|member| match store_proposed_circuit.authorization_type() {
-                    AuthorizationType::Trust => Ok((
-                        PeerAuthorizationToken::from_peer_id(member.node_id()),
-                        member.endpoints().to_vec(),
-                    )),
-                    #[cfg(feature = "challenge-authorization")]
-                    AuthorizationType::Challenge => {
-                        if let Some(public_key) = member.public_key() {
-                            Ok((
-                                PeerAuthorizationToken::from_public_key(public_key),
-                                member.endpoints().to_vec(),
-                            ))
-                        } else {
-                            Err(ServiceError::UnableToHandleMessage(Box::new(
-                                AdminSharedError::ValidationFailed(format!(
-                                    "No public key set when circuit requries challenge \
-                                        authorization: {}",
-                                    store_proposed_circuit.circuit_id()
-                                )),
-                            )))
-                        }
-                    }
-                })
-                .collect::<Result<Vec<(PeerAuthorizationToken, Vec<String>)>, ServiceError>>()?;
+            let local_required_auth = store_proposed_circuit
+                .get_node_token(&self.node_id)
+                .map_err(|err| {
+                    ServiceError::UnableToHandleMessage(Box::new(
+                        AdminSharedError::ValidationFailed(format!(
+                            "Unable to get local nodes token: {}",
+                            err
+                        )),
+                    ))
+                })?
+                .ok_or_else(|| {
+                    ServiceError::UnableToHandleMessage(Box::new(
+                        AdminSharedError::ValidationFailed(
+                            "Circuit does not have the local node".to_string(),
+                        ),
+                    ))
+                })?;
 
-            for (node_id, endpoints) in &create_request_members {
-                if !self.is_local_node(node_id) {
-                    debug!("Referencing node {:?}", node_id);
+            let peer_members = store_proposed_circuit.list_nodes().map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
+                    format!("Unable to get peer tokens for members: {}", err),
+                )))
+            })?;
+
+            for node in &peer_members {
+                if !self.is_local_node(&node.token) {
+                    debug!("Referencing node {:?}", &node.token);
                     let peer_ref = self
                         .peer_connector
-                        .add_peer_ref(node_id.clone(), endpoints.to_vec())
+                        .add_peer_ref(
+                            node.token.clone(),
+                            node.endpoints.to_vec(),
+                            #[cfg(feature = "challenge-authorization")]
+                            local_required_auth.clone(),
+                        )
                         .map_err(|err| {
                             // remove all peer refs added for this proposal
                             self.remove_peer_refs(added_peers.to_vec());
@@ -1564,21 +1671,47 @@ impl AdminServiceShared {
                         })?;
 
                     self.add_peer_ref(peer_ref);
-                    added_peers.push(node_id.clone());
+                    added_peers.push(node.token.clone());
 
                     // if we have a protocol the connection exists for the peer already
-                    if self
-                        .service_protocols
-                        .get(&admin_service_id(&node_id.id_as_string()))
-                        .is_none()
+                    if self.service_protocols.get(&node.admin_service).is_none()
+                        && self
+                            .service_protocols
+                            .get(&admin_service_id(&node.token.id_as_string()))
+                            .is_some()
                     {
-                        pending_peers.push(node_id.clone());
-                        missing_protocol_ids.push(admin_service_id(&node_id.id_as_string()))
+                        info!(
+                            "Replacing {} with protocol for {}",
+                            node.admin_service,
+                            &admin_service_id(&node.token.id_as_string())
+                        );
+
+                        if let Some(protocol) = self
+                            .service_protocols
+                            .remove(&admin_service_id(&node.token.id_as_string()))
+                        {
+                            self.update_pending_for_protocol_agreement(
+                                node.admin_service.to_string(),
+                                protocol,
+                            )
+                            .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+                        }
+                    } else if self.service_protocols.get(&node.admin_service).is_none() {
+                        pending_peers.push(node.token.clone());
+                        missing_protocol_ids.push(node.clone())
                     }
                 }
-                pending_members.push(node_id.clone())
+                pending_members.push(node.token.clone());
+
+                self.token_to_peer.insert(
+                    node.token.clone(),
+                    PeerNodePair {
+                        peer_node: node.clone(),
+                        local_peer_token: local_required_auth.clone(),
+                    },
+                );
             }
-            members.extend(create_request_members);
+            members.extend(peer_members);
         } else if payload.has_circuit_disband_request() {
             // If a `CircuitDisbandRequest` is present in the payload, the members must be gathered
             // from the admin store based on the provided circuit id.
@@ -1615,23 +1748,20 @@ impl AdminServiceShared {
                     ))
                 })?;
 
-            let tokens = circuit.list_tokens().map_err(|err| {
+            let tokens = circuit.list_nodes().map_err(|err| {
                 ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::ValidationFailed(
                     format!("Unable to get peer tokens for members: {}", err),
                 )))
             })?;
 
-            for node_id in tokens {
+            for node in tokens {
                 // Verify each disband member has an agreed upon protocol version with this node
                 // Otherwise, re-establish a peer connection
-                if !self.is_local_node(&node_id)
-                    && self
-                        .service_protocols
-                        .get(&admin_service_id(&node_id.id_as_string()))
-                        .is_none()
+                if !self.is_local_node(&node.token)
+                    && self.service_protocols.get(&node.admin_service).is_none()
                 {
-                    pending_peers.push(node_id.clone());
-                    missing_protocol_ids.push(admin_service_id(&node_id.id_as_string()))
+                    pending_peers.push(node.token.clone());
+                    missing_protocol_ids.push(node.clone())
                 }
             }
         }
@@ -1737,39 +1867,41 @@ impl AdminServiceShared {
     }
 
     pub fn on_peer_disconnected(&mut self, peer_id: PeerAuthorizationToken) {
-        self.service_protocols
-            .remove(&admin_service_id(&peer_id.id_as_string()));
-        let mut pending_protocol_payloads = std::mem::take(&mut self.pending_protocol_payloads);
+        if let Some(peer_node_pair) = self.token_to_peer.remove(&peer_id) {
+            self.service_protocols
+                .remove(&peer_node_pair.peer_node.admin_service);
+            let mut pending_protocol_payloads = std::mem::take(&mut self.pending_protocol_payloads);
 
-        // Add peer back to any pending payloads
-        for pending_protocol_payload in pending_protocol_payloads.iter_mut() {
-            if pending_protocol_payload.members.contains(&peer_id) {
-                pending_protocol_payload
-                    .missing_protocol_ids
-                    .push(admin_service_id(&peer_id.id_as_string()))
-            }
-        }
-
-        let (peering, protocol): (Vec<PendingPayload>, Vec<PendingPayload>) =
-            pending_protocol_payloads
-                .into_iter()
-                .partition(|pending_payload| {
-                    pending_payload
+            // Add peer back to any pending payloads
+            for pending_protocol_payload in pending_protocol_payloads.iter_mut() {
+                if pending_protocol_payload.members.contains(&peer_id) {
+                    pending_protocol_payload
                         .missing_protocol_ids
-                        .contains(&admin_service_id(&peer_id.id_as_string()))
-                });
-
-        self.pending_protocol_payloads = protocol;
-        // Add peer back to any pending payloads
-        let mut unpeered_payloads = std::mem::take(&mut self.unpeered_payloads);
-        for unpeered_payload in unpeered_payloads.iter_mut() {
-            if unpeered_payload.members.contains(&peer_id) {
-                unpeered_payload.unpeered_ids.push(peer_id.clone())
+                        .push(peer_node_pair.peer_node.clone())
+                }
             }
+
+            let (peering, protocol): (Vec<PendingPayload>, Vec<PendingPayload>) =
+                pending_protocol_payloads
+                    .into_iter()
+                    .partition(|pending_payload| {
+                        pending_payload
+                            .missing_protocol_ids
+                            .contains(&peer_node_pair.peer_node)
+                    });
+
+            self.pending_protocol_payloads = protocol;
+            // Add peer back to any pending payloads
+            let mut unpeered_payloads = std::mem::take(&mut self.unpeered_payloads);
+            for unpeered_payload in unpeered_payloads.iter_mut() {
+                if unpeered_payload.members.contains(&peer_id) {
+                    unpeered_payload.unpeered_ids.push(peer_id.clone())
+                }
+            }
+            // add payloads that are not waiting on peer connection
+            unpeered_payloads.extend(peering);
+            self.unpeered_payloads = unpeered_payloads;
         }
-        // add payloads that are not waiting on peer connection
-        unpeered_payloads.extend(peering);
-        self.unpeered_payloads = unpeered_payloads;
     }
 
     pub fn on_peer_connected(
@@ -1798,20 +1930,27 @@ impl AdminServiceShared {
             return Ok(());
         }
 
+        let peer_node_pair = self.token_to_peer.get(peer_id).ok_or_else(|| {
+            AdminSharedError::ServiceProtocolError(format!(
+                "Missing service information for peer token : {}",
+                peer_id
+            ))
+        })?;
+
         // We have already received a service protocol request, don't sent another request
         if self
             .service_protocols
-            .get(&admin_service_id(&peer_id.id_as_string()))
+            .get(&peer_node_pair.peer_node.admin_service)
             .is_some()
         {
             return Ok(());
         }
 
         // Send protocol request
-        if let Some(ref network_sender) = self.network_sender {
+        if let Some(ref mut network_sender) = &mut self.network_sender {
             debug!(
                 "Sending service protocol request to {}",
-                admin_service_id(&peer_id.id_as_string())
+                peer_node_pair.peer_node.admin_service
             );
             let mut request = ServiceProtocolVersionRequest::new();
             request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
@@ -1827,6 +1966,22 @@ impl AdminServiceShared {
                 ))
             })?;
 
+            // need to set the sender to our local auth that is being used
+            #[cfg(feature = "challenge-authorization")]
+            network_sender
+                .send_with_sender(
+                    &admin_service_id(&peer_id.id_as_string()),
+                    &envelope_bytes,
+                    &admin_service_id(&peer_node_pair.local_peer_token.id_as_string()),
+                )
+                .map_err(|err| {
+                    AdminSharedError::ServiceProtocolError(format!(
+                        "Unable to send service protocol request: {}",
+                        err
+                    ))
+                })?;
+
+            #[cfg(not(feature = "challenge-authorization"))]
             network_sender
                 .send(&admin_service_id(&peer_id.id_as_string()), &envelope_bytes)
                 .map_err(|err| {
@@ -1850,6 +2005,38 @@ impl AdminServiceShared {
         service_id: &str,
         protocol: u32,
     ) -> Result<(), AdminSharedError> {
+        // parse the admin service to know if the peer token is trust or challenge
+        let peer_token = get_peer_token_from_service_id(service_id).map_err(|err| {
+            AdminSharedError::ServiceProtocolError(format!(
+                "Unable to verify peer token for service id: {}",
+                err
+            ))
+        })?;
+
+        // if trust the service ID remains the same, if challenge need to get the actual service
+        // ID from the known peer
+        let service_id = match peer_token {
+            PeerAuthorizationToken::Trust { .. } => service_id.to_string(),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::Challenge { .. } => {
+                if let Some(peer_node_pair) = self.token_to_peer.get(&peer_token) {
+                    peer_node_pair.peer_node.admin_service.to_string()
+                } else {
+                    // If the peer is unknown add the service ID as is, it will be replaced once
+                    // the peer is known
+                    service_id.to_string()
+                }
+            }
+        };
+
+        self.update_pending_for_protocol_agreement(service_id, protocol)
+    }
+
+    fn update_pending_for_protocol_agreement(
+        &mut self,
+        service_id: String,
+        protocol: u32,
+    ) -> Result<(), AdminSharedError> {
         // Update any unpeered payloads that this service might be a member of
         let mut unpeered_payloads = std::mem::take(&mut self.unpeered_payloads);
         for pending_protocol_payload in unpeered_payloads.iter_mut() {
@@ -1858,7 +2045,7 @@ impl AdminServiceShared {
                     if pending_protocol_payload
                         .missing_protocol_ids
                         .iter()
-                        .any(|missing_protocol_id| missing_protocol_id == service_id)
+                        .any(|missing_protocol_id| missing_protocol_id.admin_service == service_id)
                     {
                         warn!(
                             "Dropping circuit request including service {}, \
@@ -1875,7 +2062,9 @@ impl AdminServiceShared {
                     );
                     pending_protocol_payload
                         .missing_protocol_ids
-                        .retain(|missing_protocol_id| missing_protocol_id != service_id);
+                        .retain(|missing_protocol_id| {
+                            missing_protocol_id.admin_service != service_id
+                        });
                 }
             }
         }
@@ -1894,7 +2083,7 @@ impl AdminServiceShared {
                     if pending_protocol_payload
                         .missing_protocol_ids
                         .iter()
-                        .any(|missing_protocol_id| missing_protocol_id == service_id)
+                        .any(|missing_protocol_id| missing_protocol_id.admin_service == service_id)
                     {
                         warn!(
                             "Dropping circuit request including service {}, \
@@ -1911,7 +2100,9 @@ impl AdminServiceShared {
                     );
                     pending_protocol_payload
                         .missing_protocol_ids
-                        .retain(|missing_protocol_id| missing_protocol_id != service_id);
+                        .retain(|missing_protocol_id| {
+                            missing_protocol_id.admin_service != service_id
+                        });
                 }
             }
         }
@@ -1931,7 +2122,7 @@ impl AdminServiceShared {
             return Ok(());
         }
 
-        self.service_protocols.insert(service_id.into(), protocol);
+        self.service_protocols.insert(service_id, protocol);
         for pending_payload in ready {
             match pending_payload.payload_type {
                 PayloadType::Circuit(payload) => self.pending_circuit_payloads.push_back(payload),
@@ -3328,16 +3519,6 @@ impl AdminServiceShared {
             .map_err(AdminSharedError::from)
     }
 
-    pub fn get_nodes(&self) -> Result<BTreeMap<String, CircuitNode>, AdminSharedError> {
-        Ok(self
-            .admin_store
-            .list_nodes()
-            .map_err(AdminSharedError::from)?
-            .into_iter()
-            .map(|node| (node.node_id().into(), node))
-            .collect())
-    }
-
     fn verify_signature(&self, payload: &CircuitManagementPayload) -> Result<bool, ServiceError> {
         let header: CircuitManagementPayload_Header =
             Message::parse_from_bytes(payload.get_header())?;
@@ -3352,6 +3533,59 @@ impl AdminServiceShared {
                 &PublicKey::new(public_key),
             )
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
+    }
+}
+
+// This should never return an error since we recieved a message from this service id
+fn get_peer_token_from_service_id(
+    service_id: &str,
+) -> Result<PeerAuthorizationToken, InternalError> {
+    let mut iter = service_id.split("::");
+
+    let admin_prefix = iter
+        .next()
+        .expect("str::split cannot return an empty iterator")
+        .to_string();
+
+    if admin_prefix.is_empty() {
+        return Err(InternalError::with_message(
+            "Empty admin_id argument detected".into(),
+        ));
+    }
+
+    let node_id = iter
+        .next()
+        .ok_or_else(|| InternalError::with_message("Missing node id for recipient".into()))?;
+
+    if node_id.is_empty() {
+        return Err(InternalError::with_message("Empty node id provided".into()));
+    }
+
+    #[cfg(feature = "challenge-authorization")]
+    // If challenge authorization the admin id will be in the format
+    // admin::public_key::<public key string>.
+    if node_id == ADMIN_SERVICE_PUBLIC_KEY_PREFIX {
+        let public_key = iter
+            .next()
+            .ok_or_else(|| InternalError::with_message("Missing public key for recipient".into()))?
+            .to_string();
+
+        if public_key.is_empty() {
+            return Err(InternalError::with_message(
+                "Empty public key provided".into(),
+            ));
+        }
+
+        Ok(PeerAuthorizationToken::from_public_key(
+            &parse_hex(&public_key).map_err(|err| InternalError::with_message(err.to_string()))?,
+        ))
+    } else {
+        Ok(PeerAuthorizationToken::from_peer_id(node_id))
+    }
+
+    #[cfg(not(feature = "challenge-authorization"))]
+    {
+        Ok(PeerAuthorizationToken::from_peer_id(node_id))
     }
 }
 
@@ -3372,6 +3606,7 @@ mod tests {
     use crate::admin::service::AdminKeyVerifierError;
     use crate::admin::store;
     use crate::admin::store::diesel::DieselAdminServiceStore;
+    use crate::admin::store::CircuitNode;
     use crate::circuit::routing::memory::RoutingTable;
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::{Envelope, Mesh};
@@ -5817,6 +6052,19 @@ mod tests {
             )
             .expect("unable to add circuit to store");
 
+        for node in store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active)
+            .list_nodes()
+            .expect("Unable to get peer nodes from circuit")
+        {
+            shared.token_to_peer.insert(
+                node.token.clone(),
+                PeerNodePair {
+                    peer_node: node,
+                    local_peer_token: PeerAuthorizationToken::from_peer_id("my_peer_id"),
+                },
+            );
+        }
+
         let mut request = admin::CircuitDisbandRequest::new();
         request.set_circuit_id("01234-ABCDE".to_string());
 
@@ -6974,6 +7222,8 @@ mod tests {
             "test-node".into(),
             #[cfg(feature = "challenge-authorization")]
             vec![],
+            #[cfg(feature = "challenge-authorization")]
+            Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
         )
         .expect("Unable to create authorization pool");
         let mut authorizers = Authorizers::new();
@@ -7252,6 +7502,20 @@ mod tests {
 
         fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
             Box::new(self.clone())
+        }
+
+        #[cfg(feature = "challenge-authorization")]
+        fn send_with_sender(
+            &mut self,
+            recipient: &str,
+            message: &[u8],
+            _sender: &str,
+        ) -> Result<(), ServiceSendError> {
+            self.sent
+                .lock()
+                .expect("sent lock poisoned")
+                .push((recipient.to_string(), message.to_vec()));
+            Ok(())
         }
     }
 

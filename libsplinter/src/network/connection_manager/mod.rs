@@ -47,6 +47,12 @@ pub trait Authorizer {
         connection_id: String,
         connection: Box<dyn Connection>,
         on_complete: AuthorizerCallback,
+        #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
+        #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
     ) -> Result<(), AuthorizerError>;
 }
 
@@ -55,6 +61,10 @@ pub enum AuthorizationResult {
         connection_id: String,
         identity: ConnectionAuthorizationType,
         connection: Box<dyn Connection>,
+        #[cfg(feature = "challenge-authorization")]
+        expected_authorization: Option<ConnectionAuthorizationType>,
+        #[cfg(feature = "challenge-authorization")]
+        local_authorization: Option<ConnectionAuthorizationType>,
     },
     Unauthorized {
         connection_id: String,
@@ -120,6 +130,10 @@ enum CmRequest {
     RequestOutboundConnection {
         endpoint: String,
         connection_id: String,
+        #[cfg(feature = "challenge-authorization")]
+        expected_authorization: Option<ConnectionAuthorizationType>,
+        #[cfg(feature = "challenge-authorization")]
+        local_authorization: Option<ConnectionAuthorizationType>,
         sender: Sender<Result<(), ConnectionManagerError>>,
     },
     RemoveConnection {
@@ -205,6 +219,12 @@ impl Connector {
         &self,
         endpoint: &str,
         connection_id: &str,
+        #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
+        #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
     ) -> Result<(), ConnectionManagerError> {
         let (sender, recv) = channel();
         self.sender
@@ -212,6 +232,10 @@ impl Connector {
                 sender,
                 endpoint: endpoint.to_string(),
                 connection_id: connection_id.into(),
+                #[cfg(feature = "challenge-authorization")]
+                expected_authorization,
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
             }))
             .map_err(|_| {
                 ConnectionManagerError::SendMessageError(
@@ -443,10 +467,47 @@ enum ConnectionMetadataExt {
         retry_frequency: u64,
         last_connection_attempt: Instant,
         reconnection_attempts: u64,
+        #[cfg(feature = "challenge-authorization")]
+        expected_authorization: Option<ConnectionAuthorizationType>,
+        #[cfg(feature = "challenge-authorization")]
+        local_authorization: Option<ConnectionAuthorizationType>,
     },
     Inbound {
         disconnected: bool,
     },
+}
+
+#[cfg(feature = "challenge-authorization")]
+impl ConnectionMetadataExt {
+    fn expected_authorization(&self) -> Option<ConnectionAuthorizationType> {
+        match self {
+            ConnectionMetadataExt::Outbound {
+                expected_authorization,
+                ..
+            } => expected_authorization.clone(),
+            _ => None,
+        }
+    }
+
+    fn local_authorization(&self) -> Option<ConnectionAuthorizationType> {
+        match self {
+            ConnectionMetadataExt::Outbound {
+                local_authorization,
+                ..
+            } => local_authorization.clone(),
+            _ => None,
+        }
+    }
+}
+
+/// Information required to request an outboudn connection
+struct OutboundConnection {
+    endpoint: String,
+    connection_id: String,
+    #[cfg(feature = "challenge-authorization")]
+    expected_authorization: Option<ConnectionAuthorizationType>,
+    #[cfg(feature = "challenge-authorization")]
+    local_authorization: Option<ConnectionAuthorizationType>,
 }
 
 /// Struct describing the connection manager's internal state and handling
@@ -508,6 +569,10 @@ where
                     }))
                     .map_err(Box::from)
             }),
+            #[cfg(feature = "challenge-authorization")]
+            None,
+            #[cfg(feature = "challenge-authorization")]
+            None,
         ) {
             if reply_sender
                 .send(Err(ConnectionManagerError::connection_creation_error(
@@ -525,14 +590,13 @@ where
     /// Adds a new outbound connection.
     fn add_outbound_connection(
         &mut self,
-        endpoint: &str,
-        connection_id: String,
+        outbound: OutboundConnection,
         reply_sender: Sender<Result<(), ConnectionManagerError>>,
         internal_sender: Sender<CmMessage>,
         authorizer: &dyn Authorizer,
         subscribers: &mut SubscriberMap,
     ) {
-        if let Some(connection) = self.connections.get(endpoint) {
+        if let Some(connection) = self.connections.get(&outbound.endpoint) {
             let identity = connection.identity().clone();
             // if this connection not reconnecting or disconnected, send Connected
             // notification.
@@ -542,8 +606,8 @@ where
                 } => {
                     if !reconnecting {
                         subscribers.broadcast(ConnectionManagerNotification::Connected {
-                            endpoint: endpoint.to_string(),
-                            connection_id,
+                            endpoint: outbound.endpoint.to_string(),
+                            connection_id: outbound.connection_id.to_string(),
                             identity,
                         });
                     }
@@ -551,8 +615,8 @@ where
                 ConnectionMetadataExt::Inbound { ref disconnected } => {
                     if !disconnected {
                         subscribers.broadcast(ConnectionManagerNotification::Connected {
-                            endpoint: endpoint.to_string(),
-                            connection_id,
+                            endpoint: outbound.endpoint.to_string(),
+                            connection_id: outbound.connection_id.to_string(),
                             identity,
                         });
                     }
@@ -563,12 +627,12 @@ where
                 warn!("connector dropped before receiving result of add connection");
             }
         } else {
-            match self.transport.connect(endpoint) {
+            match self.transport.connect(&outbound.endpoint) {
                 Ok(connection) => {
                     // add the connection to the authorization pool.
-                    let auth_endpoint = endpoint.to_string();
+                    let auth_endpoint = outbound.endpoint.to_string();
                     if let Err(err) = authorizer.authorize_connection(
-                        connection_id,
+                        outbound.connection_id,
                         connection,
                         Box::new(move |auth_result| {
                             internal_sender
@@ -578,6 +642,10 @@ where
                                 }))
                                 .map_err(Box::from)
                         }),
+                        #[cfg(feature = "challenge-authorization")]
+                        outbound.expected_authorization.clone(),
+                        #[cfg(feature = "challenge-authorization")]
+                        outbound.local_authorization.clone(),
                     ) {
                         if reply_sender
                             .send(Err(ConnectionManagerError::connection_creation_error(
@@ -595,7 +663,7 @@ where
                     let connection_error = match err {
                         ConnectError::IoError(io_err) => {
                             ConnectionManagerError::connection_creation_error_with_io(
-                                &format!("Unable to connect to {}", endpoint),
+                                &format!("Unable to connect to {}", outbound.endpoint),
                                 io_err.kind(),
                             )
                         }
@@ -632,6 +700,10 @@ where
                 connection_id,
                 connection,
                 identity,
+                #[cfg(feature = "challenge-authorization")]
+                expected_authorization,
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
             } => {
                 if let Err(err) = self
                     .life_cycle
@@ -659,6 +731,10 @@ where
                             retry_frequency: INITIAL_RETRY_FREQUENCY,
                             last_connection_attempt: Instant::now(),
                             reconnection_attempts: 0,
+                            #[cfg(feature = "challenge-authorization")]
+                            expected_authorization,
+                            #[cfg(feature = "challenge-authorization")]
+                            local_authorization,
                         },
                     },
                 );
@@ -700,6 +776,7 @@ where
                 connection_id,
                 connection,
                 identity,
+                ..
             } => {
                 if let Err(err) = self
                     .life_cycle
@@ -827,6 +904,10 @@ where
                         }))
                         .map_err(Box::from)
                 }),
+                #[cfg(feature = "challenge-authorization")]
+                meta.extended_metadata.expected_authorization(),
+                #[cfg(feature = "challenge-authorization")]
+                meta.extended_metadata.local_authorization(),
             ) {
                 error!("Error authorizing {}: {}", endpoint, err);
             }
@@ -837,6 +918,7 @@ where
                     ref mut retry_frequency,
                     ref mut last_connection_attempt,
                     ref mut reconnection_attempts,
+                    ..
                 } => {
                     *reconnecting = true;
                     *retry_frequency = min(*retry_frequency * 2, self.maximum_retry_frequency);
@@ -879,7 +961,10 @@ mod tests {
     use super::*;
 
     use std::sync::mpsc;
+    #[cfg(feature = "challenge-authorization")]
+    use std::sync::{Arc, Mutex};
 
+    use cylinder::{PublicKey, Signature, VerificationError, Verifier, VerifierFactory};
     use protobuf::Message;
 
     use crate::mesh::Mesh;
@@ -930,7 +1015,14 @@ mod tests {
         let connector = cm.connector();
 
         connector
-            .request_connection("inproc://test", "test_id")
+            .request_connection(
+                "inproc://test",
+                "test_id",
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
+            )
             .expect("A connection could not be created");
 
         cm.signal_shutdown();
@@ -960,11 +1052,25 @@ mod tests {
         let connector = cm.connector();
 
         connector
-            .request_connection("inproc://test", "test_id")
+            .request_connection(
+                "inproc://test",
+                "test_id",
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
+            )
             .expect("A connection could not be created");
 
         connector
-            .request_connection("inproc://test", "test_id")
+            .request_connection(
+                "inproc://test",
+                "test_id",
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
+            )
             .expect("A connection could not be re-requested");
 
         cm.signal_shutdown();
@@ -996,7 +1102,14 @@ mod tests {
         let connector = cm.connector();
 
         connector
-            .request_connection("inproc://test", "test_id")
+            .request_connection(
+                "inproc://test",
+                "test_id",
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
+            )
             .expect("A connection could not be created");
 
         // Verify mesh received heartbeat
@@ -1049,6 +1162,8 @@ mod tests {
             "test_identity".into(),
             #[cfg(feature = "challenge-authorization")]
             vec![],
+            #[cfg(feature = "challenge-authorization")]
+            Arc::new(Mutex::new(Box::new(NoopFactory))),
         )
         .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::builder()
@@ -1061,7 +1176,14 @@ mod tests {
         let connector = cm.connector();
 
         connector
-            .request_connection(&endpoint, "test_id")
+            .request_connection(
+                &endpoint,
+                "test_id",
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
+            )
             .expect("A connection could not be created");
 
         let (sub_tx, sub_rx): (
@@ -1117,6 +1239,8 @@ mod tests {
             "test_identity".into(),
             #[cfg(feature = "challenge-authorization")]
             vec![],
+            #[cfg(feature = "challenge-authorization")]
+            Arc::new(Mutex::new(Box::new(NoopFactory))),
         )
         .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::builder()
@@ -1135,7 +1259,14 @@ mod tests {
         connector.subscribe(sub_tx).expect("Unable to respond.");
 
         connector
-            .request_connection(&endpoint, "test_id")
+            .request_connection(
+                &endpoint,
+                "test_id",
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
+            )
             .expect("A connection could not be created");
 
         // Validate that the connection completed authorization
@@ -1262,6 +1393,8 @@ mod tests {
             "test_identity".into(),
             #[cfg(feature = "challenge-authorization")]
             vec![],
+            #[cfg(feature = "challenge-authorization")]
+            Arc::new(Mutex::new(Box::new(NoopFactory))),
         )
         .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::builder()
@@ -1280,7 +1413,14 @@ mod tests {
         connector.subscribe(sub_tx).expect("Unable to respond.");
 
         connector
-            .request_connection(&endpoint, "test_id")
+            .request_connection(
+                &endpoint,
+                "test_id",
+                #[cfg(feature = "challenge-authorization")]
+                None,
+                #[cfg(feature = "challenge-authorization")]
+                None,
+            )
             .expect("A connection could not be created");
 
         // Validate that the connection completed authorization
@@ -1428,6 +1568,8 @@ mod tests {
             "test_identity".into(),
             #[cfg(feature = "challenge-authorization")]
             vec![],
+            #[cfg(feature = "challenge-authorization")]
+            Arc::new(Mutex::new(Box::new(NoopFactory))),
         )
         .expect("Unable to create authorization pool");
 
@@ -1521,6 +1663,12 @@ mod tests {
             connection_id: String,
             connection: Box<dyn Connection>,
             callback: AuthorizerCallback,
+            #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+                ConnectionAuthorizationType,
+            >,
+            #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+                ConnectionAuthorizationType,
+            >,
         ) -> Result<(), AuthorizerError> {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
@@ -1528,8 +1676,37 @@ mod tests {
                 identity: ConnectionAuthorizationType::Trust {
                     identity: self.authorized_id.clone(),
                 },
+                #[cfg(feature = "challenge-authorization")]
+                expected_authorization,
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
+        }
+    }
+
+    struct NoopVerifier;
+
+    impl Verifier for NoopVerifier {
+        fn algorithm_name(&self) -> &str {
+            unimplemented!()
+        }
+
+        fn verify(
+            &self,
+            _message: &[u8],
+            _signature: &Signature,
+            _public_key: &PublicKey,
+        ) -> Result<bool, VerificationError> {
+            unimplemented!()
+        }
+    }
+
+    struct NoopFactory;
+
+    impl VerifierFactory for NoopFactory {
+        fn new_verifier(&self) -> Box<dyn Verifier> {
+            Box::new(NoopVerifier)
         }
     }
 }

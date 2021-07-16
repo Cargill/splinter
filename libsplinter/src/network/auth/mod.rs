@@ -22,16 +22,16 @@ use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 
 #[cfg(feature = "challenge-authorization")]
-use cylinder::Signer;
+use cylinder::{Signer, VerifierFactory};
 use protobuf::Message;
 
-#[cfg(feature = "trust-authorization")]
+#[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 use crate::protocol::authorization::AuthProtocolRequest;
 use crate::protocol::authorization::AuthorizationMessage;
-#[cfg(not(feature = "trust-authorization"))]
+#[cfg(not(all(feature = "trust-authorization", feature = "challenge-authorization")))]
 use crate::protocol::authorization::ConnectRequest;
 use crate::protocol::network::NetworkMessage;
-#[cfg(feature = "trust-authorization")]
+#[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 use crate::protocol::{PEER_AUTHORIZATION_PROTOCOL_MIN, PEER_AUTHORIZATION_PROTOCOL_VERSION};
 use crate::protos::network;
 use crate::protos::prelude::*;
@@ -39,7 +39,7 @@ use crate::transport::{Connection, RecvError};
 
 use self::handlers::create_authorization_dispatcher;
 use self::pool::{ThreadPool, ThreadPoolBuilder};
-#[cfg(feature = "trust-authorization")]
+#[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 pub(crate) use self::state_machine::AuthorizationLocalAction;
 pub(crate) use self::state_machine::{
     AuthorizationActionError, AuthorizationLocalState, AuthorizationManagerStateMachine,
@@ -80,6 +80,8 @@ pub struct AuthorizationManager {
     signers: Vec<Box<dyn Signer>>,
     thread_pool: ThreadPool,
     shared: Arc<Mutex<ManagedAuthorizations>>,
+    #[cfg(feature = "challenge-authorization")]
+    verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
 impl AuthorizationManager {
@@ -87,6 +89,9 @@ impl AuthorizationManager {
     pub fn new(
         local_identity: String,
         #[cfg(feature = "challenge-authorization")] signers: Vec<Box<dyn Signer>>,
+        #[cfg(feature = "challenge-authorization")] verifier_factory: Arc<
+            Mutex<Box<dyn VerifierFactory>>,
+        >,
     ) -> Result<Self, AuthorizationManagerError> {
         let thread_pool = ThreadPoolBuilder::new()
             .with_size(AUTHORIZATION_THREAD_POOL_SIZE)
@@ -102,6 +107,8 @@ impl AuthorizationManager {
             signers,
             thread_pool,
             shared,
+            #[cfg(feature = "challenge-authorization")]
+            verifier_factory,
         })
     }
 
@@ -122,6 +129,8 @@ impl AuthorizationManager {
             signers: self.signers.clone(),
             shared: Arc::clone(&self.shared),
             executor: self.thread_pool.executor(),
+            #[cfg(feature = "challenge-authorization")]
+            verifier_factory: self.verifier_factory.clone(),
         }
     }
 }
@@ -145,6 +154,8 @@ pub struct AuthorizationConnector {
     signers: Vec<Box<dyn Signer>>,
     shared: Arc<Mutex<ManagedAuthorizations>>,
     executor: pool::JobExecutor,
+    #[cfg(feature = "challenge-authorization")]
+    verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
 impl AuthorizationConnector {
@@ -152,6 +163,12 @@ impl AuthorizationConnector {
         &self,
         connection_id: String,
         connection: Box<dyn Connection>,
+        #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
+        #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
         on_complete_callback: Callback,
     ) -> Result<(), AuthorizationManagerError> {
         let mut connection = connection;
@@ -162,6 +179,15 @@ impl AuthorizationConnector {
             shared: Arc::clone(&self.shared),
         };
         let msg_sender = AuthorizationMessageSender { sender: tx };
+        #[cfg(feature = "challenge-authorization")]
+        let verifier = self
+            .verifier_factory
+            .lock()
+            .map_err(|_| AuthorizationManagerError("VerifierFactory lock poisoned".to_string()))?
+            .new_verifier();
+
+        #[cfg(feature = "challenge-authorization")]
+        let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
         let dispatcher = create_authorization_dispatcher(
             self.local_identity.clone(),
             #[cfg(feature = "challenge-authorization")]
@@ -170,10 +196,21 @@ impl AuthorizationConnector {
             #[allow(clippy::redundant_clone)]
             state_machine.clone(),
             msg_sender,
-        );
+            #[cfg(feature = "challenge-authorization")]
+            nonce,
+            #[cfg(feature = "challenge-authorization")]
+            expected_authorization.clone(),
+            #[cfg(feature = "challenge-authorization")]
+            local_authorization.clone(),
+            #[cfg(feature = "challenge-authorization")]
+            verifier,
+        )
+        .map_err(|err| {
+            AuthorizationManagerError(format!("Unable to setup authorization dispatcher: {}", err))
+        })?;
 
         self.executor.execute(move || {
-            #[cfg(not(feature = "trust-authorization"))]
+            #[cfg(not(all(feature = "trust-authorization", feature = "challenge-authorization")))]
             {
                 let connect_request_bytes = match connect_msg_bytes() {
                     Ok(bytes) => bytes,
@@ -194,7 +231,7 @@ impl AuthorizationConnector {
                 }
             }
 
-            #[cfg(feature = "trust-authorization")]
+            #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
             {
                 let protocol_request_bytes = match protocol_msg_bytes() {
                     Ok(bytes) => bytes,
@@ -298,8 +335,22 @@ impl AuthorizationConnector {
                     Identity::Trust { identity } => ConnectionAuthorizationState::Authorized {
                         connection_id,
                         connection,
+                        #[cfg(feature = "challenge-authorization")]
+                        expected_authorization,
+                        #[cfg(feature = "challenge-authorization")]
+                        local_authorization,
                         identity: ConnectionAuthorizationType::Trust { identity },
                     },
+                    #[cfg(feature = "challenge-authorization")]
+                    Identity::Challenge { public_key } => {
+                        ConnectionAuthorizationState::Authorized {
+                            connection_id: connection_id.clone(),
+                            connection,
+                            identity: ConnectionAuthorizationType::Challenge { public_key },
+                            expected_authorization,
+                            local_authorization,
+                        }
+                    }
                 }
             } else {
                 ConnectionAuthorizationState::Unauthorized {
@@ -317,7 +368,7 @@ impl AuthorizationConnector {
     }
 }
 
-#[cfg(not(feature = "trust-authorization"))]
+#[cfg(not(all(feature = "trust-authorization", feature = "challenge-authorization")))]
 fn connect_msg_bytes() -> Result<Vec<u8>, AuthorizationManagerError> {
     let connect_msg = AuthorizationMessage::ConnectRequest(ConnectRequest::Bidirectional);
 
@@ -326,7 +377,7 @@ fn connect_msg_bytes() -> Result<Vec<u8>, AuthorizationManagerError> {
     )
 }
 
-#[cfg(feature = "trust-authorization")]
+#[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 fn protocol_msg_bytes() -> Result<Vec<u8>, AuthorizationManagerError> {
     let connect_msg = AuthorizationMessage::AuthProtocolRequest(AuthProtocolRequest {
         auth_protocol_min: PEER_AUTHORIZATION_PROTOCOL_MIN,
@@ -402,6 +453,11 @@ pub enum ConnectionAuthorizationState {
         connection_id: String,
         identity: ConnectionAuthorizationType,
         connection: Box<dyn Connection>,
+        // information required if reconnect needs to be attempted
+        #[cfg(feature = "challenge-authorization")]
+        expected_authorization: Option<ConnectionAuthorizationType>,
+        #[cfg(feature = "challenge-authorization")]
+        local_authorization: Option<ConnectionAuthorizationType>,
     },
     Unauthorized {
         connection_id: String,
@@ -526,7 +582,7 @@ pub(in crate::network) mod tests {
         assert!(matches!(trust_request, AuthorizationMessage::Authorized(_)));
     }
 
-    #[cfg(feature = "trust-authorization")]
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     pub(in crate::network) fn negotiation_connection_auth(
         mesh: &Mesh,
         connection_id: &str,

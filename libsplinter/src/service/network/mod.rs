@@ -188,6 +188,8 @@ impl ServiceConnectionManager {
     /// For example:
     ///
     /// ```no_run
+    /// # use std::sync::{Arc, Mutex};
+    /// # use cylinder::secp256k1::Secp256k1Context;
     /// # use splinter::mesh::Mesh;
     /// # use splinter::network::auth::AuthorizationManager;
     /// # use splinter::network::connection_manager::{Authorizer, ConnectionManager};
@@ -199,6 +201,8 @@ impl ServiceConnectionManager {
     /// #   "test_identity".into(),
     /// #    #[cfg(feature = "challenge-authorization")]
     /// #    vec![],
+    /// #    #[cfg(feature = "challenge-authorization")]
+    /// #    Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
     /// # ).unwrap();
     /// # let authorizer: Box<dyn Authorizer + Send> = Box::new(auth_mgr.authorization_connector());
     /// let mut cm = ConnectionManager::builder()
@@ -771,6 +775,12 @@ mod tests {
             connection_id: String,
             connection: Box<dyn Connection>,
             callback: AuthorizerCallback,
+            #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+                ConnectionAuthorizationType,
+            >,
+            #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+                ConnectionAuthorizationType,
+            >,
         ) -> Result<(), AuthorizerError> {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
@@ -778,6 +788,10 @@ mod tests {
                 identity: ConnectionAuthorizationType::Trust {
                     identity: self.authorized_id.clone(),
                 },
+                #[cfg(feature = "challenge-authorization")]
+                expected_authorization,
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

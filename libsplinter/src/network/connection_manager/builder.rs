@@ -25,7 +25,7 @@ use crate::transport::Transport;
 use super::error::ConnectionManagerError;
 use super::{
     AuthResult, Authorizer, CmMessage, CmRequest, ConnectionManager, ConnectionManagerNotification,
-    ConnectionManagerState, ConnectionMetadataExt, SubscriberMap,
+    ConnectionManagerState, ConnectionMetadataExt, OutboundConnection, SubscriberMap,
 };
 
 const DEFAULT_HEARTBEAT_INTERVAL: u64 = 10;
@@ -222,9 +222,19 @@ fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             endpoint,
             sender,
             connection_id,
+            #[cfg(feature = "challenge-authorization")]
+            expected_authorization,
+            #[cfg(feature = "challenge-authorization")]
+            local_authorization,
         } => state.add_outbound_connection(
-            &endpoint,
-            connection_id,
+            OutboundConnection {
+                endpoint,
+                connection_id,
+                #[cfg(feature = "challenge-authorization")]
+                expected_authorization,
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
+            },
             sender,
             internal_sender,
             authorizer,

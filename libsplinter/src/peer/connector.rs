@@ -88,12 +88,15 @@ impl PeerManagerConnector {
         &self,
         peer_id: PeerAuthorizationToken,
         endpoints: Vec<String>,
+        #[cfg(feature = "challenge-authorization")] required_local_auth: PeerAuthorizationToken,
     ) -> Result<PeerRef, PeerRefAddError> {
         let (sender, recv) = channel();
 
         let message = PeerManagerMessage::Request(PeerManagerRequest::AddPeer {
             peer_id,
             endpoints,
+            #[cfg(feature = "challenge-authorization")]
+            required_local_auth,
             sender,
         });
 

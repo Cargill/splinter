@@ -17,7 +17,7 @@
 
 use std::collections::HashMap;
 
-use cylinder::Signer;
+use cylinder::{PublicKey, Signer};
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 
@@ -39,11 +39,12 @@ use transact::protocol::batch::Batch;
 pub(in crate::admin) fn make_create_circuit_payload(
     circuit_id: &str,
     requester: &str,
-    node_info: HashMap<String, Vec<String>>,
+    node_info: HashMap<String, (Vec<String>, PublicKey)>,
     signer: &dyn Signer,
     admin_keys: &[String],
+    auth_type: AuthorizationType,
 ) -> Result<Vec<u8>, InternalError> {
-    let circuit_request = setup_circuit(circuit_id, node_info, admin_keys);
+    let circuit_request = setup_circuit(circuit_id, node_info, admin_keys, auth_type);
     complete_create_payload(requester, signer, circuit_request)
 }
 
@@ -252,8 +253,9 @@ pub(in crate::admin) fn make_circuit_abandon_payload(
 /// Creates the `CircuitCreateRequest` for the `CircuitManagementPayload` to propose a circuit
 fn setup_circuit(
     circuit_id: &str,
-    node_info: HashMap<String, Vec<String>>,
+    node_info: HashMap<String, (Vec<String>, PublicKey)>,
     admin_keys: &[String],
+    auth_type: AuthorizationType,
 ) -> CircuitCreateRequest {
     // The services require the service IDs from its peer services, which will be generated
     // after the node information is iterated over and the `SplinterServiceBuilder` is created
@@ -296,12 +298,16 @@ fn setup_circuit(
 
     let nodes: Vec<SplinterNode> = node_info
         .iter()
-        .map(|(node_id, endpoints)| {
-            SplinterNodeBuilder::new()
+        .map(|(node_id, (endpoints, public_key))| {
+            let mut builder = SplinterNodeBuilder::new()
                 .with_node_id(&node_id)
-                .with_endpoints(endpoints)
-                .build()
-                .expect("Unable to build SplinterNode")
+                .with_endpoints(endpoints);
+
+            if auth_type == AuthorizationType::Challenge {
+                builder = builder.with_public_key(public_key.as_slice())
+            }
+
+            builder.build().expect("Unable to build SplinterNode")
         })
         .collect();
 
@@ -309,7 +315,7 @@ fn setup_circuit(
         .with_circuit_id(circuit_id)
         .with_roster(&services)
         .with_members(&nodes)
-        .with_authorization_type(&AuthorizationType::Trust)
+        .with_authorization_type(&auth_type)
         .with_persistence(&PersistenceType::Any)
         .with_durability(&DurabilityType::NoDurability)
         .with_routes(&RouteType::Any)
