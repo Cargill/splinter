@@ -136,6 +136,13 @@ impl From<ConfigError> for UserError {
     }
 }
 
+#[cfg(feature = "log-config")]
+impl From<log4rs::config::runtime::ConfigErrors> for UserError {
+    fn from(error: log4rs::config::runtime::ConfigErrors) -> Self {
+        UserError::ConfigError(error.into())
+    }
+}
+
 #[derive(Debug)]
 pub enum GetTransportError {
     CertError(String),

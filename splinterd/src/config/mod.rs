@@ -23,6 +23,8 @@ mod clap;
 mod default;
 mod env;
 mod error;
+#[cfg(feature = "log-config")]
+mod logger;
 mod partial;
 mod toml;
 
@@ -34,6 +36,8 @@ pub use crate::config::env::EnvPartialConfigBuilder;
 pub use crate::config::toml::TomlPartialConfigBuilder;
 pub use builder::{ConfigBuilder, PartialConfigBuilder};
 pub use error::ConfigError;
+#[cfg(feature = "log-config")]
+pub use logger::LogConfig;
 pub use partial::{ConfigSource, PartialConfig};
 
 /// `Config` is the final representation of configuration values. This final config object assembles
@@ -95,6 +99,10 @@ pub struct Config {
     metrics_username: Option<(String, ConfigSource)>,
     #[cfg(feature = "metrics")]
     metrics_password: Option<(String, ConfigSource)>,
+    #[cfg(feature = "log-config")]
+    log_config: Option<(LogConfig, ConfigSource)>,
+    #[cfg(feature = "log-config")]
+    verbosity: (log::Level, ConfigSource),
 }
 
 impl Config {
@@ -324,6 +332,32 @@ impl Config {
         } else {
             None
         }
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn log_config(&self) -> Option<&LogConfig> {
+        match &self.log_config {
+            Some((c, _)) => Some(c),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn log_config_source(&self) -> Option<&ConfigSource> {
+        match &self.log_config {
+            Some((_, source)) => Some(source),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn verbosity_source(&self) -> Option<&ConfigSource> {
+        Some(&self.verbosity.1)
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn verbosity(&self) -> Option<&log::Level> {
+        Some(&self.verbosity.0)
     }
 
     pub fn config_dir_source(&self) -> &ConfigSource {
@@ -778,6 +812,19 @@ impl Config {
             {
                 debug!("Config: metrics_password: <HIDDEN> (source: {:?})", source,);
             }
+        }
+        #[cfg(feature = "log-config")]
+        {
+            debug!(
+                "Config: log_config: {:?} (source: {:?})",
+                self.log_config(),
+                self.log_config_source()
+            );
+            debug!(
+                "Config: verbosity: {:?} (source: {:?})",
+                self.verbosity(),
+                self.verbosity_source()
+            );
         }
     }
 

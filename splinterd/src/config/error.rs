@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "log-config")]
+use log4rs::config::runtime::ConfigErrors;
 use std::error::Error;
 use std::fmt;
 use std::io;
@@ -21,12 +23,17 @@ use toml::de::Error as TomlError;
 #[derive(Debug)]
 /// General error type used during `Config` contruction.
 pub enum ConfigError {
-    ReadError { file: String, err: io::Error },
+    ReadError {
+        file: String,
+        err: io::Error,
+    },
     TomlParseError(TomlError),
     InvalidArgument(String),
     MissingValue(String),
     InvalidVersion(String),
     StdError(io::Error),
+    #[cfg(feature = "log-config")]
+    LoggingError(ConfigErrors),
 }
 
 impl From<TomlError> for ConfigError {
@@ -41,6 +48,13 @@ impl From<clap::Error> for ConfigError {
     }
 }
 
+#[cfg(feature = "log-config")]
+impl From<ConfigErrors> for ConfigError {
+    fn from(e: ConfigErrors) -> Self {
+        ConfigError::LoggingError(e)
+    }
+}
+
 impl Error for ConfigError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
@@ -50,6 +64,8 @@ impl Error for ConfigError {
             ConfigError::MissingValue(_) => None,
             ConfigError::InvalidVersion(_) => None,
             ConfigError::StdError(source) => Some(source),
+            #[cfg(feature = "log-config")]
+            ConfigError::LoggingError(err) => Some(err),
         }
     }
 }
@@ -65,6 +81,8 @@ impl fmt::Display for ConfigError {
             ConfigError::MissingValue(msg) => write!(f, "Configuration value must be set: {}", msg),
             ConfigError::InvalidVersion(msg) => write!(f, "{}", msg),
             ConfigError::StdError(source) => write!(f, "{}", source),
+            #[cfg(feature = "log-config")]
+            ConfigError::LoggingError(msg) => write!(f, "{}", msg),
         }
     }
 }
