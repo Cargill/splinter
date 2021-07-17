@@ -108,6 +108,7 @@ experimental = [
     "service-endpoint",
     "trust-authorization",
     "ws-transport",
+    "log-config"
 ]
 
 authorization = [
@@ -167,6 +168,7 @@ service-arg-validation = [
 service-endpoint = []
 trust-authorization = ["splinter/trust-authorization"]
 ws-transport = ["splinter/ws-transport"]
+log-config = []
 
 [package.metadata.deb]
 maintainer = "The Splinter Team"

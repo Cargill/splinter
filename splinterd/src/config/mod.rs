@@ -32,6 +32,8 @@ pub use crate::config::clap::ClapPartialConfigBuilder;
 pub use crate::config::default::DefaultPartialConfigBuilder;
 pub use crate::config::env::EnvPartialConfigBuilder;
 pub use crate::config::toml::TomlPartialConfigBuilder;
+#[cfg(feature = "log-config")]
+use crate::logging::{AppenderConfig, LoggerConfig, RootConfig};
 pub use builder::{ConfigBuilder, PartialConfigBuilder};
 pub use error::ConfigError;
 pub use partial::{ConfigSource, PartialConfig};
@@ -95,6 +97,14 @@ pub struct Config {
     metrics_username: Option<(String, ConfigSource)>,
     #[cfg(feature = "metrics")]
     metrics_password: Option<(String, ConfigSource)>,
+    #[cfg(feature = "log-config")]
+    root_logger: (RootConfig, ConfigSource),
+    #[cfg(feature = "log-config")]
+    appenders: Option<Vec<(AppenderConfig, ConfigSource)>>,
+    #[cfg(feature = "log-config")]
+    loggers: Option<Vec<(LoggerConfig, ConfigSource)>>,
+    #[cfg(feature = "log-config")]
+    verbosity: (log::Level, ConfigSource),
 }
 
 impl Config {
@@ -554,6 +564,40 @@ impl Config {
         }
     }
 
+    #[cfg(feature = "log-config")]
+    pub fn root_logger(&self) -> &RootConfig {
+        &self.root_logger.0
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn root_logger_source(&self) -> &ConfigSource {
+        &self.root_logger.1
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn appenders(&self) -> Option<Vec<AppenderConfig>> {
+        self.appenders
+            .as_ref()
+            .map(|configs| configs.iter().map(|c| c.0.clone()).collect())
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn loggers(&self) -> Option<Vec<LoggerConfig>> {
+        self.loggers
+            .as_ref()
+            .map(|configs| configs.iter().map(|c| c.0.clone()).collect())
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn verbosity(&self) -> log::Level {
+        self.verbosity.0
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn verbosity_source(&self) -> &ConfigSource {
+        &self.verbosity.1
+    }
+
     #[allow(clippy::cognitive_complexity)]
     /// Displays the configuration value along with where the value was sourced from.
     pub fn log_as_debug(&self) {
@@ -778,6 +822,29 @@ impl Config {
             {
                 debug!("Config: metrics_password: <HIDDEN> (source: {:?})", source,);
             }
+        }
+        #[cfg(feature = "log-config")]
+        {
+            let loggers = self.loggers.as_ref().unwrap_or(&vec![]).to_owned();
+            for logger in loggers {
+                debug!("Config: logger: {:?} (source: {:?})", logger.0, logger.1);
+            }
+            for appender in self.appenders.as_ref().unwrap_or(&vec![]).to_owned() {
+                debug!(
+                    "Config: appender: {:?} (source: {:?})",
+                    appender.0, appender.1
+                );
+            }
+            debug!(
+                "Config: root_logger: {:?} (source: {:?})",
+                self.root_logger(),
+                self.root_logger_source()
+            );
+            debug!(
+                "Config: verbosity: {:?} (source: {:?})",
+                self.verbosity(),
+                self.verbosity_source()
+            );
         }
     }
 

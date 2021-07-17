@@ -16,6 +16,9 @@
 
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
+#[cfg(feature = "log-config")]
+use crate::logging::{AppenderConfig, RootConfig, DEFAULT_PATTERN};
+
 const CONFIG_DIR: &str = "/etc/splinter";
 const TLS_CERT_DIR: &str = "/etc/splinter/certs";
 const STATE_DIR: &str = "/var/lib/splinter";
@@ -95,6 +98,22 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         #[cfg(feature = "biome-credentials")]
         {
             partial_config = partial_config.with_enable_biome_credentials(Some(false))
+        }
+        #[cfg(feature = "log-config")]
+        {
+            let root_logger: Option<RootConfig> = Some(RootConfig {
+                appenders: vec!["stdout".to_string()],
+                level: log::Level::Info,
+            });
+            let stdout: AppenderConfig = AppenderConfig {
+                name: "stdout".to_string(),
+                encoder: String::from(DEFAULT_PATTERN),
+                target: crate::logging::LogTarget::Stdout,
+            };
+            partial_config = partial_config
+                .with_root_logger(root_logger)
+                .with_appenders(Some(vec![stdout]))
+                .with_verbosity(Some(log::Level::Info));
         }
 
         Ok(partial_config)
