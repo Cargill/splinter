@@ -104,11 +104,14 @@ impl Handler for AuthProtocolRequestHandler {
             AuthorizationRemoteAction::ReceiveAuthProtocolRequest,
         ) {
             Err(err) => {
-                warn!(
-                    "Ignoring authorization protocol request from {}: {}",
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
                     context.source_connection_id(),
-                    err
-                );
+                    sender,
+                    &err.to_string(),
+                )?;
+                return Ok(());
             }
 
             Ok(AuthorizationRemoteState::ReceivedAuthProtocolRequest) => {
@@ -283,11 +286,14 @@ impl Handler for AuthProtocolResponseHandler {
             AuthorizationLocalAction::ReceiveAuthProtocolResponse,
         ) {
             Err(err) => {
-                warn!(
-                    "Ignoring authorization protocol request from {}: {}",
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
                     context.source_connection_id(),
-                    err
-                );
+                    sender,
+                    &err.to_string(),
+                )?;
+                return Ok(());
             }
             Ok(AuthorizationLocalState::ReceivedAuthProtocolResponse) => {
                 match self.required_local_auth {
@@ -508,11 +514,13 @@ impl Handler for AuthTrustRequestHandler {
             ),
         ) {
             Err(err) => {
-                warn!(
-                    "Ignoring trust request message from connection {}: {}",
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
                     context.source_connection_id(),
-                    err
-                );
+                    sender,
+                    &err.to_string(),
+                )?;
                 return Ok(());
             }
             Ok(AuthorizationRemoteState::Trust(
@@ -593,11 +601,14 @@ impl Handler for AuthTrustResponseHandler {
             ),
         ) {
             Err(err) => {
-                warn!(
-                    "Ignoring trust response message from connection {}: {}",
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
                     context.source_connection_id(),
-                    err
-                );
+                    sender,
+                    &err.to_string(),
+                )?;
+                return Ok(());
             }
             Ok(AuthorizationLocalState::Authorized) => (),
             Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
@@ -617,11 +628,14 @@ impl Handler for AuthTrustResponseHandler {
             AuthorizationLocalAction::SendAuthComplete,
         ) {
             Err(err) => {
-                warn!(
-                    "Cannot transition connection from Authorized {}: {}",
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
                     context.source_connection_id(),
-                    err
-                );
+                    sender,
+                    &err.to_string(),
+                )?;
+                return Ok(());
             }
             Ok(AuthorizationLocalState::WaitForComplete) => (),
             Ok(AuthorizationLocalState::AuthorizedAndComplete) => (),
@@ -677,11 +691,14 @@ impl Handler for AuthChallengeNonceRequestHandler {
             ),
         ) {
             Err(err) => {
-                warn!(
-                    "Ignoring challenge nonce request message from connection {}: {}",
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
                     context.source_connection_id(),
-                    err
-                );
+                    sender,
+                    &err.to_string(),
+                )?;
+                return Ok(());
             }
             Ok(AuthorizationRemoteState::Challenge(
                 ChallengeAuthorizationRemoteState::ReceivedAuthChallengeNonce,
@@ -809,11 +826,14 @@ impl Handler for AuthChallengeNonceResponseHandler {
             ),
         ) {
             Err(err) => {
-                warn!(
-                    "Ignoring challenge nonce response message from connection {}: {}",
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
                     context.source_connection_id(),
-                    err
-                );
+                    sender,
+                    &err.to_string(),
+                )?;
+                return Ok(());
             }
             Ok(AuthorizationLocalState::Challenge(
                 ChallengeAuthorizationLocalState::ReceivedAuthChallengeNonceResponse,
@@ -979,11 +999,14 @@ impl Handler for AuthChallengeSubmitRequestHandler {
             ),
         ) {
             Err(err) => {
-                warn!(
-                    "Ignoring challenge nonce response message from connection {}: {}",
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
                     context.source_connection_id(),
-                    err
-                );
+                    sender,
+                    &err.to_string(),
+                )?;
+                return Ok(());
             }
             Ok(AuthorizationRemoteState::Challenge(
                 ChallengeAuthorizationRemoteState::ReceivedAuthChallengeSubmitRequest(_),
@@ -1062,11 +1085,14 @@ impl Handler for AuthChallengeSubmitResponseHandler {
             ),
         ) {
             Err(err) => {
-                warn!(
-                    "Ignoring challenge submit response message from connection {}: {}",
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
                     context.source_connection_id(),
-                    err
-                );
+                    sender,
+                    &err.to_string(),
+                )?;
+                return Ok(());
             }
             Ok(AuthorizationLocalState::Authorized) => {
                 let auth_msg = AuthorizationMessage::AuthComplete(AuthComplete);
@@ -1084,11 +1110,14 @@ impl Handler for AuthChallengeSubmitResponseHandler {
                     AuthorizationLocalAction::SendAuthComplete,
                 ) {
                     Err(err) => {
-                        warn!(
-                            "Cannot transition connection from Authorized {}: {}",
+                        send_authorization_error(
+                            &self.auth_manager,
+                            context.source_id(),
                             context.source_connection_id(),
-                            err
-                        );
+                            sender,
+                            &err.to_string(),
+                        )?;
+                        return Ok(());
                     }
                     Ok(AuthorizationLocalState::WaitForComplete) => (),
                     Ok(AuthorizationLocalState::AuthorizedAndComplete) => (),
@@ -1127,7 +1156,7 @@ impl Handler for AuthCompleteHandler {
         &self,
         _msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        _sender: &dyn MessageSender<Self::Source>,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!(
             "Received authorization complete from {}",
@@ -1139,11 +1168,14 @@ impl Handler for AuthCompleteHandler {
             .received_complete(context.source_connection_id())
         {
             Err(err) => {
-                warn!(
-                    "Ignoring authorization complete message from connection {}: {}",
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
                     context.source_connection_id(),
-                    err
-                );
+                    sender,
+                    &err.to_string(),
+                )?;
+                return Ok(());
             }
             Ok(()) => (),
         }
