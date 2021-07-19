@@ -17,10 +17,16 @@
 //! Takes various `PartialConfig` objects and finalizes the config values sourced from the
 //! `PartialConfigs` to construct a `Config` object to be used to start up the Splinter daemon.
 
+#[cfg(feature = "log-config")]
+use std::collections::HashMap;
+#[cfg(feature = "log-config")]
+use std::convert::TryInto;
 use std::path::Path;
 
 use crate::config::error::ConfigError;
 use crate::config::{Config, ConfigSource, PartialConfig};
+#[cfg(feature = "log-config")]
+use crate::logging::AppenderConfig;
 
 pub trait PartialConfigBuilder {
     /// Takes all values set in a config object to create a `PartialConfig` object.
@@ -352,6 +358,67 @@ impl ConfigBuilder {
                 .partial_configs
                 .iter()
                 .find_map(|p| p.metrics_password().map(|v| (v, p.source()))),
+            #[cfg(feature = "log-config")]
+            appenders: Some({
+                let appenders = self
+                    .partial_configs
+                    .iter()
+                    .filter_map(|partial| {
+                        partial.appenders().map(|vector| {
+                            vector
+                                .iter()
+                                .map(|item| {
+                                    let result = (item.0.to_owned(), item.1.to_owned()).try_into();
+                                    match result {
+                                        Ok(inner) => Ok((inner, partial.source())),
+                                        Err(e) => Err(e),
+                                    }
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                    })
+                    .flatten()
+                    .collect::<Result<Vec<(AppenderConfig, ConfigSource)>, ConfigError>>()?;
+                let mut map: HashMap<String, &(AppenderConfig, ConfigSource)> = HashMap::new();
+                for appender in appenders.iter().rev() {
+                    map.insert(appender.0.name.to_owned(), appender);
+                }
+                map.values()
+                    .map(|item| (item.0.to_owned(), item.1.to_owned()))
+                    .collect()
+            }),
+            #[cfg(feature = "log-config")]
+            loggers: Some(
+                self.partial_configs
+                    .iter()
+                    .filter_map(|partial| {
+                        partial.loggers().map(|vector| {
+                            vector
+                                .iter()
+                                .map(|item| {
+                                    (
+                                        (item.0.to_owned(), item.1.to_owned()).into(),
+                                        partial.source(),
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                    })
+                    .flatten()
+                    .collect(),
+            ),
+            #[cfg(feature = "log-config")]
+            root_logger: self
+                .partial_configs
+                .iter()
+                .find_map(|p| p.root_logger().map(|v| (v, p.source())))
+                .ok_or_else(|| ConfigError::MissingValue("root_logger".to_string()))?,
+            #[cfg(feature = "log-config")]
+            verbosity: self
+                .partial_configs
+                .iter()
+                .find_map(|p| p.verbosity().map(|v| (v, p.source())))
+                .ok_or_else(|| ConfigError::MissingValue("verbosity".to_string()))?,
         })
     }
 }
