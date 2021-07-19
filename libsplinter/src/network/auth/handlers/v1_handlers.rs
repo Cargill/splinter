@@ -119,36 +119,13 @@ impl Handler for AuthProtocolRequestHandler {
 
                 // Send error message if version is not agreed upon
                 if version == 0 {
-                    let response = AuthorizationMessage::AuthorizationError(
-                        AuthorizationError::AuthorizationRejected(
-                            "Unable to agree on protocol version".into(),
-                        ),
-                    );
-
-                    let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
-                        NetworkMessage::from(response),
+                    send_authorization_error(
+                        &self.auth_manager,
+                        context.source_id(),
+                        context.source_connection_id(),
+                        sender,
+                        "Unable to agree on protocol version",
                     )?;
-
-                    sender
-                        .send(context.source_id().clone(), msg_bytes)
-                        .map_err(|(recipient, payload)| {
-                            DispatchError::NetworkSendError((recipient.into(), payload))
-                        })?;
-
-                    if self
-                        .auth_manager
-                        .next_remote_state(
-                            context.source_connection_id(),
-                            AuthorizationRemoteAction::Unauthorizing,
-                        )
-                        .is_err()
-                    {
-                        warn!(
-                            "Unable to update state to Unauthorizing for {}",
-                            context.source_connection_id(),
-                        )
-                    };
-
                     return Ok(());
                 };
 
@@ -343,29 +320,15 @@ impl Handler for AuthProtocolResponseHandler {
                                 NetworkMessage::from(nonce_request),
                             )?;
                         } else {
-                            let response = AuthorizationMessage::AuthorizationError(
-                                AuthorizationError::AuthorizationRejected(
-                                    "Required authorization type not supported".into(),
-                                ),
-                            );
-
-                            msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
-                                NetworkMessage::from(response),
+                            send_authorization_error(
+                                &self.auth_manager,
+                                context.source_id(),
+                                context.source_connection_id(),
+                                sender,
+                                "Required authorization type not supported",
                             )?;
 
-                            if self
-                                .auth_manager
-                                .next_local_state(
-                                    context.source_connection_id(),
-                                    AuthorizationLocalAction::Unauthorizing,
-                                )
-                                .is_err()
-                            {
-                                warn!(
-                                    "Unable to update state to Unauthorizing for {}",
-                                    context.source_connection_id(),
-                                )
-                            };
+                            return Ok(());
                         }
                     }
                     #[cfg(feature = "trust-authorization")]
@@ -400,29 +363,15 @@ impl Handler for AuthProtocolResponseHandler {
                                 NetworkMessage::from(trust_request),
                             )?;
                         } else {
-                            let response = AuthorizationMessage::AuthorizationError(
-                                AuthorizationError::AuthorizationRejected(
-                                    "Required authorization type not supported".into(),
-                                ),
-                            );
-
-                            msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
-                                NetworkMessage::from(response),
+                            send_authorization_error(
+                                &self.auth_manager,
+                                context.source_id(),
+                                context.source_connection_id(),
+                                sender,
+                                "Required authorization type not supported",
                             )?;
 
-                            if self
-                                .auth_manager
-                                .next_local_state(
-                                    context.source_connection_id(),
-                                    AuthorizationLocalAction::Unauthorizing,
-                                )
-                                .is_err()
-                            {
-                                warn!(
-                                    "Unable to update state to Unauthorizing for {}",
-                                    context.source_connection_id(),
-                                )
-                            };
+                            return Ok(());
                         }
                     }
                     _ => {
@@ -491,29 +440,15 @@ impl Handler for AuthProtocolResponseHandler {
                             feature = "challenge-authorization"
                         )))]
                         {
-                            let response = AuthorizationMessage::AuthorizationError(
-                                AuthorizationError::AuthorizationRejected(
-                                    "Required authorization type not supported".into(),
-                                ),
-                            );
-
-                            msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
-                                NetworkMessage::from(response),
+                            send_authorization_error(
+                                &self.auth_manager,
+                                context.source_id(),
+                                context.source_connection_id(),
+                                sender,
+                                "Required authorization type not supported",
                             )?;
 
-                            if self
-                                .auth_manager
-                                .next_local_state(
-                                    context.source_connection_id(),
-                                    AuthorizationLocalAction::Unauthorizing,
-                                )
-                                .is_err()
-                            {
-                                warn!(
-                                    "Unable to update state to Unauthorizing for {}",
-                                    context.source_connection_id(),
-                                )
-                            };
+                            return Ok(());
                         }
                     }
                 };
@@ -983,35 +918,13 @@ impl Handler for AuthChallengeSubmitRequestHandler {
                     DispatchError::HandleError(format!("Unable to verify submit request: {}", err))
                 })?;
             if !verified {
-                let response = AuthorizationMessage::AuthorizationError(
-                    AuthorizationError::AuthorizationRejected(
-                        "Challenge signature was not valid".into(),
-                    ),
-                );
-
-                let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
-                    NetworkMessage::from(response),
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
+                    context.source_connection_id(),
+                    sender,
+                    "Challenge signature was not valid",
                 )?;
-
-                sender
-                    .send(context.source_id().clone(), msg_bytes)
-                    .map_err(|(recipient, payload)| {
-                        DispatchError::NetworkSendError((recipient.into(), payload))
-                    })?;
-
-                if self
-                    .auth_manager
-                    .next_remote_state(
-                        context.source_connection_id(),
-                        AuthorizationRemoteAction::Unauthorizing,
-                    )
-                    .is_err()
-                {
-                    warn!(
-                        "Unable to update state to Unauthorizing for {}",
-                        context.source_connection_id(),
-                    )
-                };
 
                 return Ok(());
             }
@@ -1022,35 +935,13 @@ impl Handler for AuthChallengeSubmitRequestHandler {
             if public_keys.contains(&public_key) {
                 public_key
             } else {
-                let response = AuthorizationMessage::AuthorizationError(
-                    AuthorizationError::AuthorizationRejected(
-                        "Required public key not submitted".into(),
-                    ),
-                );
-
-                let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
-                    NetworkMessage::from(response),
+                send_authorization_error(
+                    &self.auth_manager,
+                    context.source_id(),
+                    context.source_connection_id(),
+                    sender,
+                    "Required public key not submitted",
                 )?;
-
-                sender
-                    .send(context.source_id().clone(), msg_bytes)
-                    .map_err(|(recipient, payload)| {
-                        DispatchError::NetworkSendError((recipient.into(), payload))
-                    })?;
-
-                if self
-                    .auth_manager
-                    .next_remote_state(
-                        context.source_connection_id(),
-                        AuthorizationRemoteAction::Unauthorizing,
-                    )
-                    .is_err()
-                {
-                    warn!(
-                        "Unable to update state to Unauthorizing for {}",
-                        context.source_connection_id(),
-                    )
-                };
 
                 return Ok(());
             }
@@ -1066,32 +957,13 @@ impl Handler for AuthChallengeSubmitRequestHandler {
                 }
             };
 
-            let response = AuthorizationMessage::AuthorizationError(
-                AuthorizationError::AuthorizationRejected(error_string),
-            );
-
-            let msg_bytes =
-                IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(response))?;
-
-            sender
-                .send(context.source_id().clone(), msg_bytes)
-                .map_err(|(recipient, payload)| {
-                    DispatchError::NetworkSendError((recipient.into(), payload))
-                })?;
-
-            if self
-                .auth_manager
-                .next_remote_state(
-                    context.source_connection_id(),
-                    AuthorizationRemoteAction::Unauthorizing,
-                )
-                .is_err()
-            {
-                warn!(
-                    "Unable to update state to Unauthorizing for {}",
-                    context.source_connection_id(),
-                )
-            };
+            send_authorization_error(
+                &self.auth_manager,
+                context.source_id(),
+                context.source_connection_id(),
+                sender,
+                &error_string,
+            )?;
 
             return Ok(());
         };
@@ -1278,4 +1150,37 @@ impl Handler for AuthCompleteHandler {
 
         Ok(())
     }
+}
+
+fn send_authorization_error(
+    auth_manager: &AuthorizationManagerStateMachine,
+    source_id: &str,
+    connection_id: &str,
+    sender: &dyn MessageSender<ConnectionId>,
+    error_string: &str,
+) -> Result<(), DispatchError> {
+    let response = AuthorizationMessage::AuthorizationError(
+        AuthorizationError::AuthorizationRejected(error_string.into()),
+    );
+
+    let msg_bytes =
+        IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(response))?;
+
+    sender
+        .send(source_id.into(), msg_bytes)
+        .map_err(|(recipient, payload)| {
+            DispatchError::NetworkSendError((recipient.into(), payload))
+        })?;
+
+    if auth_manager
+        .next_remote_state(connection_id, AuthorizationRemoteAction::Unauthorizing)
+        .is_err()
+    {
+        warn!(
+            "Unable to update state to Unauthorizing for {}",
+            connection_id,
+        )
+    };
+
+    Ok(())
 }
