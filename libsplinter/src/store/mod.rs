@@ -31,6 +31,10 @@ pub use self::sqlite::ForeignKeyCustomizer;
 use diesel::r2d2::{ConnectionManager, Pool};
 
 use crate::error::{InternalError, InvalidArgumentError};
+#[cfg(feature = "postgres")]
+use crate::migrations::any_pending_postgres_migrations;
+#[cfg(feature = "sqlite")]
+use crate::migrations::any_pending_sqlite_migrations;
 
 /// An abstract factory for creating Splinter stores backed by the same storage
 pub trait StoreFactory {
@@ -91,6 +95,16 @@ pub fn create_store_factory(
                     "Failed to build connection pool".to_string(),
                 )
             })?;
+            let conn = pool
+                .get()
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            if !any_pending_postgres_migrations(&conn)? {
+                return Err(InternalError::with_message(String::from(
+                    "This version of splinter requires migrations that are not yet applied \
+                    to the database. Run `splinter database migrate` to apply migrations \
+                    before running splinterd",
+                )));
+            }
             Ok(Box::new(postgres::PgStoreFactory::new(pool)))
         }
         #[cfg(feature = "sqlite")]
@@ -117,6 +131,16 @@ pub fn create_store_factory(
                     "Failed to build connection pool".to_string(),
                 )
             })?;
+            let conn = pool
+                .get()
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            if !any_pending_sqlite_migrations(&conn)? {
+                return Err(InternalError::with_message(String::from(
+                    "This version of splinter requires migrations that are not yet applied \
+                    to the database. Run `splinter database migrate` to apply migrations \
+                    before running splinterd",
+                )));
+            }
             Ok(Box::new(sqlite::SqliteStoreFactory::new(pool)))
         }
     }
