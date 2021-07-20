@@ -302,7 +302,7 @@ mod tests {
     use cylinder::{PublicKey, Signature, VerificationError, Verifier};
     use protobuf::Message;
 
-    use crate::network::auth::create_authorization_dispatcher;
+    use crate::network::auth::AuthorizationDispatchBuilder;
     use crate::protos::authorization;
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
 
@@ -318,22 +318,24 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        let dispatcher = create_authorization_dispatcher(
-            "mock_identity".into(),
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-            auth_mgr,
-            dispatch_sender,
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-            #[cfg(feature = "challenge-authorization")]
-            None,
-            #[cfg(feature = "challenge-authorization")]
-            Box::new(NoopVerifier),
-        )
-        .expect("Unable to build create_authorization_dispatcher");
+        // mut is required if chalenge authorization is enabled
+        #[allow(unused_mut)]
+        let mut dispatcher_builder =
+            AuthorizationDispatchBuilder::new().with_identity("mock_identity");
+
+        #[cfg(feature = "challenge-authorization")]
+        {
+            dispatcher_builder = dispatcher_builder
+                .with_signers(&vec![])
+                .with_nonce(&vec![])
+                .with_expected_authorization(None)
+                .with_local_authorization(None)
+                .with_verifier(Box::new(NoopVerifier))
+        }
+
+        let dispatcher = dispatcher_builder
+            .build(dispatch_sender, auth_mgr)
+            .expect("Unable to build authorization dispatcher");
 
         let connection_id = "test_connection".to_string();
         let mut msg = authorization::ConnectRequest::new();
@@ -391,22 +393,24 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        let dispatcher = create_authorization_dispatcher(
-            "mock_identity".into(),
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-            auth_mgr,
-            dispatch_sender,
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-            #[cfg(feature = "challenge-authorization")]
-            None,
-            #[cfg(feature = "challenge-authorization")]
-            Box::new(NoopVerifier),
-        )
-        .expect("Unable to build create_authorization_dispatcher");
+        // mut is required if chalenge authorization is enabled
+        #[allow(unused_mut)]
+        let mut dispatcher_builder =
+            AuthorizationDispatchBuilder::new().with_identity("mock_identity");
+
+        #[cfg(feature = "challenge-authorization")]
+        {
+            dispatcher_builder = dispatcher_builder
+                .with_signers(&vec![])
+                .with_nonce(&vec![])
+                .with_expected_authorization(None)
+                .with_local_authorization(None)
+                .with_verifier(Box::new(NoopVerifier))
+        }
+
+        let dispatcher = dispatcher_builder
+            .build(dispatch_sender, auth_mgr)
+            .expect("Unable to build authorization dispatcher");
         let connection_id = "test_connection".to_string();
         let mut msg = authorization::ConnectResponse::new();
         msg.set_accepted_authorization_types(
@@ -449,22 +453,24 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        let dispatcher = create_authorization_dispatcher(
-            "mock_identity".into(),
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-            auth_mgr,
-            dispatch_sender,
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-            #[cfg(feature = "challenge-authorization")]
-            None,
-            #[cfg(feature = "challenge-authorization")]
-            Box::new(NoopVerifier),
-        )
-        .expect("Unable to build create_authorization_dispatcher");
+        // mut is required if chalenge authorization is enabled
+        #[allow(unused_mut)]
+        let mut dispatcher_builder =
+            AuthorizationDispatchBuilder::new().with_identity("mock_identity");
+
+        #[cfg(feature = "challenge-authorization")]
+        {
+            dispatcher_builder = dispatcher_builder
+                .with_signers(&vec![])
+                .with_nonce(&vec![])
+                .with_expected_authorization(None)
+                .with_local_authorization(None)
+                .with_verifier(Box::new(NoopVerifier))
+        }
+
+        let dispatcher = dispatcher_builder
+            .build(dispatch_sender, auth_mgr)
+            .expect("Unable to build authorization dispatcher");
         let connection_id = "test_connection".to_string();
         // Begin the connection process, otherwise, the response will fail
         let mut msg = authorization::ConnectRequest::new();
