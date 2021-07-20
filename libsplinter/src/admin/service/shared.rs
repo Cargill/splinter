@@ -47,6 +47,8 @@ use crate::protos::admin::{
     Circuit_PersistenceType, Circuit_RouteType, MemberReady, RemovedProposal,
     ServiceProtocolVersionRequest, SplinterNode, SplinterService,
 };
+#[cfg(feature = "challenge-authorization")]
+use crate::public_key;
 use crate::service::error::ServiceError;
 #[cfg(feature = "service-arg-validation")]
 use crate::service::validation::ServiceArgValidator;
@@ -155,7 +157,7 @@ pub struct AdminServiceShared {
     // Mailbox of AdminServiceEvent values
     event_store: Box<dyn AdminServiceStore>,
     #[cfg(feature = "challenge-authorization")]
-    public_keys: Vec<Vec<u8>>,
+    public_keys: Vec<public_key::PublicKey>,
     token_to_peer: HashMap<PeerAuthorizationToken, PeerNodePair>,
 }
 
@@ -175,7 +177,7 @@ impl AdminServiceShared {
         key_permission_manager: Box<dyn KeyPermissionManager>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
         admin_service_event_store: Box<dyn AdminServiceStore>,
-        #[cfg(feature = "challenge-authorization")] public_keys: Vec<Vec<u8>>,
+        #[cfg(feature = "challenge-authorization")] public_keys: Vec<public_key::PublicKey>,
     ) -> Self {
         AdminServiceShared {
             node_id,

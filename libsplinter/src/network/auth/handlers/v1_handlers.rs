@@ -50,6 +50,8 @@ use crate::protocol::{PEER_AUTHORIZATION_PROTOCOL_MIN, PEER_AUTHORIZATION_PROTOC
 use crate::protos::authorization;
 use crate::protos::network;
 use crate::protos::prelude::*;
+#[cfg(feature = "challenge-authorization")]
+use crate::public_key;
 
 /// Handler for the Authorization Protocol Request Message Type
 pub struct AuthProtocolRequestHandler {
@@ -882,7 +884,7 @@ pub struct AuthChallengeSubmitRequestHandler {
     auth_manager: AuthorizationManagerStateMachine,
     verifer: Box<dyn Verifier>,
     nonce: Vec<u8>,
-    expected_public_key: Option<Vec<u8>>,
+    expected_public_key: Option<public_key::PublicKey>,
 }
 
 #[cfg(feature = "challenge-authorization")]
@@ -891,7 +893,7 @@ impl AuthChallengeSubmitRequestHandler {
         auth_manager: AuthorizationManagerStateMachine,
         verifer: Box<dyn Verifier>,
         nonce: Vec<u8>,
-        expected_public_key: Option<Vec<u8>>,
+        expected_public_key: Option<public_key::PublicKey>,
     ) -> Self {
         Self {
             auth_manager,
@@ -952,8 +954,8 @@ impl Handler for AuthChallengeSubmitRequestHandler {
         }
 
         let identity = if let Some(public_key) = &self.expected_public_key {
-            if public_keys.contains(&public_key) {
-                public_key
+            if public_keys.contains(&public_key.as_slice().to_vec()) {
+                public_key.clone()
             } else {
                 send_authorization_error(
                     &self.auth_manager,
@@ -967,7 +969,8 @@ impl Handler for AuthChallengeSubmitRequestHandler {
             }
         } else if public_keys.len() == 1 {
             // we know this is safe because of above length check
-            &public_keys[0]
+            // defaults to the first key in the list
+            public_key::PublicKey::from_bytes(public_keys[0].clone())
         } else {
             let error_string = {
                 if public_keys.is_empty() {
@@ -993,7 +996,7 @@ impl Handler for AuthChallengeSubmitRequestHandler {
             AuthorizationRemoteAction::Challenge(
                 ChallengeAuthorizationRemoteAction::ReceiveAuthChallengeSubmitRequest(
                     Identity::Challenge {
-                        public_key: identity.clone(),
+                        public_key: identity,
                     },
                 ),
             ),

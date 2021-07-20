@@ -21,6 +21,9 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "challenge-authorization")]
+use crate::public_key::PublicKey;
+
+#[cfg(feature = "challenge-authorization")]
 use self::challenge_v1::{
     ChallengeAuthorizationLocalAction, ChallengeAuthorizationLocalState,
     ChallengeAuthorizationRemoteAction, ChallengeAuthorizationRemoteState,
@@ -41,7 +44,7 @@ pub enum Identity {
     },
     #[cfg(feature = "challenge-authorization")]
     Challenge {
-        public_key: Vec<u8>,
+        public_key: PublicKey,
     },
 }
 

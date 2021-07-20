@@ -223,7 +223,9 @@ impl AuthorizationDispatchBuilder {
             let signers_to_use = match &self.local_authorization {
                 Some(ConnectionAuthorizationType::Challenge { public_key }) => {
                     let signer = signers.iter().find(|signer| match signer.public_key() {
-                        Ok(signer_public_key) => signer_public_key.as_slice() == public_key,
+                        Ok(signer_public_key) => {
+                            signer_public_key.as_slice() == public_key.as_slice()
+                        }
                         Err(_) => false,
                     });
 

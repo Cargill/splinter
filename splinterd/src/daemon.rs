@@ -61,6 +61,8 @@ use splinter::peer::interconnect::PeerInterconnectBuilder;
 use splinter::peer::PeerManager;
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::NetworkMessageType;
+#[cfg(feature = "challenge-authorization")]
+use splinter::public_key::PublicKey;
 use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RemoteYamlShutdownHandle, RwRegistry,
     UnifiedRegistry,
@@ -496,8 +498,8 @@ impl SplinterDaemon {
             admin_service_builder = admin_service_builder.with_public_keys(
                 self.signers
                     .iter()
-                    .map(|signer| Ok(signer.public_key()?.into_bytes()))
-                    .collect::<Result<Vec<Vec<u8>>, SigningError>>()
+                    .map(|signer| Ok(PublicKey::from_bytes(signer.public_key()?.into_bytes())))
+                    .collect::<Result<Vec<PublicKey>, SigningError>>()
                     .map_err(|err| {
                         StartError::AdminServiceError(format!(
                             "Unable to get public keys from signer for Admin message handler:

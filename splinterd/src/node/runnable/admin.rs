@@ -25,6 +25,7 @@ use splinter::error::InternalError;
 use splinter::events::Reactor;
 use splinter::orchestrator::ServiceOrchestratorBuilder;
 use splinter::peer::PeerManagerConnector;
+use splinter::public_key::PublicKey;
 use splinter::registry::{LocalYamlRegistry, RegistryReader, UnifiedRegistry};
 use splinter::rest_api::actix_web_1::RestResourceProvider as _;
 use splinter::service::ServiceProcessorBuilder;
@@ -49,7 +50,7 @@ pub struct RunnableAdminSubsystem {
     pub scabbard_service_factory: Option<ScabbardFactory>,
     pub registries: Option<Vec<String>>,
     pub admin_service_event_client_variant: AdminServiceEventClientVariant,
-    pub public_keys: Vec<Vec<u8>>,
+    pub public_keys: Vec<PublicKey>,
 }
 
 impl RunnableAdminSubsystem {

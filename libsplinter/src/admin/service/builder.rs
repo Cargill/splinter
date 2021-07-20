@@ -27,6 +27,8 @@ use crate::error::InvalidStateError;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::ServiceOrchestrator;
 use crate::peer::PeerManagerConnector;
+#[cfg(feature = "challenge-authorization")]
+use crate::public_key::PublicKey;
 #[cfg(feature = "service-arg-validation")]
 use crate::service::validation::ServiceArgValidator;
 
@@ -55,7 +57,7 @@ pub struct AdminServiceBuilder {
     routing_table_writer: Option<Box<dyn RoutingTableWriter>>,
     event_store: Option<Box<dyn AdminServiceStore>>,
     #[cfg(feature = "challenge-authorization")]
-    public_keys: Option<Vec<Vec<u8>>>,
+    public_keys: Option<Vec<PublicKey>>,
 }
 
 impl AdminServiceBuilder {
@@ -154,7 +156,7 @@ impl AdminServiceBuilder {
 
     /// Sets the public keys
     #[cfg(feature = "challenge-authorization")]
-    pub fn with_public_keys(mut self, public_keys: Vec<Vec<u8>>) -> Self {
+    pub fn with_public_keys(mut self, public_keys: Vec<PublicKey>) -> Self {
         self.public_keys = Some(public_keys);
 
         self

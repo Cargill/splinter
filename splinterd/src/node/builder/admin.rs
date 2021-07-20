@@ -22,6 +22,7 @@ use scabbard::service::ScabbardFactoryBuilder;
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
 use splinter::peer::PeerManagerConnector;
+use splinter::public_key::PublicKey;
 use splinter::store::{memory::MemoryStoreFactory, StoreFactory};
 use splinter::transport::inproc::InprocTransport;
 
@@ -47,7 +48,7 @@ pub struct AdminSubsystemBuilder {
     scabbard_config: Option<ScabbardConfig>,
     registries: Option<Vec<String>>,
     admin_service_event_client_variant: AdminServiceEventClientVariant,
-    public_keys: Option<Vec<Vec<u8>>>,
+    public_keys: Option<Vec<PublicKey>>,
 }
 
 impl AdminSubsystemBuilder {
@@ -134,7 +135,7 @@ impl AdminSubsystemBuilder {
     }
 
     /// Specifies the public keys set in the admin service
-    pub fn with_public_keys(mut self, public_keys: Vec<Vec<u8>>) -> Self {
+    pub fn with_public_keys(mut self, public_keys: Vec<PublicKey>) -> Self {
         self.public_keys = Some(public_keys);
         self
     }
