@@ -58,13 +58,13 @@ default = [
     "circuit-template",
     "database",
     "postgres",
-    "upgrade",
     "sqlite",
+    "upgrade",
 ]
 
 stable = [
-    "default",
     "authorization-handler-rbac",
+    "default",
 ]
 
 experimental = [
@@ -75,33 +75,33 @@ experimental = [
     "challenge-authorization",
     "health",
     "https-certs",
-    "user-list",
     "registry",
+    "user-list",
 ]
 
 authorization-handler-maintenance = []
 authorization-handler-rbac = []
-user-list = []
 challenge-authorization = ["splinter/challenge-authorization"]
 circuit-template = ["splinter/circuit-template"]
-
-registry = []
-
-health = []
-
-upgrade = ["database", "splinter/store-factory"]
-
-https-certs = []
-
 database = ["diesel"]
+health = []
+https-certs = []
 postgres = [
     "diesel/postgres",
     "splinter/postgres",
 ]
+registry = []
 sqlite = [
     "diesel/sqlite",
     "splinter/sqlite",
 ]
+upgrade = [
+    "database",
+    "splinter/store-factory"
+]
+user-list = []
+
+
 
 [package.metadata.deb]
 maintainer = "The Splinter Team"
