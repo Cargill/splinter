@@ -15,6 +15,7 @@
 #[cfg(feature = "diesel")]
 pub mod diesel;
 pub mod error;
+pub mod file;
 
 use error::NodeIdStoreError;
 
