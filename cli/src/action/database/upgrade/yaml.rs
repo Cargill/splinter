@@ -29,13 +29,11 @@ use splinter::admin::store::yaml::YamlAdminServiceStore;
 use splinter::admin::store::AdminServiceStore;
 use splinter::admin::store::CircuitNodeBuilder;
 
+#[cfg(feature = "sqlite")]
+use crate::action::database::sqlite::get_database_at_state_path;
+use crate::action::database::{ConnectionUri, SplinterEnvironment};
 use crate::error::CliError;
 use crate::Action;
-
-use super::{ConnectionUri, SplinterEnvironment};
-
-#[cfg(feature = "sqlite")]
-use super::sqlite::get_database_at_state_path;
 
 const CIRCUITS_FILE: &str = "circuits.yaml";
 const PROPOSALS_FILE: &str = "circuit_proposals.yaml";
