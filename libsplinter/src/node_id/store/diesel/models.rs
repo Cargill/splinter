@@ -12,22 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "diesel")]
-pub mod diesel;
-/// NodeIdStore error types
-pub mod error;
+use diesel::{Insertable, Queryable};
 
-use error::NodeIdStoreError;
+use super::schema::node_id;
 
-/// Trait for interacting with the instances node_id.
-pub trait NodeIdStore {
-    /// Gets node_id for the instance
-    fn get_node_id(&self) -> Result<Option<String>, NodeIdStoreError>;
-
-    /// Sets node_id for the instance
-    ///
-    /// # Arguments
-    ///
-    /// * `node_id` - the desired node_id
-    fn set_node_id(&self, node_id: String) -> Result<(), NodeIdStoreError>;
+#[derive(Queryable, Insertable)]
+#[table_name = "node_id"]
+pub struct NodeID {
+    pub id: String,
 }
