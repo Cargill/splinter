@@ -37,7 +37,7 @@ use crate::protos::network;
 use crate::protos::prelude::*;
 use crate::transport::{Connection, RecvError};
 
-use self::handlers::create_authorization_dispatcher;
+use self::handlers::AuthorizationDispatchBuilder;
 use self::pool::{ThreadPool, ThreadPoolBuilder};
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 pub(crate) use self::state_machine::AuthorizationLocalAction;
@@ -188,26 +188,35 @@ impl AuthorizationConnector {
 
         #[cfg(feature = "challenge-authorization")]
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
-        let dispatcher = create_authorization_dispatcher(
-            self.local_identity.clone(),
-            #[cfg(feature = "challenge-authorization")]
-            self.signers.clone(),
-            // need to allow clone because it is required if trust authorization is enabled
-            #[allow(clippy::redundant_clone)]
-            state_machine.clone(),
-            msg_sender,
-            #[cfg(feature = "challenge-authorization")]
-            nonce,
-            #[cfg(feature = "challenge-authorization")]
-            expected_authorization.clone(),
-            #[cfg(feature = "challenge-authorization")]
-            local_authorization.clone(),
-            #[cfg(feature = "challenge-authorization")]
-            verifier,
-        )
-        .map_err(|err| {
-            AuthorizationManagerError(format!("Unable to setup authorization dispatcher: {}", err))
-        })?;
+
+        // mut is required if chalenge authorization is enabled
+        #[allow(unused_mut)]
+        let mut dispatcher_builder =
+            AuthorizationDispatchBuilder::new().with_identity(&self.local_identity);
+
+        #[cfg(feature = "challenge-authorization")]
+        {
+            dispatcher_builder = dispatcher_builder
+                .with_signers(&self.signers)
+                .with_nonce(&nonce)
+                .with_expected_authorization(expected_authorization.clone())
+                .with_local_authorization(local_authorization.clone())
+                .with_verifier(verifier)
+        }
+
+        let dispatcher = dispatcher_builder
+            .build(
+                msg_sender,
+                // need to allow clone because it is required if trust authorization is enabled
+                #[allow(clippy::redundant_clone)]
+                state_machine.clone(),
+            )
+            .map_err(|err| {
+                AuthorizationManagerError(format!(
+                    "Unable to setup authorization dispatcher: {}",
+                    err
+                ))
+            })?;
 
         self.executor.execute(move || {
             #[cfg(not(all(feature = "trust-authorization", feature = "challenge-authorization")))]
