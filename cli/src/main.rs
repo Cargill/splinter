@@ -1686,7 +1686,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     #[cfg(feature = "upgrade")]
     {
         use action::database;
-        subcommands = subcommands.with_command("upgrade", database::ImportFromYamlAction);
+        subcommands = subcommands.with_command("upgrade", database::UpgradeAction);
     }
 
     #[cfg(feature = "authorization-handler-maintenance")]

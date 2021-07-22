@@ -30,7 +30,7 @@ use splinter::migrations::run_postgres_migrations;
 #[cfg(feature = "sqlite")]
 use self::sqlite::{get_default_database, sqlite_migrations};
 #[cfg(feature = "upgrade")]
-pub use self::upgrade::ImportFromYamlAction;
+pub use self::upgrade::UpgradeAction;
 use crate::error::CliError;
 
 use super::Action;
