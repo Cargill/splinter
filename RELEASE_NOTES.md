@@ -84,7 +84,7 @@
 * Change splinterd `/var/lib/splinter` file ownership to `splinterd:splinterd`
 
 * Change splinterd `/var/lib/splinter` file permissions to disallow global read
-                                                                                                      
+
 * Create `/etc/splinter/allow_keys` with splinterd postinst script
 
 ### Build
@@ -98,12 +98,12 @@
 ### Highlights
 
 * The splinter CLI subcommands `splinter authid`, `splinter role`, `splinter
-  permissions`, and `splinter remove-proposal` have been stabilized.  
+  permissions`, and `splinter remove-proposal` have been stabilized.
 
 ### libsplinter
 
 * Add native protocol structs for `NetworkMessages`. This reduces the need to
-  use protobuf structs directly. 
+  use protobuf structs directly.
 
 * Updated sawtooth-sabre to fix a memory leak.
 
@@ -531,7 +531,7 @@
 
 * Rewrite WsTransport in tungstenite and add SSL support. The websocket crate
   had serious limitations which manifested when attempting to implement TLS
-  support. After more analysis, Tungstenite looks better overall, so  
+  support. After more analysis, Tungstenite looks better overall, so
   re-implemented with that dependency instead. This is experimental behind the
   `ws-transport` feature.
 
@@ -2458,12 +2458,12 @@ builds.
 ### libsplinter
 
 * Add a service orchestration implementation
-* Add Scabbard service factory 
+* Add Scabbard service factory
 * Implement a deterministic two-phase commit coordinator
 * Reorder the commit/reject process for the two-phase commit coordinator. The
   coordinator now tells proposal manager to commit/reject before broadcasting
   the corresponding message to other verifiers.
-* Refactor two-phase commit complete_coordination. Move the process of 
+* Refactor two-phase commit complete_coordination. Move the process of
   finishing the coordination of a proposal in two-phase commit to a single
   function to reduce duplication.
 * Implement a two-phase commit timeout for consensus proposals
@@ -2491,7 +2491,7 @@ builds.
 
 ### Gameroom Example
 
-* Add server-side WebSocket notifications to the UI 
+* Add server-side WebSocket notifications to the UI
 * Add borders to the Acme UI
 * Improve error handling and add reconnects to the Application Authorization
   Handler
