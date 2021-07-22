@@ -14,6 +14,8 @@
 
 //! Provides database upgrade functionality
 
+#[cfg(feature = "node-id-upgrade")]
+mod node_id;
 mod yaml;
 
 use std::path::PathBuf;
@@ -48,6 +50,11 @@ impl Action for UpgradeAction {
             CliError::ActionError(format!("failed to initialized store factory: {}", err))
         })?;
 
+        #[cfg(feature = "node-id-upgrade")]
+        {
+            let db_store = store_factory.get_node_id_store();
+            node_id::migrate_node_id_to_db(state_dir.clone(), db_store)?;
+        }
         let db_store = store_factory.get_admin_service_store();
         yaml::import_yaml_state_to_database(state_dir, &*db_store)?;
         Ok(())
