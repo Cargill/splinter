@@ -75,6 +75,7 @@ experimental = [
     "challenge-authorization",
     "health",
     "https-certs",
+    "node-id-upgrade",
     "registry",
     "user-list",
 ]
@@ -86,6 +87,7 @@ circuit-template = ["splinter/circuit-template"]
 database = ["diesel"]
 health = []
 https-certs = []
+node-id-upgrade = ["upgrade","splinter/node-id-store"]
 postgres = [
     "diesel/postgres",
     "splinter/postgres",
