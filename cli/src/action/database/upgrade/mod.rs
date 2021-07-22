@@ -14,4 +14,80 @@
 
 mod yaml;
 
+use std::path::PathBuf;
+use std::str::FromStr;
+
+use clap::ArgMatches;
+use splinter::store::ConnectionUri;
+
+#[cfg(feature = "sqlite")]
+use crate::action::database::sqlite::{get_database_at_state_path, get_default_database};
+use crate::action::database::{PgConnection, SplinterEnvironment};
+use crate::diesel::Connection;
+use crate::error::CliError;
+
 pub use yaml::ImportFromYamlAction;
+
+/// Gets the path of splinterd's state directory
+///
+///
+/// # Arguments
+///
+/// * `arg_matches` - an option of clap ['ArgMatches'](https://docs.rs/clap/2.33.3/clap/struct.ArgMatches.html).
+///
+/// # Returns
+///
+/// * PathBuf to state_dir if present in arg_matches, otherwise just the default from
+/// SplinterEnvironment
+fn get_state_dir(arg_matches: Option<&ArgMatches>) -> Result<PathBuf, CliError> {
+    if let Some(arg_matches) = arg_matches {
+        match arg_matches.value_of("state_dir") {
+            Some(state_dir) => {
+                let state_dir = PathBuf::from(state_dir.to_string());
+                Ok(
+                    std::fs::canonicalize(state_dir.as_path())
+                        .unwrap_or_else(|_| state_dir.clone()),
+                )
+            }
+            None => Ok(SplinterEnvironment::load().get_state_path()),
+        }
+    } else {
+        Ok(SplinterEnvironment::load().get_state_path())
+    }
+}
+
+/// Gets the configured database_uri
+///
+///
+/// # Arguments
+///
+/// * `arg_matches` - an option of clap ['ArgMatches'](https://docs.rs/clap/2.33.3/clap/struct.ArgMatches.html).
+fn get_database_uri(arg_matches: Option<&ArgMatches>) -> Result<ConnectionUri, CliError> {
+    let database_uri = if let Some(arg_matches) = arg_matches {
+        match arg_matches.value_of("connect") {
+            Some(database_uri) => database_uri.to_string(),
+            #[cfg(feature = "sqlite")]
+            None => get_database_at_state_path(get_state_dir(Some(arg_matches))?)?,
+            #[cfg(not(feature = "sqlite"))]
+            None => get_default_database(),
+        }
+    } else if cfg!(feature = "sqlite") {
+        get_database_at_state_path(get_state_dir(arg_matches)?)?
+    } else {
+        get_default_database()?
+    };
+    let parsed_uri = ConnectionUri::from_str(&database_uri)
+        .map_err(|e| CliError::ActionError(format!("database uri could not be parsed: {}", e)))?;
+    if let ConnectionUri::Postgres(_) = parsed_uri {
+        // Verify database connection.
+        // If the connection is faulty, we want to abort here instead of
+        // creating the store, as the store would perform reconnection attempts.
+        PgConnection::establish(&database_uri[..]).map_err(|err| {
+            CliError::ActionError(format!(
+                "Failed to establish database connection to '{}': {}",
+                database_uri, err
+            ))
+        })?;
+    }
+    Ok(parsed_uri)
+}

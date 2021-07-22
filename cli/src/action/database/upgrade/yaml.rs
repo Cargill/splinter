@@ -18,20 +18,15 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::{fmt, fs};
 
 use clap::ArgMatches;
-use diesel::{connection::Connection as _, pg::PgConnection};
 
 use splinter::admin::store::error::AdminServiceStoreError;
 use splinter::admin::store::yaml::YamlAdminServiceStore;
 use splinter::admin::store::AdminServiceStore;
 use splinter::admin::store::CircuitNodeBuilder;
 
-#[cfg(feature = "sqlite")]
-use crate::action::database::sqlite::get_database_at_state_path;
-use crate::action::database::{ConnectionUri, SplinterEnvironment};
 use crate::error::CliError;
 use crate::Action;
 
@@ -176,38 +171,8 @@ impl ImportFromYamlAction {
 
 impl Action for ImportFromYamlAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let (state_dir, database_uri) = match arg_matches {
-            Some(args) => (args.value_of("state_dir"), args.value_of("connect")),
-            None => (None, None),
-        };
-
-        let state_dir = match state_dir {
-            Some(state_dir) => {
-                let state_dir = PathBuf::from(state_dir.to_string());
-                fs::canonicalize(state_dir.as_path()).unwrap_or_else(|_| state_dir.clone())
-            }
-            None => SplinterEnvironment::load().get_state_path(),
-        };
-
-        let database_uri = match database_uri {
-            Some(database_uri) => database_uri.to_string(),
-            #[cfg(feature = "sqlite")]
-            None => get_database_at_state_path(state_dir.clone())?,
-            #[cfg(not(feature = "sqlite"))]
-            None => get_default_database(),
-        };
-
-        if let ConnectionUri::Postgres(_) = ConnectionUri::from_str(&database_uri)? {
-            // Verify database connection.
-            // If the connection is faulty, we want to abort here instead of
-            // creating the store, as the store would perform reconnection attempts.
-            PgConnection::establish(&database_uri[..]).map_err(|err| {
-                CliError::ActionError(format!(
-                    "Failed to establish database connection to '{}': {}",
-                    database_uri, err
-                ))
-            })?;
-        }
+        let state_dir = super::get_state_dir(arg_matches)?;
+        let database_uri = super::get_database_uri(arg_matches)?;
 
         info!("Upgrading splinterd state");
         info!(
