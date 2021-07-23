@@ -60,15 +60,6 @@ impl PeerAuthorizationToken {
         }
     }
 
-    #[cfg(feature = "challenge-authorization")]
-    /// Check if the token is challenge and has the provided public key
-    pub fn has_public_key(&self, public_keys: &[Vec<u8>]) -> bool {
-        match self {
-            PeerAuthorizationToken::Trust { .. } => false,
-            PeerAuthorizationToken::Challenge { public_key } => public_keys.contains(&public_key),
-        }
-    }
-
     /// Get the ID if the token is trust, else None
     pub fn peer_id(&self) -> Option<&str> {
         match self {
