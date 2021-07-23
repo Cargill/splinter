@@ -1,5 +1,37 @@
 # Release Notes
 
+## Changes in Splinter 0.5.13
+
+### Highlights
+
+* The initial experimental  implementation of Challenge Authorization has been
+  added. See [Challenge
+  Authorization](https://www.splinter.dev/community/planning/challenge_authorization.html)
+  for more information.
+
+### libsplinter
+
+* Implement Challenge Authorization. Challenge Authorization is behind an
+  experimental feature `challenge-authorization`.
+
+* Update the Admin Service to support Challenge Authorization. This is behind
+  the experimental feature `challenge-authorization`.
+
+* Update PeerManager and ConnectionManger to pass the expected authorization of
+  the peer, as well as the authorization the local node must use for
+  authorization. This is required to properly connect to a peer based on the
+  requirements of a circuit.  This is behind the experimental feature
+  `challenge-authorization`.
+
+* Add experimental NodeIdStore with diesel implementation.  This store adds an
+  alternative place to store the node id, which is saved on the first run of
+  splinter.
+
+### splinterd
+
+* Update the creation of the AuthorizationManager to support Challenge
+  Authorization.
+
 ## Changes in Splinter 0.5.12
 
 ### Highlights
