@@ -22,6 +22,8 @@ use std::fmt;
 #[cfg(feature = "challenge-authorization")]
 use crate::hex::to_hex;
 use crate::network::auth::ConnectionAuthorizationType;
+#[cfg(feature = "challenge-authorization")]
+use crate::public_key::PublicKey;
 
 /// The authorization type specific peer ID
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -31,7 +33,7 @@ pub enum PeerAuthorizationToken {
     },
     #[cfg(feature = "challenge-authorization")]
     Challenge {
-        public_key: Vec<u8>,
+        public_key: PublicKey,
     },
 }
 
@@ -47,7 +49,7 @@ impl PeerAuthorizationToken {
     /// Get a challenge token from a provided public_key
     pub fn from_public_key(public_key: &[u8]) -> Self {
         PeerAuthorizationToken::Challenge {
-            public_key: public_key.to_vec(),
+            public_key: PublicKey::from_bytes(public_key.to_vec()),
         }
     }
 
@@ -57,15 +59,6 @@ impl PeerAuthorizationToken {
             PeerAuthorizationToken::Trust { peer_id: id } => peer_id == id,
             #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { .. } => false,
-        }
-    }
-
-    #[cfg(feature = "challenge-authorization")]
-    /// Check if the token is challenge and has the provided public key
-    pub fn has_public_key(&self, public_keys: &[Vec<u8>]) -> bool {
-        match self {
-            PeerAuthorizationToken::Trust { .. } => false,
-            PeerAuthorizationToken::Challenge { public_key } => public_keys.contains(&public_key),
         }
     }
 
@@ -80,7 +73,7 @@ impl PeerAuthorizationToken {
 
     #[cfg(feature = "challenge-authorization")]
     /// Get the public key if the token is challenge, else None
-    pub fn public_key(&self) -> Option<&[u8]> {
+    pub fn public_key(&self) -> Option<&PublicKey> {
         match self {
             PeerAuthorizationToken::Trust { .. } => None,
             PeerAuthorizationToken::Challenge { public_key } => Some(public_key),
@@ -93,7 +86,7 @@ impl PeerAuthorizationToken {
             PeerAuthorizationToken::Trust { peer_id } => peer_id.to_string(),
             #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { public_key } => {
-                format!("public_key::{}", to_hex(public_key))
+                format!("public_key::{}", to_hex(public_key.as_slice()))
             }
         }
     }
@@ -107,7 +100,11 @@ impl fmt::Display for PeerAuthorizationToken {
             }
             #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { public_key } => {
-                write!(f, "Challenge ( public_key: {} )", to_hex(public_key))
+                write!(
+                    f,
+                    "Challenge ( public_key: {} )",
+                    to_hex(public_key.as_slice())
+                )
             }
         }
     }

@@ -35,6 +35,8 @@ use crate::protocol::network::NetworkMessage;
 use crate::protocol::{PEER_AUTHORIZATION_PROTOCOL_MIN, PEER_AUTHORIZATION_PROTOCOL_VERSION};
 use crate::protos::network;
 use crate::protos::prelude::*;
+#[cfg(feature = "challenge-authorization")]
+use crate::public_key::PublicKey;
 use crate::transport::{Connection, RecvError};
 
 use self::handlers::AuthorizationDispatchBuilder;
@@ -453,7 +455,7 @@ pub enum ConnectionAuthorizationType {
     },
     #[cfg(feature = "challenge-authorization")]
     Challenge {
-        public_key: Vec<u8>,
+        public_key: PublicKey,
     },
 }
 

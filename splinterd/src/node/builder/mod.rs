@@ -24,6 +24,7 @@ use std::time::Duration;
 use cylinder::{secp256k1::Secp256k1Context, Context, Signer, VerifierFactory};
 use rand::{thread_rng, Rng};
 use splinter::error::InternalError;
+use splinter::public_key::PublicKey;
 use splinter::rest_api::actix_web_1::RestApiBuilder as RestApiBuilder1;
 use splinter::rest_api::actix_web_3::RestApiBuilder as RestApiBuilder3;
 use splinter::rest_api::auth::{
@@ -206,10 +207,12 @@ impl NodeBuilder {
             .admin_subsystem_builder
             .with_node_id(node_id.clone())
             .with_signing_context(signing_context.clone())
-            .with_public_keys(vec![admin_signer
-                .public_key()
-                .map_err(|err| InternalError::from_source(Box::new(err)))?
-                .into_bytes()]);
+            .with_public_keys(vec![PublicKey::from_bytes(
+                admin_signer
+                    .public_key()
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?
+                    .into_bytes(),
+            )]);
 
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => RunnableNodeRestApiVariant::ActixWeb1(

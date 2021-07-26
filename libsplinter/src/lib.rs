@@ -91,6 +91,8 @@ pub mod orchestrator;
 pub mod peer;
 pub mod protocol;
 pub mod protos;
+#[cfg(feature = "challenge-authorization")]
+pub mod public_key;
 #[cfg(feature = "registry")]
 pub mod registry;
 #[cfg(feature = "rest-api")]
