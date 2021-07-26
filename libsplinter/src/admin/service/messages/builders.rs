@@ -191,12 +191,22 @@ impl CreateCircuitBuilder {
             .members
             .ok_or_else(|| BuilderError::MissingField("members".to_string()))?;
 
+        #[cfg(not(feature = "challenge-authorization"))]
         let authorization_type = self.authorization_type.unwrap_or_else(|| {
             debug!(
                 "Building circuit create request with default authorization_type: {:?}",
                 AuthorizationType::Trust
             );
             AuthorizationType::Trust
+        });
+
+        #[cfg(feature = "challenge-authorization")]
+        let authorization_type = self.authorization_type.unwrap_or_else(|| {
+            debug!(
+                "Building circuit create request with default authorization_type: {:?}",
+                AuthorizationType::Challenge
+            );
+            AuthorizationType::Challenge
         });
 
         let persistence = self.persistence.unwrap_or_else(|| {
@@ -515,7 +525,10 @@ mod tests {
             .all(|c| c.is_ascii_alphanumeric()));
         assert_eq!(circuit.roster, vec![service]);
         assert_eq!(circuit.members, vec![node]);
+        #[cfg(not(feature = "challenge-authorization"))]
         assert_eq!(circuit.authorization_type, AuthorizationType::Trust);
+        #[cfg(feature = "challenge-authorization")]
+        assert_eq!(circuit.authorization_type, AuthorizationType::Challenge);
         assert_eq!(circuit.persistence, PersistenceType::Any);
         assert_eq!(circuit.durability, DurabilityType::NoDurability);
         assert_eq!(circuit.routes, RouteType::Any);
