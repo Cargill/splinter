@@ -48,6 +48,25 @@ pub trait KeyStore: Sync + Send {
         new_display_name: &str,
     ) -> Result<(), KeyStoreError>;
 
+    /// Replaces all keys in the underlying storage for the user
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id`: The ID owner of the key records to be updated.
+    /// * `keys`: The array of new keys for the user
+    #[cfg(feature = "biome-replace-keys")]
+    fn replace_keys(&self, user_id: &str, keys: &[Key]) -> Result<(), KeyStoreError> {
+        for key in self.list_keys(Some(user_id))? {
+            self.remove_key(&key.public_key, user_id)?;
+        }
+
+        for key in keys {
+            self.add_key(key.clone())?;
+        }
+
+        Ok(())
+    }
+
     /// Removes a key from the underlying storage
     ///
     /// # Arguments
@@ -104,6 +123,11 @@ where
         new_display_name: &str,
     ) -> Result<(), KeyStoreError> {
         (**self).update_key(public_key, user_id, new_display_name)
+    }
+
+    #[cfg(feature = "biome-replace-keys")]
+    fn replace_keys(&self, user_id: &str, keys: &[Key]) -> Result<(), KeyStoreError> {
+        (**self).replace_keys(user_id, keys)
     }
 
     fn remove_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError> {
