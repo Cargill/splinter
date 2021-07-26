@@ -17,11 +17,12 @@ SYNOPSIS
 
 DESCRIPTION
 ===========
-Upgrades splinter by importing data from the deprecated YAML state file format
-to a database. This tool searches for data in the `circuits.yaml` and
-`circuit-proposals.yaml` state definitions from the state directory. When the
+Upgrades splinter by importing data from the deprecated YAML state and node_id
+files to a database. This tool searches for data in the `circuits.yaml`,
+`circuit-proposals.yaml` and `node_id` files from the state directory. When the
 upgrade is complete, the YAML state definitions will be renamed to
-`circuits.yaml.old` and `circuit-proposals.yaml.old` respectively.
+`circuits.yaml.old` and `circuit-proposals.yaml.old` respectively. The `node_id`
+file will be renamed to `node_id.old`.
 
 OPTIONS
 =======
