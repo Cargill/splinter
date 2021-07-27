@@ -103,6 +103,7 @@ experimental = [
     "log-config",
     "metrics",
     "node",
+    "node-file-block",
     "oauth-user-list",
     "scabbard-back-pressure",
     "service-arg-validation",
@@ -155,6 +156,7 @@ node = [
     "splinter/biome-client",
     "splinter/biome-client-reqwest",
 ]
+node-file-block = ["splinter/node-id-store",]
 oauth = [
     "splinter/oauth"
 ]
