@@ -40,12 +40,14 @@ use log4rs::Handle;
 use std::convert::TryInto;
 
 use rand::{thread_rng, Rng};
-#[cfg(feature = "challenge-authorization")]
+#[cfg(any(feature = "challenge-authorization", feature = "node-file-block"))]
 use splinter::error::InternalError;
 #[cfg(feature = "metrics")]
 use splinter::metrics::influx::InfluxRecorder;
 #[cfg(feature = "challenge-authorization")]
 use splinter::peer::PeerAuthorizationToken;
+#[cfg(feature = "node-file-block")]
+use splinter::store::create_store_factory;
 
 use crate::config::{
     ClapPartialConfigBuilder, Config, ConfigBuilder, ConfigError, DefaultPartialConfigBuilder,
@@ -58,7 +60,10 @@ use clap::{Arg, ArgMatches};
 use std::env;
 #[cfg(feature = "challenge-authorization")]
 use std::ffi::OsStr;
-use std::fs::{self, File};
+use std::fs;
+#[cfg(not(feature = "node-file-block"))]
+use std::fs::File;
+#[cfg(not(feature = "node-file-block"))]
 use std::io::Write;
 use std::path::Path;
 
@@ -97,65 +102,116 @@ fn create_config(_toml_path: Option<&str>, _matches: ArgMatches) -> Result<Confi
 fn find_node_id(config: &Config) -> Result<String, UserError> {
     let node_id_path = Path::new(config.state_dir()).join("node_id");
 
-    // Check if node file exists
-    if node_id_path.exists() {
-        // If the node file exists, read the node_id within the file.
-        let mut file_node_id = fs::read_to_string(&node_id_path).map_err(|err| {
-            UserError::io_err_with_source("Unable to read node_id file", Box::new(err))
-        })?;
-        if file_node_id.ends_with('\n') {
-            file_node_id.pop();
+    #[cfg(feature = "node-file-block")]
+    {
+        if node_id_path.exists() {
+            let context = "node_id file is soft-deprecated, run splinter database migrate and splinter upgrade to import the value".to_string();
+            Err(UserError::DaemonError {
+                context,
+                source: None,
+            })
+        } else {
+            let database_uri = config
+                .database()
+                .parse()
+                .map_err(|_| UserError::InvalidArgument("db_connection".to_string()))?;
+            let store = create_store_factory(database_uri)?.get_node_id_store();
+            let db_node_id = store.get_node_id();
+            let config_node_id = config.node_id();
+            let save_new_node_id = |node_id| -> Result<(), UserError> {
+                store
+                    .set_node_id(node_id)
+                    .map_err(|err| UserError::from(InternalError::from_source(Box::new(err))))
+            };
+            match (db_node_id, config_node_id) {
+                (Ok(Some(db)), Some(conf)) => {
+                    if db == conf {
+                        Ok(db)
+                    } else {
+                        Err(UserError::InvalidArgument(format!(
+                            "node_id from database {} does not match node_id from config {}",
+                            db, conf
+                        )))
+                    }
+                }
+                (Ok(Some(db)), None) => Ok(db),
+                (Ok(None), Some(conf)) => {
+                    let conf = conf.to_string();
+                    save_new_node_id(conf.clone())?;
+                    Ok(conf)
+                }
+                (Ok(None), None) => {
+                    let node_id = format!("n{}", thread_rng().gen::<u16>().to_string());
+                    save_new_node_id(node_id.clone())?;
+                    Ok(node_id)
+                }
+                (Err(err), _) => Err(UserError::from(InternalError::from_source(Box::new(err)))),
+            }
         }
-        match config.node_id() {
-            // If the config has a node_id, check if this matches the node_id read from the file.
-            Some(config_node_id) => {
-                if config_node_id != file_node_id {
-                    // If the node_id from the config object and the file do not match,
-                    // return an error.
-                    Err(UserError::InvalidArgument(format!(
-                        "node_id from file {} does not match node_id from config {}",
-                        file_node_id, config_node_id
-                    )))
-                } else {
-                    // If the node_id does match, then we return this node_id and continue.
-                    Ok(config_node_id.to_string())
+    }
+
+    #[cfg(not(feature = "node-file-block"))]
+    {
+        // Check if node file exists
+        if node_id_path.exists() {
+            // If the node file exists, read the node_id within the file.
+            let mut file_node_id = fs::read_to_string(&node_id_path).map_err(|err| {
+                UserError::io_err_with_source("Unable to read node_id file", Box::new(err))
+            })?;
+            if file_node_id.ends_with('\n') {
+                file_node_id.pop();
+            }
+            match config.node_id() {
+                // If the config has a node_id, check if this matches the node_id read from the file.
+                Some(config_node_id) => {
+                    if config_node_id != file_node_id {
+                        // If the node_id from the config object and the file do not match,
+                        // return an error.
+                        Err(UserError::InvalidArgument(format!(
+                            "node_id from file {} does not match node_id from config {}",
+                            file_node_id, config_node_id
+                        )))
+                    } else {
+                        // If the node_id does match, then we return this node_id and continue.
+                        Ok(config_node_id.to_string())
+                    }
+                }
+                None => {
+                    // If the config object does not have a node_id, continue with the node_id read
+                    // from the file.
+                    Ok(file_node_id)
                 }
             }
-            None => {
-                // If the config object does not have a node_id, continue with the node_id read
-                // from the file.
-                Ok(file_node_id)
-            }
-        }
-    } else {
-        // If node file does not exist, need to create and save a node_id file.
-        // Check if the config obejct has a node_id, otherwise generate a random one.
-        let node_id = config
-            .node_id()
-            .map(ToOwned::to_owned)
-            .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>().to_string()));
-        let mut file = File::create(&node_id_path).map_err(|err| {
-            UserError::io_err_with_source(
-                &format!("Unable to create node_id file {:?}", &node_id_path),
-                Box::new(err),
-            )
-        })?;
-        file.write_all(node_id.as_bytes()).map_err(|err| {
-            UserError::io_err_with_source(
-                &format!("Unable to write node_id file {:?}", &node_id_path),
-                Box::new(err),
-            )
-        })?;
-        // Append newline to file
-        writeln!(file).map_err(|err| {
-            UserError::io_err_with_source(
-                &format!("Unable to write to node_id file {:?}", &node_id_path),
-                Box::new(err),
-            )
-        })?;
+        } else {
+            // If node file does not exist, need to create and save a node_id file.
+            // Check if the config object has a node_id, otherwise generate a random one.
+            let node_id = config
+                .node_id()
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>().to_string()));
+            let mut file = File::create(&node_id_path).map_err(|err| {
+                UserError::io_err_with_source(
+                    &format!("Unable to create node_id file {:?}", &node_id_path),
+                    Box::new(err),
+                )
+            })?;
+            file.write_all(node_id.as_bytes()).map_err(|err| {
+                UserError::io_err_with_source(
+                    &format!("Unable to write node_id file {:?}", &node_id_path),
+                    Box::new(err),
+                )
+            })?;
+            // Append newline to file
+            writeln!(file).map_err(|err| {
+                UserError::io_err_with_source(
+                    &format!("Unable to write to node_id file {:?}", &node_id_path),
+                    Box::new(err),
+                )
+            })?;
 
-        // Continue with node_id
-        Ok(node_id)
+            // Continue with node_id
+            Ok(node_id)
+        }
     }
 }
 
