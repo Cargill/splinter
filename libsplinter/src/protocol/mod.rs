@@ -91,7 +91,7 @@ pub(crate) const REGISTRY_FETCH_NODE_MIN: u32 = 1;
     feature = "biome-notifications",
     feature = "oauth"
 ))]
-pub const BIOME_PROTOCOL_VERSION: u32 = 1;
+pub const BIOME_PROTOCOL_VERSION: u32 = 2;
 
 #[cfg(all(feature = "biome-credentials", feature = "rest-api",))]
 pub(crate) const BIOME_REGISTER_PROTOCOL_MIN: u32 = 1;

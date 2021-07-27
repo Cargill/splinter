@@ -23,6 +23,7 @@ use crate::rest_api::{Resource, RestResourceProvider};
 ///
 /// * `GET /biome/keys` - Get all keys for the authorized user
 /// * `POST /biome/keys` - Add a new key for the authorized user
+/// * `PUT /biome/keys` - Replace keys for the authorized user
 /// * `PATCH /biome/keys` - Update the display name associated with a key for the authorized user
 /// * `GET /biome/keys/{public_key}` - Retrieve the authorized user's key that corresponds to
 ///   `public_key`
