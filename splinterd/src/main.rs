@@ -216,7 +216,7 @@ fn find_node_id(config: &Config) -> Result<String, UserError> {
 }
 
 #[cfg(feature = "challenge-authorization")]
-type ChallengeAuthorizationArgs = (Vec<Box<dyn Signer>>, Option<PeerAuthorizationToken>);
+type ChallengeAuthorizationArgs = (Vec<Box<dyn Signer>>, PeerAuthorizationToken);
 
 // load all signing keys from the configured splinterd key file
 #[cfg(feature = "challenge-authorization")]
@@ -228,12 +228,14 @@ fn load_signer_keys(
     let paths = match fs::read_dir(splinterd_key_path) {
         Ok(paths) => paths,
         Err(err) => {
-            warn!(
-                "Starting daemon with no signing keys, \
-                unable to read splinterd keys directory: {}",
-                err
-            );
-            return Ok((vec![], None));
+            return Err(UserError::io_err_with_source(
+                &format!(
+                    "Unable to read splinterd keys directory: {}, run the \
+                `splinter keygen --system` command to generate a key for the daemon",
+                    config_dir
+                ),
+                Box::new(err),
+            ))
         }
     };
 
@@ -289,37 +291,39 @@ fn load_signer_keys(
         }
     }
 
-    if signing_keys.is_empty() {
-        warn!("Starting daemon with no signing keys");
-    } else if peer_token.is_none() {
-        if signing_keys.len() == 1 {
-            let signing_key = &signing_keys[0];
-            peer_token = Some(PeerAuthorizationToken::from_public_key(
-                signing_key
-                    .public_key()
-                    .map_err(|err| {
-                        UserError::InternalError(InternalError::from_source(Box::new(err)))
-                    })?
-                    .as_slice(),
-            ));
-            warn!(
-                "Peering key name provided was not found, defaulting to the only key \
+    let token = if signing_keys.is_empty() {
+        return Err(UserError::InternalError(InternalError::with_message(
+            "Must have a signing key for challenge authorization, run the \
+            `splinter keygen --system` command to generate a key for the daemon"
+                .to_string(),
+        )));
+    } else if let Some(token) = peer_token {
+        token
+    } else if signing_keys.len() == 1 {
+        let signing_key = &signing_keys[0];
+        warn!(
+            "Peering key name provided was not found, defaulting to the only key \
                 provided: {}",
-                last_known_key
-            );
-        } else {
-            return Err(UserError::InternalError(InternalError::with_message(
-                format!(
-                    "Unable to decide which key to use for required authorization for \
-                provided peers. Peering key {} was not found and there are more then one \
-                configured signing key",
-                    peering_key,
-                ),
-            )));
-        }
-    }
+            last_known_key
+        );
+        PeerAuthorizationToken::from_public_key(
+            signing_key
+                .public_key()
+                .map_err(|err| UserError::InternalError(InternalError::from_source(Box::new(err))))?
+                .as_slice(),
+        )
+    } else {
+        return Err(UserError::InternalError(InternalError::with_message(
+            format!(
+                "Unable to decide which key to use for required authorization for \
+            provided peers. Peering key {} was not found and there are more then one \
+            configured signing key",
+                peering_key,
+            ),
+        )));
+    };
 
-    Ok((signing_keys, peer_token))
+    Ok((signing_keys, token))
 }
 
 fn main() {
