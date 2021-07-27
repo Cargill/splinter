@@ -16,7 +16,6 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 
-#[cfg(any(feature = "metrics", feature = "challenge-authorization"))]
 use splinter::error::InternalError;
 use splinter::transport::socket::TlsInitError;
 
@@ -42,6 +41,7 @@ pub enum UserError {
     MetricsError(InternalError),
     #[cfg(feature = "challenge-authorization")]
     KeyError(InternalError),
+    InternalError(InternalError),
 }
 
 impl UserError {
@@ -74,6 +74,7 @@ impl Error for UserError {
             UserError::MetricsError(err) => Some(err),
             #[cfg(feature = "challenge-authorization")]
             UserError::KeyError(err) => Some(err),
+            UserError::InternalError(err) => Some(err),
         }
     }
 }
@@ -106,6 +107,7 @@ impl fmt::Display for UserError {
             UserError::MetricsError(msg) => write!(f, "{}", msg),
             #[cfg(feature = "challenge-authorization")]
             UserError::KeyError(err) => write!(f, "{}", err),
+            UserError::InternalError(err) => write!(f, "{}", err),
         }
     }
 }
@@ -131,6 +133,12 @@ impl From<GetTransportError> for UserError {
 impl From<ConfigError> for UserError {
     fn from(error: ConfigError) -> Self {
         UserError::ConfigError(error)
+    }
+}
+
+impl From<InternalError> for UserError {
+    fn from(error: InternalError) -> Self {
+        UserError::InternalError(error)
     }
 }
 
