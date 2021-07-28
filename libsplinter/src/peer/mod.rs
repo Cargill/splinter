@@ -221,9 +221,10 @@ impl PeerManager {
         endpoint_retry_frequency: u64,
     ) -> Result<PeerManager, PeerManagerError> {
         debug!(
-            "Starting peer manager with retry_interval={}s, max_retry_attempts={} \
+            "Starting peer manager with identity={}, retry_interval={}s, max_retry_attempts={} \
             strict_ref_counts={}, retry_frequency={}, max_retry_frequency={}, and \
             endpoint_retry_frequency={}",
+            identity,
             retry_interval,
             max_retry_attempts,
             strict_ref_counts,
