@@ -157,6 +157,14 @@ pub trait BiomeClient {
     /// * `new_display_name`: Updated display name for the key pair
     fn update_key(&self, public_key: &str, new_display_name: &str) -> Result<(), InternalError>;
 
+    /// Replace the current Biome user's keys
+    ///
+    /// # Arguments
+    ///
+    /// * `keys`: New keys for the user
+    #[cfg(feature = "biome-replace-keys")]
+    fn replace_keys(&self, keys: Vec<NewKey>) -> Result<(), InternalError>;
+
     /// Add a key pair for a Biome user.
     ///
     /// # Arguments

@@ -771,6 +771,52 @@ impl BiomeClient for ReqwestBiomeClient {
             })
     }
 
+    /// Replace a Biome user's keys
+    #[cfg(feature = "biome-replace-keys")]
+    fn replace_keys(&self, keys: Vec<NewKey>) -> Result<(), InternalError> {
+        let keys: Vec<ClientNewKey> = keys.into_iter().map(ClientNewKey::from).collect();
+        let request = Client::new()
+            .put(&format!("{}/biome/keys", self.url))
+            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("Authorization", &self.auth()?)
+            .json(&keys);
+
+        let response = request.send();
+
+        response
+            .map_err(|err| {
+                InternalError::from_source_with_message(
+                    Box::new(err),
+                    "Failed to replace Biome user keys".to_string(),
+                )
+            })
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    Ok(())
+                } else {
+                    let message = res
+                        .json::<ServerError>()
+                        .map_err(|err| {
+                            InternalError::from_source_with_message(
+                                err.into(),
+                                format!(
+                                    "Biome replace user key request failed with status code '{}', but \
+                             error response was not valid",
+                                    status
+                                ),
+                            )
+                        })?
+                        .message;
+
+                    Err(InternalError::with_message(format!(
+                        "Failed to replace user keys: {}",
+                        message
+                    )))
+                }
+            })
+    }
+
     /// Get a Biome user's key pair.
     fn get_key(&self, public_key: &str) -> Result<Option<Key>, InternalError> {
         let request = Client::new()
