@@ -151,7 +151,16 @@ impl AuthorizationDispatchBuilder {
         })?;
 
         #[cfg(feature = "challenge-authorization")]
-        let signers = self.signers.unwrap_or_default();
+        let signers = self.signers.ok_or_else(|| {
+            InvalidStateError::with_message("Missing required `signers` field".to_string())
+        })?;
+
+        #[cfg(feature = "challenge-authorization")]
+        if signers.is_empty() {
+            return Err(InvalidStateError::with_message(
+                "At least one signer must be configured".to_string(),
+            ));
+        };
 
         #[cfg(feature = "challenge-authorization")]
         let nonce = self.nonce.ok_or_else(|| {
@@ -184,8 +193,6 @@ impl AuthorizationDispatchBuilder {
             auth_dispatcher.set_handler(Box::new(AuthProtocolRequestHandler::new(
                 auth_manager.clone(),
                 #[cfg(feature = "challenge-authorization")]
-                !signers.is_empty(),
-                #[cfg(feature = "challenge-authorization")]
                 self.expected_authorization.clone(),
                 #[cfg(feature = "challenge-authorization")]
                 self.local_authorization.clone(),
@@ -214,9 +221,8 @@ impl AuthorizationDispatchBuilder {
             )));
         }
 
-        // If no signers are configured do not configure challenge authorization
         #[cfg(feature = "challenge-authorization")]
-        if !signers.is_empty() {
+        {
             auth_dispatcher.set_handler(Box::new(AuthChallengeNonceRequestHandler::new(
                 auth_manager.clone(),
                 nonce.clone(),

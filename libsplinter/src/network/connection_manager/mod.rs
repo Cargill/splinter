@@ -964,6 +964,8 @@ mod tests {
     #[cfg(feature = "challenge-authorization")]
     use std::sync::{Arc, Mutex};
 
+    #[cfg(feature = "challenge-authorization")]
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
     use cylinder::{PublicKey, Signature, VerificationError, Verifier, VerifierFactory};
     use protobuf::Message;
 
@@ -1161,7 +1163,7 @@ mod tests {
         let auth_mgr = AuthorizationManager::new(
             "test_identity".into(),
             #[cfg(feature = "challenge-authorization")]
-            vec![],
+            vec![new_signer()],
             #[cfg(feature = "challenge-authorization")]
             Arc::new(Mutex::new(Box::new(NoopFactory))),
         )
@@ -1238,7 +1240,7 @@ mod tests {
         let auth_mgr = AuthorizationManager::new(
             "test_identity".into(),
             #[cfg(feature = "challenge-authorization")]
-            vec![],
+            vec![new_signer()],
             #[cfg(feature = "challenge-authorization")]
             Arc::new(Mutex::new(Box::new(NoopFactory))),
         )
@@ -1392,7 +1394,7 @@ mod tests {
         let auth_mgr = AuthorizationManager::new(
             "test_identity".into(),
             #[cfg(feature = "challenge-authorization")]
-            vec![],
+            vec![new_signer()],
             #[cfg(feature = "challenge-authorization")]
             Arc::new(Mutex::new(Box::new(NoopFactory))),
         )
@@ -1567,7 +1569,7 @@ mod tests {
         let auth_mgr = AuthorizationManager::new(
             "test_identity".into(),
             #[cfg(feature = "challenge-authorization")]
-            vec![],
+            vec![new_signer()],
             #[cfg(feature = "challenge-authorization")]
             Arc::new(Mutex::new(Box::new(NoopFactory))),
         )
@@ -1708,5 +1710,12 @@ mod tests {
         fn new_verifier(&self) -> Box<dyn Verifier> {
             Box::new(NoopVerifier)
         }
+    }
+
+    #[cfg(feature = "challenge-authorization")]
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
     }
 }
