@@ -91,7 +91,7 @@ mod tests {
         pub _refresh_token: String,
     }
 
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug, PartialEq, Eq)]
     struct PostKey {
         pub public_key: String,
         pub encrypted_private_key: String,
@@ -285,6 +285,102 @@ mod tests {
                 key.data.encrypted_private_key
             );
             assert_eq!(expected_key.display_name, key.data.display_name);
+        })
+    }
+
+    /// Test happy path for PUT /biome/keys
+    ///
+    /// Verify that PUT /biome/keys replaces all key resources, and
+    /// returns a status code of 200.
+    ///
+    /// Procedure
+    ///
+    /// 1) Create a new user and log in as that user
+    /// 2) Create a new key via POST /biome/keys
+    /// 3) Verify that added key exists
+    /// 4) Replace old key with new keys via PUT /biome/keys
+    /// 5) Verify new keys are the only keys via GET /biome/keys
+    #[test]
+    #[cfg(feature = "biome-replace-keys")]
+    fn test_put_key() {
+        run_test(|url, client| {
+            let login =
+                create_and_authorize_user(url, &client, "test_post_key@gmail.com", "Admin2193!");
+
+            let expected_key = PostKey {
+                public_key: "<public_key>".to_string(),
+                encrypted_private_key: "<private_key>".to_string(),
+                display_name: "test_post_key@gmail.com".to_string(),
+            };
+
+            let key = client
+                .post(&format!("{}/biome/keys", url))
+                .header("Authorization", format!("Bearer {}", login.token))
+                .json(&expected_key)
+                .send()
+                .unwrap()
+                .json::<PostKeyResponse>()
+                .unwrap();
+
+            assert_eq!(expected_key.public_key, key.data.public_key);
+
+            // The keys we are posting and using as a basis of comparison later
+            // These keys must be in ascending order by public_key
+            let expected_keys: Vec<PostKey> = vec![
+                PostKey {
+                    public_key: "<public_key2>".to_string(),
+                    encrypted_private_key: "<private_key2>".to_string(),
+                    display_name: "test_post_key2@gmail.com".to_string(),
+                },
+                PostKey {
+                    public_key: "<public_key3>".to_string(),
+                    encrypted_private_key: "<private_key3>".to_string(),
+                    display_name: "test_post_key3@gmail.com".to_string(),
+                },
+                PostKey {
+                    public_key: "<public_key4>".to_string(),
+                    encrypted_private_key: "<private_key4>".to_string(),
+                    display_name: "test_post_key4@gmail.com".to_string(),
+                },
+            ];
+
+            assert_eq!(
+                client
+                    .put(&format!("{}/biome/keys", url))
+                    .header("Authorization", format!("Bearer {}", login.token))
+                    .json(&expected_keys)
+                    .send()
+                    .unwrap()
+                    .status()
+                    .as_u16(),
+                200
+            );
+
+            let get_keys_response = client
+                .get(&format!("{}/biome/keys", url))
+                .header("Authorization", format!("Bearer {}", login.token))
+                .send()
+                .unwrap();
+
+            assert_eq!(get_keys_response.status().as_u16(), 200);
+
+            // Coerce keys into a comparable object
+            let mut actual_keys = get_keys_response
+                .json::<GetKeysResponse>()
+                .unwrap()
+                .data
+                .into_iter()
+                .map(|key| PostKey {
+                    public_key: key.public_key,
+                    encrypted_private_key: key.encrypted_private_key,
+                    display_name: key.display_name,
+                })
+                .collect::<Vec<PostKey>>();
+
+            actual_keys.sort_by(|a, b| a.public_key.partial_cmp(&b.public_key).unwrap());
+
+            // Ensure all keys match up exactly
+            assert_eq!(actual_keys, expected_keys);
         })
     }
 
