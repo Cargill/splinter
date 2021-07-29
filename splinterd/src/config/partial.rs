@@ -15,7 +15,12 @@
 //! An intermediate representation of the configuration values, used to take the
 //! configuration values from different sources into a common representation.
 
+#[cfg(feature = "log-config")]
+use std::collections::HashMap;
 use std::time::Duration;
+
+#[cfg(feature = "log-config")]
+use crate::logging::{RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig};
 
 /// `ConfigSource` displays the source of configuration values, used to identify which of the various
 /// config modules were used to create a particular `PartialConfig` object.
@@ -88,6 +93,14 @@ pub struct PartialConfig {
     metrics_username: Option<String>,
     #[cfg(feature = "metrics")]
     metrics_password: Option<String>,
+    #[cfg(feature = "log-config")]
+    root_logger: Option<RootConfig>,
+    #[cfg(feature = "log-config")]
+    appenders: Option<HashMap<String, UnnamedAppenderConfig>>,
+    #[cfg(feature = "log-config")]
+    loggers: Option<HashMap<String, UnnamedLoggerConfig>>,
+    #[cfg(feature = "log-config")]
+    verbosity: Option<log::Level>,
 }
 
 impl PartialConfig {
@@ -150,6 +163,14 @@ impl PartialConfig {
             metrics_username: None,
             #[cfg(feature = "metrics")]
             metrics_password: None,
+            #[cfg(feature = "log-config")]
+            appenders: None,
+            #[cfg(feature = "log-config")]
+            loggers: None,
+            #[cfg(feature = "log-config")]
+            root_logger: None,
+            #[cfg(feature = "log-config")]
+            verbosity: None,
         }
     }
 
@@ -327,6 +348,23 @@ impl PartialConfig {
     #[cfg(feature = "metrics")]
     pub fn metrics_password(&self) -> Option<String> {
         self.metrics_password.clone()
+    }
+
+    #[cfg(feature = "log-config")]
+    pub fn appenders(&self) -> Option<HashMap<String, UnnamedAppenderConfig>> {
+        self.appenders.clone()
+    }
+    #[cfg(feature = "log-config")]
+    pub fn loggers(&self) -> Option<HashMap<String, UnnamedLoggerConfig>> {
+        self.loggers.clone()
+    }
+    #[cfg(feature = "log-config")]
+    pub fn root_logger(&self) -> Option<RootConfig> {
+        self.root_logger.clone()
+    }
+    #[cfg(feature = "log-config")]
+    pub fn verbosity(&self) -> Option<log::Level> {
+        self.verbosity
     }
 
     /// Adds a `config_dir` value to the `PartialConfig` object.
@@ -783,6 +821,53 @@ impl PartialConfig {
     ///
     pub fn with_metrics_password(mut self, metrics_password: Option<String>) -> Self {
         self.metrics_password = metrics_password;
+        self
+    }
+
+    #[cfg(feature = "log-config")]
+    /// Adds a `verbosity` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    ///  * `level` - The log level the system will use for the root_logger logger
+    pub fn with_verbosity(mut self, level: Option<log::Level>) -> Self {
+        self.verbosity = level;
+        self
+    }
+
+    #[cfg(feature = "log-config")]
+    ///Adds a `root_logger` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `root_logger` - The root logger that handles default logs
+    pub fn with_root_logger(mut self, root_logger: Option<RootConfig>) -> Self {
+        self.root_logger = root_logger;
+        self
+    }
+
+    #[cfg(feature = "log-config")]
+    ///Adds `appenders` values to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `appenders` - A set of appenders for the logging system to use
+    pub fn with_appenders(
+        mut self,
+        appenders: Option<HashMap<String, UnnamedAppenderConfig>>,
+    ) -> Self {
+        self.appenders = appenders;
+        self
+    }
+
+    #[cfg(feature = "log-config")]
+    ///Adds `loggers` values to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `loggers` - A set of loggers for the logging system to use
+    pub fn with_loggers(mut self, loggers: Option<HashMap<String, UnnamedLoggerConfig>>) -> Self {
+        self.loggers = loggers;
         self
     }
 }

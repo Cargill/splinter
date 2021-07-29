@@ -27,10 +27,17 @@ mod logging;
 mod routes;
 mod transport;
 
+#[cfg(feature = "log-config")]
+use crate::logging::LogConfig;
 #[cfg(feature = "challenge-authorization")]
 use cylinder::{load_key_from_path, secp256k1::Secp256k1Context, Context, Signer};
+#[cfg(not(feature = "log-config"))]
 use log4rs::config::{Appender, Logger, Root};
+#[cfg(not(feature = "log-config"))]
 use log4rs::encode::pattern::PatternEncoder;
+use log4rs::Handle;
+#[cfg(feature = "log-config")]
+use std::convert::TryInto;
 
 use rand::{thread_rng, Rng};
 #[cfg(feature = "metrics")]
@@ -462,33 +469,67 @@ fn main() {
 
     let matches = app.get_matches();
 
-    let log_level = match matches.occurrences_of("verbose") {
-        0 => log::LevelFilter::Warn,
-        1 => log::LevelFilter::Info,
-        2 => log::LevelFilter::Debug,
-        _ => log::LevelFilter::Trace,
+    let log_handle = {
+        #[cfg(feature = "log-config")]
+        {
+            use crate::logging::{AppenderConfig, LogTarget, RootConfig, DEFAULT_PATTERN};
+            let default_config: LogConfig = LogConfig {
+                root: RootConfig {
+                    appenders: vec![String::from("default")],
+                    level: log::Level::Info,
+                },
+                appenders: vec![AppenderConfig {
+                    name: String::from("default"),
+                    encoder: String::from(DEFAULT_PATTERN),
+                    kind: LogTarget::Stdout,
+                }],
+                loggers: vec![],
+            };
+            log4rs::init_config(
+                //Always produces a valid config try_into just returns a Result
+                if let Ok(log_config) = default_config.try_into() {
+                    log_config
+                } else {
+                    unreachable!()
+                },
+            )
+        }
+        #[cfg(not(feature = "log-config"))]
+        {
+            let encoder =
+                PatternEncoder::new("[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n");
+            let stdout = log4rs::append::console::ConsoleAppender::builder()
+                .encoder(Box::new(encoder))
+                .build();
+            let config = log4rs::Config::builder()
+                .appender(Appender::builder().build("stdout", Box::new(stdout)))
+                .logger(Logger::builder().build("hyper", log::LevelFilter::Warn))
+                .logger(Logger::builder().build("tokio", log::LevelFilter::Warn));
+            #[cfg(feature = "https-bind")]
+            let config = config.logger(Logger::builder().build("h2", log::LevelFilter::Warn));
+            let conf = config.build(
+                Root::builder()
+                    .appender("stdout")
+                    .build(get_log_filter_level(&matches)),
+            );
+
+            if let Ok(lc) = conf {
+                log4rs::init_config(lc)
+            } else {
+                unreachable!();
+                //the basic config should always be valid
+            }
+        }
+    };
+    let log_handle = match log_handle {
+        Err(e) => {
+            eprintln!("Could not start logging, {}", e);
+            std::process::exit(1);
+        }
+        Ok(handle) => handle,
     };
 
-    let encoder = PatternEncoder::new("[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n");
-    let stdout = log4rs::append::console::ConsoleAppender::builder()
-        .encoder(Box::new(encoder))
-        .build();
-    let config = log4rs::Config::builder()
-        .appender(Appender::builder().build("stdout", Box::new(stdout)))
-        .logger(Logger::builder().build("hyper", log::LevelFilter::Warn))
-        .logger(Logger::builder().build("tokio", log::LevelFilter::Warn));
-    #[cfg(feature = "https-bind")]
-    let config = config.logger(Logger::builder().build("h2", log::LevelFilter::Warn));
-    let log_config = config.build(Root::builder().appender("stdout").build(log_level));
-    if let Ok(lc) = log_config {
-        let _handle = log4rs::init_config(lc);
-    } else {
-        unreachable!();
-        // log_config  should always return an Ok variant.
-        // Err is returned if multiple logger facades are registered which shouldn't ever happen
-    }
-
-    if let Err(err) = start_daemon(matches) {
+    if let Err(err) = start_daemon(matches, log_handle) {
         error!("Failed to start daemon, {}", err);
         std::process::exit(1);
     }
@@ -525,19 +566,56 @@ fn setup_metrics_recorder(config: &Config) -> Result<(), UserError> {
     Ok(())
 }
 
-fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
-    // get provided config file or search default location
-    let config_file = matches
+fn get_config_file<'a>(matches: &'a ArgMatches) -> &'a str {
+    matches
         .value_of("config")
-        .unwrap_or("/etc/splinter/splinterd.toml");
+        .unwrap_or("/etc/splinter/splinterd.toml")
+}
 
-    let config_file_path = if Path::new(&config_file).is_file() {
+#[cfg(not(feature = "log-config"))]
+fn get_log_filter_level(matches: &ArgMatches) -> log::LevelFilter {
+    match matches.occurrences_of("verbose") {
+        0 => log::LevelFilter::Warn,
+        1 => log::LevelFilter::Info,
+        2 => log::LevelFilter::Debug,
+        _ => log::LevelFilter::Trace,
+    }
+}
+
+fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserError> {
+    // get provided config file or search default location
+    let config_file = get_config_file(&matches);
+
+    let config_file_path = if Path::new(config_file).is_file() {
         Some(config_file)
     } else {
         None
     };
 
     let config = create_config(config_file_path, matches.clone())?;
+
+    #[cfg(feature = "log-config")]
+    {
+        let appenders = if let Some(appenders) = config.appenders() {
+            appenders
+        } else {
+            vec![]
+        };
+        let loggers = if let Some(loggers) = config.loggers() {
+            loggers
+        } else {
+            vec![]
+        };
+        let log_config = LogConfig {
+            root: config.root_logger().to_owned(),
+            appenders,
+            loggers,
+        }
+        .set_root_level(config.verbosity().to_owned());
+        if let Ok(log_config) = log_config.try_into() {
+            _log_handle.set_config(log_config);
+        }
+    }
 
     let state_dir = config.state_dir();
     if !Path::new(&state_dir).is_dir() {

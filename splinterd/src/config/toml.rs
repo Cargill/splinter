@@ -16,8 +16,12 @@
 
 use crate::config::PartialConfigBuilder;
 use crate::config::{ConfigError, ConfigSource, PartialConfig};
-
+#[cfg(feature = "log-config")]
+use crate::logging::{UnnamedAppenderConfig, UnnamedLoggerConfig};
+#[cfg(feature = "log-config")]
 use serde_derive::Deserialize;
+#[cfg(feature = "log-config")]
+use std::collections::HashMap;
 
 /// `TOML_VERSION` represents the version of the toml config file.
 /// The version determines the most current valid toml config entries.
@@ -77,6 +81,10 @@ struct TomlConfig {
     metrics_username: Option<String>,
     #[cfg(feature = "metrics")]
     metrics_password: Option<String>,
+    #[cfg(feature = "log-config")]
+    appenders: Option<HashMap<String, UnnamedAppenderConfig>>,
+    #[cfg(feature = "log-config")]
+    loggers: Option<HashMap<String, UnnamedLoggerConfig>>,
 
     // Deprecated values
     cert_dir: Option<String>,
@@ -194,6 +202,21 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 .with_metrics_url(self.toml_config.metrics_url)
                 .with_metrics_username(self.toml_config.metrics_username)
                 .with_metrics_password(self.toml_config.metrics_password)
+        }
+        #[cfg(feature = "log-config")]
+        {
+            if let Some(mut loggers) = self.toml_config.loggers {
+                if let Some(unnamed) = loggers.remove("root") {
+                    partial_config = partial_config
+                        .with_root_logger(Some(unnamed.into()))
+                        .with_loggers(Some(loggers));
+                } else {
+                    partial_config = partial_config.with_loggers(Some(loggers));
+                }
+            } else {
+                partial_config = partial_config.with_loggers(self.toml_config.loggers)
+            }
+            partial_config = partial_config.with_appenders(self.toml_config.appenders);
         }
 
         // deprecated values, only set if the current value was not set
