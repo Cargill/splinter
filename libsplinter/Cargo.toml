@@ -37,7 +37,7 @@ actix-web-3 = { package = "actix-web", version = "3", optional = true, features 
 atomicwrites = "0.2"
 awc = { version = "0.2", optional = true }
 base64 = { version = "0.12", optional = true }
-bcrypt = {version = "0.6", optional = true}
+bcrypt = {version = "0.10", optional = true}
 byteorder = "1"
 chrono = {version = "0.4", optional = true}
 crossbeam-channel = "0.3"
