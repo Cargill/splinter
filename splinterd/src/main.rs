@@ -635,7 +635,7 @@ fn setup_metrics_recorder(config: &Config) -> Result<(), UserError> {
         })?;
 
         InfluxRecorder::init(metrics_url, metrics_db, metrics_username, metrics_password)
-            .map_err(UserError::MetricsError)?
+            .map_err(UserError::InternalError)?
     }
 
     Ok(())

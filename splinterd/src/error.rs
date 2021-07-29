@@ -37,8 +37,6 @@ pub enum UserError {
         context: String,
         source: Option<Box<dyn Error>>,
     },
-    #[cfg(feature = "metrics")]
-    MetricsError(InternalError),
     #[cfg(feature = "challenge-authorization")]
     KeyError(InternalError),
     InternalError(InternalError),
@@ -70,8 +68,6 @@ impl Error for UserError {
             UserError::ConfigError(err) => Some(err),
             UserError::IoError { source, .. } => source.as_ref().map(|err| &**err as &dyn Error),
             UserError::DaemonError { source, .. } => source.as_ref().map(|err| &**err),
-            #[cfg(feature = "metrics")]
-            UserError::MetricsError(err) => Some(err),
             #[cfg(feature = "challenge-authorization")]
             UserError::KeyError(err) => Some(err),
             UserError::InternalError(err) => Some(err),
@@ -103,8 +99,6 @@ impl fmt::Display for UserError {
                     f.write_str(context)
                 }
             }
-            #[cfg(feature = "metrics")]
-            UserError::MetricsError(msg) => write!(f, "{}", msg),
             #[cfg(feature = "challenge-authorization")]
             UserError::KeyError(err) => write!(f, "{}", err),
             UserError::InternalError(err) => write!(f, "{}", err),
