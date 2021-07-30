@@ -137,7 +137,7 @@ fn load_signing_key(key_param: Option<&str>) -> Result<PrivateKey, CliError> {
         }
     };
 
-    PrivateKey::new_from_hex(&key_str).map_err(|err| {
+    PrivateKey::new_from_hex(key_str).map_err(|err| {
         CliError::Signing(format!(
             "Unable to parse private key file {}: {} ",
             private_key_filename.display(),
