@@ -73,7 +73,7 @@ fn load_signing_key(key_param: Option<&str>) -> Result<PrivateKey, CliError> {
         .ok_or_else(|| env::var("USER"))
         .or_else(|_| get_current_username().ok_or(0))
         .map_err(|_| {
-            CliError::UserError(String::from(
+            CliError::User(String::from(
                 "Could not load signing key: unable to determine username",
             ))
         })?;
@@ -84,7 +84,7 @@ fn load_signing_key(key_param: Option<&str>) -> Result<PrivateKey, CliError> {
     // For the case Some(scenario 2)
     let keyfile_identifier = dirs::home_dir()
         .ok_or_else(|| {
-            CliError::UserError(String::from(
+            CliError::User(String::from(
                 "Could not load signing key: unable to determine home directory",
             ))
         })
@@ -101,7 +101,7 @@ fn load_signing_key(key_param: Option<&str>) -> Result<PrivateKey, CliError> {
     // For the case Some(scenario 1) and None
     let key_identifier = dirs::home_dir()
         .ok_or_else(|| {
-            CliError::UserError(String::from(
+            CliError::User(String::from(
                 "Could not load signing key: unable to determine home directory",
             ))
         })
@@ -116,7 +116,7 @@ fn load_signing_key(key_param: Option<&str>) -> Result<PrivateKey, CliError> {
     }
 
     if !private_key_filename.as_path().exists() {
-        return Err(CliError::UserError(format!(
+        return Err(CliError::User(format!(
             "No such key file: {}",
             private_key_filename.display()
         )));
@@ -130,7 +130,7 @@ fn load_signing_key(key_param: Option<&str>) -> Result<PrivateKey, CliError> {
     let key_str = match contents.lines().next() {
         Some(k) => k,
         None => {
-            return Err(CliError::UserError(format!(
+            return Err(CliError::User(format!(
                 "Empty key file: {}",
                 private_key_filename.display()
             )));
@@ -138,7 +138,7 @@ fn load_signing_key(key_param: Option<&str>) -> Result<PrivateKey, CliError> {
     };
 
     PrivateKey::new_from_hex(&key_str).map_err(|err| {
-        CliError::SigningError(format!(
+        CliError::Signing(format!(
             "Unable to parse private key file {}: {} ",
             private_key_filename.display(),
             err

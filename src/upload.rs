@@ -43,7 +43,7 @@ pub fn do_upload(
         contract_path_buf.pop();
         contract_path_buf.push(wasm);
     } else {
-        return Err(CliError::UserError(format!(
+        return Err(CliError::User(format!(
             "Malformed contract definition file \"{}\": missing string field \"wasm\" and/or missing --wasm flag",
             filename
         )));
@@ -68,7 +68,7 @@ pub fn do_upload(
 
 fn load_contract_file(path: &Path) -> Result<Vec<u8>, CliError> {
     let file = File::open(path).map_err(|e| {
-        CliError::UserError(format!(
+        CliError::User(format!(
             "Could not load contract \"{}\": {}",
             path.display(),
             e
@@ -77,7 +77,7 @@ fn load_contract_file(path: &Path) -> Result<Vec<u8>, CliError> {
     let mut buf_reader = BufReader::new(file);
     let mut contents = Vec::new();
     buf_reader.read_to_end(&mut contents).map_err(|e| {
-        CliError::UserError(format!(
+        CliError::User(format!(
             "IoError while reading contract \"{}\": {}",
             path.display(),
             e
@@ -98,7 +98,7 @@ struct ContractDefinition {
 impl ContractDefinition {
     fn load(filename: &str) -> Result<ContractDefinition, CliError> {
         let file = File::open(filename).map_err(|e| {
-            CliError::UserError(format!(
+            CliError::User(format!(
                 "Could not load contract definition file \"{}\": {}",
                 filename, e
             ))
@@ -106,7 +106,7 @@ impl ContractDefinition {
         let mut buf_reader = BufReader::new(file);
         let mut contents = String::new();
         buf_reader.read_to_string(&mut contents).map_err(|e| {
-            CliError::UserError(format!(
+            CliError::User(format!(
                 "IoError while reading contract definition file \"{}\": {}",
                 filename, e
             ))
@@ -114,7 +114,7 @@ impl ContractDefinition {
 
         let docs = YamlLoader::load_from_str(&contents).unwrap();
         if docs.is_empty() {
-            return Err(CliError::UserError(format!(
+            return Err(CliError::User(format!(
                 "Malformed contract definition file \"{}\": no content",
                 filename
             )));
@@ -122,14 +122,14 @@ impl ContractDefinition {
         let doc = &docs[0];
 
         let name = doc["name"].as_str().ok_or_else(|| {
-            CliError::UserError(format!(
+            CliError::User(format!(
                 "Malformed contract definition file \"{}\": missing string field \"name\"",
                 filename
             ))
         })?;
 
         let version = doc["version"].as_str().ok_or_else(|| {
-            CliError::UserError(format!(
+            CliError::User(format!(
                 "Malformed contract definition file \"{}\": missing string field \"version\"",
                 filename
             ))
@@ -139,14 +139,14 @@ impl ContractDefinition {
 
         let inputs = doc["inputs"]
             .as_vec()
-            .ok_or_else(|| CliError::UserError(format!(
+            .ok_or_else(|| CliError::User(format!(
                 "Malformed contract definition file \"{}\": missing array \"inputs\"",
                 filename
             )))?
             .iter()
             .map(|y| {
                 y.as_str()
-                 .ok_or_else(|| CliError::UserError(format!(
+                 .ok_or_else(|| CliError::User(format!(
                      "Malformed contract definition file: \"{}\": inputs array contains non-string values",
                      filename)))
                  .map(String::from)
@@ -155,14 +155,14 @@ impl ContractDefinition {
 
         let outputs = doc["outputs"]
             .as_vec()
-            .ok_or_else(|| CliError::UserError(format!(
+            .ok_or_else(|| CliError::User(format!(
                 "Malformed contract definition file \"{}\": missing array \"outputs\"",
                 filename
             )))?
             .iter()
             .map(|y| {
                 y.as_str()
-                 .ok_or_else(|| CliError::UserError(format!(
+                 .ok_or_else(|| CliError::User(format!(
                      "Malformed contract definition file: \"{}\": outputs array contains non-string values",
                      filename)))
                  .map(String::from)
