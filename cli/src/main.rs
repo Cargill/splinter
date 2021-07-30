@@ -54,6 +54,10 @@ const CIRCUIT_PROPOSE_AFTER_HELP: &str = r"DETAILS:
           endpoints:
             - tcps://node-2-endpoint:8045
 
+    If using challenge authorization, a public key must be provided for every node using
+    --node-public-key, regardless of if --node or --node-file is used. This public key correlates
+    to the key pair that node will use for identification
+
     For the --service-arg, --service-peer-group, and --service-type options, service IDs can be
     wildcarded with '*' to match multiple services. For example, '--service-type *::scabbard' match
     all services, and '--service-type sc*::scabbard' will match all services with IDs that start
