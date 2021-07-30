@@ -1011,21 +1011,23 @@ impl AdminServiceStore for YamlAdminServiceStore {
     fn list_nodes(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = CircuitNode>>, AdminServiceStoreError> {
-        let nodes: Vec<CircuitNode> = self
-            .state
-            .lock()
-            .map_err(|_| {
-                AdminServiceStoreError::InternalError(InternalError::with_message(
-                    "YAML admin service store's internal lock was poisoned".to_string(),
-                ))
-            })?
-            .circuit_state
-            .nodes
-            .iter()
-            .map(|(_, node)| node.clone())
-            .collect();
+        let nodes: Box<dyn ExactSizeIterator<Item = CircuitNode>> = Box::new(
+            self.state
+                .lock()
+                .map_err(|_| {
+                    AdminServiceStoreError::InternalError(InternalError::with_message(
+                        "YAML admin service store's internal lock was poisoned".to_string(),
+                    ))
+                })?
+                .circuit_state
+                .nodes
+                .iter()
+                .map(|(_, node)| node.clone())
+                .collect::<Vec<_>>()
+                .into_iter(),
+        );
 
-        Ok(Box::new(nodes.into_iter()))
+        Ok(nodes)
     }
 
     /// Fetches a service from the underlying storage
