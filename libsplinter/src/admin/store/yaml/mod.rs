@@ -663,7 +663,7 @@ impl AdminServiceStore for YamlAdminServiceStore {
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<u32, AdminServiceStoreError> {
-        let mut proposals: Vec<CircuitProposal> = self
+        let count = self
             .state
             .lock()
             .map_err(|_| {
@@ -674,16 +674,14 @@ impl AdminServiceStore for YamlAdminServiceStore {
             .proposal_state
             .proposals
             .iter()
-            .map(|(_, proposal)| proposal.clone())
-            .collect::<Vec<CircuitProposal>>();
+            .filter(|(_, proposal)| {
+                predicates
+                    .iter()
+                    .all(|predicate| predicate.apply_to_proposals(proposal))
+            })
+            .count();
 
-        proposals.retain(|proposal| {
-            predicates
-                .iter()
-                .all(|predicate| predicate.apply_to_proposals(proposal))
-        });
-
-        u32::try_from(proposals.len()).map_err(|_| {
+        u32::try_from(count).map_err(|_| {
             AdminServiceStoreError::InternalError(InternalError::with_message(
                 "The number of proposals is larger than the max u32".to_string(),
             ))
@@ -900,7 +898,7 @@ impl AdminServiceStore for YamlAdminServiceStore {
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<u32, AdminServiceStoreError> {
-        let mut circuits: Vec<Circuit> = self
+        let count = self
             .state
             .lock()
             .map_err(|_| {
@@ -911,16 +909,14 @@ impl AdminServiceStore for YamlAdminServiceStore {
             .circuit_state
             .circuits
             .iter()
-            .map(|(_, circuit)| circuit.clone())
-            .collect();
+            .filter(|(_, circuit)| {
+                predicates
+                    .iter()
+                    .all(|predicate| predicate.apply_to_circuit(circuit))
+            })
+            .count();
 
-        circuits.retain(|circuit| {
-            predicates
-                .iter()
-                .all(|predicate| predicate.apply_to_circuit(circuit))
-        });
-
-        u32::try_from(circuits.len()).map_err(|_| {
+        u32::try_from(count).map_err(|_| {
             AdminServiceStoreError::InternalError(InternalError::with_message(
                 "The number of circuits is larger than the max u32".to_string(),
             ))
