@@ -23,12 +23,6 @@ pub(crate) struct NewKey {
     pub display_name: String,
 }
 
-#[derive(Deserialize)]
-pub(crate) struct UpdatedKey {
-    pub public_key: String,
-    pub new_display_name: String,
-}
-
 #[derive(Serialize)]
 pub(crate) struct ResponseKey<'a> {
     public_key: &'a str,
