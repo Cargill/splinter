@@ -157,7 +157,7 @@ impl PeerMap {
     ///
     /// Returns the metadata for the peer if it exists.
     pub fn remove(&mut self, peer_id: &PeerAuthorizationToken) -> Option<PeerMetadata> {
-        if let Some(peer_metadata) = self.peers.remove(&peer_id) {
+        if let Some(peer_metadata) = self.peers.remove(peer_id) {
             for endpoint in peer_metadata.endpoints.iter() {
                 self.endpoints.remove(endpoint);
             }

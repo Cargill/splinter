@@ -188,17 +188,17 @@ where
 
                         if let Some(application_metadata) = &proposed_circuit.application_metadata {
                             proposed_circuit_builder = proposed_circuit_builder
-                                .with_application_metadata(&application_metadata);
+                                .with_application_metadata(application_metadata);
                         }
 
                         if let Some(comments) = &proposed_circuit.comments {
                             proposed_circuit_builder =
-                                proposed_circuit_builder.with_comments(&comments);
+                                proposed_circuit_builder.with_comments(comments);
                         }
 
                         if let Some(display_name) = &proposed_circuit.display_name {
                             proposed_circuit_builder =
-                                proposed_circuit_builder.with_display_name(&display_name);
+                                proposed_circuit_builder.with_display_name(display_name);
                         }
 
                         Ok((
@@ -313,7 +313,7 @@ where
 
                         #[cfg(feature = "challenge-authorization")]
                         if let Some(public_key) = &node.public_key {
-                            proposed_node = proposed_node.with_public_key(&public_key)
+                            proposed_node = proposed_node.with_public_key(public_key)
                         }
 
                         proposed_nodes.insert(
@@ -393,13 +393,13 @@ where
                     proposal_builders
                 {
                     if let Some(services) = built_proposed_services.get(&circuit_id) {
-                        proposed_circuit_builder = proposed_circuit_builder.with_roster(&services);
+                        proposed_circuit_builder = proposed_circuit_builder.with_roster(services);
                     }
                     if let Some(nodes) = built_proposed_nodes.get(&circuit_id) {
                         proposed_circuit_builder = proposed_circuit_builder.with_members(nodes);
                     }
                     if let Some(votes) = vote_records.get(&circuit_id) {
-                        proposal_builder = proposal_builder.with_votes(&votes);
+                        proposal_builder = proposal_builder.with_votes(votes);
                     }
                     proposals.push(
                         proposal_builder

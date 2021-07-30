@@ -400,13 +400,13 @@ fn make_splinter_node(
 ) -> Result<SplinterNode, CliError> {
     #[allow(unused_mut)]
     let mut node_builder = SplinterNodeBuilder::new()
-        .with_node_id(&node_id)
+        .with_node_id(node_id)
         .with_endpoints(endpoints);
 
     #[cfg(feature = "challenge-authorization")]
     {
         if let Some(public_key) = public_key {
-            node_builder = node_builder.with_public_key(&parse_hex(&public_key)?)
+            node_builder = node_builder.with_public_key(&parse_hex(public_key)?)
         }
     }
 

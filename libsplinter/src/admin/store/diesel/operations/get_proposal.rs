@@ -144,7 +144,7 @@ where
 
                     #[cfg(feature = "challenge-authorization")]
                     if let Some(public_key) = &node.public_key {
-                        builder = builder.with_public_key(&public_key)
+                        builder = builder.with_public_key(public_key)
                     }
 
                     builder
@@ -249,15 +249,15 @@ where
                 .with_circuit_status(&CircuitStatus::from(&proposed_circuit.circuit_status));
 
             if let Some(application_metadata) = &proposed_circuit.application_metadata {
-                builder = builder.with_application_metadata(&application_metadata);
+                builder = builder.with_application_metadata(application_metadata);
             }
 
             if let Some(comments) = &proposed_circuit.comments {
-                builder = builder.with_comments(&comments);
+                builder = builder.with_comments(comments);
             }
 
             if let Some(display_name) = &proposed_circuit.display_name {
-                builder = builder.with_display_name(&display_name)
+                builder = builder.with_display_name(display_name)
             }
 
             let native_proposed_circuit = builder

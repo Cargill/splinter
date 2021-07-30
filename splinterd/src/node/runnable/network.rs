@@ -199,7 +199,7 @@ impl RunnableNetworkSubsystem {
         for network_endpoint in network_endpoints {
             listeners.push(
                 transport
-                    .listen(&network_endpoint)
+                    .listen(network_endpoint)
                     .map_err(|e| InternalError::from_source(Box::new(e)))?,
             )
         }

@@ -248,7 +248,7 @@ impl fmt::Display for AuthorizationActionError {
                     start, action
                 )
             }
-            AuthorizationActionError::InternalError(msg) => f.write_str(&msg),
+            AuthorizationActionError::InternalError(msg) => f.write_str(msg),
         }
     }
 }

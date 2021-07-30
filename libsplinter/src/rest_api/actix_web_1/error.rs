@@ -40,7 +40,7 @@ impl fmt::Display for ResponseError {
                 "Failed to get response when setting up websocket: {}",
                 err
             ),
-            ResponseError::InternalError(msg) => f.write_str(&msg),
+            ResponseError::InternalError(msg) => f.write_str(msg),
         }
     }
 }

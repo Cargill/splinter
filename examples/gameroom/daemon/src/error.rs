@@ -23,25 +23,25 @@ use gameroom_database::DatabaseError;
 
 #[derive(Debug)]
 pub enum GameroomDaemonError {
-    LoggingInitializationError(flexi_logger::FlexiLoggerError),
-    ConfigurationError(Box<ConfigurationError>),
-    DatabaseError(Box<DatabaseError>),
-    RestApiError(RestApiServerError),
-    AppAuthHandlerError(AppAuthHandlerError),
-    SigningError(String),
-    GetNodeError(GetNodeError),
+    LoggingInitialization(flexi_logger::FlexiLoggerError),
+    Configuration(Box<ConfigurationError>),
+    Database(Box<DatabaseError>),
+    RestApi(RestApiServerError),
+    AppAuthHandler(AppAuthHandlerError),
+    Signing(String),
+    GetNode(GetNodeError),
 }
 
 impl Error for GameroomDaemonError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            GameroomDaemonError::LoggingInitializationError(err) => Some(err),
-            GameroomDaemonError::ConfigurationError(err) => Some(err),
-            GameroomDaemonError::DatabaseError(err) => Some(&**err),
-            GameroomDaemonError::RestApiError(err) => Some(err),
-            GameroomDaemonError::AppAuthHandlerError(err) => Some(err),
-            GameroomDaemonError::SigningError(_) => None,
-            GameroomDaemonError::GetNodeError(err) => Some(err),
+            GameroomDaemonError::LoggingInitialization(err) => Some(err),
+            GameroomDaemonError::Configuration(err) => Some(err),
+            GameroomDaemonError::Database(err) => Some(&**err),
+            GameroomDaemonError::RestApi(err) => Some(err),
+            GameroomDaemonError::AppAuthHandler(err) => Some(err),
+            GameroomDaemonError::Signing(_) => None,
+            GameroomDaemonError::GetNode(err) => Some(err),
         }
     }
 }
@@ -49,19 +49,19 @@ impl Error for GameroomDaemonError {
 impl fmt::Display for GameroomDaemonError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            GameroomDaemonError::LoggingInitializationError(e) => {
+            GameroomDaemonError::LoggingInitialization(e) => {
                 write!(f, "Logging initialization error: {}", e)
             }
-            GameroomDaemonError::ConfigurationError(e) => write!(f, "Coniguration error: {}", e),
-            GameroomDaemonError::DatabaseError(e) => write!(f, "Database error: {}", e),
-            GameroomDaemonError::RestApiError(e) => write!(f, "Rest API error: {}", e),
-            GameroomDaemonError::AppAuthHandlerError(e) => write!(
+            GameroomDaemonError::Configuration(e) => write!(f, "Coniguration error: {}", e),
+            GameroomDaemonError::Database(e) => write!(f, "Database error: {}", e),
+            GameroomDaemonError::RestApi(e) => write!(f, "Rest API error: {}", e),
+            GameroomDaemonError::AppAuthHandler(e) => write!(
                 f,
                 "The application authorization handler returned an error: {}",
                 e
             ),
-            GameroomDaemonError::SigningError(e) => write!(f, "A signing error occurred: {}", e),
-            GameroomDaemonError::GetNodeError(e) => write!(
+            GameroomDaemonError::Signing(e) => write!(f, "A signing error occurred: {}", e),
+            GameroomDaemonError::GetNode(e) => write!(
                 f,
                 "an error occurred while getting splinterd node information: {}",
                 e
@@ -72,37 +72,37 @@ impl fmt::Display for GameroomDaemonError {
 
 impl From<flexi_logger::FlexiLoggerError> for GameroomDaemonError {
     fn from(err: flexi_logger::FlexiLoggerError) -> GameroomDaemonError {
-        GameroomDaemonError::LoggingInitializationError(err)
+        GameroomDaemonError::LoggingInitialization(err)
     }
 }
 
 impl From<DatabaseError> for GameroomDaemonError {
     fn from(err: DatabaseError) -> GameroomDaemonError {
-        GameroomDaemonError::DatabaseError(Box::new(err))
+        GameroomDaemonError::Database(Box::new(err))
     }
 }
 
 impl From<RestApiServerError> for GameroomDaemonError {
     fn from(err: RestApiServerError) -> GameroomDaemonError {
-        GameroomDaemonError::RestApiError(err)
+        GameroomDaemonError::RestApi(err)
     }
 }
 
 impl From<AppAuthHandlerError> for GameroomDaemonError {
     fn from(err: AppAuthHandlerError) -> GameroomDaemonError {
-        GameroomDaemonError::AppAuthHandlerError(err)
+        GameroomDaemonError::AppAuthHandler(err)
     }
 }
 
 impl From<ContextError> for GameroomDaemonError {
     fn from(err: ContextError) -> GameroomDaemonError {
-        GameroomDaemonError::SigningError(err.to_string())
+        GameroomDaemonError::Signing(err.to_string())
     }
 }
 
 impl From<JsonWebTokenBuildError> for GameroomDaemonError {
     fn from(err: JsonWebTokenBuildError) -> GameroomDaemonError {
-        GameroomDaemonError::SigningError(err.to_string())
+        GameroomDaemonError::Signing(err.to_string())
     }
 }
 
@@ -125,7 +125,7 @@ impl fmt::Display for ConfigurationError {
 
 impl From<ConfigurationError> for GameroomDaemonError {
     fn from(err: ConfigurationError) -> Self {
-        GameroomDaemonError::ConfigurationError(Box::new(err))
+        GameroomDaemonError::Configuration(Box::new(err))
     }
 }
 
@@ -146,6 +146,6 @@ impl fmt::Display for GetNodeError {
 
 impl From<GetNodeError> for GameroomDaemonError {
     fn from(err: GetNodeError) -> Self {
-        GameroomDaemonError::GetNodeError(err)
+        GameroomDaemonError::GetNode(err)
     }
 }

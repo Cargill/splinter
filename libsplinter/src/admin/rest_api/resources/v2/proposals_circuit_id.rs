@@ -134,7 +134,7 @@ impl<'a> From<&'a SplinterNode> for NodeResponse<'a> {
             public_key: node
                 .public_key
                 .as_ref()
-                .map(|public_key| to_hex(&public_key)),
+                .map(|public_key| to_hex(public_key)),
         }
     }
 }

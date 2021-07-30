@@ -286,13 +286,13 @@ fn process_admin_event(
             })
         }
         AdminServiceEvent::ProposalVote((msg_proposal, signer_public_key)) => {
-            let proposal = get_pending_proposal_with_circuit_id(&pool, &msg_proposal.circuit_id)?;
+            let proposal = get_pending_proposal_with_circuit_id(pool, &msg_proposal.circuit_id)?;
             let vote = msg_proposal
                 .votes
                 .iter()
                 .find(|vote| vote.public_key == signer_public_key)
                 .ok_or_else(|| {
-                    AppAuthHandlerError::InvalidMessageError("Missing vote from signer".to_string())
+                    AppAuthHandlerError::InvalidMessage("Missing vote from signer".to_string())
                 })?;
             let vote = NewProposalVoteRecord {
                 proposal_id: proposal.id,
@@ -320,13 +320,13 @@ fn process_admin_event(
             })
         }
         AdminServiceEvent::ProposalAccepted((msg_proposal, signer_public_key)) => {
-            let proposal = get_pending_proposal_with_circuit_id(&pool, &msg_proposal.circuit_id)?;
+            let proposal = get_pending_proposal_with_circuit_id(pool, &msg_proposal.circuit_id)?;
             let vote = msg_proposal
                 .votes
                 .iter()
                 .find(|vote| vote.public_key == signer_public_key)
                 .ok_or_else(|| {
-                    AppAuthHandlerError::InvalidMessageError("Missing vote from signer".to_string())
+                    AppAuthHandlerError::InvalidMessage("Missing vote from signer".to_string())
                 })?;
 
             let vote = NewProposalVoteRecord {
@@ -371,13 +371,13 @@ fn process_admin_event(
             })
         }
         AdminServiceEvent::ProposalRejected((msg_proposal, signer_public_key)) => {
-            let proposal = get_pending_proposal_with_circuit_id(&pool, &msg_proposal.circuit_id)?;
+            let proposal = get_pending_proposal_with_circuit_id(pool, &msg_proposal.circuit_id)?;
             let vote = msg_proposal
                 .votes
                 .iter()
                 .find(|vote| vote.public_key == signer_public_key)
                 .ok_or_else(|| {
-                    AppAuthHandlerError::InvalidMessageError("Missing vote from signer".to_string())
+                    AppAuthHandlerError::InvalidMessage("Missing vote from signer".to_string())
                 })?;
 
             let vote = NewProposalVoteRecord {
@@ -450,7 +450,7 @@ fn process_admin_event(
             ) {
                 Ok(metadata) => metadata.scabbard_admin_keys().to_vec(),
                 Err(err) => {
-                    return Err(AppAuthHandlerError::InvalidMessageError(format!(
+                    return Err(AppAuthHandlerError::InvalidMessage(format!(
                         "unable to parse application metadata: {}",
                         err
                     )))
@@ -493,7 +493,7 @@ fn process_admin_event(
                 &msg_proposal.circuit_id,
                 &proposal.requester_node_id,
                 &proposal.requester,
-                &pool,
+                pool,
             )?;
 
             let mut xo_ws = WebSocketClient::new(
@@ -501,7 +501,7 @@ fn process_admin_event(
                     "{}/scabbard/{}/{}/ws/subscribe",
                     url, msg_proposal.circuit_id, service_id
                 ),
-                &authorization,
+                authorization,
                 move |_, event| {
                     if let Err(err) = processor.handle_state_change_event(event) {
                         error!(
@@ -556,7 +556,7 @@ fn process_admin_event(
 
             igniter.start_ws(&xo_ws).map_err(AppAuthHandlerError::from)
         }
-        AdminServiceEvent::CircuitDisbanded(_) => Err(AppAuthHandlerError::InvalidMessageError(
+        AdminServiceEvent::CircuitDisbanded(_) => Err(AppAuthHandlerError::InvalidMessage(
             "Unsupported event type".to_string(),
         )),
     }
@@ -586,7 +586,7 @@ fn resubscribe(
             "{}/scabbard/{}/{}/ws/subscribe{}",
             url, gameroom.circuit_id, gameroom.service_id, query_string,
         ),
-        &authorization,
+        authorization,
         move |_, event| {
             match &processor {
                 Ok(processor) => {
@@ -709,9 +709,9 @@ fn get_pending_proposal_with_circuit_id(
     pool: &ConnectionPool,
     circuit_id: &str,
 ) -> Result<GameroomProposal, AppAuthHandlerError> {
-    helpers::fetch_gameroom_proposal_with_status(&*pool.get()?, &circuit_id, "Pending")?.ok_or_else(
+    helpers::fetch_gameroom_proposal_with_status(&*pool.get()?, circuit_id, "Pending")?.ok_or_else(
         || {
-            AppAuthHandlerError::DatabaseError(format!(
+            AppAuthHandlerError::Database(format!(
                 "Could not find open proposal for circuit: {}",
                 circuit_id
             ))
@@ -986,10 +986,10 @@ mod test {
         // accept proposal
         match process_admin_event(accept_message, &pool, "", "", "", "", reactor.igniter()) {
             Ok(()) => panic!("Pending proposal for circuit is missing, error should be returned"),
-            Err(AppAuthHandlerError::DatabaseError(msg)) => {
+            Err(AppAuthHandlerError::Database(msg)) => {
                 assert!(msg.contains("Could not find open proposal for circuit: 01234-ABCDE"));
             }
-            Err(err) => panic!("Should have gotten DatabaseError error but got {}", err),
+            Err(err) => panic!("Should have gotten Database error but got {}", err),
         }
     }
 
@@ -1091,10 +1091,10 @@ mod test {
         // reject proposal
         match process_admin_event(rejected_message, &pool, "", "", "", "", reactor.igniter()) {
             Ok(()) => panic!("Pending proposal for circuit is missing, error should be returned"),
-            Err(AppAuthHandlerError::DatabaseError(msg)) => {
+            Err(AppAuthHandlerError::Database(msg)) => {
                 assert!(msg.contains("Could not find open proposal for circuit: 01234-ABCDE"));
             }
-            Err(err) => panic!("Should have gotten DatabaseError error but got {}", err),
+            Err(err) => panic!("Should have gotten Database error but got {}", err),
         }
     }
 
@@ -1211,10 +1211,10 @@ mod test {
         // vote proposal
         match process_admin_event(vote_message, &pool, "", "", "", "", reactor.igniter()) {
             Ok(()) => panic!("Pending proposal for circuit is missing, error should be returned"),
-            Err(AppAuthHandlerError::DatabaseError(msg)) => {
+            Err(AppAuthHandlerError::Database(msg)) => {
                 assert!(msg.contains("Could not find open proposal for circuit: 01234-ABCDE"));
             }
-            Err(err) => panic!("Should have gotten DatabaseError error but got {}", err),
+            Err(err) => panic!("Should have gotten Database error but got {}", err),
         }
     }
 

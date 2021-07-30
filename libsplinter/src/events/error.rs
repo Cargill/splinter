@@ -37,7 +37,7 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ParseError::MalformedMessage(err) => write!(f, "Malformed message {}", err),
-            ParseError::MalformedReducedToString(msg) => f.write_str(&msg),
+            ParseError::MalformedReducedToString(msg) => f.write_str(msg),
         }
     }
 }

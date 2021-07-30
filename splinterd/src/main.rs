@@ -140,7 +140,7 @@ fn find_node_id(config: &Config) -> Result<String, UserError> {
                 Box::new(err),
             )
         })?;
-        file.write_all(&node_id.as_bytes()).map_err(|err| {
+        file.write_all(node_id.as_bytes()).map_err(|err| {
             UserError::io_err_with_source(
                 &format!("Unable to write node_id file {:?}", &node_id_path),
                 Box::new(err),

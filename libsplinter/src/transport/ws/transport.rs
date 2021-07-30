@@ -103,8 +103,8 @@ impl WsTransport {
         if let Some(conf) = config {
             Ok(WsTransport {
                 tls_inner: Some(TlsInner {
-                    acceptor: build_acceptor(&conf)?,
-                    connector: build_connector(&conf)?,
+                    acceptor: build_acceptor(conf)?,
+                    connector: build_connector(conf)?,
                 }),
             })
         } else {

@@ -116,17 +116,17 @@ where
                             &proposed_circuit_model.application_metadata
                         {
                             proposed_circuit_builder = proposed_circuit_builder
-                                .with_application_metadata(&application_metadata);
+                                .with_application_metadata(application_metadata);
                         }
 
                         if let Some(comments) = &proposed_circuit_model.comments {
                             proposed_circuit_builder =
-                                proposed_circuit_builder.with_comments(&comments);
+                                proposed_circuit_builder.with_comments(comments);
                         }
 
                         if let Some(display_name) = &proposed_circuit_model.display_name {
                             proposed_circuit_builder =
-                                proposed_circuit_builder.with_display_name(&display_name);
+                                proposed_circuit_builder.with_display_name(display_name);
                         }
 
                         Ok((
@@ -327,13 +327,13 @@ where
                 events_map
             {
                 if let Some(services) = built_proposed_services.get(&event_id) {
-                    proposed_circuit_builder = proposed_circuit_builder.with_roster(&services);
+                    proposed_circuit_builder = proposed_circuit_builder.with_roster(services);
                 }
                 if let Some(nodes) = built_proposed_nodes.get(&event_id) {
                     proposed_circuit_builder = proposed_circuit_builder.with_members(nodes);
                 }
                 if let Some(votes) = vote_records.get(&event_id) {
-                    proposal_builder = proposal_builder.with_votes(&votes);
+                    proposal_builder = proposal_builder.with_votes(votes);
                 }
                 let proposal = proposal_builder
                     .with_circuit(

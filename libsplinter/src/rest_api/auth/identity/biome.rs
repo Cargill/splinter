@@ -62,7 +62,7 @@ impl IdentityProvider for BiomeUserIdentityProvider {
             .secret()
             .map_err(|err| InternalError::from_source(err.into()))?;
 
-        Ok(decode::<Claims>(&token, secret.as_ref(), &self.validation)
+        Ok(decode::<Claims>(token, secret.as_ref(), &self.validation)
             .map(|token_data| Identity::User(token_data.claims.user_id()))
             .ok())
     }

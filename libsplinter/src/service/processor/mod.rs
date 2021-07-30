@@ -442,7 +442,7 @@ fn process_inbound_msg_with_correlation_id(
                     "unable to parse inbound admin direct message"
                 ))?;
 
-            handle_admin_direct_msg(admin_direct_message, &shared_state).map_err(
+            handle_admin_direct_msg(admin_direct_message, shared_state).map_err(
                 to_process_err!("unable to handle inbound admin direct message"),
             )?;
         }
@@ -452,7 +452,7 @@ fn process_inbound_msg_with_correlation_id(
                     "unable to parse inbound circuit direct message"
                 ))?;
 
-            handle_circuit_direct_msg(circuit_direct_message, &shared_state).map_err(
+            handle_circuit_direct_msg(circuit_direct_message, shared_state).map_err(
                 to_process_err!("unable to handle inbound circuit direct message"),
             )?;
         }

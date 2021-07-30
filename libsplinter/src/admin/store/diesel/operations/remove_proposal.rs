@@ -63,7 +63,7 @@ where
     fn remove_proposal(&self, proposal_id: &str) -> Result<(), AdminServiceStoreError> {
         self.conn.transaction::<(), _, _>(|| {
             // Verify the `proposal` being removed exists
-            self.get_proposal(&proposal_id).and_then(|_| {
+            self.get_proposal(proposal_id).and_then(|_| {
                 // Remove the `proposal` entry with the matching `proposal_id`, which is represented
                 // in the `circuit_proposal` by the `circuit_id`.
                 // The `circuit_id` foreign key has cascade delete, meaning all related tables

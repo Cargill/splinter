@@ -42,12 +42,12 @@ impl Error for SendableRoleBasedAuthorizationStoreError {
 impl fmt::Display for SendableRoleBasedAuthorizationStoreError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            SendableRoleBasedAuthorizationStoreError::ConstraintViolation(err) => f.write_str(&err),
-            SendableRoleBasedAuthorizationStoreError::InternalError(err) => f.write_str(&err),
+            SendableRoleBasedAuthorizationStoreError::ConstraintViolation(err) => f.write_str(err),
+            SendableRoleBasedAuthorizationStoreError::InternalError(err) => f.write_str(err),
             SendableRoleBasedAuthorizationStoreError::InvalidState(err) => {
                 f.write_str(&err.to_string())
             }
-            SendableRoleBasedAuthorizationStoreError::NotFound(msg) => f.write_str(&msg),
+            SendableRoleBasedAuthorizationStoreError::NotFound(msg) => f.write_str(msg),
         }
     }
 }

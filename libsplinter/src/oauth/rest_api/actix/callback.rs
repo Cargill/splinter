@@ -308,7 +308,7 @@ fn save_user_profile(
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        match user_profile_store.get_profile(&user.user_id()) {
+        match user_profile_store.get_profile(user.user_id()) {
             Ok(_) => user_profile_store
                 .update_profile(profile)
                 .map_err(|err| InternalError::from_source(Box::new(err))),

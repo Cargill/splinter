@@ -78,7 +78,7 @@ impl AuthorizationHandler for AllowKeysAuthorizationHandler {
                         )
                     })?
                     .get_keys()
-                    .contains(&key) =>
+                    .contains(key) =>
             {
                 Ok(AuthorizationHandlerResult::Allow)
             }

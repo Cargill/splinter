@@ -221,7 +221,7 @@ impl Scabbard {
                     .lock()
                     .map_err(|_| ScabbardError::LockPoisoned)?
                     .batch_history()
-                    .add_batch(&batch.batch().header_signature());
+                    .add_batch(batch.batch().header_signature());
 
                 link.push_str(&format!("{},", batch.batch().header_signature()));
 

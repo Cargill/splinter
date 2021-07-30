@@ -41,7 +41,7 @@ impl std::fmt::Display for FrameError {
                 HEADER_LENGTH, n
             ),
             FrameError::UnsupportedVersion => f.write_str("Unsupported frame version"),
-            FrameError::HandshakeFailure(msg) => f.write_str(&msg),
+            FrameError::HandshakeFailure(msg) => f.write_str(msg),
         }
     }
 }

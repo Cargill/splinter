@@ -219,7 +219,7 @@ impl AdminServiceShared {
             PeerAuthorizationToken::Trust { peer_id } => peer_id == self.node_id(),
             #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { public_key } => {
-                self.public_keys.contains(&public_key)
+                self.public_keys.contains(public_key)
             }
         }
     }
@@ -427,7 +427,7 @@ impl AdminServiceShared {
                                     })?
                                     .iter()
                                 {
-                                    if !self.is_local_node(&token) {
+                                    if !self.is_local_node(token) {
                                         network_sender.send(
                                             &admin_service_id(&token.id_as_string()),
                                             &envelope_bytes,
@@ -536,7 +536,7 @@ impl AdminServiceShared {
                                     })?
                                     .iter()
                                 {
-                                    if !self.is_local_node(&token) {
+                                    if !self.is_local_node(token) {
                                         network_sender.send(
                                             &admin_service_id(&token.id_as_string()),
                                             &envelope_bytes,
@@ -617,7 +617,7 @@ impl AdminServiceShared {
                     }
                     CircuitProposalStatus::Rejected => {
                         // remove circuit
-                        let proposal = self.remove_proposal(&circuit_id)?;
+                        let proposal = self.remove_proposal(circuit_id)?;
                         #[cfg(feature = "admin-service-count")]
                         self.update_metrics()?;
                         if let Some(proposal) = proposal {
@@ -1083,7 +1083,7 @@ impl AdminServiceShared {
                 )))
             })?;
 
-        self.purge_services(circuit_id, &stored_circuit.roster())
+        self.purge_services(circuit_id, stored_circuit.roster())
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
         if let Some(circuit) = self
@@ -1152,7 +1152,7 @@ impl AdminServiceShared {
                 })?
                 .iter()
             {
-                if !self.is_local_node(&token) {
+                if !self.is_local_node(token) {
                     network_sender
                         .send(&admin_service_id(&token.id_as_string()), &envelope_bytes)?;
                 }
@@ -1219,7 +1219,7 @@ impl AdminServiceShared {
     /// removed.
     fn request_proposal_removal(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
         if let Some(proposal) = self
-            .get_proposal(&circuit_id)
+            .get_proposal(circuit_id)
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
         {
             // send REMOVED_PROPOSAL message to all other members' admin services
@@ -1249,7 +1249,7 @@ impl AdminServiceShared {
                     })?
                     .iter()
                 {
-                    if !self.is_local_node(&token) {
+                    if !self.is_local_node(token) {
                         network_sender
                             .send(&admin_service_id(&token.id_as_string()), &envelope_bytes)?;
                     }
@@ -1257,7 +1257,7 @@ impl AdminServiceShared {
             }
 
             // Remove the proposal itself
-            self.remove_proposal(&circuit_id)
+            self.remove_proposal(circuit_id)
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
                 .ok_or_else(|| {
                     ServiceError::UnableToHandleMessage(Box::new(
@@ -1879,7 +1879,7 @@ impl AdminServiceShared {
         };
 
         self.event_subscribers
-            .broadcast_by_type(&circuit_management_type, &admin_event);
+            .broadcast_by_type(circuit_management_type, &admin_event);
     }
 
     pub fn remove_all_event_subscribers(&mut self) {
@@ -2290,7 +2290,7 @@ impl AdminServiceShared {
         // may not be available. In this case, the proposal type must be pulled from the circuit
         // proposal stored in the `uninitialized_circuits` list.
         let mut proposal_type = ProposalType::Create;
-        if let Some(proposal) = self.get_proposal(&circuit_id)? {
+        if let Some(proposal) = self.get_proposal(circuit_id)? {
             proposal_type = proposal.proposal_type().clone();
         } else if let Some(uninit_circuit) = self.uninitialized_circuits.get(circuit_id) {
             if let Some(circuit) = &uninit_circuit.circuit {
@@ -2323,7 +2323,7 @@ impl AdminServiceShared {
         // Move onto either initializing the services or stopping the services, depending on the
         // associated circuit proposal's type.
         match proposal_type {
-            ProposalType::Disband => self.cleanup_disbanded_circuit_if_members_ready(&circuit_id),
+            ProposalType::Disband => self.cleanup_disbanded_circuit_if_members_ready(circuit_id),
             _ => self.initialize_services_if_members_ready(circuit_id),
         }
     }
@@ -2654,7 +2654,7 @@ impl AdminServiceShared {
 
             #[cfg(feature = "service-arg-validation")]
             {
-                self.validate_service_args(&service)?;
+                self.validate_service_args(service)?;
             }
         }
 
@@ -3044,7 +3044,7 @@ impl AdminServiceShared {
                 ))
             })?;
 
-        if self.get_proposal(&circuit_id)?.is_none() {
+        if self.get_proposal(circuit_id)?.is_none() {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Attempting to remove proposal for circuit {} that does not exist",
                 &circuit_id,
@@ -3185,7 +3185,7 @@ impl AdminServiceShared {
             .with_circuit_status(&messages::CircuitStatus::Disbanded);
 
         if let Some(display_name) = store_circuit.display_name() {
-            create_circuit_builder = create_circuit_builder.with_display_name(&display_name);
+            create_circuit_builder = create_circuit_builder.with_display_name(display_name);
         }
 
         let proposed_circuit: Circuit = create_circuit_builder
@@ -3552,7 +3552,7 @@ impl AdminServiceShared {
 
         self.signature_verifier
             .verify(
-                &payload.get_header(),
+                payload.get_header(),
                 &Signature::new(signature),
                 &PublicKey::new(public_key),
             )

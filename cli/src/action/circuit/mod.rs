@@ -164,7 +164,7 @@ impl Action for CircuitProposeAction {
                     json_string.pop();
                     json_string.push('}');
 
-                    builder.set_application_metadata(&json_string.as_bytes());
+                    builder.set_application_metadata(json_string.as_bytes());
                 }
                 _ => {
                     return Err(CliError::ActionError(format!(
@@ -621,7 +621,7 @@ impl TryFrom<&SplinterNode> for CircuitMembers {
             public_key: node
                 .public_key
                 .as_ref()
-                .map(|public_key| to_hex(&public_key)),
+                .map(|public_key| to_hex(public_key)),
         })
     }
 }

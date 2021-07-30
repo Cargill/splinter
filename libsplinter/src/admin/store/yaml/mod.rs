@@ -1011,21 +1011,23 @@ impl AdminServiceStore for YamlAdminServiceStore {
     fn list_nodes(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = CircuitNode>>, AdminServiceStoreError> {
-        let nodes: Vec<CircuitNode> = self
-            .state
-            .lock()
-            .map_err(|_| {
-                AdminServiceStoreError::InternalError(InternalError::with_message(
-                    "YAML admin service store's internal lock was poisoned".to_string(),
-                ))
-            })?
-            .circuit_state
-            .nodes
-            .iter()
-            .map(|(_, node)| node.clone())
-            .collect();
+        let nodes: Box<dyn ExactSizeIterator<Item = CircuitNode>> = Box::new(
+            self.state
+                .lock()
+                .map_err(|_| {
+                    AdminServiceStoreError::InternalError(InternalError::with_message(
+                        "YAML admin service store's internal lock was poisoned".to_string(),
+                    ))
+                })?
+                .circuit_state
+                .nodes
+                .iter()
+                .map(|(_, node)| node.clone())
+                .collect::<Vec<_>>()
+                .into_iter(),
+        );
 
-        Ok(Box::new(nodes.into_iter()))
+        Ok(nodes)
     }
 
     /// Fetches a service from the underlying storage
@@ -1231,7 +1233,7 @@ impl TryFrom<YamlService> for Service {
         ServiceBuilder::new()
             .with_service_id(&service.service_id)
             .with_service_type(&service.service_type)
-            .with_node_id(&service.allowed_nodes.get(0).ok_or_else(|| {
+            .with_node_id(service.allowed_nodes.get(0).ok_or_else(|| {
                 InvalidStateError::with_message("Must contain 1 node ID".to_string())
             })?)
             .with_arguments(
@@ -1543,7 +1545,7 @@ impl From<ProposedCircuit> for YamlProposedCircuit {
         let application_metadata = circuit
             .application_metadata()
             .as_ref()
-            .map(|app_metadata| to_hex(&app_metadata));
+            .map(|app_metadata| to_hex(app_metadata));
 
         YamlProposedCircuit {
             circuit_id: circuit.circuit_id().into(),
@@ -1588,7 +1590,7 @@ impl TryFrom<YamlProposedService> for ProposedService {
         ProposedServiceBuilder::new()
             .with_service_id(&service.service_id)
             .with_service_type(&service.service_type)
-            .with_node_id(&service.allowed_nodes.get(0).ok_or_else(|| {
+            .with_node_id(service.allowed_nodes.get(0).ok_or_else(|| {
                 InvalidStateError::with_message("Must contain 1 node ID".to_string())
             })?)
             .with_arguments(

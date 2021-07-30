@@ -33,29 +33,29 @@ use crate::application_metadata::ApplicationMetadataError;
 
 #[derive(Debug)]
 pub enum AppAuthHandlerError {
-    IoError(std::io::Error),
-    InvalidMessageError(String),
-    DatabaseError(String),
-    ReactorError(events::ReactorError),
-    WebSocketError(events::WebSocketError),
-    SabreError(String),
-    SigningError(String),
-    TransactError(String),
-    BatchSubmitError(String),
+    Io(std::io::Error),
+    InvalidMessage(String),
+    Database(String),
+    Reactor(events::ReactorError),
+    WebSocket(events::WebSocketError),
+    Sabre(String),
+    Signing(String),
+    Transact(String),
+    BatchSubmit(String),
 }
 
 impl Error for AppAuthHandlerError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            AppAuthHandlerError::IoError(err) => Some(err),
-            AppAuthHandlerError::InvalidMessageError(_) => None,
-            AppAuthHandlerError::DatabaseError(_) => None,
-            AppAuthHandlerError::ReactorError(err) => Some(err),
-            AppAuthHandlerError::SabreError(_) => None,
-            AppAuthHandlerError::SigningError(_) => None,
-            AppAuthHandlerError::TransactError(_) => None,
-            AppAuthHandlerError::BatchSubmitError(_) => None,
-            AppAuthHandlerError::WebSocketError(err) => Some(err),
+            AppAuthHandlerError::Io(err) => Some(err),
+            AppAuthHandlerError::InvalidMessage(_) => None,
+            AppAuthHandlerError::Database(_) => None,
+            AppAuthHandlerError::Reactor(err) => Some(err),
+            AppAuthHandlerError::Sabre(_) => None,
+            AppAuthHandlerError::Signing(_) => None,
+            AppAuthHandlerError::Transact(_) => None,
+            AppAuthHandlerError::BatchSubmit(_) => None,
+            AppAuthHandlerError::WebSocket(err) => Some(err),
         }
     }
 }
@@ -63,82 +63,82 @@ impl Error for AppAuthHandlerError {
 impl fmt::Display for AppAuthHandlerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AppAuthHandlerError::IoError(msg) => write!(f, "An I/O error occurred: {}", msg),
-            AppAuthHandlerError::InvalidMessageError(msg) => {
+            AppAuthHandlerError::Io(msg) => write!(f, "An I/O error occurred: {}", msg),
+            AppAuthHandlerError::InvalidMessage(msg) => {
                 write!(f, "The client received an invalid message: {}", msg)
             }
-            AppAuthHandlerError::DatabaseError(msg) => {
+            AppAuthHandlerError::Database(msg) => {
                 write!(f, "The database returned an error: {}", msg)
             }
-            AppAuthHandlerError::ReactorError(msg) => write!(f, "Reactor Error: {}", msg),
-            AppAuthHandlerError::SabreError(msg) => write!(
+            AppAuthHandlerError::Reactor(msg) => write!(f, "Reactor Error: {}", msg),
+            AppAuthHandlerError::Sabre(msg) => write!(
                 f,
                 "An error occurred while building a Sabre payload: {}",
                 msg
             ),
-            AppAuthHandlerError::SigningError(msg) => {
+            AppAuthHandlerError::Signing(msg) => {
                 write!(f, "A signing error occurred: {}", msg)
             }
-            AppAuthHandlerError::TransactError(msg) => write!(
+            AppAuthHandlerError::Transact(msg) => write!(
                 f,
                 "An error occurred while building a transaction or batch: {}",
                 msg
             ),
-            AppAuthHandlerError::BatchSubmitError(msg) => write!(
+            AppAuthHandlerError::BatchSubmit(msg) => write!(
                 f,
                 "An error occurred while submitting a batch to the scabbard service: {}",
                 msg
             ),
-            AppAuthHandlerError::WebSocketError(msg) => write!(f, "WebsocketError {}", msg),
+            AppAuthHandlerError::WebSocket(msg) => write!(f, "WebsocketError {}", msg),
         }
     }
 }
 
 impl From<std::io::Error> for AppAuthHandlerError {
     fn from(err: std::io::Error) -> AppAuthHandlerError {
-        AppAuthHandlerError::IoError(err)
+        AppAuthHandlerError::Io(err)
     }
 }
 
 impl From<serde_json::error::Error> for AppAuthHandlerError {
     fn from(err: serde_json::error::Error) -> AppAuthHandlerError {
-        AppAuthHandlerError::InvalidMessageError(format!("{}", err))
+        AppAuthHandlerError::InvalidMessage(format!("{}", err))
     }
 }
 
 impl From<std::string::FromUtf8Error> for AppAuthHandlerError {
     fn from(err: std::string::FromUtf8Error) -> AppAuthHandlerError {
-        AppAuthHandlerError::InvalidMessageError(format!("{}", err))
+        AppAuthHandlerError::InvalidMessage(format!("{}", err))
     }
 }
 
 impl From<ApplicationMetadataError> for AppAuthHandlerError {
     fn from(err: ApplicationMetadataError) -> AppAuthHandlerError {
-        AppAuthHandlerError::InvalidMessageError(format!("{}", err))
+        AppAuthHandlerError::InvalidMessage(format!("{}", err))
     }
 }
 
 impl From<gameroom_database::DatabaseError> for AppAuthHandlerError {
     fn from(err: gameroom_database::DatabaseError) -> AppAuthHandlerError {
-        AppAuthHandlerError::DatabaseError(format!("{}", err))
+        AppAuthHandlerError::Database(format!("{}", err))
     }
 }
 
 impl From<diesel::result::Error> for AppAuthHandlerError {
     fn from(err: diesel::result::Error) -> Self {
-        AppAuthHandlerError::DatabaseError(format!("Error performing query: {}", err))
+        AppAuthHandlerError::Database(format!("Error performing query: {}", err))
     }
 }
 
 impl From<events::ReactorError> for AppAuthHandlerError {
     fn from(err: events::ReactorError) -> Self {
-        AppAuthHandlerError::ReactorError(err)
+        AppAuthHandlerError::Reactor(err)
     }
 }
 
 impl From<events::WebSocketError> for AppAuthHandlerError {
     fn from(err: events::WebSocketError) -> Self {
-        AppAuthHandlerError::WebSocketError(err)
+        AppAuthHandlerError::WebSocket(err)
     }
 }
 
@@ -147,7 +147,7 @@ macro_rules! impl_from_sabre_errors {
         $(
             impl From<$x> for AppAuthHandlerError {
                 fn from(e: $x) -> Self {
-                    AppAuthHandlerError::SabreError(e.to_string())
+                    AppAuthHandlerError::Sabre(e.to_string())
                 }
             }
         )*
@@ -158,30 +158,30 @@ impl_from_sabre_errors!(AddressingError, ActionBuildError, SabrePayloadBuildErro
 
 impl From<KeyParseError> for AppAuthHandlerError {
     fn from(err: KeyParseError) -> Self {
-        AppAuthHandlerError::SigningError(err.to_string())
+        AppAuthHandlerError::Signing(err.to_string())
     }
 }
 
 impl From<SigningError> for AppAuthHandlerError {
     fn from(err: SigningError) -> Self {
-        AppAuthHandlerError::SigningError(err.to_string())
+        AppAuthHandlerError::Signing(err.to_string())
     }
 }
 
 impl From<BatchBuildError> for AppAuthHandlerError {
     fn from(err: BatchBuildError) -> Self {
-        AppAuthHandlerError::TransactError(err.to_string())
+        AppAuthHandlerError::Transact(err.to_string())
     }
 }
 
 impl From<TransactionBuildError> for AppAuthHandlerError {
     fn from(err: TransactionBuildError) -> Self {
-        AppAuthHandlerError::TransactError(err.to_string())
+        AppAuthHandlerError::Transact(err.to_string())
     }
 }
 
 impl From<ProtoConversionError> for AppAuthHandlerError {
     fn from(err: ProtoConversionError) -> Self {
-        AppAuthHandlerError::TransactError(err.to_string())
+        AppAuthHandlerError::Transact(err.to_string())
     }
 }

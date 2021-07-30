@@ -102,11 +102,9 @@ fn run() -> Result<(), GameroomDaemonError> {
     // Get the public/private key pair
     let context = Secp256k1Context::new();
     let private_key = load_key(config.key(), &[PathBuf::from("")])
-        .map_err(|err| GameroomDaemonError::SigningError(err.to_string()))?
+        .map_err(|err| GameroomDaemonError::Signing(err.to_string()))?
         .ok_or_else(|| {
-            GameroomDaemonError::SigningError({
-                format!("No signing key found in {}", config.key())
-            })
+            GameroomDaemonError::Signing(format!("No signing key found in {}", config.key()))
         })?;
     let private_key_hex = private_key.as_hex();
     let public_key_hex = context.get_public_key(&private_key)?.as_hex();

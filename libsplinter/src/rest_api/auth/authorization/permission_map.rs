@@ -45,7 +45,7 @@ impl PermissionMap {
     pub fn get_permission(&self, method: &Method, endpoint: &str) -> Option<&Permission> {
         self.internal
             .iter()
-            .find(|(req, _)| req.matches(&method, endpoint))
+            .find(|(req, _)| req.matches(method, endpoint))
             .map(|(_, perm)| perm)
     }
 

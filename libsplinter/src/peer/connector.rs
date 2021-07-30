@@ -160,14 +160,14 @@ impl PeerManagerConnector {
         match self.sender.send(message) {
             Ok(()) => (),
             Err(_) => {
-                return Err(PeerListError::InternalError(
+                return Err(PeerListError::Internal(
                     "Unable to send message to PeerManager, receiver dropped".to_string(),
                 ))
             }
         };
 
         recv.recv()
-            .map_err(|err| PeerListError::ReceiveError(format!("{:?}", err)))?
+            .map_err(|err| PeerListError::Receive(format!("{:?}", err)))?
     }
 
     /// Requests the list of unreferenced peers.
@@ -183,14 +183,14 @@ impl PeerManagerConnector {
         match self.sender.send(message) {
             Ok(()) => (),
             Err(_) => {
-                return Err(PeerListError::InternalError(
+                return Err(PeerListError::Internal(
                     "Unable to send message to PeerManager, receiver dropped".to_string(),
                 ))
             }
         };
 
         recv.recv()
-            .map_err(|err| PeerListError::ReceiveError(format!("{:?}", err)))?
+            .map_err(|err| PeerListError::Receive(format!("{:?}", err)))?
     }
 
     /// Requests the map of currently connected peers to connection IDs
@@ -373,14 +373,14 @@ impl PeerRemover {
         match self.sender.send(message) {
             Ok(()) => (),
             Err(_) => {
-                return Err(PeerRefRemoveError::InternalError(
+                return Err(PeerRefRemoveError::Internal(
                     "Unable to send message to PeerManager, receiver dropped".to_string(),
                 ))
             }
         };
 
         recv.recv()
-            .map_err(|err| PeerRefRemoveError::ReceiveError(format!("{:?}", err)))?
+            .map_err(|err| PeerRefRemoveError::Receive(format!("{:?}", err)))?
     }
 
     /// Sends a request to the `PeerManager` to remove a peer by its endpoint.
@@ -400,14 +400,14 @@ impl PeerRemover {
         match self.sender.send(message) {
             Ok(()) => (),
             Err(_) => {
-                return Err(PeerRefRemoveError::InternalError(
+                return Err(PeerRefRemoveError::Internal(
                     "Unable to send message to PeerManager, receiver dropped".to_string(),
                 ))
             }
         };
 
         recv.recv()
-            .map_err(|err| PeerRefRemoveError::ReceiveError(format!("{:?}", err)))?
+            .map_err(|err| PeerRefRemoveError::Receive(format!("{:?}", err)))?
     }
 }
 

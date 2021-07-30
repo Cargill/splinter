@@ -251,9 +251,9 @@ impl ServiceFactory for ScabbardFactory {
             circuit_id,
             version,
             peer_services,
-            &state_db_dir,
+            state_db_dir,
             self.state_db_size,
-            &receipt_db_dir,
+            receipt_db_dir,
             self.receipt_db_size,
             self.signature_verifier_factory
                 .lock()

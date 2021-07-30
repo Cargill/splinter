@@ -119,14 +119,14 @@ impl Action for CertGenAction {
                 if metadata.permissions().readonly() {
                     return Err(CliError::ActionError(format!(
                         "Cert directory is not writeable: {}",
-                        absolute_path(&cert_dir)?,
+                        absolute_path(cert_dir)?,
                     )));
                 }
             }
             Err(err) => {
                 return Err(CliError::ActionError(format!(
                     "Cannot check if cert directory {} is writable: {}",
-                    absolute_path(&cert_dir)?,
+                    absolute_path(cert_dir)?,
                     err
                 )));
             }
@@ -601,7 +601,7 @@ fn make_ca_signed_cert(
 
     // build x509_name
     let mut x509_name = X509NameBuilder::new()?;
-    x509_name.append_entry_by_text("CN", &common_name)?;
+    x509_name.append_entry_by_text("CN", common_name)?;
     let x509_name = x509_name.build();
 
     // build x509 cert
@@ -630,7 +630,7 @@ fn make_ca_signed_cert(
     )?;
 
     // sign the cert by the ca
-    cert_builder.sign(&ca_privkey, MessageDigest::sha256())?;
+    cert_builder.sign(ca_privkey, MessageDigest::sha256())?;
     let cert = cert_builder.build();
 
     // return private key and cert

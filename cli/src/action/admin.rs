@@ -47,7 +47,7 @@ impl Action for AdminKeyGenAction {
         let public_key_path = key_dir.join(key_name).with_extension("pub");
 
         create_key_pair(
-            &key_dir,
+            key_dir,
             private_key_path,
             public_key_path,
             args.is_present("force"),

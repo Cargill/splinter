@@ -625,11 +625,11 @@ impl TryFrom<&messages::CreateCircuit> for ProposedCircuit {
         }
         // Add the `comments` if present
         if let Some(comments) = &create_circuit.comments {
-            circuit_builder = circuit_builder.with_comments(&comments);
+            circuit_builder = circuit_builder.with_comments(comments);
         }
         // Add the `display_name` if present
         if let Some(display_name) = &create_circuit.display_name {
-            circuit_builder = circuit_builder.with_display_name(&display_name);
+            circuit_builder = circuit_builder.with_display_name(display_name);
         }
         circuit_builder.build()
     }

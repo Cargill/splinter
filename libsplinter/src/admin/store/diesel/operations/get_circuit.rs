@@ -94,20 +94,20 @@ where
 
             // Collecting services associated with the `Circuit` using the `list_services` method,
             // which provides a list of the `Services` with the matching `circuit_id`.
-            let services: Vec<Service> = self.list_services(&circuit_id)?.collect();
+            let services: Vec<Service> = self.list_services(circuit_id)?.collect();
             let circuit_members: Vec<CircuitNode> = nodes_vec
                 .iter()
                 .map(|member| {
                     let mut builder = CircuitNodeBuilder::new().with_node_id(&member.node_id);
 
                     if let Some(endpoints) = node_map.get(&member.node_id) {
-                        builder = builder.with_endpoints(&endpoints);
+                        builder = builder.with_endpoints(endpoints);
                     }
 
                     #[cfg(feature = "challenge-authorization")]
                     {
                         if let Some(public_key) = &member.public_key {
-                            builder = builder.with_public_key(&public_key);
+                            builder = builder.with_public_key(public_key);
                         }
                     }
 
