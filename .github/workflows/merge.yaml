@@ -2,6 +2,8 @@ name: Merge
 
 on:
   push:
+  schedule:
+    - cron: "0 10 * * *"
 
 env:
   CARGO_TERM_COLOR: always
