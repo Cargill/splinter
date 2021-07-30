@@ -19,14 +19,10 @@ use std::convert::TryFrom;
 use diesel::{
     dsl::{count_star, exists},
     prelude::*,
-    sql_types::{Binary, Integer, Nullable, SmallInt, Text},
 };
 
 use crate::admin::store::{
-    diesel::{
-        models::{CircuitProposalModel, ProposedCircuitModel},
-        schema::{proposed_circuit, proposed_node},
-    },
+    diesel::schema::{proposed_circuit, proposed_node},
     error::AdminServiceStoreError,
     CircuitPredicate,
 };
@@ -44,26 +40,7 @@ pub(in crate::admin::store::diesel) trait AdminServiceStoreCountProposalsOperati
 impl<'a, C> AdminServiceStoreCountProposalsOperation for AdminServiceStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
-    CircuitProposalModel: diesel::Queryable<(Text, Text, Text, Binary, Text), C::Backend>,
-    ProposedCircuitModel: diesel::Queryable<
-        (
-            Text,
-            Text,
-            Text,
-            Text,
-            Text,
-            Text,
-            Nullable<Binary>,
-            Nullable<Text>,
-            Nullable<Text>,
-            Integer,
-            SmallInt,
-        ),
-        C::Backend,
-    >,
 {
     fn count_proposals(
         &self,
