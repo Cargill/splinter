@@ -64,7 +64,7 @@ pub struct UpdateUser {
 }
 
 /// New key pairs to be added while updating a Biome user.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct NewKey {
     pub public_key: String,
     pub encrypted_private_key: String,
