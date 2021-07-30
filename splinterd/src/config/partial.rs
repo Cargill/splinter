@@ -93,6 +93,8 @@ pub struct PartialConfig {
     metrics_username: Option<String>,
     #[cfg(feature = "metrics")]
     metrics_password: Option<String>,
+    #[cfg(feature = "challenge-authorization")]
+    peering_key: Option<String>,
     #[cfg(feature = "log-config")]
     root_logger: Option<RootConfig>,
     #[cfg(feature = "log-config")]
@@ -163,6 +165,8 @@ impl PartialConfig {
             metrics_username: None,
             #[cfg(feature = "metrics")]
             metrics_password: None,
+            #[cfg(feature = "challenge-authorization")]
+            peering_key: None,
             #[cfg(feature = "log-config")]
             appenders: None,
             #[cfg(feature = "log-config")]
@@ -348,6 +352,11 @@ impl PartialConfig {
     #[cfg(feature = "metrics")]
     pub fn metrics_password(&self) -> Option<String> {
         self.metrics_password.clone()
+    }
+
+    #[cfg(feature = "challenge-authorization")]
+    pub fn peering_key(&self) -> Option<String> {
+        self.peering_key.clone()
     }
 
     #[cfg(feature = "log-config")]
@@ -821,6 +830,18 @@ impl PartialConfig {
     ///
     pub fn with_metrics_password(mut self, metrics_password: Option<String>) -> Self {
         self.metrics_password = metrics_password;
+        self
+    }
+    #[cfg(feature = "challenge-authorization")]
+    /// Adds an `peering_key` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `peering_key` - Add the name of the key that should be used to peer with endpoints
+    ///    passed to the peer option when using challenge authorization
+    ///
+    pub fn with_peering_key(mut self, peering_key: Option<String>) -> Self {
+        self.peering_key = peering_key;
         self
     }
 

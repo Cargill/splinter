@@ -185,11 +185,19 @@ OPTIONS
 `--peers PEER-URL` `[,...]`
 : Specifies one or more Splinter nodes that `splinterd` will automatically
   connect to when it starts. The *PEER-URL* argument must specify another node's
-  network endpoint, using the format `protocol_prefix://ip:port`.
+  network endpoint, using the format `protocol_prefix://ip:port` or
+  `protocol-prefix+trust://ip:port` to require trust authorization. Default
+  authorization type is challenge if signing keys are configured.
 
   Specify multiple nodes in a comma-separated list or by repeating the
   `--peers` option. The protocol prefix part of the peer URL specifies the
   type of connection that is created.
+
+`--peering-key PEERING_KEY`
+: The name of the key to use for challenge authorization with specified peers.
+  Defaults to the only key if there is only one key supported otherwise,
+  defaults to `splinterd`. This key is expected to be present in the storage
+  directory.
 
 `--registries REGISTRY-FILE` `[,...]`
 : Specifies one or more read-only Splinter registry files.

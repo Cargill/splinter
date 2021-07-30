@@ -40,8 +40,12 @@ use log4rs::Handle;
 use std::convert::TryInto;
 
 use rand::{thread_rng, Rng};
+#[cfg(feature = "challenge-authorization")]
+use splinter::error::InternalError;
 #[cfg(feature = "metrics")]
 use splinter::metrics::influx::InfluxRecorder;
+#[cfg(feature = "challenge-authorization")]
+use splinter::peer::PeerAuthorizationToken;
 
 use crate::config::{
     ClapPartialConfigBuilder, Config, ConfigBuilder, ConfigError, DefaultPartialConfigBuilder,
@@ -155,9 +159,15 @@ fn find_node_id(config: &Config) -> Result<String, UserError> {
     }
 }
 
+#[cfg(feature = "challenge-authorization")]
+type ChallengeAuthorizationArgs = (Vec<Box<dyn Signer>>, Option<PeerAuthorizationToken>);
+
 // load all signing keys from the configured splinterd key file
 #[cfg(feature = "challenge-authorization")]
-fn load_signer_keys(config_dir: &str) -> Result<Vec<Box<dyn Signer>>, UserError> {
+fn load_signer_keys(
+    config_dir: &str,
+    peering_key: &str,
+) -> Result<ChallengeAuthorizationArgs, UserError> {
     let splinterd_key_path = Path::new(config_dir).join("keys");
     let paths = match fs::read_dir(splinterd_key_path) {
         Ok(paths) => paths,
@@ -167,11 +177,13 @@ fn load_signer_keys(config_dir: &str) -> Result<Vec<Box<dyn Signer>>, UserError>
                 unable to read splinterd keys directory: {}",
                 err
             );
-            return Ok(vec![]);
+            return Ok((vec![], None));
         }
     };
 
+    let mut peer_token = None;
     let mut signing_keys = vec![];
+    let mut last_known_key = String::default();
     for path in paths {
         let path = path
             .map_err(|err| {
@@ -183,16 +195,70 @@ fn load_signer_keys(config_dir: &str) -> Result<Vec<Box<dyn Signer>>, UserError>
             .path();
 
         if path.extension() == Some(OsStr::new("priv")) {
-            let private_key = load_key_from_path(&path).map_err(UserError::KeyLoadError)?;
-            signing_keys.push(Secp256k1Context::new().new_signer(private_key));
+            let private_key = load_key_from_path(&path)
+                .map_err(|err| UserError::KeyError(InternalError::from_source(Box::new(err))))?;
+            let signing_key = Secp256k1Context::new().new_signer(private_key);
+
+            if path.file_stem() == Some(OsStr::new(peering_key)) {
+                peer_token = Some(PeerAuthorizationToken::from_public_key(
+                    signing_key
+                        .public_key()
+                        .map_err(|err| {
+                            UserError::KeyError(InternalError::from_source(Box::new(err)))
+                        })?
+                        .as_slice(),
+                ));
+
+                // put configured peering signing key in the front of the Vec
+                signing_keys.insert(0, signing_key);
+            } else {
+                signing_keys.push(signing_key);
+            }
+        } else {
+            last_known_key = path
+                .file_stem()
+                .ok_or_else(|| {
+                    UserError::KeyError(InternalError::with_message(
+                        "Unable to get file name".to_string(),
+                    ))
+                })?
+                .to_str()
+                .ok_or_else(|| {
+                    UserError::KeyError(InternalError::with_message(
+                        "Unable to get file name".to_string(),
+                    ))
+                })?
+                .to_string();
         }
     }
 
     if signing_keys.is_empty() {
         warn!("Starting daemon with no signing keys");
+    } else if peer_token.is_none() {
+        if signing_keys.len() == 1 {
+            let signing_key = &signing_keys[0];
+            peer_token = Some(PeerAuthorizationToken::from_public_key(
+                signing_key
+                    .public_key()
+                    .map_err(|err| UserError::KeyError(InternalError::from_source(Box::new(err))))?
+                    .as_slice(),
+            ));
+            warn!(
+                "Peering key name provided was not found, defaulting to the only key \
+                provided: {}",
+                last_known_key
+            );
+        } else {
+            return Err(UserError::KeyError(InternalError::with_message(format!(
+                "Unable to decide which key to use for required authorization for \
+                provided peers. Peering key {} was not found and there are more then one \
+                configured signing key",
+                peering_key,
+            ))));
+        }
     }
 
-    Ok(signing_keys)
+    Ok((signing_keys, peer_token))
 }
 
 fn main() {
@@ -269,10 +335,19 @@ fn main() {
         .arg(
             Arg::with_name("peers")
                 .long("peers")
-                .help("Endpoint that service will connect to, protocol-prefix://ip:port")
+                .help(
+                    "Endpoint that service will connect to, protocol-prefix://ip:port or \
+                    protocol-prefix+trust://ip:port to require trust authorization",
+                )
                 .takes_value(true)
                 .multiple(true)
                 .alias("peer"),
+        )
+        .arg(
+            Arg::with_name("peering_key")
+                .long("peering-key")
+                .help("Key to use for challenge authorization with --peers, defaults to splinterd")
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("registries")
@@ -724,8 +799,10 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
 
     #[cfg(feature = "challenge-authorization")]
     {
-        let signers = load_signer_keys(config.config_dir())?;
-        daemon_builder = daemon_builder.with_signers(signers);
+        let (signers, peering_token) = load_signer_keys(config.config_dir(), config.peering_key())?;
+        daemon_builder = daemon_builder
+            .with_signers(signers)
+            .with_peering_token(peering_token);
     }
 
     let mut node = daemon_builder.build().map_err(|err| {

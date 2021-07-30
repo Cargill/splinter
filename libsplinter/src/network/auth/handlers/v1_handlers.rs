@@ -60,6 +60,8 @@ pub struct AuthProtocolRequestHandler {
     challenge_configured: bool,
     #[cfg(feature = "challenge-authorization")]
     expected_authorization: Option<ConnectionAuthorizationType>,
+    #[cfg(feature = "challenge-authorization")]
+    local_authorization: Option<ConnectionAuthorizationType>,
 }
 
 impl AuthProtocolRequestHandler {
@@ -69,6 +71,9 @@ impl AuthProtocolRequestHandler {
         #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
             ConnectionAuthorizationType,
         >,
+        #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+            ConnectionAuthorizationType,
+        >,
     ) -> Self {
         Self {
             auth_manager,
@@ -76,6 +81,8 @@ impl AuthProtocolRequestHandler {
             challenge_configured,
             #[cfg(feature = "challenge-authorization")]
             expected_authorization,
+            #[cfg(feature = "challenge-authorization")]
+            local_authorization,
         }
     }
 }
@@ -160,11 +167,21 @@ impl Handler for AuthProtocolRequestHandler {
                     Some(ConnectionAuthorizationType::Challenge { .. }) => {
                         accepted_authorization_type = vec![PeerAuthorizationType::Challenge]
                     }
+                    // if None, check required local authorization type as well
                     _ => {
-                        // if trust is enabled it was already added
-                        #[cfg(feature = "challenge-authorization")]
-                        if self.challenge_configured {
-                            accepted_authorization_type.push(PeerAuthorizationType::Challenge)
+                        match self.local_authorization {
+                            Some(ConnectionAuthorizationType::Trust { .. }) => (),
+                            Some(ConnectionAuthorizationType::Challenge { .. }) => {
+                                accepted_authorization_type = vec![PeerAuthorizationType::Challenge]
+                            }
+                            _ => {
+                                // if trust is enabled it was already added
+                                #[cfg(feature = "challenge-authorization")]
+                                if self.challenge_configured {
+                                    accepted_authorization_type
+                                        .push(PeerAuthorizationType::Challenge)
+                                }
+                            }
                         }
                     }
                 };
@@ -967,25 +984,17 @@ impl Handler for AuthChallengeSubmitRequestHandler {
 
                 return Ok(());
             }
-        } else if public_keys.len() == 1 {
+        } else if !public_keys.is_empty() {
             // we know this is safe because of above length check
             // defaults to the first key in the list
             public_key::PublicKey::from_bytes(public_keys[0].clone())
         } else {
-            let error_string = {
-                if public_keys.is_empty() {
-                    "No public keys submitted".to_string()
-                } else {
-                    "Too many public keys submitted".to_string()
-                }
-            };
-
             send_authorization_error(
                 &self.auth_manager,
                 context.source_id(),
                 context.source_connection_id(),
                 sender,
-                &error_string,
+                "No public keys submitted",
             )?;
 
             return Ok(());

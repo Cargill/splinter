@@ -189,6 +189,12 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 });
         }
 
+        #[cfg(feature = "challenge-authorization")]
+        {
+            partial_config = partial_config
+                .with_peering_key(self.matches.value_of("peering_key").map(String::from))
+        }
+
         Ok(partial_config)
     }
 }

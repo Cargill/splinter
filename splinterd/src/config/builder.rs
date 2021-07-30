@@ -358,6 +358,12 @@ impl ConfigBuilder {
                 .partial_configs
                 .iter()
                 .find_map(|p| p.metrics_password().map(|v| (v, p.source()))),
+            #[cfg(feature = "challenge-authorization")]
+            peering_key: self
+                .partial_configs
+                .iter()
+                .find_map(|p| p.peering_key().map(|v| (v, p.source())))
+                .ok_or_else(|| ConfigError::MissingValue("peering_key".to_string()))?,
             #[cfg(feature = "log-config")]
             appenders: Some({
                 let appenders = self

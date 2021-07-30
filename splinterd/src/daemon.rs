@@ -58,6 +58,8 @@ use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
 use splinter::orchestrator::ServiceOrchestratorBuilder;
 use splinter::peer::interconnect::NetworkMessageSender;
 use splinter::peer::interconnect::PeerInterconnectBuilder;
+#[cfg(feature = "challenge-authorization")]
+use splinter::peer::PeerAuthorizationToken;
 use splinter::peer::PeerManager;
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::NetworkMessageType;
@@ -152,6 +154,8 @@ pub struct SplinterDaemon {
     strict_ref_counts: bool,
     #[cfg(feature = "challenge-authorization")]
     signers: Vec<Box<dyn Signer>>,
+    #[cfg(feature = "challenge-authorization")]
+    peering_token: PeerAuthorizationToken,
 }
 
 impl SplinterDaemon {
@@ -430,7 +434,16 @@ impl SplinterDaemon {
         // hold on to peer refs for the peers provided to ensure the connections are kept around
         let mut peer_refs = vec![];
         for endpoint in self.initial_peers.iter() {
-            match peer_connector.add_unidentified_peer(endpoint.into()) {
+            #[cfg(feature = "challenge-authorization")]
+            let (endpoint, token) =
+                parse_peer_endpoint(endpoint, &self.peering_token, &self.node_id);
+            #[cfg(not(feature = "challenge-authorization"))]
+            let endpoint = endpoint.to_string();
+            match peer_connector.add_unidentified_peer(
+                endpoint,
+                #[cfg(feature = "challenge-authorization")]
+                token,
+            ) {
                 Ok(peer_ref) => peer_refs.push(peer_ref),
                 Err(err) => error!("Connect Error: {}", err),
             }
@@ -1058,6 +1071,8 @@ pub struct SplinterDaemonBuilder {
     strict_ref_counts: Option<bool>,
     #[cfg(feature = "challenge-authorization")]
     signers: Option<Vec<Box<dyn Signer>>>,
+    #[cfg(feature = "challenge-authorization")]
+    peering_token: Option<PeerAuthorizationToken>,
 }
 
 impl SplinterDaemonBuilder {
@@ -1219,6 +1234,12 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "challenge-authorization")]
+    pub fn with_peering_token(mut self, value: Option<PeerAuthorizationToken>) -> Self {
+        self.peering_token = value;
+        self
+    }
+
     pub fn build(self) -> Result<SplinterDaemon, CreateError> {
         let heartbeat = self.heartbeat.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
@@ -1302,6 +1323,11 @@ impl SplinterDaemonBuilder {
             vec![]
         });
 
+        #[cfg(feature = "challenge-authorization")]
+        let peering_token = self
+            .peering_token
+            .unwrap_or_else(|| PeerAuthorizationToken::from_peer_id(&node_id));
+
         Ok(SplinterDaemon {
             #[cfg(feature = "authorization-handler-allow-keys")]
             config_dir,
@@ -1344,6 +1370,8 @@ impl SplinterDaemonBuilder {
             strict_ref_counts,
             #[cfg(feature = "challenge-authorization")]
             signers,
+            #[cfg(feature = "challenge-authorization")]
+            peering_token,
         })
     }
 }
@@ -1615,6 +1643,26 @@ fn create_allow_keys_authorization_handler(
             ))
         })?,
     ))
+}
+
+/// Parse the peer endpoint that we want to connect to regardless of a circuit. The endpoint will
+/// either be in normal form impling it should use the configured peer authorization token for
+/// peering (usally challenge, unless no keys were provided) or includes +trust after the
+/// transport type which means a trust token should be used
+#[cfg(feature = "challenge-authorization")]
+fn parse_peer_endpoint(
+    endpoint: &str,
+    peering_token: &PeerAuthorizationToken,
+    node_id: &str,
+) -> (String, PeerAuthorizationToken) {
+    // if endpoint is in the form tcp+trust://ipaddr:port Trust authorization must be used
+    if endpoint.contains("+trust://") {
+        // set endpoint to the form tcp://ipaddr:port, removing the +trust and return a trust token
+        let endpoint = endpoint.replace("+trust://", "://");
+        (endpoint, PeerAuthorizationToken::from_peer_id(node_id))
+    } else {
+        (endpoint.to_string(), peering_token.clone())
+    }
 }
 
 #[derive(Debug)]
