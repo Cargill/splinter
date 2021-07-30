@@ -788,7 +788,7 @@ fn remove_peer(
                     peer_id
                 );
             } else {
-                return Err(PeerRefRemoveError::RemoveError(format!(
+                return Err(PeerRefRemoveError::Remove(format!(
                     "Failed to remove ref for peer {} from ref map: {}",
                     peer_id, err
                 )));
@@ -798,7 +798,7 @@ fn remove_peer(
 
     if let Some(removed_peer) = removed_peer {
         let peer_metadata = peers.remove(&removed_peer).ok_or_else(|| {
-            PeerRefRemoveError::RemoveError(format!(
+            PeerRefRemoveError::Remove(format!(
                 "Peer {} has already been removed from the peer map",
                 peer_id
             ))
@@ -816,11 +816,11 @@ fn remove_peer(
                 );
                 Ok(())
             }
-            Ok(None) => Err(PeerRefRemoveError::RemoveError(format!(
+            Ok(None) => Err(PeerRefRemoveError::Remove(format!(
                 "The connection for peer {}'s active endpoint ({}) has already been removed",
                 peer_id, peer_metadata.active_endpoint
             ))),
-            Err(err) => Err(PeerRefRemoveError::RemoveError(format!("{}", err))),
+            Err(err) => Err(PeerRefRemoveError::Remove(format!("{}", err))),
         }
     } else {
         // if the peer has not been fully removed, return OK
@@ -838,7 +838,7 @@ fn remove_peer_by_endpoint(
     let peer_metadata = match peers.get_peer_from_endpoint(&endpoint) {
         Some(peer_metadata) => peer_metadata,
         None => {
-            return Err(PeerRefRemoveError::RemoveError(format!(
+            return Err(PeerRefRemoveError::Remove(format!(
                 "Peer with endpoint {} has already been removed from the peer map",
                 endpoint
             )))
@@ -859,7 +859,7 @@ fn remove_peer_by_endpoint(
                     peer_metadata.id
                 );
             } else {
-                return Err(PeerRefRemoveError::RemoveError(format!(
+                return Err(PeerRefRemoveError::Remove(format!(
                     "Failed to remove ref for peer {} from ref map: {}",
                     peer_metadata.id, err
                 )));
@@ -868,7 +868,7 @@ fn remove_peer_by_endpoint(
     };
     if let Some(removed_peer) = removed_peer {
         let peer_metadata = peers.remove(&removed_peer).ok_or_else(|| {
-            PeerRefRemoveError::RemoveError(format!(
+            PeerRefRemoveError::Remove(format!(
                 "Peer with endpoint {} has already been removed from the peer map",
                 endpoint
             ))
@@ -887,11 +887,11 @@ fn remove_peer_by_endpoint(
                 );
                 Ok(())
             }
-            Ok(None) => Err(PeerRefRemoveError::RemoveError(format!(
+            Ok(None) => Err(PeerRefRemoveError::Remove(format!(
                 "The connection for peer {}'s active endpoint ({}) has already been removed",
                 peer_metadata.id, peer_metadata.active_endpoint
             ))),
-            Err(err) => Err(PeerRefRemoveError::RemoveError(format!("{}", err))),
+            Err(err) => Err(PeerRefRemoveError::Remove(format!("{}", err))),
         }
     } else {
         // if the peer has not been fully removed, return OK

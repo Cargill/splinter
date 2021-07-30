@@ -53,9 +53,7 @@ pub fn build_transport(config: &Config) -> Result<MultiTransport, GetTransportEr
 
         #[cfg(feature = "ws-transport")]
         transports.push(Box::new(WsTransport::new(Some(&tls_config)).map_err(
-            |e| {
-                GetTransportError::CertError(format!("Failed to create WebSocket transport: {}", e))
-            },
+            |e| GetTransportError::Cert(format!("Failed to create WebSocket transport: {}", e)),
         )?));
     } else {
         #[cfg(feature = "ws-transport")]
@@ -80,13 +78,13 @@ fn build_tls_config(config: &Config) -> Result<TlsConfig, GetTransportError> {
 
     builder
         .build()
-        .map_err(|e| GetTransportError::CertError(format!("TLS config error: {}", e)))
+        .map_err(|e| GetTransportError::Cert(format!("TLS config error: {}", e)))
 }
 
 fn validate_tls_config(tls_config: &TlsConfig) -> Result<(), GetTransportError> {
     let client_cert = tls_config.client_cert_file();
     if !Path::new(&client_cert).is_file() {
-        return Err(GetTransportError::CertError(format!(
+        return Err(GetTransportError::Cert(format!(
             "Must provide a valid client certificate: {}",
             client_cert
         )));
@@ -94,7 +92,7 @@ fn validate_tls_config(tls_config: &TlsConfig) -> Result<(), GetTransportError> 
 
     let server_cert = tls_config.server_cert_file();
     if !Path::new(&server_cert).is_file() {
-        return Err(GetTransportError::CertError(format!(
+        return Err(GetTransportError::Cert(format!(
             "Must provide a valid server certificate: {}",
             server_cert
         )));
@@ -102,7 +100,7 @@ fn validate_tls_config(tls_config: &TlsConfig) -> Result<(), GetTransportError> 
 
     let server_key_file = tls_config.server_private_key_file();
     if !Path::new(&server_key_file).is_file() {
-        return Err(GetTransportError::CertError(format!(
+        return Err(GetTransportError::Cert(format!(
             "Must provide a valid server key path: {}",
             server_key_file
         )));
@@ -110,7 +108,7 @@ fn validate_tls_config(tls_config: &TlsConfig) -> Result<(), GetTransportError> 
 
     let client_key_file = tls_config.client_private_key_file();
     if !Path::new(&client_key_file).is_file() {
-        return Err(GetTransportError::CertError(format!(
+        return Err(GetTransportError::Cert(format!(
             "Must provide a valid client key path: {}",
             client_key_file
         )));
@@ -118,7 +116,7 @@ fn validate_tls_config(tls_config: &TlsConfig) -> Result<(), GetTransportError> 
 
     if let Some(ca_file) = tls_config.ca_certs_file() {
         if !Path::new(&ca_file).is_file() {
-            return Err(GetTransportError::CertError(format!(
+            return Err(GetTransportError::Cert(format!(
                 "Must provide a valid file containing ca certs: {}",
                 ca_file
             )));

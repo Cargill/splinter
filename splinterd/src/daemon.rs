@@ -1680,6 +1680,7 @@ impl fmt::Display for CreateError {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug)]
 pub enum StartError {
     TransportError(String),

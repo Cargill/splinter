@@ -136,17 +136,17 @@ impl From<ConfigError> for UserError {
 
 #[derive(Debug)]
 pub enum GetTransportError {
-    CertError(String),
-    TlsTransportError(TlsInitError),
-    IoError(io::Error),
+    Cert(String),
+    TlsTransport(TlsInitError),
+    Io(io::Error),
 }
 
 impl Error for GetTransportError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            GetTransportError::CertError(_) => None,
-            GetTransportError::TlsTransportError(err) => Some(err),
-            GetTransportError::IoError(err) => Some(err),
+            GetTransportError::Cert(_) => None,
+            GetTransportError::TlsTransport(err) => Some(err),
+            GetTransportError::Io(err) => Some(err),
         }
     }
 }
@@ -154,13 +154,13 @@ impl Error for GetTransportError {
 impl fmt::Display for GetTransportError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            GetTransportError::CertError(msg) => {
+            GetTransportError::Cert(msg) => {
                 write!(f, "unable to retrieve certificate: {}", msg)
             }
-            GetTransportError::TlsTransportError(err) => {
+            GetTransportError::TlsTransport(err) => {
                 write!(f, "unable to create TLS transport: {}", err)
             }
-            GetTransportError::IoError(err) => {
+            GetTransportError::Io(err) => {
                 write!(f, "unable to get transport due to IoError: {}", err)
             }
         }
@@ -169,12 +169,12 @@ impl fmt::Display for GetTransportError {
 
 impl From<TlsInitError> for GetTransportError {
     fn from(tls_error: TlsInitError) -> Self {
-        GetTransportError::TlsTransportError(tls_error)
+        GetTransportError::TlsTransport(tls_error)
     }
 }
 
 impl From<io::Error> for GetTransportError {
     fn from(io_error: io::Error) -> Self {
-        GetTransportError::IoError(io_error)
+        GetTransportError::Io(io_error)
     }
 }
