@@ -34,8 +34,8 @@ impl SetMetadata {
                     .iter()
                     .map(|metadata| match &metadata.value {
                         Value::Single(value) => {
-                            let value = if is_arg_value(&value) {
-                                get_argument_value(&value, &template_arguments)?
+                            let value = if is_arg_value(value) {
+                                get_argument_value(value, template_arguments)?
                             } else {
                                 value.to_string()
                             };
@@ -45,8 +45,8 @@ impl SetMetadata {
                             let processed_values = values
                                 .iter()
                                 .map(|value| {
-                                    let value = if is_arg_value(&value) {
-                                        get_argument_value(&value, &template_arguments)?
+                                    let value = if is_arg_value(value) {
+                                        get_argument_value(value, template_arguments)?
                                     } else {
                                         value.to_string()
                                     };

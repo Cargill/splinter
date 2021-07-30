@@ -75,7 +75,7 @@ pub fn require_header(header_key: &str, request: &HttpRequest) -> Result<String,
 }
 
 pub fn get_authorization_token(request: &HttpRequest) -> Result<String, RequestError> {
-    let auth_header = require_header("Authorization", &request)?;
+    let auth_header = require_header("Authorization", request)?;
     Ok(auth_header
         .split_whitespace()
         .last()

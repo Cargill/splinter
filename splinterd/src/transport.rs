@@ -39,7 +39,7 @@ pub fn build_transport(config: &Config) -> Result<MultiTransport, GetTransportEr
 
     // add tls transport
     if !config.no_tls() {
-        let tls_config = build_tls_config(&config)?;
+        let tls_config = build_tls_config(config)?;
         validate_tls_config(&tls_config)?;
         print_tls_config(&tls_config)?;
 

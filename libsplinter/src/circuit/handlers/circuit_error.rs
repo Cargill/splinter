@@ -77,7 +77,7 @@ impl Handler for CircuitErrorHandler {
                         })?;
 
                     self.routing_table
-                        .get_node(&service.node_id())
+                        .get_node(service.node_id())
                         .map_err(|err| DispatchError::HandleError(err.to_string()))?
                         .ok_or_else(|| {
                             DispatchError::HandleError(format!(

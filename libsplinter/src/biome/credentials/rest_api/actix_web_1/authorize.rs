@@ -31,7 +31,7 @@ pub(crate) fn authorize_user(
     secret_manager: &Arc<dyn SecretManager>,
     validation: &Validation,
 ) -> AuthorizationResult {
-    let token = match get_authorization_token(&request) {
+    let token = match get_authorization_token(request) {
         Ok(token) => match token.splitn(2, ':').nth(1) {
             Some(token) => token.to_string(),
             None => {
@@ -62,7 +62,7 @@ pub(crate) fn validate_claims(
         }
     };
 
-    match decode::<Claims>(&token, secret.as_ref(), validation) {
+    match decode::<Claims>(token, secret.as_ref(), validation) {
         Ok(claims) => AuthorizationResult::Authorized(claims.claims),
         Err(err) => {
             debug!("Invalid token: {}", err);

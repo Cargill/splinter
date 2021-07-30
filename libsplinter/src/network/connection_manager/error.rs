@@ -55,9 +55,7 @@ impl fmt::Display for ConnectionManagerError {
             ConnectionManagerError::HeartbeatError(ref s) => f.write_str(s),
             ConnectionManagerError::SendMessageError(ref s) => f.write_str(s),
             ConnectionManagerError::SendTimeoutError(ref s) => f.write_str(s),
-            ConnectionManagerError::ConnectionCreationError { context, .. } => {
-                f.write_str(&context)
-            }
+            ConnectionManagerError::ConnectionCreationError { context, .. } => f.write_str(context),
             ConnectionManagerError::ConnectionRemovalError(ref s) => f.write_str(s),
             ConnectionManagerError::ConnectionReconnectError(ref s) => f.write_str(s),
             ConnectionManagerError::Unauthorized(ref connection_id) => {

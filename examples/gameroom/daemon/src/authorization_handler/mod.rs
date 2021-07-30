@@ -286,7 +286,7 @@ fn process_admin_event(
             })
         }
         AdminServiceEvent::ProposalVote((msg_proposal, signer_public_key)) => {
-            let proposal = get_pending_proposal_with_circuit_id(&pool, &msg_proposal.circuit_id)?;
+            let proposal = get_pending_proposal_with_circuit_id(pool, &msg_proposal.circuit_id)?;
             let vote = msg_proposal
                 .votes
                 .iter()
@@ -320,7 +320,7 @@ fn process_admin_event(
             })
         }
         AdminServiceEvent::ProposalAccepted((msg_proposal, signer_public_key)) => {
-            let proposal = get_pending_proposal_with_circuit_id(&pool, &msg_proposal.circuit_id)?;
+            let proposal = get_pending_proposal_with_circuit_id(pool, &msg_proposal.circuit_id)?;
             let vote = msg_proposal
                 .votes
                 .iter()
@@ -371,7 +371,7 @@ fn process_admin_event(
             })
         }
         AdminServiceEvent::ProposalRejected((msg_proposal, signer_public_key)) => {
-            let proposal = get_pending_proposal_with_circuit_id(&pool, &msg_proposal.circuit_id)?;
+            let proposal = get_pending_proposal_with_circuit_id(pool, &msg_proposal.circuit_id)?;
             let vote = msg_proposal
                 .votes
                 .iter()
@@ -493,7 +493,7 @@ fn process_admin_event(
                 &msg_proposal.circuit_id,
                 &proposal.requester_node_id,
                 &proposal.requester,
-                &pool,
+                pool,
             )?;
 
             let mut xo_ws = WebSocketClient::new(
@@ -501,7 +501,7 @@ fn process_admin_event(
                     "{}/scabbard/{}/{}/ws/subscribe",
                     url, msg_proposal.circuit_id, service_id
                 ),
-                &authorization,
+                authorization,
                 move |_, event| {
                     if let Err(err) = processor.handle_state_change_event(event) {
                         error!(
@@ -586,7 +586,7 @@ fn resubscribe(
             "{}/scabbard/{}/{}/ws/subscribe{}",
             url, gameroom.circuit_id, gameroom.service_id, query_string,
         ),
-        &authorization,
+        authorization,
         move |_, event| {
             match &processor {
                 Ok(processor) => {
@@ -709,7 +709,7 @@ fn get_pending_proposal_with_circuit_id(
     pool: &ConnectionPool,
     circuit_id: &str,
 ) -> Result<GameroomProposal, AppAuthHandlerError> {
-    helpers::fetch_gameroom_proposal_with_status(&*pool.get()?, &circuit_id, "Pending")?.ok_or_else(
+    helpers::fetch_gameroom_proposal_with_status(&*pool.get()?, circuit_id, "Pending")?.ok_or_else(
         || {
             AppAuthHandlerError::DatabaseError(format!(
                 "Could not find open proposal for circuit: {}",

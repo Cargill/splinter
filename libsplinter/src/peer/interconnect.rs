@@ -406,7 +406,7 @@ where
         // thread
         if let Some(peer_id) = peer_id {
             let mut network_msg: NetworkMessage =
-                match Message::parse_from_bytes(&envelope.payload()) {
+                match Message::parse_from_bytes(envelope.payload()) {
                     Ok(msg) => msg,
                     Err(err) => {
                         error!("Unable to dispatch message: {}", err);
@@ -584,7 +584,7 @@ fn run_pending_recv_loop(
             // the message
             if let Some(peer_id) = peer_id {
                 let mut network_msg: NetworkMessage =
-                    match Message::parse_from_bytes(&pending.envelope.payload()) {
+                    match Message::parse_from_bytes(pending.envelope.payload()) {
                         Ok(msg) => msg,
                         Err(err) => {
                             error!("Unable to dispatch message: {}", err);

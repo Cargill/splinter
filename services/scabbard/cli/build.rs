@@ -117,7 +117,7 @@ fn main() -> Result<(), BuildError> {
 
         if markdown.ends_with(".md") {
             match Command::new("pandoc")
-                .args(&["--standalone", "--to", "man", &markdown, "-o", &manpage])
+                .args(&["--standalone", "--to", "man", markdown, "-o", manpage])
                 .status()
             {
                 Ok(status) => {

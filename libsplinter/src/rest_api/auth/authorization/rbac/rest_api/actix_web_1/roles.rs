@@ -286,7 +286,7 @@ fn update_role(
     role_update: RoleUpdatePayload,
 ) -> Result<(), SendableRoleBasedAuthorizationStoreError> {
     role_based_auth_store
-        .get_role(&role_id)
+        .get_role(role_id)
         .map_err(SendableRoleBasedAuthorizationStoreError::from)
         .and_then(|role_opt| {
             if let Some(role) = role_opt {

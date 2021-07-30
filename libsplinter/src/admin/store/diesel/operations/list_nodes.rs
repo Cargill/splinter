@@ -90,12 +90,12 @@ where
                 #[cfg(feature = "challenge-authorization")]
                 {
                     if let Some(public_key) = &node.public_key {
-                        builder = builder.with_public_key(&public_key);
+                        builder = builder.with_public_key(public_key);
                     }
                 }
 
                 if let Some(endpoints) = node_map.get(&node.node_id) {
-                    builder = builder.with_endpoints(&endpoints);
+                    builder = builder.with_endpoints(endpoints);
                 }
 
                 builder.build()

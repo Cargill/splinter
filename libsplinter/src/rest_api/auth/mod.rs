@@ -82,7 +82,7 @@ fn authorize(
     #[cfg(feature = "authorization")]
     {
         // Get the permission that applies to this request
-        let permission = match permission_map.get_permission(&method, endpoint) {
+        let permission = match permission_map.get_permission(method, endpoint) {
             Some(perm) => perm,
             None => return AuthorizationResult::UnknownEndpoint,
         };

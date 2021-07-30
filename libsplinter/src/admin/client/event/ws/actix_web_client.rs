@@ -419,7 +419,7 @@ impl From<messages::SplinterNode> for CircuitMembers {
             public_key: splinter_node
                 .public_key
                 .as_ref()
-                .map(|public_key| hex::to_hex(&public_key)),
+                .map(|public_key| hex::to_hex(public_key)),
         }
     }
 }

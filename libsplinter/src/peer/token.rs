@@ -65,7 +65,7 @@ impl PeerAuthorizationToken {
     /// Get the ID if the token is trust, else None
     pub fn peer_id(&self) -> Option<&str> {
         match self {
-            PeerAuthorizationToken::Trust { peer_id } => Some(&peer_id),
+            PeerAuthorizationToken::Trust { peer_id } => Some(peer_id),
             #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { .. } => None,
         }

@@ -594,7 +594,7 @@ fn add_peer(
                     if unreferenced_peers
                         .requested_endpoints
                         .contains_key(endpoint)
-                        && endpoints.contains(&endpoint)
+                        && endpoints.contains(endpoint)
                     {
                         info!(
                             "Updating peer {} to include endpoints {:?}",
@@ -692,7 +692,7 @@ fn add_peer(
 
     for endpoint in endpoints.iter() {
         match connector.request_connection(
-            &endpoint,
+            endpoint,
             &connection_id,
             #[cfg(feature = "challenge-authorization")]
             Some(peer_id.clone().into()),
@@ -705,7 +705,7 @@ fn add_peer(
             }
             // If the request_connection errored we will retry in the future
             Err(err) => {
-                log_connect_request_err(err, &peer_id, &endpoint);
+                log_connect_request_err(err, &peer_id, endpoint);
             }
         }
     }
@@ -951,7 +951,7 @@ fn handle_notifications(
                             continue;
                         }
                         match connector.request_connection(
-                            &endpoint,
+                            endpoint,
                             &peer_metadata.connection_id,
                             #[cfg(feature = "challenge-authorization")]
                             Some(peer_metadata.id.clone().into()),
@@ -960,7 +960,7 @@ fn handle_notifications(
                         ) {
                             Ok(()) => break,
                             Err(err) => {
-                                log_connect_request_err(err, &peer_metadata.id, &endpoint);
+                                log_connect_request_err(err, &peer_metadata.id, endpoint);
                             }
                         }
                     }
@@ -1058,7 +1058,7 @@ fn handle_disconnection(
             info!("Attempting to find available endpoint for {}", identity);
             for endpoint in peer_metadata.endpoints.iter() {
                 match connector.request_connection(
-                    &endpoint,
+                    endpoint,
                     &peer_metadata.connection_id,
                     #[cfg(feature = "challenge-authorization")]
                     Some(identity.clone().into()),
@@ -1067,7 +1067,7 @@ fn handle_disconnection(
                 ) {
                     Ok(()) => break,
                     Err(err) => {
-                        log_connect_request_err(err, &peer_metadata.id, &endpoint);
+                        log_connect_request_err(err, &peer_metadata.id, endpoint);
                     }
                 }
             }
@@ -1393,7 +1393,7 @@ fn retry_pending(
         debug!("Attempting to peer with pending peer {}", peer_metadata.id);
         for endpoint in peer_metadata.endpoints.iter() {
             match connector.request_connection(
-                &endpoint,
+                endpoint,
                 &peer_metadata.connection_id,
                 #[cfg(feature = "challenge-authorization")]
                 Some(peer_metadata.id.clone().into()),
@@ -1403,7 +1403,7 @@ fn retry_pending(
                 Ok(()) => peer_metadata.active_endpoint = endpoint.to_string(),
                 // If request_connection errored we will retry in the future
                 Err(err) => {
-                    log_connect_request_err(err, &peer_metadata.id, &endpoint);
+                    log_connect_request_err(err, &peer_metadata.id, endpoint);
                 }
             }
         }
@@ -1428,7 +1428,7 @@ fn retry_pending(
             info!("Attempting to peer with peer by {}", endpoint);
             let connection_id = format!("{}", Uuid::new_v4());
             match connector.request_connection(
-                &requested_endpoint.endpoint,
+                endpoint,
                 &connection_id,
                 #[cfg(feature = "challenge-authorization")]
                 None,

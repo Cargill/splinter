@@ -255,7 +255,7 @@ where
                         .with_circuit_status(&CircuitStatus::from(&model.circuit_status));
 
                     if let Some(display_name) = &model.display_name {
-                        circuit_builder = circuit_builder.with_display_name(&display_name);
+                        circuit_builder = circuit_builder.with_display_name(display_name);
                     }
                     if let Some(members) = circuit_members.get_mut(&model.circuit_id) {
                         members.sort_by_key(|node| node.position);
@@ -267,13 +267,13 @@ where
                                     CircuitNodeBuilder::new().with_node_id(&member.node_id);
 
                                 if let Some(endpoints) = node_map.get(&member.node_id) {
-                                    builder = builder.with_endpoints(&endpoints);
+                                    builder = builder.with_endpoints(endpoints);
                                 }
 
                                 #[cfg(feature = "challenge-authorization")]
                                 {
                                     if let Some(public_key) = &member.public_key {
-                                        builder = builder.with_public_key(&public_key);
+                                        builder = builder.with_public_key(public_key);
                                     }
                                 }
 
@@ -285,7 +285,7 @@ where
                         circuit_builder = circuit_builder.with_members(&circuit_node_members);
                     }
                     if let Some(services) = built_services.get(&model.circuit_id) {
-                        circuit_builder = circuit_builder.with_roster(&services);
+                        circuit_builder = circuit_builder.with_roster(services);
                     }
 
                     ret_circuits.push(
