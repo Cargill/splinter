@@ -34,7 +34,7 @@ where
             .values(&vec![user_model])
             .execute(self.conn)
             .map(|_| ())
-            .map_err(|err| UserStoreError::OperationError {
+            .map_err(|err| UserStoreError::Operation {
                 context: "Failed to add user".to_string(),
                 source: Box::new(err),
             })?;

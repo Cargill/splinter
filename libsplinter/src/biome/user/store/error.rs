@@ -22,37 +22,37 @@ use crate::database::error;
 #[derive(Debug)]
 pub enum UserStoreError {
     /// Represents CRUD operations failures
-    OperationError {
+    Operation {
         context: String,
         source: Box<dyn Error>,
     },
     /// Represents database query failures
-    QueryError {
+    Query {
         context: String,
         source: Box<dyn Error>,
     },
     /// Represents general failures in the database
-    StorageError {
+    Storage {
         context: String,
         source: Option<Box<dyn Error>>,
     },
     /// Represents an issue connecting to the database
-    ConnectionError(Box<dyn Error>),
-    NotFoundError(String),
+    Connection(Box<dyn Error>),
+    NotFound(String),
 }
 
 impl Error for UserStoreError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            UserStoreError::OperationError { source, .. } => Some(&**source),
-            UserStoreError::QueryError { source, .. } => Some(&**source),
-            UserStoreError::StorageError {
+            UserStoreError::Operation { source, .. } => Some(&**source),
+            UserStoreError::Query { source, .. } => Some(&**source),
+            UserStoreError::Storage {
                 source: Some(source),
                 ..
             } => Some(&**source),
-            UserStoreError::StorageError { source: None, .. } => None,
-            UserStoreError::ConnectionError(err) => Some(&**err),
-            UserStoreError::NotFoundError(_) => None,
+            UserStoreError::Storage { source: None, .. } => None,
+            UserStoreError::Connection(err) => Some(&**err),
+            UserStoreError::NotFound(_) => None,
         }
     }
 }
@@ -60,13 +60,13 @@ impl Error for UserStoreError {
 impl fmt::Display for UserStoreError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            UserStoreError::OperationError { context, source } => {
+            UserStoreError::Operation { context, source } => {
                 write!(f, "failed to perform operation: {}: {}", context, source)
             }
-            UserStoreError::QueryError { context, source } => {
+            UserStoreError::Query { context, source } => {
                 write!(f, "failed query: {}: {}", context, source)
             }
-            UserStoreError::StorageError {
+            UserStoreError::Storage {
                 context,
                 source: Some(source),
             } => write!(
@@ -74,14 +74,14 @@ impl fmt::Display for UserStoreError {
                 "the underlying storage returned an error: {}: {}",
                 context, source
             ),
-            UserStoreError::StorageError {
+            UserStoreError::Storage {
                 context,
                 source: None,
             } => write!(f, "the underlying storage returned an error: {}", context),
-            UserStoreError::ConnectionError(err) => {
+            UserStoreError::Connection(err) => {
                 write!(f, "failed to connect to underlying storage: {}", err)
             }
-            UserStoreError::NotFoundError(ref s) => write!(f, "User not found: {}", s),
+            UserStoreError::NotFound(ref s) => write!(f, "User not found: {}", s),
         }
     }
 }
@@ -89,6 +89,6 @@ impl fmt::Display for UserStoreError {
 #[cfg(feature = "diesel")]
 impl From<error::ConnectionError> for UserStoreError {
     fn from(err: error::ConnectionError) -> UserStoreError {
-        UserStoreError::ConnectionError(Box::new(err))
+        UserStoreError::Connection(Box::new(err))
     }
 }

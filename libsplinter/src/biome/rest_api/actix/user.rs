@@ -321,7 +321,7 @@ fn add_delete_user_method(
                 .json(json!({ "message": "User deleted sucessfully" }))
                 .into_future(),
             Err(err) => match err {
-                UserStoreError::NotFoundError(msg) => {
+                UserStoreError::NotFound(msg) => {
                     debug!("User not found: {}", msg);
                     HttpResponse::NotFound()
                         .json(ErrorResponse::not_found(&format!(

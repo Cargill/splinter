@@ -37,13 +37,11 @@ where
             .first::<UserModel>(self.conn)
             .map(Some)
             .or_else(|err| if err == NotFound { Ok(None) } else { Err(err) })
-            .map_err(|err| UserStoreError::OperationError {
+            .map_err(|err| UserStoreError::Operation {
                 context: "Failed to fetch user".to_string(),
                 source: Box::new(err),
             })?
-            .ok_or_else(|| {
-                UserStoreError::NotFoundError(format!("Failed to find user: {}", user_id))
-            })?;
+            .ok_or_else(|| UserStoreError::NotFound(format!("Failed to find user: {}", user_id)))?;
         Ok(User::from(user))
     }
 }

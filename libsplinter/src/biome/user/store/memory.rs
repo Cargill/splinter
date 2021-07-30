@@ -47,32 +47,26 @@ impl MemoryUserStore {
 
 impl UserStore for MemoryUserStore {
     fn add_user(&self, user: User) -> Result<(), UserStoreError> {
-        let mut inner = self
-            .inner
-            .lock()
-            .map_err(|_| UserStoreError::StorageError {
-                context: "Cannot access user store: mutex lock poisoned".to_string(),
-                source: None,
-            })?;
+        let mut inner = self.inner.lock().map_err(|_| UserStoreError::Storage {
+            context: "Cannot access user store: mutex lock poisoned".to_string(),
+            source: None,
+        })?;
 
         inner.insert(user.id(), user);
         Ok(())
     }
 
     fn update_user(&self, updated_user: User) -> Result<(), UserStoreError> {
-        let mut inner = self
-            .inner
-            .lock()
-            .map_err(|_| UserStoreError::StorageError {
-                context: "Cannot access user store: mutex lock poisoned".to_string(),
-                source: None,
-            })?;
+        let mut inner = self.inner.lock().map_err(|_| UserStoreError::Storage {
+            context: "Cannot access user store: mutex lock poisoned".to_string(),
+            source: None,
+        })?;
 
         if inner.contains_key(&updated_user.id()) {
             inner.insert(updated_user.id(), updated_user);
             Ok(())
         } else {
-            Err(UserStoreError::NotFoundError(format!(
+            Err(UserStoreError::NotFound(format!(
                 "User {} not found.",
                 updated_user.id()
             )))
@@ -80,59 +74,44 @@ impl UserStore for MemoryUserStore {
     }
 
     fn remove_user(&self, id: &str) -> Result<(), UserStoreError> {
-        let mut inner = self
-            .inner
-            .lock()
-            .map_err(|_| UserStoreError::StorageError {
-                context: "Cannot access user store: mutex lock poisoned".to_string(),
-                source: None,
-            })?;
+        let mut inner = self.inner.lock().map_err(|_| UserStoreError::Storage {
+            context: "Cannot access user store: mutex lock poisoned".to_string(),
+            source: None,
+        })?;
 
         if inner.remove(id).is_some() {
             #[cfg(feature = "biome-credentials")]
             self.credentials_store
                 .remove_credentials(id)
-                .map_err(|err| UserStoreError::QueryError {
+                .map_err(|err| UserStoreError::Query {
                     context: format!("Cannot delete user {} from credentials store", id),
                     source: Box::new(err),
                 })?;
 
             Ok(())
         } else {
-            Err(UserStoreError::NotFoundError(format!(
-                "User {} not found.",
-                id
-            )))
+            Err(UserStoreError::NotFound(format!("User {} not found.", id)))
         }
     }
 
     fn fetch_user(&self, id: &str) -> Result<User, UserStoreError> {
-        let inner = self
-            .inner
-            .lock()
-            .map_err(|_| UserStoreError::StorageError {
-                context: "Cannot access user store: mutex lock poisoned".to_string(),
-                source: None,
-            })?;
+        let inner = self.inner.lock().map_err(|_| UserStoreError::Storage {
+            context: "Cannot access user store: mutex lock poisoned".to_string(),
+            source: None,
+        })?;
 
         if let Some(user) = inner.get(id) {
             Ok(user.clone())
         } else {
-            Err(UserStoreError::NotFoundError(format!(
-                "User {} not found.",
-                id
-            )))
+            Err(UserStoreError::NotFound(format!("User {} not found.", id)))
         }
     }
 
     fn list_users(&self) -> Result<Vec<User>, UserStoreError> {
-        let inner = self
-            .inner
-            .lock()
-            .map_err(|_| UserStoreError::StorageError {
-                context: "Cannot access user store: mutex lock poisoned".to_string(),
-                source: None,
-            })?;
+        let inner = self.inner.lock().map_err(|_| UserStoreError::Storage {
+            context: "Cannot access user store: mutex lock poisoned".to_string(),
+            source: None,
+        })?;
 
         Ok(inner.iter().map(|(_, v)| v.clone()).collect())
     }

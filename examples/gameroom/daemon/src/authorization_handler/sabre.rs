@@ -91,7 +91,7 @@ pub fn setup_xo(
             protocol::SCABBARD_PROTOCOL_VERSION.to_string(),
         )
         .body(Body::wrap_stream(body_stream))
-        .map_err(|err| AppAuthHandlerError::BatchSubmitError(format!("{}", err)))?;
+        .map_err(|err| AppAuthHandlerError::BatchSubmit(format!("{}", err)))?;
 
     let client = Client::new();
 
@@ -106,7 +106,7 @@ pub fn setup_xo(
                         .concat2()
                         .wait()
                         .map_err(|err| {
-                            AppAuthHandlerError::BatchSubmitError(format!(
+                            AppAuthHandlerError::BatchSubmit(format!(
                                 "The client encountered an error {}",
                                 err
                             ))
@@ -115,14 +115,14 @@ pub fn setup_xo(
 
                     match status {
                         StatusCode::ACCEPTED => Ok(()),
-                        _ => Err(AppAuthHandlerError::BatchSubmitError(format!(
+                        _ => Err(AppAuthHandlerError::BatchSubmit(format!(
                             "The server returned an error. Status: {}, {}",
                             status,
                             String::from_utf8(body)?
                         ))),
                     }
                 }
-                Err(err) => Err(AppAuthHandlerError::BatchSubmitError(format!(
+                Err(err) => Err(AppAuthHandlerError::BatchSubmit(format!(
                     "The client encountered an error {}",
                     err
                 ))),
@@ -151,13 +151,12 @@ fn create_contract_registry_txn(
 
 fn upload_contract_txn(signer: &dyn Signer) -> Result<Transaction, AppAuthHandlerError> {
     let contract_path = Path::new(XO_CONTRACT_PATH);
-    let contract_file = File::open(contract_path).map_err(|err| {
-        AppAuthHandlerError::SabreError(format!("Failed to load contract: {}", err))
-    })?;
+    let contract_file = File::open(contract_path)
+        .map_err(|err| AppAuthHandlerError::Sabre(format!("Failed to load contract: {}", err)))?;
     let mut buf_reader = BufReader::new(contract_file);
     let mut contract = Vec::new();
     buf_reader.read_to_end(&mut contract).map_err(|err| {
-        AppAuthHandlerError::SabreError(format!("IoError while reading contract: {}", err))
+        AppAuthHandlerError::Sabre(format!("IoError while reading contract: {}", err))
     })?;
 
     let action_addresses = vec![XO_PREFIX.into()];

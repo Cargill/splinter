@@ -37,12 +37,12 @@ where
             .load::<UserModel>(self.conn)
             .map(Some)
             .or_else(|err| if err == NotFound { Ok(None) } else { Err(err) })
-            .map_err(|err| UserStoreError::OperationError {
+            .map_err(|err| UserStoreError::Operation {
                 context: "Failed to get users".to_string(),
                 source: Box::new(err),
             })?
             .ok_or_else(|| {
-                UserStoreError::NotFoundError("Could not get all users from storage".to_string())
+                UserStoreError::NotFound("Could not get all users from storage".to_string())
             })?
             .into_iter()
             .map(User::from)

@@ -17,6 +17,7 @@
 use std::{error, fmt};
 
 /// Errors that could be raised by the `PeerManager`
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, PartialEq)]
 pub enum PeerManagerError {
     /// `PeerManager` start up failed
@@ -37,6 +38,7 @@ impl fmt::Display for PeerManagerError {
 }
 
 /// Errors that could be raised when requesting a peer is added
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, PartialEq)]
 pub enum PeerRefAddError {
     /// Internal `PeerManager` error
@@ -62,6 +64,7 @@ impl fmt::Display for PeerRefAddError {
 }
 
 /// Errors that could be raised when requesting a peer is added without a peer ID
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, PartialEq)]
 pub enum PeerUnknownAddError {
     /// Internal `PeerManager` error
@@ -94,11 +97,11 @@ impl fmt::Display for PeerUnknownAddError {
 #[derive(Debug, PartialEq)]
 pub enum PeerRefRemoveError {
     /// Internal `PeerManager` error
-    InternalError(String),
+    Internal(String),
     /// Unable to receive response
-    ReceiveError(String),
+    Receive(String),
     /// Unable to remove requested peer
-    RemoveError(String),
+    Remove(String),
 }
 
 impl error::Error for PeerRefRemoveError {}
@@ -106,11 +109,11 @@ impl error::Error for PeerRefRemoveError {}
 impl fmt::Display for PeerRefRemoveError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            PeerRefRemoveError::InternalError(msg) => write!(f, "Received internal error: {}", msg),
-            PeerRefRemoveError::ReceiveError(msg) => {
+            PeerRefRemoveError::Internal(msg) => write!(f, "Received internal error: {}", msg),
+            PeerRefRemoveError::Receive(msg) => {
                 write!(f, "Unable to receive response from PeerManager: {}", msg)
             }
-            PeerRefRemoveError::RemoveError(msg) => write!(f, "Unable to remove peer: {}", msg),
+            PeerRefRemoveError::Remove(msg) => write!(f, "Unable to remove peer: {}", msg),
         }
     }
 }
@@ -119,11 +122,11 @@ impl fmt::Display for PeerRefRemoveError {
 #[derive(Debug, PartialEq)]
 pub enum PeerListError {
     /// Internal `PeerManager`error
-    InternalError(String),
+    Internal(String),
     /// Unable to receive response
-    ReceiveError(String),
+    Receive(String),
     /// Unable to get current list of peers
-    ListError(String),
+    List(String),
 }
 
 impl error::Error for PeerListError {}
@@ -131,16 +134,17 @@ impl error::Error for PeerListError {}
 impl fmt::Display for PeerListError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            PeerListError::InternalError(msg) => write!(f, "Received internal error: {}", msg),
-            PeerListError::ReceiveError(msg) => {
+            PeerListError::Internal(msg) => write!(f, "Received internal error: {}", msg),
+            PeerListError::Receive(msg) => {
                 write!(f, "Unable to receive response from PeerManager: {}", msg)
             }
-            PeerListError::ListError(msg) => write!(f, "Unable to list peers: {}", msg),
+            PeerListError::List(msg) => write!(f, "Unable to list peers: {}", msg),
         }
     }
 }
 
 /// Errors that could be raised when requesting a peer's connection ID
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, PartialEq)]
 pub enum PeerConnectionIdError {
     /// Internal `PeerManager` error
