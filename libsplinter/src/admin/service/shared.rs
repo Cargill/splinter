@@ -371,7 +371,7 @@ impl AdminServiceShared {
                         let circuit = circuit_proposal.get_circuit_proposal();
                         self.update_splinter_state(circuit)?;
                         // remove approved proposal
-                        self.remove_proposal(&circuit_id)?;
+                        self.remove_proposal(circuit_id)?;
                         // send message about circuit acceptance
 
                         let circuit_proposal_proto =
@@ -447,7 +447,7 @@ impl AdminServiceShared {
                     }
                     Ok(CircuitProposalStatus::Rejected) => {
                         // remove circuit
-                        let proposal = self.remove_proposal(&circuit_id)?;
+                        let proposal = self.remove_proposal(circuit_id)?;
                         if let Some(proposal) = proposal {
                             for member in proposal.get_circuit_proposal().members.iter() {
                                 self.remove_peer_ref(member.get_node_id());
@@ -1002,7 +1002,7 @@ impl AdminServiceShared {
         };
 
         self.event_subscribers
-            .broadcast_by_type(&circuit_management_type, &event, &ts);
+            .broadcast_by_type(circuit_management_type, &event, &ts);
     }
 
     pub fn remove_all_event_subscribers(&mut self) {
@@ -1532,7 +1532,7 @@ impl AdminServiceShared {
 
             #[cfg(feature = "service-arg-validation")]
             {
-                self.validate_service_args(&service)?;
+                self.validate_service_args(service)?;
             }
         }
 
@@ -1861,7 +1861,7 @@ impl AdminServiceShared {
             );
 
             let allowed_node = &service.allowed_nodes()[0];
-            if let Some(member) = self.splinter_state.node(&allowed_node)? {
+            if let Some(member) = self.splinter_state.node(allowed_node)? {
                 let service = Service::new(service.service_id().to_string(), None, member.clone());
                 self.splinter_state.add_service(unique_id, service)?;
             } else {
@@ -1886,7 +1886,7 @@ impl AdminServiceShared {
                 let unique_id = ServiceId::new(id.to_string(), service.service_id().to_string());
 
                 let allowed_node = &service.allowed_nodes()[0];
-                if let Some(member) = self.splinter_state.node(&allowed_node)? {
+                if let Some(member) = self.splinter_state.node(allowed_node)? {
                     // rebuild Node with id
                     let node =
                         StateNode::new(allowed_node.to_string(), member.endpoints().to_vec());
@@ -1914,7 +1914,7 @@ impl AdminServiceShared {
 
         self.signature_verifier
             .verify(
-                &payload.get_header(),
+                payload.get_header(),
                 &Signature::new(signature),
                 &PublicKey::new(public_key),
             )

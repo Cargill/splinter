@@ -91,14 +91,14 @@ impl fmt::Display for UserError {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
-                    f.write_str(&context)
+                    f.write_str(context)
                 }
             }
             UserError::DaemonError { context, source } => {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
-                    f.write_str(&context)
+                    f.write_str(context)
                 }
             }
         }

@@ -361,9 +361,8 @@ pub fn run_incoming_loop(
         // the message, otherwise it will be sent to the inbound thread
         match msg.get_message_type() {
             NetworkMessageType::CIRCUIT => {
-                let mut circuit_msg: CircuitMessage =
-                    protobuf::parse_from_bytes(&msg.get_payload())
-                        .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
+                let mut circuit_msg: CircuitMessage = protobuf::parse_from_bytes(msg.get_payload())
+                    .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
 
                 match circuit_msg.get_message_type() {
                     CircuitMessageType::ADMIN_DIRECT_MESSAGE => {

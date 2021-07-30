@@ -298,7 +298,7 @@ where
         // If we have the service, pass message to dispatcher, else print error
         if let Some(service_id) = service_id {
             let mut component_msg: ComponentMessage =
-                match protobuf::parse_from_bytes(&envelope.payload()) {
+                match protobuf::parse_from_bytes(envelope.payload()) {
                     Ok(msg) => msg,
                     Err(err) => {
                         error!("Unable to dispatch message: {}", err);

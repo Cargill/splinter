@@ -99,7 +99,7 @@ pub async fn login(
                 Some(value) => value.as_str().unwrap_or("Request was malformed."),
                 None => "Request malformed.",
             };
-            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)));
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(message)));
         }
         StatusCode::UNAUTHORIZED => {
             let body = login_response.body().await?;
@@ -108,7 +108,7 @@ pub async fn login(
                 Some(value) => value.as_str().unwrap_or("Unauthorized user"),
                 None => "Unauthorized user",
             };
-            return Ok(HttpResponse::Unauthorized().json(ErrorResponse::unauthorized(&message)));
+            return Ok(HttpResponse::Unauthorized().json(ErrorResponse::unauthorized(message)));
         }
         _ => {
             error!(
@@ -149,7 +149,7 @@ pub async fn login(
                 Some(value) => value.as_str().unwrap_or("Request was malformed."),
                 None => "Request malformed.",
             };
-            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)));
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(message)));
         }
         _ => {
             error!(
@@ -208,7 +208,7 @@ pub async fn register(
                 Some(value) => value.as_str().unwrap_or("Request was malformed."),
                 None => "Request malformed.",
             };
-            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)));
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(message)));
         }
         _ => {
             error!(
@@ -237,7 +237,7 @@ pub async fn register(
                 Some(value) => value.as_str().unwrap_or("Request was malformed."),
                 None => "Request malformed.",
             };
-            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)));
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(message)));
         }
         _ => {
             error!(

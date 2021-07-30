@@ -71,7 +71,7 @@ impl fmt::Display for AdminServiceError {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
-                    f.write_str(&context)
+                    f.write_str(context)
                 }
             }
         }
@@ -215,7 +215,7 @@ impl fmt::Display for AdminSharedError {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
-                    f.write_str(&context)
+                    f.write_str(context)
                 }
             }
             AdminSharedError::ServiceSendError(err) => {

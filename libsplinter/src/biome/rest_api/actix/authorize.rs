@@ -28,7 +28,7 @@ pub(crate) fn authorize_user(
     secret_manager: &Arc<dyn SecretManager>,
     validation: &Validation,
 ) -> AuthorizationResult {
-    let token = match get_authorization_token(&request) {
+    let token = match get_authorization_token(request) {
         Ok(token) => token,
         Err(err) => {
             debug!("Failed to get token: {}", err);
@@ -52,7 +52,7 @@ pub(crate) fn validate_claims(
         }
     };
 
-    match decode::<Claims>(&token, secret.as_ref(), validation) {
+    match decode::<Claims>(token, secret.as_ref(), validation) {
         Ok(claims) => AuthorizationResult::Authorized(claims.claims),
         Err(err) => {
             debug!("Invalid token: {}", err);

@@ -31,8 +31,8 @@ impl SetMetadata {
                     .iter()
                     .map(|metadata| match &metadata.value {
                         Value::Single(value) => {
-                            let value = if is_arg(&value) {
-                                get_argument_value(&value, &template_arguments)?
+                            let value = if is_arg(value) {
+                                get_argument_value(value, template_arguments)?
                             } else {
                                 value.to_string()
                             };
@@ -42,8 +42,8 @@ impl SetMetadata {
                             let processed_values = values
                                 .iter()
                                 .map(|value| {
-                                    let value = if is_arg(&value) {
-                                        get_argument_value(&value, &template_arguments)?
+                                    let value = if is_arg(value) {
+                                        get_argument_value(value, template_arguments)?
                                     } else {
                                         value.to_string()
                                     };
@@ -62,7 +62,7 @@ impl SetMetadata {
 
                 let json_metadata = format!("{{{}}}", metadata.join(","));
 
-                Ok(builder.with_application_metadata(&json_metadata.as_bytes()))
+                Ok(builder.with_application_metadata(json_metadata.as_bytes()))
             }
         }
     }

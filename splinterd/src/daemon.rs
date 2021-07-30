@@ -470,7 +470,7 @@ impl SplinterDaemon {
                         "biome was enabled but the builder failed to require the db URL".into(),
                     )
                 })?;
-                let biome_resources = build_biome_routes(&db_url)?;
+                let biome_resources = build_biome_routes(db_url)?;
                 rest_api_builder = rest_api_builder.add_resources(biome_resources.resources());
             }
         }

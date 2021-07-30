@@ -334,7 +334,7 @@ fn is_match(service_id_match: &str, service_id: &str) -> bool {
 
 fn make_splinter_node(node_id: &str, endpoints: &[String]) -> Result<SplinterNode, CliError> {
     let node = SplinterNodeBuilder::new()
-        .with_node_id(&node_id)
+        .with_node_id(node_id)
         .with_endpoints(endpoints)
         .build()
         .map_err(|err| {

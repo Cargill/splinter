@@ -134,7 +134,7 @@ impl Action for CircuitProposeAction {
                     json_string.pop();
                     json_string.push('}');
 
-                    builder.set_application_metadata(&json_string.as_bytes());
+                    builder.set_application_metadata(json_string.as_bytes());
                 }
                 _ => {
                     return Err(CliError::ActionError(format!(

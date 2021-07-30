@@ -605,7 +605,7 @@ fn add_peer(
                     // if peer was added by endpoint, its peer metadata should be updated to
                     // include the full list of endpoints in this request
                     if unreferenced_peers.requested_endpoints.contains(endpoint)
-                        && endpoints.contains(&endpoint)
+                        && endpoints.contains(endpoint)
                     {
                         info!(
                             "Updating peer {} to include endpoints {:?}",
@@ -699,14 +699,14 @@ fn add_peer(
     };
 
     for endpoint in endpoints.iter() {
-        match connector.request_connection(&endpoint, &connection_id) {
+        match connector.request_connection(endpoint, &connection_id) {
             Ok(()) => {
                 active_endpoint = endpoint.to_string();
                 break;
             }
             // If the request_connection errored we will retry in the future
             Err(err) => {
-                log_connect_request_err(err, &peer_id, &endpoint);
+                log_connect_request_err(err, &peer_id, endpoint);
             }
         }
     }
@@ -936,11 +936,10 @@ fn handle_notifications(
                         if endpoint == &peer_metadata.active_endpoint {
                             continue;
                         }
-                        match connector.request_connection(&endpoint, &peer_metadata.connection_id)
-                        {
+                        match connector.request_connection(endpoint, &peer_metadata.connection_id) {
                             Ok(()) => break,
                             Err(err) => {
-                                log_connect_request_err(err, &peer_metadata.id, &endpoint);
+                                log_connect_request_err(err, &peer_metadata.id, endpoint);
                             }
                         }
                     }
@@ -1039,10 +1038,10 @@ fn handle_disconnection(
 
             info!("Attempting to find available endpoint for {}", identity);
             for endpoint in peer_metadata.endpoints.iter() {
-                match connector.request_connection(&endpoint, &peer_metadata.connection_id) {
+                match connector.request_connection(endpoint, &peer_metadata.connection_id) {
                     Ok(()) => break,
                     Err(err) => {
-                        log_connect_request_err(err, &peer_metadata.id, &endpoint);
+                        log_connect_request_err(err, &peer_metadata.id, endpoint);
                     }
                 }
             }
@@ -1363,11 +1362,11 @@ fn retry_pending(
     for mut peer_metadata in to_retry {
         debug!("Attempting to peer with pending peer {}", peer_metadata.id);
         for endpoint in peer_metadata.endpoints.iter() {
-            match connector.request_connection(&endpoint, &peer_metadata.connection_id) {
+            match connector.request_connection(endpoint, &peer_metadata.connection_id) {
                 Ok(()) => peer_metadata.active_endpoint = endpoint.to_string(),
                 // If request_connection errored we will retry in the future
                 Err(err) => {
-                    log_connect_request_err(err, &peer_metadata.id, &endpoint);
+                    log_connect_request_err(err, &peer_metadata.id, endpoint);
                 }
             }
         }
@@ -1391,7 +1390,7 @@ fn retry_pending(
             }
             info!("Attempting to peer with peer by {}", endpoint);
             let connection_id = format!("{}", Uuid::new_v4());
-            match connector.request_connection(&endpoint, &connection_id) {
+            match connector.request_connection(endpoint, &connection_id) {
                 Ok(()) => (),
                 // If request_connection errored we will retry in the future
                 Err(err) => match err {

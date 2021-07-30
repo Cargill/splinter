@@ -137,7 +137,7 @@ impl KeyStore for MemoryKeyStore {
 
         let creds = self
             .credentials_store
-            .fetch_credential_by_user_id(&user_id)
+            .fetch_credential_by_user_id(user_id)
             .map_err(|err| KeyStoreError::QueryError {
                 context: "Cannot find user in credentials store".to_string(),
                 source: Box::new(err),

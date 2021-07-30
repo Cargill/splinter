@@ -59,7 +59,7 @@ pub async fn submit_signed_payload(
                 Some(value) => value.as_str().unwrap_or("Request malformed."),
                 None => "Request malformed.",
             };
-            Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)))
+            Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(message)))
         }
         _ => {
             debug!(
@@ -151,7 +151,7 @@ pub async fn submit_scabbard_payload(
                 None => "Request malformed.",
             };
 
-            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)));
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(message)));
         }
         _ => {
             let body_value: serde_json::Value = serde_json::from_slice(&body)?;
@@ -227,7 +227,7 @@ fn fetch_service_id_for_gameroom_service_from_db(
 }
 
 fn parse_link(response_bytes: &[u8]) -> Result<String, RestApiResponseError> {
-    let mut response_value: HashMap<String, String> = serde_json::from_slice(&response_bytes)
+    let mut response_value: HashMap<String, String> = serde_json::from_slice(response_bytes)
         .map_err(|err| {
             RestApiResponseError::InternalError(format!(
                 "Failed to parse batches_ids from splinterd response {}",

@@ -149,7 +149,7 @@ impl std::fmt::Display for ServiceAddInstanceError {
             ServiceAddInstanceError::InternalError {
                 context,
                 source: None,
-            } => f.write_str(&context),
+            } => f.write_str(context),
         }
     }
 }
@@ -199,7 +199,7 @@ impl std::fmt::Display for ServiceRemoveInstanceError {
             ServiceRemoveInstanceError::InternalError {
                 context,
                 source: None,
-            } => f.write_str(&context),
+            } => f.write_str(context),
         }
     }
 }
