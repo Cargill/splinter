@@ -52,6 +52,7 @@ pub struct Node {
     pub(super) network_subsystem: network::NetworkSubsystem,
     pub(super) node_id: String,
     pub(super) admin_service_event_client: Box<dyn AdminServiceEventClient>,
+    pub(super) signers: Vec<Box<dyn cylinder::Signer>>,
 }
 
 impl Node {
@@ -65,6 +66,10 @@ impl Node {
 
     pub fn admin_signer(&self) -> &dyn Signer {
         &*self.admin_signer
+    }
+
+    pub fn signers(&self) -> &[Box<dyn Signer>] {
+        &self.signers
     }
 
     pub fn registry_writer(&self) -> &dyn RegistryWriter {
@@ -123,6 +128,7 @@ impl Node {
             rest_api_port,
             mut network_subsystem,
             admin_service_event_client: _,
+            signers,
         } = self;
 
         let rest_api_variant = match rest_api_variant {
@@ -160,6 +166,7 @@ impl Node {
             .with_node_id(node_id)
             .with_rest_api_variant(rest_api_variant)
             .with_admin_signer(admin_signer.to_owned())
+            .with_signers(signers)
             .with_rest_api_port(rest_api_port.into())
             .with_store_factory(store_factory)
             .build()
