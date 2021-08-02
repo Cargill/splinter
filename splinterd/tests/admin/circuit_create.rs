@@ -15,9 +15,12 @@
 //! Integration tests for the creation of a circuit between multiple nodes.
 
 use std::collections::HashMap;
+use std::sync::mpsc;
+use std::time::Duration;
 
 use splinter::admin::client::event::{EventType, PublicKey};
 use splinter::admin::messages::AuthorizationType;
+use splinter::peer::{PeerAuthorizationToken, PeerManagerNotification};
 use splinterd::node::{Node, RestApiVariant};
 
 use crate::admin::circuit_commit::{commit_2_party_circuit, commit_3_party_circuit};
@@ -55,14 +58,10 @@ pub fn test_2_party_circuit_creation() {
 
 /// Test that a 2-party circuit may be created on a 2-node network using challenge authorization.
 ///
-/// 1. Create and submit a `CircuitCreateRequest` from the first node
-/// 2. Wait until the proposal is available to the second node, using `list_proposals`
-/// 3. Verify the same proposal is available on each node
-/// 4. Submit the same `CircuitCreateRequest` created in the first step from the second node
-/// 5. Validate the duplicate proposal submitted in the previous step results in an error
-/// 6. Create and submit a `CircuitProposalVote` from the second node to accept the proposal
-/// 7. Wait until the circuit is available on the first node, using `list_circuits`
-/// 8. Verify the same circuit is available to each node
+/// 1. Start a two node network and get both nodes.
+/// 2. Use commit_2_party_circuit to verify that a circuit can be created between the two nodes
+///    using challenge authorization.
+/// 3. Shutdown the network
 #[test]
 pub fn test_2_party_circuit_creation_challenge_authorization() {
     // Start a 2-node network
@@ -74,6 +73,75 @@ pub fn test_2_party_circuit_creation_challenge_authorization() {
     let node_a = network.node(0).expect("Unable to get first node");
     // Get the second node in the network
     let node_b = network.node(1).expect("Unable to get second node");
+
+    let circuit_id = "ABCDE-01234";
+
+    commit_2_party_circuit(circuit_id, node_a, node_b, AuthorizationType::Challenge);
+
+    shutdown!(network).expect("Unable to shutdown network");
+}
+
+/// Test that a 2-party circuit may be created on a 2-node network using challenge authorization
+/// after the nodes have already connected via endpoints.
+///
+/// 1. Add node_b as an unidentified peer on node_a
+/// 2. Wait for node_a to get connection notification of node_b.
+/// 3. Use commit_2_party_circuit to verify that a circuit can be created between the two nodes
+///    using challenge authorization.
+/// 4. Shutdown the network.
+#[test]
+pub fn test_2_party_circuit_creation_challenge_authorization_unidentified_peer() {
+    // Start a 2-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .add_nodes_with_defaults(2)
+        .expect("Unable to start 2-node ActixWeb1 network");
+    // Get the first node in the network
+    let node_a = network.node(0).expect("Unable to get first node");
+
+    // Get the second node in the network
+    let node_b = network.node(1).expect("Unable to get second node");
+
+    let peer_connector = node_a.peer_connector();
+    let (tx, notification_rx): (mpsc::Sender<TestEnum>, mpsc::Receiver<TestEnum>) = mpsc::channel();
+    peer_connector
+        .subscribe_sender(tx)
+        .expect("Unable to get subscriber");
+
+    let _peer_ref = peer_connector
+        .add_unidentified_peer(
+            node_b.network_endpoints()[0].to_string(),
+            PeerAuthorizationToken::from_public_key(
+                node_a
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
+                    .public_key()
+                    .expect("Unable to get first node's public key")
+                    .as_slice(),
+            ),
+        )
+        .expect("Unable to request connection to peer by endpoint");
+
+    // timeout after 60 seconds
+    let timeout = Duration::from_secs(60);
+    let notification = notification_rx
+        .recv_timeout(timeout)
+        .expect("Unable to get new notifications");
+    assert_eq!(
+        notification,
+        TestEnum::Notification(PeerManagerNotification::Connected {
+            peer: PeerAuthorizationToken::from_public_key(
+                node_b
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
+                    .public_key()
+                    .expect("Unable to get first node's public key")
+                    .as_slice(),
+            )
+        })
+    );
 
     let circuit_id = "ABCDE-01234";
 
@@ -113,7 +181,39 @@ pub fn test_3_party_circuit_creation() {
     let node_c = network.node(2).expect("Unable to get third node");
 
     let circuit_id = "ABCDE-01234";
-    commit_3_party_circuit(circuit_id, node_a, node_b, node_c);
+    commit_3_party_circuit(circuit_id, node_a, node_b, node_c, AuthorizationType::Trust);
+
+    shutdown!(network).expect("Unable to shutdown network");
+}
+
+/// Test that a 3-party circuit may be created on a 3-node network using challenge authorization.
+///
+/// 1. Create a 3 node network and get each node.
+/// 2. Use commit_3_party_circuit to verify that a circuit can be created between the three nodes
+///    using challenge authorization.
+/// 3. Shutdown the network.
+#[test]
+pub fn test_3_party_circuit_creation_challenge_authorization() {
+    // Start a 3-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .add_nodes_with_defaults(3)
+        .expect("Unable to start 3-node ActixWeb1 network");
+    // Get the first node in the network
+    let node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node in the network
+    let node_b = network.node(1).expect("Unable to get second node");
+    // Get the third node in the network
+    let node_c = network.node(2).expect("Unable to get third node");
+
+    let circuit_id = "ABCDE-01234";
+    commit_3_party_circuit(
+        circuit_id,
+        node_a,
+        node_b,
+        node_c,
+        AuthorizationType::Challenge,
+    );
 
     shutdown!(network).expect("Unable to shutdown network");
 }
@@ -1380,4 +1480,15 @@ fn admin_pubkey(node: &Node) -> PublicKey {
             .as_slice()
             .to_vec(),
     )
+}
+
+#[derive(PartialEq, Debug)]
+enum TestEnum {
+    Notification(PeerManagerNotification),
+}
+/// Converts `PeerManagerNotification` into `Test_Enum::Notification(PeerManagerNotification)`
+impl From<PeerManagerNotification> for TestEnum {
+    fn from(notification: PeerManagerNotification) -> Self {
+        TestEnum::Notification(notification)
+    }
 }
