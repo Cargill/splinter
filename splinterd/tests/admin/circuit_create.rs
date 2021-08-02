@@ -150,6 +150,196 @@ pub fn test_2_party_circuit_creation_challenge_authorization_unidentified_peer()
     shutdown!(network).expect("Unable to shutdown network");
 }
 
+/// Test that two 2-party circuit may be created on a 2-node network using challenge authorization,
+/// where the second circuit has a different key for the first node defined in the circuit.
+///
+/// 1. Create and submit a `CircuitCreateRequest` from the first node
+/// 2. Wait for the `ProposalSubmitted` event from each node's event client
+/// 3. Verify the same proposal is available on each node
+/// 4. Submit the same `CircuitCreateRequest` created in the first step from the second node
+/// 5. Validate the duplicate proposal submitted in the previous step results in an error
+/// 6. Create and submit a `CircuitProposalVote` from the second node to accept the proposal
+/// 7. Wait for the `CircuitReady` event from each node's event client
+/// 8. Verify the same circuit is available to each node
+/// 9. Repeat steps 1-8 for a different circuit that sets the member public keys to the nodes
+///    second configured key.
+#[test]
+#[ignore]
+pub fn test_2_party_circuit_creation_challenge_authorization_different_keys() {
+    // Start a 2-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .set_num_of_keys(2)
+        .add_nodes_with_defaults(2)
+        .expect("Unable to start 2-node ActixWeb1 network");
+    // Get the first node in the network
+    let node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node in the network
+    let node_b = network.node(1).expect("Unable to get second node");
+
+    let first_circuit_id = "ABCDE-01234";
+
+    commit_2_party_circuit(
+        first_circuit_id,
+        node_a,
+        node_b,
+        AuthorizationType::Challenge,
+    );
+
+    let second_circuit_id = "ABCDE-56789";
+    // Get the first node in the network
+    let node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node in the network
+    let node_b = network.node(1).expect("Unable to get second node");
+
+    // Create the list of node details needed to build the `CircuitCreateRequest`
+    let node_info = vec![
+        (
+            node_a.node_id().to_string(),
+            (
+                node_a.network_endpoints().to_vec(),
+                // get the second signer (not the admin signer which is in the first position)
+                node_a
+                    .signers()
+                    .get(1)
+                    .expect("node does not have enough signers configured")
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
+        ),
+        (
+            node_b.node_id().to_string(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .admin_signer()
+                    .public_key()
+                    .expect("Unable to get seconds node's public key"),
+            ),
+        ),
+    ]
+    .into_iter()
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
+
+    let node_b_admin_pubkey = admin_pubkey(node_b);
+
+    let node_a_event_client = node_a
+        .admin_service_event_client(&format!("test_circuit_{}", &second_circuit_id), None)
+        .expect("Unable to get event client");
+    let node_b_event_client = node_b
+        .admin_service_event_client(&format!("test_circuit_{}", &second_circuit_id), None)
+        .expect("Unable to get event client");
+
+    let circuit_payload_bytes = make_create_circuit_payload(
+        &second_circuit_id,
+        node_a.node_id(),
+        node_info,
+        &*node_a.admin_signer().clone_box(),
+        &vec![
+            node_a
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get first node's public key")
+                .as_hex(),
+            node_b
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get second node's public key")
+                .as_hex(),
+        ],
+        AuthorizationType::Challenge,
+    )
+    .expect("Unable to generate circuit request");
+    // Submit the `CircuitManagementPayload` to the first node
+    let res = node_a
+        .admin_service_client()
+        .submit_admin_payload(circuit_payload_bytes.clone());
+    assert!(res.is_ok());
+
+    // Wait for the proposal event from each node.
+    let proposal_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let proposal_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+
+    assert_eq!(&EventType::ProposalSubmitted, proposal_a_event.event_type());
+    assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
+    assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
+
+    // Submit the same `CircuitManagmentPayload` to create the circuit to the second node
+    // to validate this duplicate proposal is rejected
+    let duplicate_res = node_b
+        .admin_service_client()
+        .submit_admin_payload(circuit_payload_bytes);
+    assert!(
+        duplicate_res.is_err(),
+        "node {} erroneously accepted a duplicate proposal",
+        node_b.node_id()
+    );
+
+    // Create the `CircuitProposalVote` to be sent to a node
+    // Uses `true` for the `accept` argument to create a vote to accept the proposal
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_a_event.proposal().clone(),
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_b
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
+    assert!(res.is_ok());
+
+    // Wait for proposal accepted
+    let accepted_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let accepted_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_b_admin_pubkey.clone()
+        },
+        accepted_a_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_b_admin_pubkey.clone()
+        },
+        accepted_b_event.event_type(),
+    );
+    assert_eq!(accepted_a_event.proposal(), accepted_b_event.proposal());
+
+    // Wait for circuit ready.
+    let ready_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let ready_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    assert_eq!(ready_a_event.event_type(), &EventType::CircuitReady);
+    assert_eq!(ready_b_event.event_type(), &EventType::CircuitReady);
+    assert_eq!(ready_a_event.proposal(), ready_b_event.proposal());
+
+    let circuit_a = node_a
+        .admin_service_client()
+        .fetch_circuit(&second_circuit_id)
+        .expect("Unable to get circuit from node_a")
+        .expect("Circuit was not found");
+    let circuit_b = node_b
+        .admin_service_client()
+        .fetch_circuit(&second_circuit_id)
+        .expect("Unable to get circuit from node_b")
+        .expect("Circuit was not found");
+
+    assert_eq!(circuit_a, circuit_b);
+
+    shutdown!(network).expect("Unable to shutdown network");
+}
+
 /// Test that a 3-party circuit may be created on a 3-node network.
 ///
 /// 1. Create and submit a `CircuitCreateRequest` from the first node
