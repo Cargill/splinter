@@ -182,6 +182,7 @@ pub(in crate::admin) fn commit_3_party_circuit(
     node_a: &Node,
     node_b: &Node,
     node_c: &Node,
+    auth_type: AuthorizationType,
 ) {
     // Create the list of node details needed to build the `CircuitCreateRequest`
     let node_info = vec![
@@ -258,7 +259,7 @@ pub(in crate::admin) fn commit_3_party_circuit(
                 .expect("Unable to get third node's public key")
                 .as_hex(),
         ],
-        AuthorizationType::Trust,
+        auth_type,
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
