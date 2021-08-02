@@ -17,6 +17,7 @@
 use splinter::admin::client::event::{AdminServiceEventClient, AwcAdminServiceEventClientBuilder};
 use splinter::error::InternalError;
 use splinter::events::Reactor;
+use splinter::peer::PeerManagerConnector;
 use splinter::registry::RegistryWriter;
 use splinter::rest_api::actix_web_1::Resource as Actix1Resource;
 use splinter::service::ServiceProcessorShutdownHandle;
@@ -35,6 +36,7 @@ pub struct AdminSubsystem {
     pub(crate) actix1_resources: Vec<Actix1Resource>,
     pub(crate) store_factory: Box<dyn StoreFactory>,
     pub(crate) admin_service_event_client_variant: AdminServiceEventClientVariant,
+    pub(crate) peer_connector: PeerManagerConnector,
 }
 
 impl AdminSubsystem {
@@ -47,6 +49,10 @@ impl AdminSubsystem {
 
     pub fn registry_writer(&self) -> &dyn RegistryWriter {
         &*self.registry_writer
+    }
+
+    pub fn peer_connector(&self) -> &PeerManagerConnector {
+        &self.peer_connector
     }
 
     pub fn admin_service_event_client(

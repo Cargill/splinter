@@ -27,6 +27,7 @@ use splinter::admin::client::event::{
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::biome::client::{BiomeClient, ReqwestBiomeClient};
 use splinter::error::InternalError;
+use splinter::peer::PeerManagerConnector;
 use splinter::registry::{
     client::{RegistryClient, ReqwestRegistryClient},
     RegistryWriter,
@@ -74,6 +75,10 @@ impl Node {
 
     pub fn registry_writer(&self) -> &dyn RegistryWriter {
         self.admin_subsystem.registry_writer()
+    }
+
+    pub fn peer_connector(&self) -> &PeerManagerConnector {
+        self.admin_subsystem.peer_connector()
     }
 
     pub fn network_endpoints(&self) -> &[String] {

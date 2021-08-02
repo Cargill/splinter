@@ -128,7 +128,7 @@ impl RunnableAdminSubsystem {
         admin_service_builder = admin_service_builder
             .with_node_id(node_id.clone())
             .with_service_orchestrator(orchestrator)
-            .with_peer_manager_connector(peer_connector)
+            .with_peer_manager_connector(peer_connector.clone())
             .with_admin_service_store(store_factory.get_admin_service_store())
             .with_admin_event_store(store_factory.get_admin_service_store())
             .with_signature_verifier(self.admin_service_verifier)
@@ -205,6 +205,7 @@ impl RunnableAdminSubsystem {
             actix1_resources,
             store_factory,
             admin_service_event_client_variant: running_admin_service_event_client_variant,
+            peer_connector,
         })
     }
 }
