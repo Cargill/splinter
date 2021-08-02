@@ -761,6 +761,182 @@ pub fn test_2_party_circuit_creation_stop() {
     shutdown!(network).expect("Unable to shutdown network");
 }
 
+/// Test that a 2-party circuit proposal using challenge authorization may be submitted and
+/// committed to both nodes, while the nodes are stopped throughout the process.
+///
+/// 1. Collect  the node information needed to create the `CircuitCreateRequest`
+/// 2. Stop the second node in the network
+/// 3. Create and submit a `CircuitCreateRequest` from the first node
+/// 4. Restart the second node in the network
+/// 5. Wait for the `ProposalSubmitted` event from each node's event client, validate the
+///    corresponding proposal
+/// 6. Stop the first node in the network
+/// 7. Create and submit a `CircuitProposalVote` from the second node to accept the proposal
+/// 8. Restart the first node in the network
+/// 9. Wait for the `ProposalAccepted` event from each node's event client, validate the
+///    corresponding proposal
+/// 10. Wait for the `CircuitReady` event from each node's event client, validate the
+///     corresponding proposal
+/// 11. Verify the circuit is now available to each node, using `fetch_circuit`
+#[test]
+#[ignore]
+pub fn test_2_party_circuit_creation_stop_challenge_authorization() {
+    // Start a 2-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .add_nodes_with_defaults(2)
+        .expect("Unable to start 2-node ActixWeb1 network");
+    // Get the first node in the network
+    let mut node_a = network.node(0).expect("Unable to get node_a");
+    // Get the second node from the network
+    let mut node_b = network.node(1).expect("Unable to get node_b");
+    let node_info = vec![
+        (
+            node_a.node_id().to_string(),
+            (
+                node_a.network_endpoints().to_vec(),
+                node_a
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
+        ),
+        (
+            node_b.node_id().to_string(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .admin_signer()
+                    .clone()
+                    .public_key()
+                    .expect("Unable to get seconds node's public key"),
+            ),
+        ),
+    ]
+    .into_iter()
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
+    let circuit_id = "ABCDE-01234";
+    // Stop the second node in the network
+    network = network.stop(1).expect("Unable to stop second node");
+    node_a = network.node(0).expect("Unable to get first node");
+    // Create the `CircuitManagementPayload` to be sent to a node
+    let circuit_payload_bytes = make_create_circuit_payload(
+        &circuit_id,
+        node_a.node_id(),
+        node_info,
+        &*node_a.admin_signer().clone_box(),
+        &vec![node_a
+            .admin_signer()
+            .public_key()
+            .expect("Unable to get first node's public key")
+            .as_hex()],
+        AuthorizationType::Challenge,
+    )
+    .expect("Unable to generate circuit request");
+    // Submit the `CircuitManagementPayload` to the first node
+    let res = node_a
+        .admin_service_client()
+        .submit_admin_payload(circuit_payload_bytes);
+    assert!(res.is_ok());
+    // Restart the second node in the network
+    network = network.start(1).expect("Unable to start second node");
+    node_a = network.node(0).expect("Unable to get first node");
+    node_b = network.node(1).expect("Unable to get second node");
+
+    let node_a_event_client = node_a
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+        .expect("Unable to get event client");
+    let node_b_event_client = node_b
+        .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
+        .expect("Unable to get event client");
+
+    // Wait for the proposal event from each node
+    let proposal_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let proposal_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+
+    assert_eq!(&EventType::ProposalSubmitted, proposal_a_event.event_type());
+    assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
+    assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
+    // Stop the first node in the network
+    network = network.stop(0).expect("Unable to stop first node");
+    node_b = network.node(1).expect("Unable to get second node");
+    // Create the `CircuitProposalVote` to be sent to a node
+    // Uses `true` for the `accept` argument to create a vote to accept the proposal
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_b_event.proposal().clone(),
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_b
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
+    assert!(res.is_ok());
+    // Restart the first node in the network
+    network = network.start(0).expect("Unable to start first node");
+    node_a = network.node(0).expect("Unable to get first node");
+    node_b = network.node(1).expect("Unable to get second node");
+    let node_b_admin_pubkey = admin_pubkey(node_b);
+    let node_a_event_client = node_a
+        .admin_service_event_client(
+            &format!("test_circuit_{}", &circuit_id),
+            Some(*proposal_a_event.event_id()),
+        )
+        .expect("Unable to get event client");
+
+    // Wait for proposal accepted
+    let accepted_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let accepted_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_b_admin_pubkey.clone()
+        },
+        accepted_a_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_b_admin_pubkey.clone()
+        },
+        accepted_b_event.event_type(),
+    );
+    assert_eq!(accepted_a_event.proposal(), accepted_b_event.proposal());
+
+    // Wait for circuit ready.
+    let ready_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let ready_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    assert_eq!(ready_a_event.event_type(), &EventType::CircuitReady);
+    assert_eq!(ready_b_event.event_type(), &EventType::CircuitReady);
+    assert_eq!(ready_a_event.proposal(), ready_b_event.proposal());
+
+    let circuit_a = node_a
+        .admin_service_client()
+        .fetch_circuit(&circuit_id)
+        .expect("Unable to get circuit from node_a")
+        .expect("Circuit was not found");
+    let circuit_b = node_b
+        .admin_service_client()
+        .fetch_circuit(&circuit_id)
+        .expect("Unable to get circuit from node_b")
+        .expect("Circuit was not found");
+
+    assert_eq!(circuit_a, circuit_b);
+
+    shutdown!(network).expect("Unable to shutdown network");
+}
+
 /// Test that a 2-party circuit proposal may be submitted and committed to both nodes, while the
 /// nodes are stopped throughout the process.
 ///
