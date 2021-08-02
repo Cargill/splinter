@@ -195,8 +195,9 @@ fn load_signer_keys(
             .path();
 
         if path.extension() == Some(OsStr::new("priv")) {
-            let private_key = load_key_from_path(&path)
-                .map_err(|err| UserError::KeyError(InternalError::from_source(Box::new(err))))?;
+            let private_key = load_key_from_path(&path).map_err(|err| {
+                UserError::InternalError(InternalError::from_source(Box::new(err)))
+            })?;
             let signing_key = Secp256k1Context::new().new_signer(private_key);
 
             if path.file_stem() == Some(OsStr::new(peering_key)) {
@@ -204,7 +205,7 @@ fn load_signer_keys(
                     signing_key
                         .public_key()
                         .map_err(|err| {
-                            UserError::KeyError(InternalError::from_source(Box::new(err)))
+                            UserError::InternalError(InternalError::from_source(Box::new(err)))
                         })?
                         .as_slice(),
                 ));
@@ -218,13 +219,13 @@ fn load_signer_keys(
             last_known_key = path
                 .file_stem()
                 .ok_or_else(|| {
-                    UserError::KeyError(InternalError::with_message(
+                    UserError::InternalError(InternalError::with_message(
                         "Unable to get file name".to_string(),
                     ))
                 })?
                 .to_str()
                 .ok_or_else(|| {
-                    UserError::KeyError(InternalError::with_message(
+                    UserError::InternalError(InternalError::with_message(
                         "Unable to get file name".to_string(),
                     ))
                 })?
@@ -240,7 +241,9 @@ fn load_signer_keys(
             peer_token = Some(PeerAuthorizationToken::from_public_key(
                 signing_key
                     .public_key()
-                    .map_err(|err| UserError::KeyError(InternalError::from_source(Box::new(err))))?
+                    .map_err(|err| {
+                        UserError::InternalError(InternalError::from_source(Box::new(err)))
+                    })?
                     .as_slice(),
             ));
             warn!(
@@ -249,12 +252,14 @@ fn load_signer_keys(
                 last_known_key
             );
         } else {
-            return Err(UserError::KeyError(InternalError::with_message(format!(
-                "Unable to decide which key to use for required authorization for \
+            return Err(UserError::InternalError(InternalError::with_message(
+                format!(
+                    "Unable to decide which key to use for required authorization for \
                 provided peers. Peering key {} was not found and there are more then one \
                 configured signing key",
-                peering_key,
-            ))));
+                    peering_key,
+                ),
+            )));
         }
     }
 
