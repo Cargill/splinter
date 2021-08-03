@@ -77,12 +77,17 @@ mod tests {
         pub hashed_password: String,
     }
 
+    // ignored fields test that the server provides the field, but its not important to test the
+    // contents
     #[derive(Deserialize)]
     struct LoginResponse {
-        pub message: String,
-        pub user_id: String,
+        #[serde(rename = "message")]
+        pub _message: String,
+        #[serde(rename = "user_id")]
+        pub _user_id: String,
         pub token: String,
-        pub refresh_token: String,
+        #[serde(rename = "refresh_token")]
+        pub _refresh_token: String,
     }
 
     #[derive(Serialize)]
@@ -92,17 +97,23 @@ mod tests {
         pub display_name: String,
     }
 
+    // ignored fields test that the server provides the field, but its not important to test the
+    // contents
     #[derive(Deserialize)]
     struct Key {
         pub public_key: String,
-        pub user_id: String,
+        #[serde(rename = "user_id")]
+        pub _user_id: String,
         pub display_name: String,
         pub encrypted_private_key: String,
     }
 
+    // ignored fields test that the server provides the field, but its not important to test the
+    // contents
     #[derive(Deserialize)]
     struct PostKeyResponse {
-        pub message: String,
+        #[serde(rename = "message")]
+        pub _message: String,
         pub data: Key,
     }
 

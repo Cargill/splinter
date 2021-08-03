@@ -290,15 +290,21 @@ mod tests {
         pub username: String,
     }
 
+    // ignored fields test that the server provides the field, but its not important to test the
+    // contents
     #[derive(Deserialize)]
     struct RegistrationResponse {
-        pub message: String,
+        #[serde(rename = "message")]
+        pub _message: String,
         pub data: RegistrationUser,
     }
 
+    // ignored fields test that the server provides the field, but its not important to test the
+    // contents
     #[derive(Deserialize)]
     struct LoginResponse {
-        pub message: String,
+        #[serde(rename = "message")]
+        pub _message: String,
         pub user_id: String,
         pub token: String,
         pub refresh_token: String,
@@ -334,9 +340,12 @@ mod tests {
         hashed_password: String,
     }
 
+    // ignored fields test that the server provides the field, but its not important to test the
+    // contents
     #[derive(Deserialize)]
     struct PostVerifyResponse {
-        pub message: String,
+        #[serde(rename = "message")]
+        pub _message: String,
         pub user_id: String,
     }
 
