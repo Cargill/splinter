@@ -121,6 +121,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                     .help("Overwrite files if they exist"),
             )
             .arg(
+                Arg::with_name("skip")
+                    .long("skip")
+                    .conflicts_with("force")
+                    .help("Skip generating the files if they exist"),
+            )
+            .arg(
                 Arg::with_name("system")
                     .long("system")
                     .help("Generate system keys in /etc/splinter/keys"),

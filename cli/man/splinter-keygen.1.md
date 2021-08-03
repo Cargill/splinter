@@ -41,6 +41,9 @@ FLAGS
 : Decreases verbosity (the opposite of -v). When specified, only errors or
   warnings will be output.
 
+`--skip`
+: Skip generating the files if they exist. Cannot use  `--skip` with `--force`.
+
 `--system`
 : Generates system keys for `splinterd` in `/etc/splinter/keys`.
 
