@@ -15,10 +15,13 @@
 use std::sync::Arc;
 
 use actix_web::{
-    error::ErrorBadRequest, http::header, web, Error as ActixError, HttpRequest, HttpResponse,
+    error::ErrorBadRequest,
+    http::{header, Method as ActixMethod},
+    web, Error as ActixError, HttpRequest, HttpResponse,
 };
 use futures::{future::IntoFuture, stream::Stream, Future};
 use protobuf::{self, Message};
+use std::cmp::PartialEq;
 
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::{Permission, PermissionMap};
@@ -45,6 +48,19 @@ impl std::fmt::Display for Method {
             Method::Patch => f.write_str("PATCH"),
             Method::Delete => f.write_str("DELETE"),
             Method::Head => f.write_str("HEAD"),
+        }
+    }
+}
+
+impl PartialEq<ActixMethod> for Method {
+    fn eq(&self, other: &ActixMethod) -> bool {
+        match self {
+            Method::Get => other == ActixMethod::GET,
+            Method::Post => other == ActixMethod::POST,
+            Method::Put => other == ActixMethod::PUT,
+            Method::Patch => other == ActixMethod::PATCH,
+            Method::Delete => other == ActixMethod::DELETE,
+            Method::Head => other == ActixMethod::HEAD,
         }
     }
 }
