@@ -135,7 +135,6 @@ health-service = ["health", "health/authorization"]
 https-bind = ["splinter/https-bind"]
 log-config = []
 metrics = [
-  "splinter/admin-service-count",
   "splinter/metrics",
   "scabbard/metrics",
 ]
