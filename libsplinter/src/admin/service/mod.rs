@@ -216,7 +216,6 @@ impl AdminService {
     ///
     /// Also adds peer references for members of the circuits and proposals.
     fn re_initialize_circuits(&self) -> Result<(), ServiceStartError> {
-        #[cfg(feature = "admin-service-count")]
         self.admin_service_shared
             .lock()
             .map_err(|_| {

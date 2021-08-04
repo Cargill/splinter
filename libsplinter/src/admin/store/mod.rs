@@ -238,7 +238,6 @@ pub trait AdminServiceStore: Send + Sync {
     ///
     /// * `predicates` - A list of predicates to be applied before counting the proposals.
     ///    This enables getting the count of proposals with specific management types and members.
-    #[cfg(feature = "admin-service-count")]
     fn count_proposals(
         &self,
         predicates: &[CircuitPredicate],
@@ -297,7 +296,6 @@ pub trait AdminServiceStore: Send + Sync {
     ///
     /// * `predicates` - A list of predicates to be applied before counting the circuits.
     ///    This enables getting the count of circuits with specific management types and members.
-    #[cfg(feature = "admin-service-count")]
     fn count_circuits(
         &self,
         predicates: &[CircuitPredicate],

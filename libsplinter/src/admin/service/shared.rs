@@ -393,7 +393,6 @@ impl AdminServiceShared {
                                 })
                                 .and_then(|_| self.remove_proposal(store_circuit.circuit_id()))?;
 
-                            #[cfg(feature = "admin-service-count")]
                             self.update_metrics()?;
 
                             // send message about circuit disband proposal being accepted
@@ -439,7 +438,6 @@ impl AdminServiceShared {
                             // commit new circuit
                             self.admin_store.upgrade_proposal_to_circuit(circuit_id)?;
 
-                            #[cfg(feature = "admin-service-count")]
                             self.update_metrics()?;
 
                             let circuit =
@@ -554,7 +552,6 @@ impl AdminServiceShared {
                         match action {
                             CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST => {
                                 self.add_proposal(circuit_proposal.clone())?;
-                                #[cfg(feature = "admin-service-count")]
                                 self.update_metrics()?;
                                 // notify registered application authorization handlers of the
                                 // committed circuit proposal
@@ -574,7 +571,6 @@ impl AdminServiceShared {
 
                             CircuitManagementPayload_Action::CIRCUIT_PROPOSAL_VOTE => {
                                 self.update_proposal(circuit_proposal.clone())?;
-                                #[cfg(feature = "admin-service-count")]
                                 self.update_metrics()?;
                                 // notify registered application authorization handlers of the
                                 // committed circuit proposal
@@ -592,7 +588,6 @@ impl AdminServiceShared {
                             }
                             CircuitManagementPayload_Action::CIRCUIT_DISBAND_REQUEST => {
                                 self.add_proposal(circuit_proposal.clone())?;
-                                #[cfg(feature = "admin-service-count")]
                                 self.update_metrics()?;
                                 // notify registered application authorization handlers of the
                                 // committed disband circuit proposal
@@ -618,7 +613,6 @@ impl AdminServiceShared {
                     CircuitProposalStatus::Rejected => {
                         // remove circuit
                         let proposal = self.remove_proposal(circuit_id)?;
-                        #[cfg(feature = "admin-service-count")]
                         self.update_metrics()?;
                         if let Some(proposal) = proposal {
                             self.remove_peer_refs(proposal.circuit().list_tokens().map_err(
@@ -1049,7 +1043,6 @@ impl AdminServiceShared {
         self.check_connected_peers_payload_disband(&members, payload, message_sender)
     }
 
-    #[cfg(feature = "admin-service-count")]
     pub fn update_metrics(&self) -> Result<(), AdminSharedError> {
         // initialize circuit and proposal metrics
         gauge!(
@@ -1172,7 +1165,6 @@ impl AdminServiceShared {
                 )))
             })?;
 
-        #[cfg(feature = "admin-service-count")]
         gauge!(
             "splinter.admin.circuits.active",
             self.admin_store.count_circuits(&[]).map_err(|_| {
@@ -1268,7 +1260,6 @@ impl AdminServiceShared {
                     ))
                 })?;
             // Update the metrics because the proposal has been removed for this node
-            #[cfg(feature = "admin-service-count")]
             self.update_metrics()
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 

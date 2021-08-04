@@ -36,9 +36,7 @@ use crate::admin::store::{AdminServiceEvent, EventIter};
 use operations::add_circuit::AdminServiceStoreAddCircuitOperation as _;
 use operations::add_event::AdminServiceStoreAddEventOperation as _;
 use operations::add_proposal::AdminServiceStoreAddProposalOperation as _;
-#[cfg(feature = "admin-service-count")]
 use operations::count_circuits::AdminServiceStoreCountCircuitsOperation as _;
-#[cfg(feature = "admin-service-count")]
 use operations::count_proposals::AdminServiceStoreCountProposalsOperation as _;
 use operations::get_circuit::AdminServiceStoreFetchCircuitOperation as _;
 use operations::get_node::AdminServiceStoreFetchNodeOperation as _;
@@ -119,7 +117,6 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_proposals(predicates)
     }
 
-    #[cfg(feature = "admin-service-count")]
     fn count_proposals(
         &self,
         predicates: &[CircuitPredicate],
@@ -154,7 +151,6 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_circuits(predicates)
     }
 
-    #[cfg(feature = "admin-service-count")]
     fn count_circuits(
         &self,
         predicates: &[CircuitPredicate],
@@ -244,7 +240,6 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_proposals(predicates)
     }
 
-    #[cfg(feature = "admin-service-count")]
     fn count_proposals(
         &self,
         predicates: &[CircuitPredicate],
@@ -279,7 +274,6 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_circuits(predicates)
     }
 
-    #[cfg(feature = "admin-service-count")]
     fn count_circuits(
         &self,
         predicates: &[CircuitPredicate],
@@ -483,7 +477,6 @@ pub mod tests {
     /// 8. Count Proposal from store with mismatching management type predicate, validate 0 is
     ///    returned
     #[test]
-    #[cfg(feature = "admin-service-count")]
     fn test_count_proposals() {
         let pool = create_connection_pool_and_migrate();
 
@@ -875,7 +868,6 @@ pub mod tests {
     /// 12. Count circuits with the `CircuitStatus::Abandoned` circuit status predicate, validate
     ///     that the correct number of `Abandoned` circuits are returned
     #[test]
-    #[cfg(feature = "admin-service-count")]
     fn test_count_circuits() {
         let pool = create_connection_pool_and_migrate();
 

@@ -114,7 +114,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "admin-service-client",
-    "admin-service-count",
     "admin-service-event-client",
     "admin-service-event-client-actix-web-client",
     "admin-service-event-subscriber-glob",
@@ -143,7 +142,6 @@ benchmark = []
 
 admin-service = []
 admin-service-client = ["admin-service"]
-admin-service-count = []
 admin-service-event-client = ["admin-service-client" ]
 admin-service-event-client-actix-web-client = [
     "admin-service-event-client",
