@@ -20,14 +20,12 @@ pub(in crate::biome) mod schema;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
-#[cfg(feature = "oauth-user-list")]
 use super::OAuthUserIter;
 use super::{
     InsertableOAuthUserSession, OAuthUser, OAuthUserSession, OAuthUserSessionStore,
     OAuthUserSessionStoreError,
 };
 
-#[cfg(feature = "oauth-user-list")]
 use operations::list_users::OAuthUserSessionStoreListUsers as _;
 use operations::{
     add_session::OAuthUserSessionStoreAddSession as _,
@@ -86,7 +84,6 @@ impl OAuthUserSessionStore for DieselOAuthUserSessionStore<diesel::sqlite::Sqlit
         OAuthUserSessionStoreOperations::new(&*connection).get_user(subject)
     }
 
-    #[cfg(feature = "oauth-user-list")]
     fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserSessionStoreOperations::new(&*connection).list_users()
@@ -138,7 +135,6 @@ impl OAuthUserSessionStore for DieselOAuthUserSessionStore<diesel::pg::PgConnect
         OAuthUserSessionStoreOperations::new(&*connection).get_user(subject)
     }
 
-    #[cfg(feature = "oauth-user-list")]
     fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserSessionStoreOperations::new(&*connection).list_users()
@@ -475,7 +471,6 @@ pub mod tests {
         assert_eq!(stored_session2.oauth_access_token(), oauth_access_token2);
     }
 
-    #[cfg(feature = "oauth-user-list")]
     /// Verify that a SQLite-backed `DieselOAuthUserSessionStore` correctly supports inserting and
     /// and listing OAuth users.
     ///

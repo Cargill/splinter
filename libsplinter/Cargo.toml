@@ -127,7 +127,6 @@ experimental = [
     "https-bind",
     "metrics",
     "node-id-store",
-    "oauth-user-list",
     "registry-client",
     "registry-client-reqwest",
     "rest-api-actix-web-3",
@@ -171,7 +170,6 @@ memory = ["sqlite"]
 metrics = ["chrono", "futures-0-3", "influxdb", "metrics-lib", "tokio-0-2"]
 node-id-store = []
 oauth = ["biome", "base64", "oauth2", "reqwest", "rest-api"]
-oauth-user-list = ["oauth"]
 postgres = ["diesel/postgres", "diesel_migrations"]
 registry = []
 registry-client = ["registry"]

@@ -74,7 +74,7 @@ pub(crate) const OAUTH_CALLBACK_MIN: u32 = 1;
 pub(crate) const OAUTH_LOGIN_MIN: u32 = 1;
 #[cfg(all(feature = "oauth", feature = "rest-api-actix"))]
 pub(crate) const OAUTH_LOGOUT_MIN: u32 = 1;
-#[cfg(all(feature = "oauth-user-list", feature = "rest-api-actix"))]
+#[cfg(all(feature = "oauth", feature = "rest-api-actix"))]
 pub(crate) const OAUTH_USER_READ_PROTOCOL_MIN: u32 = 1;
 
 #[cfg(feature = "registry")]

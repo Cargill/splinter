@@ -23,7 +23,6 @@ use crate::error::{
     InvalidStateError,
 };
 
-#[cfg(feature = "oauth-user-list")]
 use super::OAuthUserIter;
 use super::{
     InsertableOAuthUserSession, OAuthUser, OAuthUserSession, OAuthUserSessionStore,
@@ -188,7 +187,6 @@ impl OAuthUserSessionStore for MemoryOAuthUserSessionStore {
             .cloned())
     }
 
-    #[cfg(feature = "oauth-user-list")]
     fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
         let internal = self.internal.lock().map_err(|_| {
             OAuthUserSessionStoreError::Internal(InternalError::with_message(

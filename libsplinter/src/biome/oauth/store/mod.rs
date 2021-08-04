@@ -390,7 +390,6 @@ pub trait OAuthUserSessionStore: Send + Sync {
     /// exists
     fn get_user(&self, subject: &str) -> Result<Option<OAuthUser>, OAuthUserSessionStoreError>;
 
-    #[cfg(feature = "oauth-user-list")]
     /// Returns the list of OAuth users, including the Biome user ID if it exists
     fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError>;
 
@@ -404,13 +403,11 @@ impl Clone for Box<dyn OAuthUserSessionStore> {
     }
 }
 
-#[cfg(feature = "oauth-user-list")]
 /// An iterator over OauthUsers, with a well-known count of values.
 pub struct OAuthUserIter {
     inner: Box<dyn ExactSizeIterator<Item = OAuthUser>>,
 }
 
-#[cfg(feature = "oauth-user-list")]
 impl OAuthUserIter {
     pub fn new(users: Vec<OAuthUser>) -> Self {
         Self {
@@ -419,7 +416,6 @@ impl OAuthUserIter {
     }
 }
 
-#[cfg(feature = "oauth-user-list")]
 impl Iterator for OAuthUserIter {
     type Item = OAuthUser;
 
@@ -432,7 +428,6 @@ impl Iterator for OAuthUserIter {
     }
 }
 
-#[cfg(feature = "oauth-user-list")]
 impl ExactSizeIterator for OAuthUserIter {
     fn len(&self) -> usize {
         self.inner.len()
