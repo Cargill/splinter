@@ -43,10 +43,7 @@ pub(in crate::admin::store::diesel) trait AdminServiceStoreCountCircuitsOperatio
 impl<'a, C> AdminServiceStoreCountCircuitsOperation for AdminServiceStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
-    i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
 {
     fn count_circuits(
         &self,
