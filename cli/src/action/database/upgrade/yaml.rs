@@ -345,9 +345,11 @@ proposals:
 
         let result = import_yaml_state_to_database(&temp_dir.path(), &db_store);
 
+        // The function returns Ok(()) and logs a message, checking the message is logged doesn't
+        // seem to be possible currently.
         match result {
-            Err(CliError::ActionError(_)) => (),
-            _ => panic!("received unexpected result"),
+            Err(_) => panic!("received unexpected result"),
+            Ok(()) => (),
         }
     }
 
