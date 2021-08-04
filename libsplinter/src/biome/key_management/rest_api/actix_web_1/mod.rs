@@ -384,6 +384,59 @@ mod tests {
         })
     }
 
+    /// Test PUT to /biome/keys version number
+    ///
+    /// Verify that PUT /biome/keys correctly identifies and rejects
+    /// invalid version numbers
+    ///
+    /// Procedure
+    ///
+    /// 1) Create a new user and log in as that user
+    /// 2) Validate that PUT /biome/keys with a correct version returns 200
+    /// 3) Validate that PUT /biome/keys with an incorrect returns 400
+    #[test]
+    #[cfg(feature = "biome-replace-keys")]
+    fn test_put_key_version() {
+        run_test(|url, client| {
+            let login =
+                create_and_authorize_user(url, &client, "test_post_key@gmail.com", "Admin2193!");
+
+            let test_keys: Vec<PostKey> = vec![PostKey {
+                public_key: "<public_key>".to_string(),
+                encrypted_private_key: "<private_key>".to_string(),
+                display_name: "test_post_key@gmail.com".to_string(),
+            }];
+
+            // Verify that a correct version works
+            assert_eq!(
+                client
+                    .put(&format!("{}/biome/keys", url))
+                    .header("Authorization", format!("Bearer {}", login.token))
+                    .header("SplinterProtocolVersion", "2")
+                    .json(&test_keys)
+                    .send()
+                    .unwrap()
+                    .status()
+                    .as_u16(),
+                200
+            );
+
+            // Verify that an incorrect version does not work
+            assert_eq!(
+                client
+                    .put(&format!("{}/biome/keys", url))
+                    .header("Authorization", format!("Bearer {}", login.token))
+                    .header("SplinterProtocolVersion", "1")
+                    .json(&test_keys)
+                    .send()
+                    .unwrap()
+                    .status()
+                    .as_u16(),
+                400
+            );
+        });
+    }
+
     /// Test happy path for GET /biome/keys/{public_key}
     ///
     /// Verify GET /biome/keys/{public_key} retrieves the

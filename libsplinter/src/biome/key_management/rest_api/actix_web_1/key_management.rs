@@ -40,11 +40,19 @@ pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
     #[cfg(feature = "authorization")]
     {
         #[cfg(feature = "biome-replace-keys")]
-        let resource = resource.add_method(
-            Method::Put,
-            Permission::AllowAuthenticated,
-            handle_put(key_store.clone()),
-        );
+        let resource = resource
+            .add_method(
+                Method::Put,
+                Permission::AllowAuthenticated,
+                handle_put(key_store.clone()),
+            )
+            .add_request_guard(
+                ProtocolVersionRangeGuard::new(
+                    protocol::BIOME_REPLACE_KEYS_PROTOCOL_MIN,
+                    protocol::BIOME_PROTOCOL_VERSION,
+                )
+                .with_method(Method::Put),
+            );
 
         resource
             .add_method(
@@ -66,7 +74,15 @@ pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
     #[cfg(not(feature = "authorization"))]
     {
         #[cfg(feature = "biome-replace-keys")]
-        let resource = resource.add_method(Method::Put, handle_put(key_store.clone()));
+        let resource = resource
+            .add_method(Method::Put, handle_put(key_store.clone()))
+            .add_request_guard(
+                ProtocolVersionRangeGuard::new(
+                    protocol::BIOME_REPLACE_KEYS_PROTOCOL_MIN,
+                    protocol::BIOME_PROTOCOL_VERSION,
+                )
+                .with_method(Method::Put),
+            );
 
         resource
             .add_method(Method::Post, handle_post(key_store.clone()))
