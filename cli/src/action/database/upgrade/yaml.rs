@@ -101,9 +101,8 @@ pub fn import_yaml_state_to_database<P: Into<PathBuf>>(
     let proposals_location = state_dir.join(PROPOSALS_FILE);
 
     if !(circuits_location.exists() || proposals_location.exists()) {
-        return Err(CliError::ActionError(
-            "no yaml state files found to import".to_string(),
-        ));
+        warn!("Skipping yaml state import: no yaml state files found");
+        return Ok(());
     }
 
     let yaml_admin_service_store = YamlAdminServiceStore::new(

@@ -39,13 +39,6 @@ impl Action for UpgradeAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let state_dir = get_state_dir(arg_matches)?;
         let database_uri = get_database_uri(arg_matches)?;
-        info!("Upgrading splinterd state");
-        info!(
-            "Source yaml state directory: {}",
-            state_dir.to_string_lossy()
-        );
-        info!("Destination database uri: {}", database_uri);
-        info!("Loading YAML datastore... ");
         let store_factory = splinter::store::create_store_factory(database_uri).map_err(|err| {
             CliError::ActionError(format!("failed to initialized store factory: {}", err))
         })?;
@@ -55,6 +48,14 @@ impl Action for UpgradeAction {
             let db_store = store_factory.get_node_id_store();
             node_id::migrate_node_id_to_db(state_dir.clone(), db_store)?;
         }
+        info!("Upgrading splinterd state");
+        info!(
+            "Source yaml state directory: {}",
+            state_dir.to_string_lossy()
+        );
+        let database_uri = get_database_uri(arg_matches)?;
+        info!("Destination database uri: {}", database_uri);
+        info!("Loading YAML datastore... ");
         let db_store = store_factory.get_admin_service_store();
         yaml::import_yaml_state_to_database(state_dir, &*db_store)?;
         Ok(())
