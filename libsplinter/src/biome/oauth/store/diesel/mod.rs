@@ -20,16 +20,15 @@ pub(in crate::biome) mod schema;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
-use super::OAuthUserIter;
 use super::{
-    InsertableOAuthUserSession, OAuthUser, OAuthUserSession, OAuthUserSessionStore,
+    InsertableOAuthUserSession, OAuthUser, OAuthUserIter, OAuthUserSession, OAuthUserSessionStore,
     OAuthUserSessionStoreError,
 };
 
-use operations::list_users::OAuthUserSessionStoreListUsers as _;
 use operations::{
     add_session::OAuthUserSessionStoreAddSession as _,
     get_session::OAuthUserSessionStoreGetSession as _, get_user::OAuthUserSessionStoreGetUser as _,
+    list_users::OAuthUserSessionStoreListUsers as _,
     remove_session::OAuthUserSessionStoreRemoveSession as _,
     update_session::OAuthUserSessionStoreUpdateSession as _, OAuthUserSessionStoreOperations,
 };

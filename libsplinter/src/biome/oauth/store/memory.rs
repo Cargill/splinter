@@ -23,9 +23,8 @@ use crate::error::{
     InvalidStateError,
 };
 
-use super::OAuthUserIter;
 use super::{
-    InsertableOAuthUserSession, OAuthUser, OAuthUserSession, OAuthUserSessionStore,
+    InsertableOAuthUserSession, OAuthUser, OAuthUserIter, OAuthUserSession, OAuthUserSessionStore,
     OAuthUserSessionStoreError,
 };
 
