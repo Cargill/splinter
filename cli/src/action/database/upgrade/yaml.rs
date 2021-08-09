@@ -14,15 +14,10 @@
 
 //! Provides the import action for yaml
 
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::{fmt, fs};
-
-use clap::ArgMatches;
-use diesel::{connection::Connection as _, pg::PgConnection};
 
 use splinter::admin::store::error::AdminServiceStoreError;
 use splinter::admin::store::yaml::YamlAdminServiceStore;
@@ -30,199 +25,122 @@ use splinter::admin::store::AdminServiceStore;
 use splinter::admin::store::CircuitNodeBuilder;
 
 use crate::error::CliError;
-use crate::Action;
-
-use super::{ConnectionUri, SplinterEnvironment};
-
-#[cfg(feature = "sqlite")]
-use super::sqlite::get_database_at_state_path;
 
 const CIRCUITS_FILE: &str = "circuits.yaml";
 const PROPOSALS_FILE: &str = "circuit_proposals.yaml";
 
-pub struct ImportFromYamlAction;
+/// Import all the data from one store to another store
+fn import_store(
+    to: &'_ dyn AdminServiceStore,
+    from: &'_ dyn AdminServiceStore,
+) -> Result<ImportResult, ImportError> {
+    let mut import_result = ImportResult::default();
+    let predicates = &[];
 
-impl ImportFromYamlAction {
-    /// Get an admin service store to the specified database
-    fn db_admin_service_store(url: String) -> Result<Box<dyn AdminServiceStore>, CliError> {
-        let connection_uri = url.parse().map_err(|_| {
-            CliError::ActionError(format!("invalid database url provided: {}", url))
-        })?;
+    let nodes = from.list_nodes().map_err(ImportError::Store)?;
+    let endpoints: HashMap<String, Vec<String>> = nodes
+        .map(|node| (node.node_id().to_string(), node.endpoints().to_vec()))
+        .collect();
 
-        let store_factory =
-            splinter::store::create_store_factory(connection_uri).map_err(|err| {
-                CliError::ActionError(format!("failed to initialize store factory: {}", err))
-            })?;
-        Ok(store_factory.get_admin_service_store())
-    }
+    let circuits = from.list_circuits(predicates).map_err(ImportError::Store)?;
 
-    /// Import all the data from one store to another store
-    fn import_store(
-        to: &'_ dyn AdminServiceStore,
-        from: &'_ dyn AdminServiceStore,
-    ) -> Result<ImportResult, ImportError> {
-        let mut import_result = ImportResult::default();
-        let predicates = &[];
+    for circuit in circuits {
+        let id = circuit.circuit_id().to_string();
 
-        let nodes = from.list_nodes().map_err(ImportError::Store)?;
-        let endpoints: HashMap<String, Vec<String>> = nodes
-            .map(|node| (node.node_id().to_string(), node.endpoints().to_vec()))
-            .collect();
-
-        let circuits = from.list_circuits(predicates).map_err(ImportError::Store)?;
-
-        for circuit in circuits {
-            let id = circuit.circuit_id().to_string();
-
-            // Yaml circuits do not store the endpoints, so we're adding them from the nodes
-            // definition. Not doing this will cause the database to enter an invalid state,
-            // and listing the circuits will fail
-            let members = circuit
-                .members()
-                .iter()
-                .map(|member| {
-                    let node_id = member.node_id();
-                    if let Some(endpoints) = endpoints.get(node_id) {
-                        CircuitNodeBuilder::new()
-                            .with_node_id(node_id)
-                            .with_endpoints(endpoints)
-                            .build()
-                            .map_err(|e| {
-                                ImportError::Endpoint(format!(
-                                    "could not build node endpoint: {}",
-                                    e
-                                ))
-                            })
-                    } else {
-                        Err(ImportError::Endpoint(node_id.to_string()))
-                    }
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-
-            to.add_circuit(circuit, members)
-                .map_err(|e| ImportError::Circuit(id, e))?;
-            import_result.circuits += 1;
-        }
-
-        let proposals = from
-            .list_proposals(predicates)
-            .map_err(ImportError::Store)?;
-        for proposal in proposals {
-            let requester = proposal.requester_node_id().to_string();
-            to.add_proposal(proposal)
-                .map_err(|e| ImportError::Proposal(requester, e))?;
-            import_result.proposals += 1;
-        }
-
-        Ok(import_result)
-    }
-
-    /// Import yaml state from the specified directory to a database
-    fn import_yaml_state_to_database<P: Into<PathBuf>>(
-        state_dir: P,
-        db_store: &'_ dyn AdminServiceStore,
-    ) -> Result<(), CliError> {
-        info!("Loading YAML datastore... ");
-        fn invalid_utf8() -> CliError {
-            CliError::ActionError("'state_dir' is not a valid UTF-8 string".to_string())
-        }
-
-        let state_dir: PathBuf = state_dir.into();
-        let circuits_location = state_dir.join(CIRCUITS_FILE);
-        let proposals_location = state_dir.join(PROPOSALS_FILE);
-
-        if !(circuits_location.exists() || proposals_location.exists()) {
-            return Err(CliError::ActionError(
-                "no yaml state files found to import".to_string(),
-            ));
-        }
-
-        let yaml_admin_service_store = YamlAdminServiceStore::new(
-            circuits_location
-                .to_str()
-                .ok_or_else(invalid_utf8)?
-                .to_string(),
-            proposals_location
-                .to_str()
-                .ok_or_else(invalid_utf8)?
-                .to_string(),
-        )
-        .map_err(|err| {
-            CliError::ActionError(format!("unable to create YamlAdminServiceStore: {}", err))
-        })?;
-
-        info!("Processing import data... ");
-        let result = Self::import_store(db_store, &yaml_admin_service_store).map_err(|e| {
-            CliError::ActionError(match e.source() {
-                Some(source) => format!("{}: {}", e.to_string(), source),
-                None => e.to_string(),
+        // Yaml circuits do not store the endpoints, so we're adding them from the nodes
+        // definition. Not doing this will cause the database to enter an invalid state,
+        // and listing the circuits will fail
+        let members = circuit
+            .members()
+            .iter()
+            .map(|member| {
+                let node_id = member.node_id();
+                if let Some(endpoints) = endpoints.get(node_id) {
+                    CircuitNodeBuilder::new()
+                        .with_node_id(node_id)
+                        .with_endpoints(endpoints)
+                        .build()
+                        .map_err(|e| {
+                            ImportError::Endpoint(format!("could not build node endpoint: {}", e))
+                        })
+                } else {
+                    Err(ImportError::Endpoint(node_id.to_string()))
+                }
             })
-        })?;
+            .collect::<Result<Vec<_>, _>>()?;
 
-        info!("Backing up state files... ");
-        let new_circuits_location = circuits_location.with_extension("yaml.old");
-        let new_proposals_location = proposals_location.with_extension("yaml.old");
-        fs::rename(circuits_location, new_circuits_location)
-            .map_err(|e| CliError::ActionError(format!("could not move circuits file: {}", e)))?;
-        fs::rename(proposals_location, new_proposals_location)
-            .map_err(|e| CliError::ActionError(format!("could not move proposals file: {}", e)))?;
-
-        info!(
-            "Successfully imported {} circuit(s) and {} proposal(s)",
-            result.circuits, result.proposals
-        );
-
-        Ok(())
+        to.add_circuit(circuit, members)
+            .map_err(|e| ImportError::Circuit(id, e))?;
+        import_result.circuits += 1;
     }
+
+    let proposals = from
+        .list_proposals(predicates)
+        .map_err(ImportError::Store)?;
+    for proposal in proposals {
+        let requester = proposal.requester_node_id().to_string();
+        to.add_proposal(proposal)
+            .map_err(|e| ImportError::Proposal(requester, e))?;
+        import_result.proposals += 1;
+    }
+
+    Ok(import_result)
 }
 
-impl Action for ImportFromYamlAction {
-    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let (state_dir, database_uri) = match arg_matches {
-            Some(args) => (args.value_of("state_dir"), args.value_of("connect")),
-            None => (None, None),
-        };
-
-        let state_dir = match state_dir {
-            Some(state_dir) => {
-                let state_dir = PathBuf::from(state_dir.to_string());
-                fs::canonicalize(state_dir.as_path()).unwrap_or_else(|_| state_dir.clone())
-            }
-            None => SplinterEnvironment::load().get_state_path(),
-        };
-
-        let database_uri = match database_uri {
-            Some(database_uri) => database_uri.to_string(),
-            #[cfg(feature = "sqlite")]
-            None => get_database_at_state_path(state_dir.clone())?,
-            #[cfg(not(feature = "sqlite"))]
-            None => get_default_database(),
-        };
-
-        if let ConnectionUri::Postgres(_) = ConnectionUri::from_str(&database_uri)? {
-            // Verify database connection.
-            // If the connection is faulty, we want to abort here instead of
-            // creating the store, as the store would perform reconnection attempts.
-            PgConnection::establish(&database_uri[..]).map_err(|err| {
-                CliError::ActionError(format!(
-                    "Failed to establish database connection to '{}': {}",
-                    database_uri, err
-                ))
-            })?;
-        }
-
-        info!("Upgrading splinterd state");
-        info!(
-            "Source yaml state directory: {}",
-            state_dir.to_string_lossy()
-        );
-        info!("Destination database uri: {}", database_uri);
-
-        let db_store = Self::db_admin_service_store(database_uri)?;
-        Self::import_yaml_state_to_database(&state_dir, db_store.borrow())?;
-
-        Ok(())
+/// Import yaml state from the specified directory to a database
+pub fn import_yaml_state_to_database<P: Into<PathBuf>>(
+    state_dir: P,
+    db_store: &'_ dyn AdminServiceStore,
+) -> Result<(), CliError> {
+    fn invalid_utf8() -> CliError {
+        CliError::ActionError("'state_dir' is not a valid UTF-8 string".to_string())
     }
+
+    let state_dir: PathBuf = state_dir.into();
+    let circuits_location = state_dir.join(CIRCUITS_FILE);
+    let proposals_location = state_dir.join(PROPOSALS_FILE);
+
+    if !(circuits_location.exists() || proposals_location.exists()) {
+        warn!("Skipping yaml state import: no yaml state files found");
+        return Ok(());
+    }
+
+    let yaml_admin_service_store = YamlAdminServiceStore::new(
+        circuits_location
+            .to_str()
+            .ok_or_else(invalid_utf8)?
+            .to_string(),
+        proposals_location
+            .to_str()
+            .ok_or_else(invalid_utf8)?
+            .to_string(),
+    )
+    .map_err(|err| {
+        CliError::ActionError(format!("unable to create YamlAdminServiceStore: {}", err))
+    })?;
+
+    info!("Processing import data... ");
+    let result = import_store(db_store, &yaml_admin_service_store).map_err(|e| {
+        CliError::ActionError(match e.source() {
+            Some(source) => format!("{}: {}", e.to_string(), source),
+            None => e.to_string(),
+        })
+    })?;
+
+    info!("Backing up state files... ");
+    let new_circuits_location = circuits_location.with_extension("yaml.old");
+    let new_proposals_location = proposals_location.with_extension("yaml.old");
+    fs::rename(circuits_location, new_circuits_location)
+        .map_err(|e| CliError::ActionError(format!("could not move circuits file: {}", e)))?;
+    fs::rename(proposals_location, new_proposals_location)
+        .map_err(|e| CliError::ActionError(format!("could not move proposals file: {}", e)))?;
+
+    info!(
+        "Successfully imported {} circuit(s) and {} proposal(s)",
+        result.circuits, result.proposals
+    );
+
+    Ok(())
 }
 
 /// Represents errors that may occur during the import process
@@ -394,8 +312,7 @@ proposals:
         assert_eq!(db_store.list_circuits(&[]).unwrap().count(), 0);
         assert_eq!(db_store.list_proposals(&[]).unwrap().count(), 0);
 
-        let result =
-            ImportFromYamlAction::import_yaml_state_to_database(&temp_dir.path(), &db_store);
+        let result = import_yaml_state_to_database(&temp_dir.path(), &db_store);
 
         if result.is_err() {
             panic!("received unexpected error: {:?}", result);
@@ -426,12 +343,13 @@ proposals:
         let pool = create_connection_pool_and_migrate();
         let db_store = DieselAdminServiceStore::new(pool);
 
-        let result =
-            ImportFromYamlAction::import_yaml_state_to_database(&temp_dir.path(), &db_store);
+        let result = import_yaml_state_to_database(&temp_dir.path(), &db_store);
 
+        // The function returns Ok(()) and logs a message, checking the message is logged doesn't
+        // seem to be possible currently.
         match result {
-            Err(CliError::ActionError(_)) => (),
-            _ => panic!("received unexpected result"),
+            Err(_) => panic!("received unexpected result"),
+            Ok(()) => (),
         }
     }
 

@@ -21,7 +21,7 @@ pub mod postgres;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 #[cfg(all(feature = "sqlite", not(test)))]
 use self::sqlite::ForeignKeyCustomizer;
@@ -157,6 +157,20 @@ pub enum ConnectionUri {
     Postgres(String),
     #[cfg(feature = "sqlite")]
     Sqlite(String),
+}
+
+impl Display for ConnectionUri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            #[cfg(feature = "memory")]
+            ConnectionUri::Memory => "memory",
+            #[cfg(feature = "sqlite")]
+            ConnectionUri::Sqlite(sqlite) => sqlite,
+            #[cfg(feature = "postgres")]
+            ConnectionUri::Postgres(pg) => pg,
+        };
+        write!(f, "{}", string)
+    }
 }
 
 impl FromStr for ConnectionUri {

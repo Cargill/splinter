@@ -64,3 +64,9 @@ impl From<diesel::r2d2::PoolError> for NodeIdStoreError {
         ))
     }
 }
+
+impl From<std::io::Error> for NodeIdStoreError {
+    fn from(err: std::io::Error) -> Self {
+        Self::InternalError(InternalError::from_source(Box::new(err)))
+    }
+}
