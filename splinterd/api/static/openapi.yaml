@@ -15,7 +15,7 @@
 openapi: '3.0.0'
 
 info:
-  version: 0.5.14
+  version: 0.5.15
   title: splinterd API
   description: REST API for the Splinter daemon
 
@@ -1700,6 +1700,45 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BiomeUserKey'
+        401:
+          description: The client is unauthorized
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/ErrorBiome'
+    put:
+      tags:
+      - Biome
+      description: Replace all keys for the user
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/BiomeUserKey'
+      responses:
+        200:
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Keys replaced successfully"
+        400:
+          description: Request was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         401:
           description: The client is unauthorized
         500:

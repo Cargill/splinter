@@ -64,7 +64,7 @@ pub struct UpdateUser {
 }
 
 /// New key pairs to be added while updating a Biome user.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct NewKey {
     pub public_key: String,
     pub encrypted_private_key: String,
@@ -156,6 +156,14 @@ pub trait BiomeClient {
     /// * `public_key`: Public key of the key pair to be updated
     /// * `new_display_name`: Updated display name for the key pair
     fn update_key(&self, public_key: &str, new_display_name: &str) -> Result<(), InternalError>;
+
+    /// Replace the current Biome user's keys
+    ///
+    /// # Arguments
+    ///
+    /// * `keys`: New keys for the user
+    #[cfg(feature = "biome-replace-keys")]
+    fn replace_keys(&self, keys: Vec<NewKey>) -> Result<(), InternalError>;
 
     /// Add a key pair for a Biome user.
     ///

@@ -39,6 +39,21 @@ pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
         ));
     #[cfg(feature = "authorization")]
     {
+        #[cfg(feature = "biome-replace-keys")]
+        let resource = resource
+            .add_method(
+                Method::Put,
+                Permission::AllowAuthenticated,
+                handle_put(key_store.clone()),
+            )
+            .add_request_guard(
+                ProtocolVersionRangeGuard::new(
+                    protocol::BIOME_REPLACE_KEYS_PROTOCOL_MIN,
+                    protocol::BIOME_PROTOCOL_VERSION,
+                )
+                .with_method(Method::Put),
+            );
+
         resource
             .add_method(
                 Method::Post,
@@ -58,6 +73,17 @@ pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
     }
     #[cfg(not(feature = "authorization"))]
     {
+        #[cfg(feature = "biome-replace-keys")]
+        let resource = resource
+            .add_method(Method::Put, handle_put(key_store.clone()))
+            .add_request_guard(
+                ProtocolVersionRangeGuard::new(
+                    protocol::BIOME_REPLACE_KEYS_PROTOCOL_MIN,
+                    protocol::BIOME_PROTOCOL_VERSION,
+                )
+                .with_method(Method::Put),
+            );
+
         resource
             .add_method(Method::Post, handle_post(key_store.clone()))
             .add_method(Method::Get, handle_get(key_store.clone()))
@@ -162,6 +188,71 @@ fn handle_get(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
                 )
             }
         }
+    })
+}
+
+/// Defines a REST endpoint for updating all keys in the underlying storage
+#[cfg(feature = "biome-replace-keys")]
+fn handle_put(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
+    Box::new(move |request, payload| {
+        let key_store = key_store.clone();
+        let user = match request.extensions().get::<Identity>() {
+            Some(Identity::User(user)) => user.clone(),
+            _ => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized())
+                        .into_future(),
+                )
+            }
+        };
+
+        Box::new(into_bytes(payload).and_then(move |bytes| {
+            let new_keys = match serde_json::from_slice::<Vec<NewKey>>(&bytes) {
+                Ok(val) => val,
+                Err(err) => {
+                    debug!("Error parsing payload {}", err);
+                    return HttpResponse::BadRequest()
+                        .json(ErrorResponse::bad_request(&format!(
+                            "Failed to parse payload: {}",
+                            err
+                        )))
+                        .into_future();
+                }
+            };
+
+            let new_keys: Vec<Key> = new_keys
+                .iter()
+                .map(|new_key| {
+                    Key::new(
+                        &new_key.public_key,
+                        &new_key.encrypted_private_key,
+                        &user,
+                        &new_key.display_name,
+                    )
+                })
+                .collect();
+
+            match key_store.replace_keys(&user, &new_keys) {
+                Ok(()) => HttpResponse::Ok()
+                    .json(json!({ "message": "Keys replaced successfully" }))
+                    .into_future(),
+                Err(err) => {
+                    debug!("Failed to replace keys in database {}", err);
+                    match err {
+                        KeyStoreError::DuplicateKeyError(msg) => HttpResponse::BadRequest()
+                            .json(ErrorResponse::bad_request(&msg))
+                            .into_future(),
+                        KeyStoreError::UserDoesNotExistError(msg) => HttpResponse::BadRequest()
+                            .json(ErrorResponse::bad_request(&msg))
+                            .into_future(),
+                        _ => HttpResponse::InternalServerError()
+                            .json(ErrorResponse::internal_error())
+                            .into_future(),
+                    }
+                }
+            }
+        }))
     })
 }
 

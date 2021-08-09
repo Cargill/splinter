@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::Method;
 use actix_web::{Error as ActixError, HttpRequest, HttpResponse};
 use futures::{Future, IntoFuture};
 
@@ -63,17 +64,33 @@ impl RequestGuard for Box<dyn RequestGuard> {
 pub struct ProtocolVersionRangeGuard {
     min: u32,
     max: u32,
+    method: Option<Method>,
 }
 
 impl ProtocolVersionRangeGuard {
     /// Constructs a new protocol version guard with the given minimum.
     pub fn new(min: u32, max: u32) -> Self {
-        Self { min, max }
+        Self {
+            min,
+            max,
+            method: None,
+        }
+    }
+
+    /// Limits the protocol version guard to check the given method
+    pub fn with_method(mut self, method: Method) -> Self {
+        self.method = Some(method);
+        self
     }
 }
 
 impl RequestGuard for ProtocolVersionRangeGuard {
     fn evaluate(&self, req: &HttpRequest) -> Continuation {
+        if let Some(method) = &self.method {
+            if method != req.method() {
+                return Continuation::Continue;
+            }
+        }
         if let Some(header_value) = req.headers().get("SplinterProtocolVersion") {
             let parsed_header = header_value
                 .to_str()
