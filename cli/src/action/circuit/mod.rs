@@ -54,10 +54,24 @@ impl Action for CircuitProposeAction {
 
         let mut builder = CreateCircuitMessageBuilder::new();
 
+        #[cfg(feature = "challenge-authorization")]
+        let mut public_keys = HashMap::new();
+        #[cfg(feature = "challenge-authorization")]
+        if let Some(nodes_public_keys) = args.values_of("node_public_key") {
+            for node_argument in nodes_public_keys {
+                let (node, public_key) = parse_node_public_key(node_argument)?;
+                public_keys.insert(node, public_key);
+            }
+        }
+
         if let Some(node_file) = args.value_of("node_file") {
             #[cfg(feature = "challenge-authorization")]
             for node in load_nodes_from_file(node_file)? {
-                builder.add_node(&node.identity, &node.endpoints, None)?;
+                builder.add_node(
+                    &node.identity,
+                    &node.endpoints,
+                    public_keys.get(&node.identity),
+                )?;
             }
 
             #[cfg(not(feature = "challenge-authorization"))]
@@ -69,14 +83,6 @@ impl Action for CircuitProposeAction {
         if let Some(nodes) = args.values_of("node") {
             #[cfg(feature = "challenge-authorization")]
             {
-                let mut public_keys = HashMap::new();
-                if let Some(nodes_public_keys) = args.values_of("node_public_key") {
-                    for node_argument in nodes_public_keys {
-                        let (node, public_key) = parse_node_public_key(node_argument)?;
-                        public_keys.insert(node, public_key);
-                    }
-                }
-
                 for node_argument in nodes {
                     let (node, endpoints) = parse_node_argument(node_argument)?;
                     builder.add_node(&node, &endpoints, public_keys.get(&node))?;
