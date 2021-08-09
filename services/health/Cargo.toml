@@ -29,10 +29,11 @@ log = "0.3.0"
 splinter = { path = "../../libsplinter", features = ["rest-api", "rest-api-actix"] }
 
 [features]
-default = []
+default = [
+  "authorization",
+]
 
 stable = [
-  "authorization",
   "default"
 ]
 
