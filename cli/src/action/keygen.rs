@@ -101,6 +101,7 @@ impl Action for KeyGenAction {
             private_key_path,
             public_key_path,
             args.is_present("force"),
+            args.is_present("skip"),
             true,
         )?;
 
@@ -116,20 +117,52 @@ pub fn create_key_pair(
     private_key_path: PathBuf,
     public_key_path: PathBuf,
     force_create: bool,
+    skip_create: bool,
     change_permissions: bool,
-) -> Result<Vec<u8>, CliError> {
+) -> Result<(), CliError> {
     if !force_create {
-        if private_key_path.exists() {
-            return Err(CliError::EnvironmentError(format!(
-                "File already exists: {:?}",
-                private_key_path
-            )));
-        }
-        if public_key_path.exists() {
-            return Err(CliError::EnvironmentError(format!(
-                "File already exists: {:?}",
-                public_key_path
-            )));
+        match (private_key_path.exists(), public_key_path.exists()) {
+            (true, true) => {
+                if skip_create {
+                    info!(
+                        "Skipping, key already exists: {}",
+                        private_key_path.display()
+                    );
+                    return Ok(());
+                } else {
+                    return Err(CliError::EnvironmentError(format!(
+                        "Files already exists: private_key: {:?}, public_key: {:?}",
+                        private_key_path, public_key_path
+                    )));
+                }
+            }
+            (true, false) => {
+                if skip_create {
+                    return Err(CliError::EnvironmentError(format!(
+                        "Cannot skip, private key exists but not the public key: {:?}",
+                        private_key_path
+                    )));
+                } else {
+                    return Err(CliError::EnvironmentError(format!(
+                        "File already exists: {:?}",
+                        private_key_path
+                    )));
+                }
+            }
+            (false, true) => {
+                if skip_create {
+                    return Err(CliError::EnvironmentError(format!(
+                        "Cannot skip, public key exists but not the private key: {:?}",
+                        public_key_path
+                    )));
+                } else {
+                    return Err(CliError::EnvironmentError(format!(
+                        "File already exists: {:?}",
+                        public_key_path
+                    )));
+                }
+            }
+            (false, false) => (),
         }
     }
 
@@ -218,5 +251,5 @@ pub fn create_key_pair(
         chown(public_key_path.as_path(), key_dir_uid, key_dir_gid)?;
     }
 
-    Ok(public_key.into_bytes())
+    Ok(())
 }
