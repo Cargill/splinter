@@ -88,3 +88,5 @@ RUN apt-get update \
  && mandb \
  && dpkg --unpack /tmp/splinter-*.deb \
  && apt-get -f -y install
+
+RUN echo ". /usr/share/bash-completion/bash_completion" >> ~/.bashrc

@@ -107,10 +107,11 @@ user = []
 
 [package.metadata.deb]
 maintainer = "The Splinter Team"
-depends = "$auto"
+depends = "$auto, bash-completion"
 maintainer-scripts = "packaging/ubuntu"
 assets = [
     ["packaging/man/*.1", "/usr/share/man/man1", "644"],
     ["target/release/splinter", "/usr/bin/splinter", "755"],
+    ["packaging/ubuntu/completions/splinter", "/usr/share/bash-completion/completions/splinter", "644"],
     ["packaging/scabbard_circuit_template.yaml", "/usr/share/splinter/circuit-templates/scabbard.yaml", "644"]
 ]

@@ -1,0 +1,282 @@
+#!/usr/bin/env bash
+# Copyright 2021 Cargill Incorporated
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# shellcheck disable=2207
+
+__splinter()
+{
+  local cur prev subcommand
+
+  __splinter_get_subcommand() {
+    local subcommand i
+
+    subcommand=
+    for ((i = 1; i < ${#COMP_WORDS[@]}; ++i)); do
+      if [[ ${COMP_WORDS[i]} != -* ]]; then
+        subcommand=${COMP_WORDS[i]}
+        break
+      fi
+    done
+
+    echo "$subcommand"
+  }
+
+  cur=${COMP_WORDS[COMP_CWORD]}
+  prev=${COMP_WORDS[COMP_CWORD-1]}
+  subcommand=$(__splinter_get_subcommand)
+
+  GLOBAL_OPTS="
+    --help
+    --quiet
+    -v
+  "
+
+  SPLINTER_OPTS="
+    $GLOBAL_OPTS
+    --version
+    admin
+    cert
+    circuit
+    database
+    help
+    keygen
+    permissions
+    registry
+    upgrade
+    user
+  "
+
+  SPLINTER_ADMIN_OPTS="
+    $GLOBAL_OPTS
+    help
+    keygen
+  "
+
+  SPLINTER_CERT_OPTS="
+    $GLOBAL_OPTS
+    generate
+    help
+  "
+
+  SPLINTER_CIRCUIT_OPTS="
+    $GLOBAL_OPTS
+    abandon
+    disband
+    help
+    list
+    proposals
+    propose
+    purge
+    remove-proposal
+    show
+    template
+    vote
+  "
+
+  SPLINTER_DATABASE_OPTS="
+    $GLOBAL_OPTS
+    migrate
+  "
+
+  SPLINTER_KEYGEN_OPTS="
+    $GLOBAL_OPTS
+    --force
+    --system
+    --key-dir
+  "
+
+  SPLINTER_PERMISSIONS_OPTS="
+    $GLOBAL_OPTS
+    --format
+    --key
+    --url
+  "
+
+  SPLINTER_REGISTRY_OPTS="
+    $GLOBAL_OPTS
+    build
+  "
+
+  SPLINTER_UPGRADE_OPTS="
+    $GLOBAL_OPTS
+    --connect
+    --state-dir
+  "
+
+  SPLINTER_USER_OPTS="
+    $GLOBAL_OPTS
+    list
+  "
+
+  case "${subcommand}" in
+    admin)
+      case "${prev}" in
+        keygen)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --force --key-dir --quiet" \
+                      -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_ADMIN_OPTS" -- "${cur}"))
+          ;;
+
+      esac
+      ;;
+
+    cert)
+      case "${prev}" in
+        generate)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --force --quiet --skip
+                     --cert-dir \ --common-name" -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_CERT_OPTS" -- "${cur}"))
+          ;;
+
+      esac
+      ;;
+
+    circuit)
+      case "${prev}" in
+        abandon)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --key --url" -- "${cur}"))
+          ;;
+
+        disband)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --key --url" -- "${cur}"))
+          ;;
+
+        list)
+          if [ "${COMP_WORDS[2]}" == "template" ]; then
+            COMPREPLY=($(compgen -W "$GLOBAL_OPTS --format" -- "${cur}"))
+          else
+            COMPREPLY=($(compgen -W "$GLOBAL_OPTS --circuit-status --format \
+                        --member --key --url" -- "${cur}"))
+          fi
+          ;;
+
+        proposals)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --format --management-type \
+                      --member --key --url" -- "${cur}"))
+          ;;
+
+        propose)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --dry-run --comments --compat \
+                      --display-name --key --management --metadata \
+                      --metadata-encoding --node --node-file --service \
+                      --service-arg --service-peer-group --service-type \
+                      --template --template-arg --url" -- "${cur}"))
+          ;;
+
+        purge)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --key --url" -- "${cur}"))
+          ;;
+
+        remove-proposal)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --key --url" -- "${cur}"))
+          ;;
+
+        show)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --format --key --url" \
+                      -- "${cur}"))
+          ;;
+
+        template)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS arguments help list show" \
+                      -- "${cur}"))
+          ;;
+
+        vote)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --accept --reject --key --url" \
+                      -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_CIRCUIT_OPTS" -- "${cur}"))
+          ;;
+
+      esac
+      ;;
+
+    database)
+      case "${prev}" in
+        migrate)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS -C" -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_DATABASE_OPTS" -- "${cur}"))
+          ;;
+      esac
+      ;;
+
+    keygen)
+      case "${prev}" in
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_KEYGEN_OPTS" -- "${cur}"))
+          ;;
+      esac
+      ;;
+
+    permissions)
+      case "${prev}" in
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_PERMISSIONS_OPTS" -- "${cur}"))
+          ;;
+      esac
+      ;;
+
+    registry)
+      case "${prev}" in
+        build)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --force --key-file --metadata \
+                      --key" -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_REGISTRY_OPTS" -- "${cur}"))
+          ;;
+      esac
+      ;;
+
+    upgrade)
+      case "${prev}" in
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_UPGRADE_OPTS" -- "${cur}"))
+          ;;
+      esac
+      ;;
+
+    user)
+      case "${prev}" in
+        list)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --format --key --url" \
+                      -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_USER_OPTS" -- "${cur}"))
+          ;;
+      esac
+      ;;
+
+    *)
+      COMPREPLY=($(compgen -W "$SPLINTER_OPTS" -- "${cur}"))
+      ;;
+  esac
+}
+
+complete -F __splinter splinter
