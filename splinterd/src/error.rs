@@ -16,7 +16,6 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 
-#[cfg(any(feature = "metrics", feature = "challenge-authorization"))]
 use splinter::error::InternalError;
 use splinter::transport::socket::TlsInitError;
 
@@ -38,10 +37,7 @@ pub enum UserError {
         context: String,
         source: Option<Box<dyn Error>>,
     },
-    #[cfg(feature = "metrics")]
-    MetricsError(InternalError),
-    #[cfg(feature = "challenge-authorization")]
-    KeyError(InternalError),
+    InternalError(InternalError),
 }
 
 impl UserError {
@@ -70,10 +66,7 @@ impl Error for UserError {
             UserError::ConfigError(err) => Some(err),
             UserError::IoError { source, .. } => source.as_ref().map(|err| &**err as &dyn Error),
             UserError::DaemonError { source, .. } => source.as_ref().map(|err| &**err),
-            #[cfg(feature = "metrics")]
-            UserError::MetricsError(err) => Some(err),
-            #[cfg(feature = "challenge-authorization")]
-            UserError::KeyError(err) => Some(err),
+            UserError::InternalError(err) => Some(err),
         }
     }
 }
@@ -102,10 +95,7 @@ impl fmt::Display for UserError {
                     f.write_str(context)
                 }
             }
-            #[cfg(feature = "metrics")]
-            UserError::MetricsError(msg) => write!(f, "{}", msg),
-            #[cfg(feature = "challenge-authorization")]
-            UserError::KeyError(err) => write!(f, "{}", err),
+            UserError::InternalError(err) => write!(f, "{}", err),
         }
     }
 }
@@ -131,6 +121,12 @@ impl From<GetTransportError> for UserError {
 impl From<ConfigError> for UserError {
     fn from(error: ConfigError) -> Self {
         UserError::ConfigError(error)
+    }
+}
+
+impl From<InternalError> for UserError {
+    fn from(error: InternalError) -> Self {
+        UserError::InternalError(error)
     }
 }
 
