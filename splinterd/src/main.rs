@@ -105,7 +105,9 @@ fn find_node_id(config: &Config) -> Result<String, UserError> {
     #[cfg(feature = "node-file-block")]
     {
         if node_id_path.exists() {
-            let context = "node_id file is soft-deprecated, run splinter database migrate and splinter upgrade to import the value".to_string();
+            let context = "node_id file is soft-deprecated, run splinter database migrate and \
+                splinter upgrade to import the value"
+                .to_string();
             Err(UserError::DaemonError {
                 context,
                 source: None,
