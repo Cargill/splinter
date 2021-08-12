@@ -20,11 +20,7 @@ mod resources;
 
 use crate::biome::OAuthUserSessionStore;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
-#[cfg(all(
-    feature = "authorization",
-    feature = "rest-api-actix",
-    feature = "oauth-user-list"
-))]
+#[cfg(all(feature = "authorization", feature = "rest-api-actix",))]
 use crate::rest_api::auth::authorization::Permission;
 
 #[cfg(feature = "biome-profile")]
@@ -32,11 +28,7 @@ use crate::biome::UserProfileStore;
 
 use super::OAuthClient;
 
-#[cfg(all(
-    feature = "authorization",
-    feature = "rest-api-actix",
-    feature = "oauth-user-list"
-))]
+#[cfg(all(feature = "authorization", feature = "rest-api-actix",))]
 const OAUTH_USER_READ_PERMISSION: Permission = Permission::Check {
     permission_id: "oauth.users.read",
     permission_display_name: "OAuth Users read",
@@ -82,9 +74,6 @@ impl OAuthResourceProvider {
 /// * `GET /oauth/login` - Get the URL for requesting authorization from the provider
 /// * `GET /oauth/callback` - Receive the authorization code from the provider
 /// * `GET /oauth/logout` - Remove the user's access and refresh tokens
-///
-/// The following endpoint is only available if the `oauth-user-list` feature is enabled:
-///
 /// * `GET` /oauth/users` - Get a list of the OAuth users
 ///
 /// These endpoints are only available if the following REST API backend feature is enabled:
@@ -109,7 +98,6 @@ impl RestResourceProvider for OAuthResourceProvider {
                 ),
                 actix::logout::make_logout_route(self.oauth_user_session_store.clone()),
             ]);
-            #[cfg(feature = "oauth-user-list")]
             resources.append(&mut vec![
                 actix::list_users::make_oauth_list_users_resource(
                     self.oauth_user_session_store.clone(),
