@@ -131,6 +131,7 @@ challenge-authorization = [
   "cylinder/key-load",
   "splinter/challenge-authorization"
 ]
+config-allow-keys = ["authorization-handler-allow-keys"]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
 health-service = ["health", "health/authorization"]

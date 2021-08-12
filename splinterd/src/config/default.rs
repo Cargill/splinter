@@ -53,6 +53,9 @@ const ADMIN_TIMEOUT: u64 = 30; // 30 seconds
 #[cfg(feature = "challenge-authorization")]
 const PEERING_KEY_NAME: &str = "splinterd";
 
+#[cfg(feature = "config-allow-keys")]
+const ALLOW_KEYS_FILE: &str = "allow_keys";
+
 pub struct DefaultPartialConfigBuilder;
 
 impl DefaultPartialConfigBuilder {
@@ -128,6 +131,12 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         #[cfg(feature = "challenge-authorization")]
         {
             partial_config = partial_config.with_peering_key(Some(String::from(PEERING_KEY_NAME)))
+        }
+
+        #[cfg(feature = "config-allow-keys")]
+        {
+            partial_config =
+                partial_config.with_allow_keys_file(Some(String::from(ALLOW_KEYS_FILE)))
         }
 
         Ok(partial_config)

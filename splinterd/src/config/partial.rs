@@ -103,6 +103,8 @@ pub struct PartialConfig {
     loggers: Option<HashMap<String, UnnamedLoggerConfig>>,
     #[cfg(feature = "log-config")]
     verbosity: Option<log::Level>,
+    #[cfg(feature = "config-allow-keys")]
+    allow_keys_file: Option<String>,
 }
 
 impl PartialConfig {
@@ -175,6 +177,8 @@ impl PartialConfig {
             root_logger: None,
             #[cfg(feature = "log-config")]
             verbosity: None,
+            #[cfg(feature = "config-allow-keys")]
+            allow_keys_file: None,
         }
     }
 
@@ -374,6 +378,11 @@ impl PartialConfig {
     #[cfg(feature = "log-config")]
     pub fn verbosity(&self) -> Option<log::Level> {
         self.verbosity
+    }
+
+    #[cfg(feature = "config-allow-keys")]
+    pub fn allow_keys_file(&self) -> Option<String> {
+        self.allow_keys_file.clone()
     }
 
     /// Adds a `config_dir` value to the `PartialConfig` object.
@@ -889,6 +898,18 @@ impl PartialConfig {
     /// * `loggers` - A set of loggers for the logging system to use
     pub fn with_loggers(mut self, loggers: Option<HashMap<String, UnnamedLoggerConfig>>) -> Self {
         self.loggers = loggers;
+        self
+    }
+
+    #[cfg(feature = "config-allow-keys")]
+    /// Adds a `allow_keys_file` value to the  `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `allow_keys_file` - List of public keys to allow
+    ///
+    pub fn with_allow_keys_file(mut self, allow_keys_file: Option<String>) -> Self {
+        self.allow_keys_file = allow_keys_file;
         self
     }
 }
