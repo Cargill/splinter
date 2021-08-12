@@ -36,7 +36,7 @@ impl NodeIdStore for FileNodeIdStore {
     fn get_node_id(&self) -> Result<Option<String>, NodeIdStoreError> {
         fs::read_to_string(&self.filename)
             .map_err(|e| e.into())
-            .map(Some)
+            .map(|s| Some(s.trim_end().to_string()))
     }
 
     fn set_node_id(&self, node_id: String) -> Result<(), NodeIdStoreError> {
