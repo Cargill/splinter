@@ -82,7 +82,6 @@ default = [
     "biome-credentials",
     "biome-key-management",
     "biome-profile",
-    "biome-replace-keys",
     "database-postgres",
     "database-sqlite",
     "oauth",
@@ -126,7 +125,6 @@ authorization-handler-rbac = [
 biome-credentials = ["splinter/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management"]
 biome-profile = ["splinter/biome-profile"]
-biome-replace-keys = ["splinter/biome-replace-keys"]
 challenge-authorization = [
   "cylinder/key-load",
   "splinter/challenge-authorization"

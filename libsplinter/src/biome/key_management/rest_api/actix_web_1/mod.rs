@@ -301,7 +301,6 @@ mod tests {
     /// 4) Replace old key with new keys via PUT /biome/keys
     /// 5) Verify new keys are the only keys via GET /biome/keys
     #[test]
-    #[cfg(feature = "biome-replace-keys")]
     fn test_put_key() {
         run_test(|url, client| {
             let login =
@@ -395,7 +394,6 @@ mod tests {
     /// 2) Validate that PUT /biome/keys with a correct version returns 200
     /// 3) Validate that PUT /biome/keys with an incorrect returns 400
     #[test]
-    #[cfg(feature = "biome-replace-keys")]
     fn test_put_key_version() {
         run_test(|url, client| {
             let login =
