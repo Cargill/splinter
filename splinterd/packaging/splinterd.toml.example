@@ -70,6 +70,10 @@ version = "1"
 # service).
 #admin_timeout = 30
 
+# Sets the file for allowable keys. Can be absolute or relative. Relative files
+# are relative to the config directory. Defaults to "allow_keys".
+#allow_keys_file = "allow_keys"
+
 #
 # Registry Options
 #

@@ -109,6 +109,10 @@ heartbeat = 60
 # (in seconds; default 30 seconds)
 admin_timeout = 30
 
+# Sets the file for allowable keys. Can be absolute or relative. Relative files
+# are relative to the config directory. Defaults to "allow_keys".
+allow_keys_file = "allow_keys"
+
 # Domains included in the REST API CORS
 # (default ["*"])
 whitelist = ["*"]
