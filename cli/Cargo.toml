@@ -60,6 +60,7 @@ default = [
     "postgres",
     "sqlite",
     "upgrade",
+    "user",
 ]
 
 stable = [
@@ -77,7 +78,6 @@ experimental = [
     "https-certs",
     "node-id-upgrade",
     "registry",
-    "user-list",
 ]
 
 authorization-handler-maintenance = []
@@ -101,7 +101,7 @@ upgrade = [
     "database",
     "splinter/store-factory"
 ]
-user-list = []
+user = []
 
 
 

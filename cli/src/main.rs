@@ -1563,7 +1563,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             ),
     );
 
-    #[cfg(feature = "user-list")]
+    #[cfg(feature = "user")]
     {
         app = app.subcommand(
             SubCommand::with_name("user")
@@ -1736,7 +1736,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
 
     subcommands = subcommands.with_command("permissions", permissions::ListAction);
 
-    #[cfg(feature = "user-list")]
+    #[cfg(feature = "user")]
     {
         use action::user;
         subcommands = subcommands.with_command(
