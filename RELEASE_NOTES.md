@@ -1,5 +1,63 @@
 # Release Notes
 
+## Changes in Splinter 0.5.14
+
+### Highlights
+
+* Splinterd will not start if there are database migrations that need to be run
+  and will give information about how to upgrade the database.
+
+* User configurable logging with stdout, stderr, file, and rotating file log
+  targets as well as fine grain control over where each log statement goes.
+
+### libsplinter
+
+* Replace the use of a Vec<u8> to represent a public key in the
+  PeerAuthorizationToken, ConnectionAuthorizationType, Identity, and in the
+  AdminService.
+
+* Add `any_pending_migrations` to postgres and sqlite migration modules
+
+* Fix identity comparison in PeerManager to decide between inbound/outboud
+  connections. This comparison must now be between the connection's identity
+  and the required local authorization used when requesting the connection
+  originally.
+
+* Stabilize `admin-service-count`. This makes `count_circuits` and
+  `count_proposals`available on the `AdminServiceStore`.
+
+* Stabilize `oauth-user-list` feature by removing it, its functionality is
+  included under the `oauth` feature.
+
+### splinterd
+
+* Detect pending migrations and abort if migrations are required
+
+* Add experimental `--peering-key` option to the splinterd to set which key
+  will be used during challenge authorization with the peers provided with
+  `--peer`
+
+* Update `--peer` to default to using challenge authorization to connect to the
+  specified unidentified peer. The `--peer` option also has been updated to
+  take the format tcp+trust://ipaddr:port/ if the authorization used must be
+  trust. The feature is experimental.
+
+ * Add file base logging configuration options based on the log4j/rs pattern.
+   `splinterd.toml` has new sections for loggers and appenders. Each logger can
+   direct logs to one or more appenders. Each appender can be shared between
+   loggers. There are two special cases, the `stdout` appender and the
+   `root` logger both of which are auto added if not otherwise specified in
+   the log file. Both can be overridden from `splinterd.toml` by including a
+   logger or appender named `stdout` or `root` respectively. The feature is
+   experimental.
+
+*  Add new PUT method at /biome/keys to replace existing user keys
+
+### splinter CLI
+
+* Stabilize `user-list` feature by renaming it to `user` and adding it to
+  `default`.
+
 ## Changes in Splinter 0.5.13
 
 ### Highlights
