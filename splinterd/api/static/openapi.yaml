@@ -2191,7 +2191,7 @@ components:
         version:
           description: Rest API version
           type: string
-          example: "0.5.14"
+          example: "0.5.15"
         node_id:
           description: Node id
           type: string
