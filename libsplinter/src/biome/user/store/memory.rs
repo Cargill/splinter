@@ -62,8 +62,8 @@ impl UserStore for MemoryUserStore {
             source: None,
         })?;
 
-        if inner.contains_key(&updated_user.id()) {
-            inner.insert(updated_user.id(), updated_user);
+        if let std::collections::hash_map::Entry::Occupied(mut e) = inner.entry(updated_user.id()) {
+            e.insert(updated_user);
             Ok(())
         } else {
             Err(UserStoreError::NotFound(format!(
