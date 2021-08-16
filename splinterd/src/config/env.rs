@@ -44,23 +44,60 @@ const METRICS_USERNAME_ENV: &str = "SPLINTER_INFLUX_USERNAME";
 #[cfg(feature = "tap")]
 const METRICS_PASSWORD_ENV: &str = "SPLINTER_INFLUX_PASSWORD";
 
-pub struct EnvPartialConfigBuilder;
+/// Trait that outlines a basic read-only environment variable store
+pub trait EnvStore {
+    /// Returns an environment variable for the given key
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - A string slice that holds the name of the environment variable
+    ///
+    fn get(&self, key: &str) -> Option<String>;
+}
 
-impl EnvPartialConfigBuilder {
-    pub fn new() -> Self {
-        EnvPartialConfigBuilder {}
+/// Implementation of `EnvStore` for operating system environment variables
+pub struct OsEnvStore;
+
+impl EnvStore for OsEnvStore {
+    fn get(&self, key: &str) -> Option<String> {
+        env::var(key).ok()
     }
+}
+
+pub struct EnvPartialConfigBuilder<K: EnvStore> {
+    store: K,
 }
 
 /// Implementation of the `PartialConfigBuilder` trait to create a `PartialConfig` object from the
 /// environment variable config options.
-impl PartialConfigBuilder for EnvPartialConfigBuilder {
+impl EnvPartialConfigBuilder<OsEnvStore> {
+    pub fn new() -> Self {
+        EnvPartialConfigBuilder {
+            store: OsEnvStore {},
+        }
+    }
+}
+
+impl<K: EnvStore> EnvPartialConfigBuilder<K> {
+    /// Returns an `EnvPartialConfigBuilder` that will fetch data from the given store.
+    ///
+    /// # Arguments
+    ///
+    /// * `store` - An instance of `EnvStore`
+    ///
+    #[cfg(test)]
+    pub fn from_store(store: K) -> Self {
+        EnvPartialConfigBuilder { store }
+    }
+}
+
+impl<K: EnvStore> PartialConfigBuilder for EnvPartialConfigBuilder<K> {
     fn build(self) -> Result<PartialConfig, ConfigError> {
         let mut config = PartialConfig::new(ConfigSource::Environment);
 
         let config_dir_env = match (
-            env::var(CONFIG_DIR_ENV).ok(),
-            env::var(SPLINTER_HOME_ENV).ok(),
+            self.store.get(CONFIG_DIR_ENV),
+            self.store.get(SPLINTER_HOME_ENV),
         ) {
             (Some(config_dir), _) => Some(config_dir),
             (None, Some(splinter_home)) => {
@@ -73,8 +110,8 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
             _ => None,
         };
         let tls_cert_dir_env = match (
-            env::var(CERT_DIR_ENV).ok(),
-            env::var(SPLINTER_HOME_ENV).ok(),
+            self.store.get(CERT_DIR_ENV),
+            self.store.get(SPLINTER_HOME_ENV),
         ) {
             (Some(tls_cert_dir), _) => Some(tls_cert_dir),
             (None, Some(splinter_home)) => {
@@ -87,8 +124,8 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
             _ => None,
         };
         let state_dir_env = match (
-            env::var(STATE_DIR_ENV).ok(),
-            env::var(SPLINTER_HOME_ENV).ok(),
+            self.store.get(STATE_DIR_ENV),
+            self.store.get(SPLINTER_HOME_ENV),
         ) {
             (Some(state_dir), _) => Some(state_dir),
             (None, Some(splinter_home)) => {
@@ -101,7 +138,7 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
             _ => None,
         };
 
-        let strict_ref_counts = match env::var(SPLINTER_STRICT_REF_COUNT_ENV).ok() {
+        let strict_ref_counts = match self.store.get(SPLINTER_STRICT_REF_COUNT_ENV) {
             Some(value) => {
                 let t: bool = value.parse().unwrap_or(false);
                 Some(t)
@@ -118,20 +155,20 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
         #[cfg(feature = "oauth")]
         {
             config = config
-                .with_oauth_provider(env::var(OAUTH_PROVIDER_ENV).ok())
-                .with_oauth_client_id(env::var(OAUTH_CLIENT_ID_ENV).ok())
-                .with_oauth_client_secret(env::var(OAUTH_CLIENT_SECRET_ENV).ok())
-                .with_oauth_redirect_url(env::var(OAUTH_REDIRECT_URL_ENV).ok())
-                .with_oauth_openid_url(env::var(OAUTH_OPENID_URL_ENV).ok());
+                .with_oauth_provider(self.store.get(OAUTH_PROVIDER_ENV))
+                .with_oauth_client_id(self.store.get(OAUTH_CLIENT_ID_ENV))
+                .with_oauth_client_secret(self.store.get(OAUTH_CLIENT_SECRET_ENV))
+                .with_oauth_redirect_url(self.store.get(OAUTH_REDIRECT_URL_ENV))
+                .with_oauth_openid_url(self.store.get(OAUTH_OPENID_URL_ENV));
         }
 
         #[cfg(feature = "tap")]
         {
             config = config
-                .with_influx_db(env::var(METRICS_DB_ENV).ok())
-                .with_influx_url(env::var(METRICS_URL_ENV).ok())
-                .with_influx_username(env::var(METRICS_USERNAME_ENV).ok())
-                .with_influx_password(env::var(METRICS_PASSWORD_ENV).ok())
+                .with_influx_db(self.store.get(METRICS_DB_ENV))
+                .with_influx_url(self.store.get(METRICS_URL_ENV))
+                .with_influx_username(self.store.get(METRICS_USERNAME_ENV))
+                .with_influx_password(self.store.get(METRICS_PASSWORD_ENV))
         }
 
         Ok(config)
@@ -141,22 +178,49 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
+    /// Implementation of `EnvStore` that supports arbitrary hashmaps
+    pub(crate) struct HashmapEnvStore {
+        hashmap: HashMap<String, String>,
+    }
+
+    impl HashmapEnvStore {
+        /// Returns an `EnvStore` that will fetch an environment variable using the given hashmap.
+        ///
+        /// # Arguments
+        ///
+        /// * `hashmap` - The hashmap to obtain values from
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use crate::config::env;
+        /// use std::collections::HashMap;
+        /// let mut hashmap: HashMap<String, String> = new HashMap();
+        /// hashmap.insert("MY_ENV_VAR".to_string(), "Success!".to_string());
+        /// let store = HashmapEnvStore::new(hashmap);
+        /// ```
+        pub fn new(hashmap: HashMap<String, String>) -> HashmapEnvStore {
+            HashmapEnvStore { hashmap }
+        }
+    }
+
+    impl EnvStore for HashmapEnvStore {
+        fn get(&self, key: &str) -> Option<String> {
+            self.hashmap.get(key).map(ToOwned::to_owned)
+        }
+    }
 
     #[test]
-    // This test intermittently fails due to interaction with other tests that set the environment
-    // variables used within. It also fails to reset the environment variables to their original
-    // values.
-    #[ignore]
     /// This test verifies that a `PartialConfig` object, constructed from the
     /// `EnvPartialConfigBuilder` module, contains the correct values using the following steps:
     ///
-    /// 1. Remove any existing environment variables which may be set.
-    /// 2. A new `EnvPartialConfigBuilder` object is created.
-    /// 3. The `EnvPartialConfigBuilder` object is transformed to a `PartialConfig` object using
+    /// 1. A new `EnvPartialConfigBuilder` object is created mimicking an empty environment
+    /// 2. The `EnvPartialConfigBuilder` object is transformed to a `PartialConfig` object using
     ///    `build`.
-    /// 4. Set the environment variables for both the state and cert directories.
-    /// 5. A new `EnvPartialConfigBuilder` object is created.
-    /// 6. The `EnvPartialConfigBuilder` object is transformed to a `PartialConfig` object using
+    /// 3. A new `EnvPartialConfigBuilder` object is created mimicking state and cert directories.
+    /// 4. The `EnvPartialConfigBuilder` object is transformed to a `PartialConfig` object using
     ///    `build`.
     ///
     /// This test verifies each `PartialConfig` object built from the `EnvPartialConfigBuilder` module
@@ -164,12 +228,11 @@ mod tests {
     /// first `PartialConfig` should not contain any values. After the environment variables were
     /// set, the new `PartialConfig` configuration values should reflect those values.
     fn test_environment_var_set_config() {
-        // Remove any existing environment variables.
-        env::remove_var(STATE_DIR_ENV);
-        env::remove_var(CERT_DIR_ENV);
-
         // Create a new EnvPartialConfigBuilder object.
-        let env_var_config = EnvPartialConfigBuilder::new();
+        let hashmap = HashMap::new();
+        let store = HashmapEnvStore::new(hashmap);
+        let env_var_config = EnvPartialConfigBuilder::from_store(store);
+
         // Build a `PartialConfig` from the `EnvPartialConfigBuilder` object created.
         let unset_config = env_var_config
             .build()
@@ -179,11 +242,12 @@ mod tests {
         assert_eq!(unset_config.state_dir(), None);
         assert_eq!(unset_config.tls_cert_dir(), None);
 
-        // Set the environment variables.
-        env::set_var(STATE_DIR_ENV, "state/test/config");
-        env::set_var(CERT_DIR_ENV, "cert/test/config");
         // Create a new EnvPartialConfigBuilder object.
-        let env_var_config = EnvPartialConfigBuilder::new();
+        let mut hashmap: HashMap<String, String> = HashMap::new();
+        hashmap.insert(STATE_DIR_ENV.to_string(), "state/test/config".to_string());
+        hashmap.insert(CERT_DIR_ENV.to_string(), "cert/test/config".to_string());
+        let store = HashmapEnvStore::new(hashmap);
+        let env_var_config = EnvPartialConfigBuilder::from_store(store);
         // Build a `PartialConfig` from the `EnvPartialConfigBuilder` object created.
         let set_config = env_var_config
             .build()
