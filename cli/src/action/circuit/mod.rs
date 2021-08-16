@@ -607,12 +607,11 @@ fn list_circuits(url: &str, filter: Option<&str>, format: &str) -> Result<(), Cl
     let client = SplinterRestClient::new(url);
 
     let circuits = client.list_circuits(filter)?;
-    let mut data = Vec::new();
-    data.push(vec![
+    let mut data = vec![vec![
         "ID".to_string(),
         "MANAGEMENT".to_string(),
         "MEMBERS".to_string(),
-    ]);
+    ]];
     circuits.data.iter().for_each(|circuit| {
         let members = circuit.members.join(";");
         data.push(vec![
@@ -743,13 +742,12 @@ fn list_proposals(
     let client = SplinterRestClient::new(url);
 
     let proposals = client.list_proposals(management_type_filter, member_filter)?;
-    let mut data = Vec::new();
-    data.push(vec![
+    let mut data = vec![vec![
         "ID".to_string(),
         "MANAGEMENT".to_string(),
         "MEMBERS".to_string(),
         "COMMENTS".to_string(),
-    ]);
+    ]];
     proposals.data.iter().for_each(|proposal| {
         let members = proposal
             .circuit

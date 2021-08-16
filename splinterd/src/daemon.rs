@@ -180,9 +180,10 @@ impl SplinterDaemon {
             service_listener.endpoint()
         );
 
-        let mut internal_service_listeners = vec![];
-        internal_service_listeners.push(transport.listen("inproc://admin-service")?);
-        internal_service_listeners.push(transport.listen("inproc://orchestator")?);
+        let mut internal_service_listeners = vec![
+            transport.listen("inproc://admin-service")?,
+            transport.listen("inproc://orchestator")?,
+        ];
         #[cfg(feature = "health")]
         internal_service_listeners.push(transport.listen("inproc://health_service")?);
 
