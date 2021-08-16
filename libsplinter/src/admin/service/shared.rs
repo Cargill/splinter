@@ -1011,8 +1011,7 @@ impl AdminServiceShared {
 
     pub fn on_peer_disconnected(&mut self, peer_id: String) {
         self.service_protocols.remove(&admin_service_id(&peer_id));
-        let mut pending_protocol_payloads =
-            std::mem::replace(&mut self.pending_protocol_payloads, vec![]);
+        let mut pending_protocol_payloads = std::mem::take(&mut self.pending_protocol_payloads);
 
         // Add peer back to any pending payloads
         for pending_protocol_payload in pending_protocol_payloads.iter_mut() {
@@ -1032,7 +1031,7 @@ impl AdminServiceShared {
 
         self.pending_protocol_payloads = protocol;
         // Add peer back to any pending payloads
-        let mut unpeered_payloads = std::mem::replace(&mut self.unpeered_payloads, vec![]);
+        let mut unpeered_payloads = std::mem::take(&mut self.unpeered_payloads);
         for unpeered_payload in unpeered_payloads.iter_mut() {
             if unpeered_payload.members.contains(&peer_id) {
                 unpeered_payload.unpeered_ids.push(peer_id.to_string())
@@ -1044,7 +1043,7 @@ impl AdminServiceShared {
     }
 
     pub fn on_peer_connected(&mut self, peer_id: &str) -> Result<(), AdminSharedError> {
-        let mut unpeered_payloads = std::mem::replace(&mut self.unpeered_payloads, vec![]);
+        let mut unpeered_payloads = std::mem::take(&mut self.unpeered_payloads);
         for unpeered_payload in unpeered_payloads.iter_mut() {
             unpeered_payload
                 .unpeered_ids
@@ -1118,8 +1117,7 @@ impl AdminServiceShared {
         service_id: &str,
         protocol: u32,
     ) -> Result<(), AdminSharedError> {
-        let mut pending_protocol_payloads =
-            std::mem::replace(&mut self.pending_protocol_payloads, vec![]);
+        let mut pending_protocol_payloads = std::mem::take(&mut self.pending_protocol_payloads);
         for pending_protocol_payload in pending_protocol_payloads.iter_mut() {
             match protocol {
                 0 => {
