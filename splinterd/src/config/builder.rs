@@ -77,18 +77,12 @@ impl ConfigBuilder {
         let config_dir = self
             .partial_configs
             .iter()
-            .find_map(|p| match p.config_dir() {
-                Some(v) => Some((v, p.source())),
-                None => None,
-            })
+            .find_map(|p| p.config_dir().map(|v| (v, p.source())))
             .ok_or_else(|| ConfigError::MissingValue("config directory".to_string()))?;
         let tls_cert_dir = self
             .partial_configs
             .iter()
-            .find_map(|p| match p.tls_cert_dir() {
-                Some(v) => Some((v, p.source())),
-                None => None,
-            })
+            .find_map(|p| p.tls_cert_dir().map(|dir| (dir, p.source())))
             .ok_or_else(|| ConfigError::MissingValue("certificate directory".to_string()))?;
         let tls_ca_file = self
             .partial_configs
@@ -133,10 +127,7 @@ impl ConfigBuilder {
         let network_endpoints = self
             .partial_configs
             .iter()
-            .find_map(|p| match p.network_endpoints() {
-                Some(v) => Some((v, p.source())),
-                None => None,
-            })
+            .find_map(|p| p.network_endpoints().map(|point| (point, p.source())))
             .ok_or_else(|| ConfigError::MissingValue("network endpoints".to_string()))?;
         // Iterates over the list of `PartialConfig` objects to find the first config with a value
         // for the specific field. If no value is found, an error is returned.
@@ -145,10 +136,7 @@ impl ConfigBuilder {
             storage: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.storage() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.storage().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("storage".to_string()))?,
             tls_cert_dir,
             tls_ca_file,
@@ -160,100 +148,67 @@ impl ConfigBuilder {
             service_endpoint: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.service_endpoint() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.service_endpoint().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("service endpoint".to_string()))?,
             advertised_endpoints: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.advertised_endpoints() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.advertised_endpoints().map(|v| (v, p.source())))
                 // Default to whatever `network_endpoints` is set to
                 .unwrap_or((network_endpoints.0.clone(), ConfigSource::Default)),
             network_endpoints,
             peers: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.peers() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.peers().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("peers".to_string()))?,
             display_name: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.display_name() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                }),
-            node_id: self.partial_configs.iter().find_map(|p| match p.node_id() {
-                Some(v) => Some((v, p.source())),
-                None => None,
-            }),
+                .find_map(|p| p.display_name().map(|v| (v, p.source()))),
+            node_id: self
+                .partial_configs
+                .iter()
+                .find_map(|p| p.node_id().map(|v| (v, p.source()))),
             rest_api_endpoint: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.rest_api_endpoint() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.rest_api_endpoint().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("rest api endpoint".to_string()))?,
             #[cfg(feature = "database")]
             database: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.database() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.database().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("database".to_string()))?,
             registries: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.registries() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.registries().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("registries".to_string()))?,
             registry_auto_refresh: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.registry_auto_refresh() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.registry_auto_refresh().map(|v| (v, p.source())))
                 .ok_or_else(|| {
                     ConfigError::MissingValue("registry auto refresh interval".to_string())
                 })?,
             registry_forced_refresh: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.registry_forced_refresh() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.registry_forced_refresh().map(|v| (v, p.source())))
                 .ok_or_else(|| {
                     ConfigError::MissingValue("registry forced refresh interval".to_string())
                 })?,
             heartbeat: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.heartbeat() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.heartbeat().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("heartbeat interval".to_string()))?,
             admin_timeout: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.admin_timeout() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.admin_timeout().map(|v| (v, p.source())))
                 .ok_or_else(|| {
                     ConfigError::MissingValue("admin service coordinator timeout".to_string())
                 })?,
@@ -261,51 +216,33 @@ impl ConfigBuilder {
             state_dir: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.state_dir() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.state_dir().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("state directory".to_string()))?,
             tls_insecure: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.tls_insecure() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.tls_insecure().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("insecure".to_string()))?,
             no_tls: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.no_tls() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.no_tls().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("no tls".to_string()))?,
             #[cfg(feature = "biome")]
             enable_biome: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.enable_biome() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.enable_biome().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("enable_biome".to_string()))?,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.whitelist() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                }),
+                .find_map(|p| p.whitelist().map(|v| (v, p.source()))),
             strict_ref_counts: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.strict_ref_counts() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
+                .find_map(|p| p.strict_ref_counts().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("strict_ref_counts".to_string()))?,
         })
     }
