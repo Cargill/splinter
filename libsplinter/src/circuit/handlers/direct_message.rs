@@ -124,19 +124,12 @@ impl Handler for CircuitDirectMessageHandler {
                         let node_id = service.node().id().to_string();
                         // If the service is on this node send message to the service, otherwise
                         // send the message to the node the service is connected to
+                        let msg_bytes = context.message_bytes().to_vec();
+                        let network_msg_bytes =
+                            create_message(msg_bytes, CircuitMessageType::CIRCUIT_DIRECT_MESSAGE)?;
                         if node_id != self.node_id {
-                            let msg_bytes = context.message_bytes().to_vec();
-                            let network_msg_bytes = create_message(
-                                msg_bytes,
-                                CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                            )?;
                             (network_msg_bytes, node_id)
                         } else {
-                            let msg_bytes = context.message_bytes().to_vec();
-                            let network_msg_bytes = create_message(
-                                msg_bytes,
-                                CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                            )?;
                             let peer_id = match service.peer_id() {
                                 Some(peer_id) => peer_id.clone(),
                                 None => {
