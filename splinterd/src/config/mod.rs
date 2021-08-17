@@ -107,6 +107,8 @@ pub struct Config {
     loggers: Option<Vec<(LoggerConfig, ConfigSource)>>,
     #[cfg(feature = "log-config")]
     verbosity: (log::Level, ConfigSource),
+    #[cfg(feature = "config-allow-keys")]
+    allow_keys_file: (String, ConfigSource),
 }
 
 impl Config {
@@ -610,6 +612,16 @@ impl Config {
         &self.verbosity.1
     }
 
+    #[cfg(feature = "config-allow-keys")]
+    pub fn allow_keys_file(&self) -> log::Level {
+        self.allow_keys_file.0
+    }
+
+    #[cfg(feature = "config-allow-keys")]
+    pub fn allow_keys_file_source(&self) -> &ConfigSource {
+        &self.allow_keys_file.1
+    }
+
     #[allow(clippy::cognitive_complexity)]
     /// Displays the configuration value along with where the value was sourced from.
     pub fn log_as_debug(&self) {
@@ -864,6 +876,14 @@ impl Config {
                 self.verbosity_source()
             );
         }
+        #[cfg(feature = "config-allow-keys")]
+        {
+            debug!(
+                "Config: allow_keys_file: {:?} (source: {:?})",
+                self.allow_keys_file(),
+                self.allow_keys_file_source()
+            );
+        }
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -906,6 +926,8 @@ mod tests {
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
     static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
+    #[cfg(feature = "config-allow-keys")]
+    static EXAMPLE_ALLOW_KEYS_FILE: &str = "/some/path/allow_keys";
 
     static DEFAULT_CLIENT_CERT: &str = "client.crt";
     static DEFAULT_CLIENT_KEY: &str = "private/client.key";
@@ -935,6 +957,11 @@ mod tests {
             ("node_id".to_string(), EXAMPLE_NODE_ID.to_string()),
             ("display_name".to_string(), EXAMPLE_DISPLAY_NAME.to_string()),
             ("version".to_string(), "1".to_string()),
+            #[cfg(feature = "config-allow-keys")]
+            (
+                "allow_keys_file".to_string(),
+                EXAMPLE_ALLOW_KEYS_FILE.to_string(),
+            ),
         ];
 
         let mut config_values = Map::new();
@@ -1372,6 +1399,23 @@ mod tests {
         assert_eq!(
             (final_config.state_dir(), final_config.state_dir_source()),
             ("test/state/", &ConfigSource::Environment)
+        );
+
+        #[cfg(feature = "config-allow-keys")]
+        // Both the `DefaultPartialConfigBuilder` and `TomlPartialConfigBuilder` had values for
+        // `allow_keys_file`, but the `TomlPartialConfigBuilder` value should have precedence
+        // (source should be `Toml`).
+        assert_eq!(
+            (
+                final_config.allow_keys_file(),
+                final_config.allow_keys_file_source()
+            ),
+            (
+                EXAMPLE_ALLOW_KEYS_FILE.to_string(),
+                &ConfigSource::Toml {
+                    file: TEST_TOML.to_string()
+                }
+            )
         );
     }
 

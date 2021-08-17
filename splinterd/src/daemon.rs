@@ -18,6 +18,8 @@ use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::path::Path;
+#[cfg(feature = "authorization-handler-allow-keys")]
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc::channel, Arc, Mutex};
 use std::thread;
@@ -156,6 +158,8 @@ pub struct SplinterDaemon {
     signers: Vec<Box<dyn Signer>>,
     #[cfg(feature = "challenge-authorization")]
     peering_token: PeerAuthorizationToken,
+    #[cfg(feature = "config-allow-keys")]
+    allow_keys_file: String,
 }
 
 impl SplinterDaemon {
@@ -564,7 +568,18 @@ impl SplinterDaemon {
             #[allow(unused_mut)]
             let mut authorization_handlers = vec![
                 #[cfg(feature = "authorization-handler-allow-keys")]
-                create_allow_keys_authorization_handler(&self.config_dir)?,
+                create_allow_keys_authorization_handler(
+                    &create_allow_keys_path(
+                        &self.config_dir,
+                        #[cfg(feature = "config-allow-keys")]
+                        &self.allow_keys_file,
+                        #[cfg(not(feature = "config-allow-keys"))]
+                        "allow_keys",
+                    )
+                    .to_str()
+                    .expect("path built from &str cannot be invalid")
+                    .to_string(),
+                )?,
             ];
 
             #[cfg(feature = "authorization-handler-rbac")]
@@ -1573,6 +1588,24 @@ mod tests {
             ("http", "server/registry.yaml")
         );
     }
+
+    #[cfg(feature = "authorization-handler-allow-keys")]
+    #[test]
+    fn test_create_allow_keys_path_absolute_path() {
+        assert_eq!(
+            create_allow_keys_path("/config/path", "/absolute/path"),
+            Path::new("/absolute/path")
+        );
+    }
+
+    #[cfg(feature = "authorization-handler-allow-keys")]
+    #[test]
+    fn test_create_allow_keys_path_relative_path() {
+        assert_eq!(
+            create_allow_keys_path("/config/path", "relative/path"),
+            Path::new("/config/path/relative/path")
+        );
+    }
 }
 
 #[derive(Default)]
@@ -1622,27 +1655,31 @@ impl ShutdownHandle for RegistryShutdownHandle {
 
 #[cfg(feature = "authorization-handler-allow-keys")]
 fn create_allow_keys_authorization_handler(
-    config_dir: &str,
+    allow_keys_path: &str,
 ) -> Result<Box<dyn AuthorizationHandler>, StartError> {
-    let allow_keys_path = Path::new(config_dir)
-        .join("allow_keys")
-        .to_str()
-        .expect("path built from &str cannot be invalid")
-        .to_string();
-
     debug!(
         "Reading allow keys authorization handler file: {:?}",
         allow_keys_path
     );
 
     Ok(Box::new(
-        AllowKeysAuthorizationHandler::new(&allow_keys_path).map_err(|err| {
+        AllowKeysAuthorizationHandler::new(allow_keys_path).map_err(|err| {
             StartError::StorageError(format!(
                 "Failed to initialize allow keys authorization handler: {}",
                 err
             ))
         })?,
     ))
+}
+
+#[cfg(feature = "authorization-handler-allow-keys")]
+fn create_allow_keys_path(config_path: &str, allow_keys_file: &str) -> PathBuf {
+    let allow_keys_path = Path::new(allow_keys_file);
+    if allow_keys_path.is_relative() {
+        Path::new(config_path).join(allow_keys_file)
+    } else {
+        allow_keys_path.to_path_buf()
+    }
 }
 
 /// Parse the peer endpoint that we want to connect to regardless of a circuit. The endpoint will
