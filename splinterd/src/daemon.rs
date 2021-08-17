@@ -180,12 +180,12 @@ impl SplinterDaemon {
             service_listener.endpoint()
         );
 
-        let mut internal_service_listeners = vec![
+        let internal_service_listeners = vec![
             transport.listen("inproc://admin-service")?,
             transport.listen("inproc://orchestator")?,
+            #[cfg(feature = "health")]
+            transport.listen("inproc://health_service")?,
         ];
-        #[cfg(feature = "health")]
-        internal_service_listeners.push(transport.listen("inproc://health_service")?);
 
         info!("Starting SpinterNode with ID {}", self.node_id);
         let authorization_manager =
