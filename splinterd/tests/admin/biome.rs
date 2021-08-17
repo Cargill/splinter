@@ -241,52 +241,49 @@ fn test_biome_key_management() {
         .expect("Unable to retrieve key")
         .is_some());
 
-    #[cfg(feature = "biome-replace-keys")]
-    {
-        // The keys we are posting and using as a basis of comparison later
-        // These keys must be in ascending order by public_key
-        let expected_keys = vec![
-            NewKey {
-                public_key: "10293".to_string(),
-                encrypted_private_key: "48472".to_string(),
-                display_name: "replacement_key2".to_string(),
-            },
-            NewKey {
-                public_key: "89212".to_string(),
-                encrypted_private_key: "72612".to_string(),
-                display_name: "replacement_key".to_string(),
-            },
-            NewKey {
-                public_key: "93838".to_string(),
-                encrypted_private_key: "17279".to_string(),
-                display_name: "replacement_key3".to_string(),
-            },
-        ];
+    // The keys we are posting and using as a basis of comparison later
+    // These keys must be in ascending order by public_key
+    let expected_keys = vec![
+        NewKey {
+            public_key: "10293".to_string(),
+            encrypted_private_key: "48472".to_string(),
+            display_name: "replacement_key2".to_string(),
+        },
+        NewKey {
+            public_key: "89212".to_string(),
+            encrypted_private_key: "72612".to_string(),
+            display_name: "replacement_key".to_string(),
+        },
+        NewKey {
+            public_key: "93838".to_string(),
+            encrypted_private_key: "17279".to_string(),
+            display_name: "replacement_key3".to_string(),
+        },
+    ];
 
-        // Attempt to replace the keys, using the biome user's access token returned at log-in
-        assert!(node
-            .biome_client(Some(&auth_token))
-            .replace_keys(expected_keys.clone())
-            .is_ok());
+    // Attempt to replace the keys, using the biome user's access token returned at log-in
+    assert!(node
+        .biome_client(Some(&auth_token))
+        .replace_keys(expected_keys.clone())
+        .is_ok());
 
-        // List the user's keys, using the biome user's access token returned at log-in
-        let mut keys = node
-            .biome_client(Some(&auth_token))
-            .list_user_keys()
-            .expect("Unable to list Biome user keys")
-            .into_iter()
-            .map(|key| NewKey {
-                public_key: key.public_key,
-                encrypted_private_key: key.encrypted_private_key,
-                display_name: key.display_name,
-            })
-            .collect::<Vec<NewKey>>();
+    // List the user's keys, using the biome user's access token returned at log-in
+    let mut keys = node
+        .biome_client(Some(&auth_token))
+        .list_user_keys()
+        .expect("Unable to list Biome user keys")
+        .into_iter()
+        .map(|key| NewKey {
+            public_key: key.public_key,
+            encrypted_private_key: key.encrypted_private_key,
+            display_name: key.display_name,
+        })
+        .collect::<Vec<NewKey>>();
 
-        keys.sort_by(|a, b| a.public_key.partial_cmp(&b.public_key).unwrap());
+    keys.sort_by(|a, b| a.public_key.partial_cmp(&b.public_key).unwrap());
 
-        // Validate all keys are returned
-        assert_eq!(keys, expected_keys);
-    }
+    // Validate all keys are returned
+    assert_eq!(keys, expected_keys);
 
     // Shutdown the network
     shutdown!(network).expect("Unable to shutdown network");

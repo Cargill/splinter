@@ -772,7 +772,6 @@ impl BiomeClient for ReqwestBiomeClient {
     }
 
     /// Replace a Biome user's keys
-    #[cfg(feature = "biome-replace-keys")]
     fn replace_keys(&self, keys: Vec<NewKey>) -> Result<(), InternalError> {
         let keys: Vec<ClientNewKey> = keys.into_iter().map(ClientNewKey::from).collect();
         let request = Client::new()

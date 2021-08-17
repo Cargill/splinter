@@ -162,7 +162,6 @@ pub trait BiomeClient {
     /// # Arguments
     ///
     /// * `keys`: New keys for the user
-    #[cfg(feature = "biome-replace-keys")]
     fn replace_keys(&self, keys: Vec<NewKey>) -> Result<(), InternalError>;
 
     /// Add a key pair for a Biome user.

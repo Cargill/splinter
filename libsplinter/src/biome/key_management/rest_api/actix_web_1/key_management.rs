@@ -39,8 +39,7 @@ pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
         ));
     #[cfg(feature = "authorization")]
     {
-        #[cfg(feature = "biome-replace-keys")]
-        let resource = resource
+        resource
             .add_method(
                 Method::Put,
                 Permission::AllowAuthenticated,
@@ -52,9 +51,7 @@ pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
                     protocol::BIOME_PROTOCOL_VERSION,
                 )
                 .with_method(Method::Put),
-            );
-
-        resource
+            )
             .add_method(
                 Method::Post,
                 Permission::AllowAuthenticated,
@@ -73,8 +70,7 @@ pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
     }
     #[cfg(not(feature = "authorization"))]
     {
-        #[cfg(feature = "biome-replace-keys")]
-        let resource = resource
+        resource
             .add_method(Method::Put, handle_put(key_store.clone()))
             .add_request_guard(
                 ProtocolVersionRangeGuard::new(
@@ -82,9 +78,7 @@ pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
                     protocol::BIOME_PROTOCOL_VERSION,
                 )
                 .with_method(Method::Put),
-            );
-
-        resource
+            )
             .add_method(Method::Post, handle_post(key_store.clone()))
             .add_method(Method::Get, handle_get(key_store.clone()))
             .add_method(Method::Patch, handle_patch(key_store))
@@ -192,7 +186,6 @@ fn handle_get(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
 }
 
 /// Defines a REST endpoint for updating all keys in the underlying storage
-#[cfg(feature = "biome-replace-keys")]
 fn handle_put(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();

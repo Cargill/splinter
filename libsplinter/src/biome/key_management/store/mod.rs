@@ -54,7 +54,6 @@ pub trait KeyStore: Sync + Send {
     ///
     /// * `user_id`: The ID owner of the key records to be updated.
     /// * `keys`: The array of new keys for the user
-    #[cfg(feature = "biome-replace-keys")]
     fn replace_keys(&self, user_id: &str, keys: &[Key]) -> Result<(), KeyStoreError> {
         for key in self.list_keys(Some(user_id))? {
             self.remove_key(&key.public_key, user_id)?;
@@ -125,7 +124,6 @@ where
         (**self).update_key(public_key, user_id, new_display_name)
     }
 
-    #[cfg(feature = "biome-replace-keys")]
     fn replace_keys(&self, user_id: &str, keys: &[Key]) -> Result<(), KeyStoreError> {
         (**self).replace_keys(user_id, keys)
     }
