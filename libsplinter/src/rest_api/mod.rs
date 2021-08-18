@@ -129,9 +129,9 @@ impl From<(HttpRequest, web::Payload)> for Request {
     }
 }
 
-impl Into<(HttpRequest, web::Payload)> for Request {
-    fn into(self) -> (HttpRequest, web::Payload) {
-        (self.0, self.1)
+impl From<Request> for (HttpRequest, web::Payload) {
+    fn from(request: Request) -> Self {
+        (request.0, request.1)
     }
 }
 
@@ -659,7 +659,7 @@ pub fn require_header(header_key: &str, request: &HttpRequest) -> Result<String,
 }
 
 pub fn get_authorization_token(request: &HttpRequest) -> Result<String, RequestError> {
-    let auth_header = require_header("Authorization", &request)?;
+    let auth_header = require_header("Authorization", request)?;
     Ok(auth_header
         .split_whitespace()
         .last()

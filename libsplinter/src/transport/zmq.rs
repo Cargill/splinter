@@ -122,9 +122,9 @@ impl TryFrom<Vec<u8>> for MessageType {
     }
 }
 
-impl Into<Vec<u8>> for MessageType {
-    fn into(self) -> Vec<u8> {
-        match self {
+impl From<MessageType> for Vec<u8> {
+    fn from(msg_type: MessageType) -> Self {
+        match msg_type {
             MessageType::RequestConnection => "CONNECT".into(),
             MessageType::ConnectionAccepted => "CONNECTION_ACCEPTED".into(),
             MessageType::RequestData => "REQUEST_DATA".into(),
@@ -508,26 +508,19 @@ impl ZmqListener {
                                     .get_mut(&payload.partner_id)
                                     .unwrap()
                                     .push(payload.message.clone());
-                                Self::send_msg(
-                                    &frontend,
-                                    &payload.socket_id,
-                                    &payload.partner_id,
-                                    &[],
-                                    MessageType::MessageReceived,
-                                )?;
                             } else {
                                 message_queue.insert(
                                     payload.partner_id.clone(),
                                     vec![payload.message.clone()],
                                 );
-                                Self::send_msg(
-                                    &frontend,
-                                    &payload.socket_id,
-                                    &payload.partner_id,
-                                    &[],
-                                    MessageType::MessageReceived,
-                                )?;
                             }
+                            Self::send_msg(
+                                &frontend,
+                                &payload.socket_id,
+                                &payload.partner_id,
+                                &[],
+                                MessageType::MessageReceived,
+                            )?;
                         }
                         _ => {
                             debug!("Unhandled message type {:?}", payload.message_type);
@@ -606,26 +599,19 @@ impl ZmqListener {
                                     .get_mut(&payload.partner_id)
                                     .unwrap()
                                     .push(payload.message.clone());
-                                Self::send_msg(
-                                    &backend,
-                                    &payload.socket_id,
-                                    &payload.partner_id,
-                                    &[],
-                                    MessageType::MessageReceived,
-                                )?;
                             } else {
                                 message_queue.insert(
                                     payload.partner_id.clone(),
                                     vec![payload.message.clone()],
                                 );
-                                Self::send_msg(
-                                    &backend,
-                                    &payload.socket_id,
-                                    &payload.partner_id,
-                                    &[],
-                                    MessageType::MessageReceived,
-                                )?;
                             }
+                            Self::send_msg(
+                                &backend,
+                                &payload.socket_id,
+                                &payload.partner_id,
+                                &[],
+                                MessageType::MessageReceived,
+                            )?;
                         }
                         _ => {
                             debug!("Unhandled message type {:?}", payload.message_type);

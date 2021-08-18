@@ -96,7 +96,7 @@ impl fmt::Display for AuthorizationActionError {
             AuthorizationActionError::InvalidMessageOrder(start, action) => {
                 write!(f, "Attempting to transition from {} via {}.", start, action)
             }
-            AuthorizationActionError::InternalError(msg) => f.write_str(&msg),
+            AuthorizationActionError::InternalError(msg) => f.write_str(msg),
         }
     }
 }
@@ -434,8 +434,12 @@ impl ManagedAuthorizations {
     }
 
     fn is_complete(&self, connection_id: &str) -> Option<bool> {
-        self.states.get(connection_id).map(|state|
-            matches!(state, AuthorizationState::Authorized(_) | AuthorizationState::Unauthorized))
+        self.states.get(connection_id).map(|state| {
+            matches!(
+                state,
+                AuthorizationState::Authorized(_) | AuthorizationState::Unauthorized
+            )
+        })
     }
 }
 

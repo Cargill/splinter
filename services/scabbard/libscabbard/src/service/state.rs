@@ -250,7 +250,7 @@ impl ScabbardState {
         let batch_status = batch_result.clone().into();
         let signature = batch.batch().header_signature();
         self.batch_history
-            .update_batch_status(&signature, batch_status);
+            .update_batch_status(signature, batch_status);
 
         let txn_receipts = batch_result
             .receipts

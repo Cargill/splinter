@@ -16,7 +16,7 @@
 //!
 //! Module for establishing WebSocket connections with Splinter Services.
 //!
-//!```
+//!``` no_run
 //! use std::{thread::sleep, time};
 //! use splinter::events::{WsResponse, WebSocketClient, Reactor, ParseBytes};
 //!

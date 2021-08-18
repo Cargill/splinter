@@ -66,7 +66,7 @@ impl fmt::Display for CliError {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
-                    f.write_str(&context)
+                    f.write_str(context)
                 }
             }
             CliError::InvalidArgument(msg) => write!(f, "invalid argument: {}", msg),

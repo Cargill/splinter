@@ -350,7 +350,7 @@ impl std::fmt::Display for ConnectionMatrixRecvError {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
-                    f.write_str(&context)
+                    f.write_str(context)
                 }
             }
             ConnectionMatrixRecvError::Shutdown => {
@@ -405,7 +405,7 @@ impl std::fmt::Display for ConnectionMatrixRecvTimeoutError {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
-                    f.write_str(&context)
+                    f.write_str(context)
                 }
             }
             ConnectionMatrixRecvTimeoutError::Shutdown => {

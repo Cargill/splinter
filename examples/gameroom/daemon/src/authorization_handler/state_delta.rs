@@ -61,7 +61,7 @@ impl XoStateDeltaProcessor {
         let conn = &*self.db_pool.get()?;
         conn.transaction::<_, error::DatabaseError, _>(|| {
             helpers::update_gameroom_service_last_event(
-                &conn,
+                conn,
                 &self.circuit_id,
                 &time,
                 &change_event.id,
@@ -90,17 +90,17 @@ impl XoStateDeltaProcessor {
                         &self.node_id,
                         &self.circuit_id,
                     );
-                    helpers::insert_gameroom_notification(&conn, &[notification])?;
-                    helpers::update_gameroom_status(&conn, &self.circuit_id, &time, "Active")?;
+                    helpers::insert_gameroom_notification(conn, &[notification])?;
+                    helpers::update_gameroom_status(conn, &self.circuit_id, &time, "Active")?;
                     helpers::update_gameroom_member_status(
-                        &conn,
+                        conn,
                         &self.circuit_id,
                         &time,
                         "Ready",
                         "Active",
                     )?;
                     helpers::update_gameroom_service_status(
-                        &conn,
+                        conn,
                         &self.circuit_id,
                         &time,
                         "Ready",
@@ -120,10 +120,10 @@ impl XoStateDeltaProcessor {
                 let conn = &*self.db_pool.get()?;
                 conn.transaction::<_, error::DatabaseError, _>(|| {
                     if let Some(game) =
-                        helpers::fetch_xo_game(&conn, &self.circuit_id, &game_state[0])?
+                        helpers::fetch_xo_game(conn, &self.circuit_id, &game_state[0])?
                     {
                         helpers::update_xo_game(
-                            &conn,
+                            conn,
                             XoGame {
                                 game_board: game_state[1].clone(),
                                 game_status: game_state[2].clone(),
@@ -140,10 +140,10 @@ impl XoStateDeltaProcessor {
                             &self.node_id,
                             &self.circuit_id,
                         );
-                        helpers::insert_gameroom_notification(&conn, &[notification])?;
+                        helpers::insert_gameroom_notification(conn, &[notification])?;
                     } else {
                         helpers::insert_xo_game(
-                            &conn,
+                            conn,
                             NewXoGame {
                                 circuit_id: self.circuit_id.clone(),
                                 game_name: game_state[0].clone(),
@@ -161,7 +161,7 @@ impl XoStateDeltaProcessor {
                             &self.node_id,
                             &self.circuit_id,
                         );
-                        helpers::insert_gameroom_notification(&conn, &[notification])?;
+                        helpers::insert_gameroom_notification(conn, &[notification])?;
                     }
 
                     Ok(())

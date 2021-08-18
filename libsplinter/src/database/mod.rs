@@ -49,7 +49,7 @@ impl Deref for Connection {
 
     fn deref(&self) -> &Self::Target {
         match &self.inner {
-            InnerConnection::Pg(conn) => &conn,
+            InnerConnection::Pg(conn) => conn,
         }
     }
 }

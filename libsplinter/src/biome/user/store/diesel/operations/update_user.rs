@@ -38,13 +38,13 @@ where
             .first::<UserModel>(self.conn)
             .map(Some)
             .or_else(|err| if err == NotFound { Ok(None) } else { Err(err) })
-            .map_err(|err| UserStoreError::OperationError {
+            .map_err(|err| UserStoreError::Operation {
                 context: "Failed to fetch user".to_string(),
                 source: Box::new(err),
             })?;
 
         if user.is_none() {
-            return Err(UserStoreError::NotFoundError(format!(
+            return Err(UserStoreError::NotFound(format!(
                 "Failed to find user: {}",
                 &id
             )));
@@ -54,7 +54,7 @@ where
             .set((splinter_user::id.eq(&id),))
             .execute(self.conn)
             .map(|_| ())
-            .map_err(|err| UserStoreError::OperationError {
+            .map_err(|err| UserStoreError::Operation {
                 context: "Failed to update user".to_string(),
                 source: Box::new(err),
             })?;

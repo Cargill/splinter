@@ -28,11 +28,9 @@ use crate::error::GetTransportError;
 type SendableTransport = Box<dyn Transport + Send>;
 
 pub fn build_transport(config: &Config) -> Result<MultiTransport, GetTransportError> {
-    let mut transports: Vec<SendableTransport> = vec![];
-
     // add tcp transport
     // this will be default for endpoints without a prefix
-    transports.push(Box::new(TcpTransport::default()));
+    let mut transports: Vec<SendableTransport> = vec![Box::new(TcpTransport::default())];
 
     // add web socket transport
     #[cfg(feature = "ws-transport")]
@@ -49,7 +47,7 @@ pub fn build_transport(config: &Config) -> Result<MultiTransport, GetTransportEr
 fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, GetTransportError> {
     let client_cert = config.tls_client_cert();
     if !Path::new(&client_cert).is_file() {
-        return Err(GetTransportError::CertError(format!(
+        return Err(GetTransportError::Cert(format!(
             "Must provide a valid client certificate: {}",
             client_cert
         )));
@@ -61,7 +59,7 @@ fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, Get
 
     let server_cert = config.tls_server_cert();
     if !Path::new(&server_cert).is_file() {
-        return Err(GetTransportError::CertError(format!(
+        return Err(GetTransportError::Cert(format!(
             "Must provide a valid server certificate: {}",
             server_cert
         )));
@@ -73,7 +71,7 @@ fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, Get
 
     let server_key_file = config.tls_server_key();
     if !Path::new(&server_key_file).is_file() {
-        return Err(GetTransportError::CertError(format!(
+        return Err(GetTransportError::Cert(format!(
             "Must provide a valid server key path: {}",
             server_key_file
         )));
@@ -85,7 +83,7 @@ fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, Get
 
     let client_key_file = config.tls_client_key();
     if !Path::new(&client_key_file).is_file() {
-        return Err(GetTransportError::CertError(format!(
+        return Err(GetTransportError::Cert(format!(
             "Must provide a valid client key path: {}",
             client_key_file
         )));
@@ -105,7 +103,7 @@ fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, Get
         } else {
             let ca_file = config.tls_ca_file();
             if !Path::new(&ca_file).is_file() {
-                return Err(GetTransportError::CertError(format!(
+                return Err(GetTransportError::Cert(format!(
                     "Must provide a valid file containing ca certs: {}",
                     ca_file
                 )));
@@ -116,7 +114,7 @@ fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, Get
                     Some(ca_path.to_string())
                 }
                 None => {
-                    return Err(GetTransportError::CertError(
+                    return Err(GetTransportError::Cert(
                         "CA path is not a valid path".to_string(),
                     ))
                 }

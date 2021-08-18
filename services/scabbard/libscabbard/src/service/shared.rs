@@ -94,7 +94,7 @@ impl ScabbardShared {
     }
 
     pub fn remove_proposed_batch(&mut self, proposal_id: &ProposalId) -> Option<BatchPair> {
-        self.proposed_batches.remove(&proposal_id)
+        self.proposed_batches.remove(proposal_id)
     }
 
     pub fn verify_batches(&self, batches: &[BatchPair]) -> Result<bool, ScabbardError> {

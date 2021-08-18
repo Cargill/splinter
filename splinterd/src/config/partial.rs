@@ -455,10 +455,7 @@ impl PartialConfig {
     /// * `timeout` - The coordinator timeout for admin service proposals (in milliseconds).
     ///
     pub fn with_admin_timeout(mut self, timeout: Option<u64>) -> Self {
-        let duration: Option<Duration> = match timeout {
-            Some(t) => Some(Duration::from_secs(t)),
-            _ => None,
-        };
+        let duration: Option<Duration> = timeout.map(Duration::from_secs);
         self.admin_timeout = duration;
         self
     }

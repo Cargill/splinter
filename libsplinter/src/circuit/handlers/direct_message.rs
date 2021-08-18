@@ -77,7 +77,7 @@ impl Handler for CircuitDirectMessageHandler {
             {
                 // Check if the message sender is allowed on the circuit
                 // if the sender is not allowed on the circuit
-                if !circuit.roster().contains(&msg_sender) {
+                if !circuit.roster().contains(msg_sender) {
                     let mut error_message = CircuitError::new();
                     error_message.set_correlation_id(msg.get_correlation_id().to_string());
                     error_message.set_service_id(msg_sender.into());
@@ -114,7 +114,7 @@ impl Handler for CircuitDirectMessageHandler {
                     let network_msg_bytes =
                         create_message(msg_bytes, CircuitMessageType::CIRCUIT_ERROR_MESSAGE)?;
                     (network_msg_bytes, context.source_peer_id().to_string())
-                } else if circuit.roster().contains(&recipient) {
+                } else if circuit.roster().contains(recipient) {
                     // check if the recipient service is allowed on the circuit and registered
                     if let Some(service) = self
                         .state
@@ -124,19 +124,12 @@ impl Handler for CircuitDirectMessageHandler {
                         let node_id = service.node().id().to_string();
                         // If the service is on this node send message to the service, otherwise
                         // send the message to the node the service is connected to
+                        let msg_bytes = context.message_bytes().to_vec();
+                        let network_msg_bytes =
+                            create_message(msg_bytes, CircuitMessageType::CIRCUIT_DIRECT_MESSAGE)?;
                         if node_id != self.node_id {
-                            let msg_bytes = context.message_bytes().to_vec();
-                            let network_msg_bytes = create_message(
-                                msg_bytes,
-                                CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                            )?;
                             (network_msg_bytes, node_id)
                         } else {
-                            let msg_bytes = context.message_bytes().to_vec();
-                            let network_msg_bytes = create_message(
-                                msg_bytes,
-                                CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                            )?;
                             let peer_id = match service.peer_id() {
                                 Some(peer_id) => peer_id.clone(),
                                 None => {

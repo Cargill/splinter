@@ -180,11 +180,12 @@ impl SplinterDaemon {
             service_listener.endpoint()
         );
 
-        let mut internal_service_listeners = vec![];
-        internal_service_listeners.push(transport.listen("inproc://admin-service")?);
-        internal_service_listeners.push(transport.listen("inproc://orchestator")?);
-        #[cfg(feature = "health")]
-        internal_service_listeners.push(transport.listen("inproc://health_service")?);
+        let internal_service_listeners = vec![
+            transport.listen("inproc://admin-service")?,
+            transport.listen("inproc://orchestator")?,
+            #[cfg(feature = "health")]
+            transport.listen("inproc://health_service")?,
+        ];
 
         info!("Starting SpinterNode with ID {}", self.node_id);
         let authorization_manager =
@@ -470,7 +471,7 @@ impl SplinterDaemon {
                         "biome was enabled but the builder failed to require the db URL".into(),
                     )
                 })?;
-                let biome_resources = build_biome_routes(&db_url)?;
+                let biome_resources = build_biome_routes(db_url)?;
                 rest_api_builder = rest_api_builder.add_resources(biome_resources.resources());
             }
         }
@@ -1116,6 +1117,7 @@ impl fmt::Display for CreateError {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug)]
 pub enum StartError {
     TransportError(String),

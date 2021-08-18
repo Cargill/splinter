@@ -330,7 +330,7 @@ where
         // If we have the peer, pass message to dispatcher, else print error
         if let Some(peer_id) = peer_id {
             let mut network_msg: NetworkMessage =
-                match protobuf::parse_from_bytes(&envelope.payload()) {
+                match protobuf::parse_from_bytes(envelope.payload()) {
                     Ok(msg) => msg,
                     Err(err) => {
                         error!("Unable to dispatch message: {}", err);

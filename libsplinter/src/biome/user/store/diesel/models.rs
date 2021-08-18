@@ -28,8 +28,8 @@ impl From<UserModel> for User {
     }
 }
 
-impl Into<UserModel> for User {
-    fn into(self) -> UserModel {
-        UserModel { id: self.id }
+impl From<User> for UserModel {
+    fn from(user: User) -> Self {
+        UserModel { id: user.id }
     }
 }

@@ -68,13 +68,13 @@ impl From<KeyModel> for Key {
 }
 
 #[cfg(feature = "diesel")]
-impl Into<KeyModel> for Key {
-    fn into(self) -> KeyModel {
-        KeyModel {
-            public_key: self.public_key,
-            encrypted_private_key: self.encrypted_private_key,
-            user_id: self.user_id,
-            display_name: self.display_name,
+impl From<Key> for KeyModel {
+    fn from(key: Key) -> Self {
+        Self {
+            public_key: key.public_key,
+            encrypted_private_key: key.encrypted_private_key,
+            user_id: key.user_id,
+            display_name: key.display_name,
         }
     }
 }

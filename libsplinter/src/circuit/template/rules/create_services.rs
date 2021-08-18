@@ -73,8 +73,8 @@ impl CreateServices {
                     if arg.key == PEER_SERVICES_ARG && value == ALL_OTHER_SERVICES {
                         service_builders = all_services(service_builders)?;
                     } else {
-                        let value = if is_arg(&value) {
-                            get_argument_value(&value, template_arguments)?
+                        let value = if is_arg(value) {
+                            get_argument_value(value, template_arguments)?
                         } else {
                             value.clone()
                         };
@@ -87,8 +87,8 @@ impl CreateServices {
                         .try_fold::<_, _, Result<_, CircuitTemplateError>>(
                             Vec::new(),
                             |mut acc, value| {
-                                let value = if is_arg(&value) {
-                                    get_argument_value(&value, template_arguments)?
+                                let value = if is_arg(value) {
+                                    get_argument_value(value, template_arguments)?
                                 } else {
                                     value.to_string()
                                 };

@@ -175,7 +175,7 @@ impl Mesh {
         let id = envelope.id().to_string();
         if let Some(mesh_id) = state.unique_ids.get_by_key(&id) {
             match state.outgoings.get(mesh_id) {
-                Some(ref outgoing) => match outgoing.send(Vec::from(envelope)) {
+                Some(outgoing) => match outgoing.send(Vec::from(envelope)) {
                     Ok(()) => Ok(()),
                     Err(err) => Err(SendError::from_outgoing_send_error(err, id)),
                 },

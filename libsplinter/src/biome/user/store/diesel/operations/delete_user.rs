@@ -35,13 +35,13 @@ where
             .find(&user_id)
             .first::<UserModel>(self.conn)
             .map(Some)
-            .map_err(|err| UserStoreError::OperationError {
+            .map_err(|err| UserStoreError::Operation {
                 context: "Failed to fetch user".to_string(),
                 source: Box::new(err),
             })?;
 
         if user.is_none() {
-            return Err(UserStoreError::NotFoundError(format!(
+            return Err(UserStoreError::NotFound(format!(
                 "Failed to find user: {}",
                 &user_id
             )));
@@ -50,7 +50,7 @@ where
         delete(splinter_user::table.filter(splinter_user::id.eq(&user_id)))
             .execute(self.conn)
             .map(|_| ())
-            .map_err(|err| UserStoreError::OperationError {
+            .map_err(|err| UserStoreError::Operation {
                 context: "Failed to delete user".to_string(),
                 source: Box::new(err),
             })?;

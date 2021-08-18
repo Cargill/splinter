@@ -68,7 +68,7 @@ impl fmt::Display for RegistryError {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
-                    f.write_str(&context)
+                    f.write_str(context)
                 }
             }
         }

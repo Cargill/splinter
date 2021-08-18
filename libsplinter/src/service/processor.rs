@@ -326,7 +326,7 @@ fn process_incoming_msg(
     // the message, otherwise it will be sent to the inbound thread
     match msg.get_message_type() {
         NetworkMessageType::CIRCUIT => {
-            let mut circuit_msg: CircuitMessage = protobuf::parse_from_bytes(&msg.get_payload())
+            let mut circuit_msg: CircuitMessage = protobuf::parse_from_bytes(msg.get_payload())
                 .map_err(to_process_err!("unable to parse circuit message"))?;
 
             match circuit_msg.get_message_type() {
@@ -408,7 +408,7 @@ fn process_inbound_msg_with_correlation_id(
                     "unable to parse inbound admin direct message"
                 ))?;
 
-            handle_admin_direct_msg(admin_direct_message, &shared_state).map_err(
+            handle_admin_direct_msg(admin_direct_message, shared_state).map_err(
                 to_process_err!("unable to handle inbound admin direct message"),
             )?;
         }
@@ -418,7 +418,7 @@ fn process_inbound_msg_with_correlation_id(
                     "unable to parse inbound circuit direct message"
                 ))?;
 
-            handle_circuit_direct_msg(circuit_direct_message, &shared_state).map_err(
+            handle_circuit_direct_msg(circuit_direct_message, shared_state).map_err(
                 to_process_err!("unable to handle inbound circuit direct message"),
             )?;
         }
