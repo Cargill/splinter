@@ -21,7 +21,9 @@ use gameroom_database::{
 };
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
-use splinter::admin::messages::{CreateCircuit, CreateCircuitBuilder, SplinterNode};
+use splinter::admin::messages::{
+    AuthorizationType, CreateCircuit, CreateCircuitBuilder, SplinterNode,
+};
 use splinter::circuit::template::CircuitCreateTemplate;
 use splinter::protocol;
 use splinter::protos::admin::{
@@ -174,7 +176,8 @@ pub async fn propose_gameroom(
         }
     };
 
-    let mut create_circuit_builder = CreateCircuitBuilder::new();
+    let mut create_circuit_builder =
+        CreateCircuitBuilder::new().with_authorization_type(&AuthorizationType::Trust);
 
     create_circuit_builder = match template.apply_to_builder(create_circuit_builder) {
         Ok(builder) => builder,

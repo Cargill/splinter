@@ -1250,8 +1250,8 @@ impl SplinterDaemonBuilder {
     }
 
     #[cfg(feature = "challenge-authorization")]
-    pub fn with_peering_token(mut self, value: Option<PeerAuthorizationToken>) -> Self {
-        self.peering_token = value;
+    pub fn with_peering_token(mut self, value: PeerAuthorizationToken) -> Self {
+        self.peering_token = Some(value);
         self
     }
 
@@ -1333,15 +1333,14 @@ impl SplinterDaemonBuilder {
         })?;
 
         #[cfg(feature = "challenge-authorization")]
-        let signers = self.signers.unwrap_or_else(|| {
-            warn!("Starting daemon with no signing keys");
-            vec![]
-        });
+        let signers = self.signers.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: signers".to_string())
+        })?;
 
         #[cfg(feature = "challenge-authorization")]
-        let peering_token = self
-            .peering_token
-            .unwrap_or_else(|| PeerAuthorizationToken::from_peer_id(&node_id));
+        let peering_token = self.peering_token.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: peering_token".to_string())
+        })?;
 
         Ok(SplinterDaemon {
             #[cfg(feature = "authorization-handler-allow-keys")]

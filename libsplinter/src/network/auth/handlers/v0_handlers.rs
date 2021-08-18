@@ -299,6 +299,8 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
+    #[cfg(feature = "challenge-authorization")]
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
     use cylinder::{PublicKey, Signature, VerificationError, Verifier};
     use protobuf::Message;
 
@@ -326,7 +328,7 @@ mod tests {
         #[cfg(feature = "challenge-authorization")]
         {
             dispatcher_builder = dispatcher_builder
-                .with_signers(&vec![])
+                .with_signers(&vec![new_signer()])
                 .with_nonce(&vec![])
                 .with_expected_authorization(None)
                 .with_local_authorization(None)
@@ -401,7 +403,7 @@ mod tests {
         #[cfg(feature = "challenge-authorization")]
         {
             dispatcher_builder = dispatcher_builder
-                .with_signers(&vec![])
+                .with_signers(&vec![new_signer()])
                 .with_nonce(&vec![])
                 .with_expected_authorization(None)
                 .with_local_authorization(None)
@@ -461,7 +463,7 @@ mod tests {
         #[cfg(feature = "challenge-authorization")]
         {
             dispatcher_builder = dispatcher_builder
-                .with_signers(&vec![])
+                .with_signers(&vec![new_signer()])
                 .with_nonce(&vec![])
                 .with_expected_authorization(None)
                 .with_local_authorization(None)
@@ -589,5 +591,12 @@ mod tests {
         ) -> Result<bool, VerificationError> {
             unimplemented!()
         }
+    }
+
+    #[cfg(feature = "challenge-authorization")]
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
     }
 }

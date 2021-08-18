@@ -57,8 +57,6 @@ use crate::public_key;
 pub struct AuthProtocolRequestHandler {
     auth_manager: AuthorizationManagerStateMachine,
     #[cfg(feature = "challenge-authorization")]
-    challenge_configured: bool,
-    #[cfg(feature = "challenge-authorization")]
     expected_authorization: Option<ConnectionAuthorizationType>,
     #[cfg(feature = "challenge-authorization")]
     local_authorization: Option<ConnectionAuthorizationType>,
@@ -67,7 +65,6 @@ pub struct AuthProtocolRequestHandler {
 impl AuthProtocolRequestHandler {
     pub fn new(
         auth_manager: AuthorizationManagerStateMachine,
-        #[cfg(feature = "challenge-authorization")] challenge_configured: bool,
         #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
             ConnectionAuthorizationType,
         >,
@@ -77,8 +74,6 @@ impl AuthProtocolRequestHandler {
     ) -> Self {
         Self {
             auth_manager,
-            #[cfg(feature = "challenge-authorization")]
-            challenge_configured,
             #[cfg(feature = "challenge-authorization")]
             expected_authorization,
             #[cfg(feature = "challenge-authorization")]
@@ -163,24 +158,20 @@ impl Handler for AuthProtocolRequestHandler {
                 match self.expected_authorization {
                     #[cfg(feature = "trust-authorization")]
                     Some(ConnectionAuthorizationType::Trust { .. }) => (),
-                    #[cfg(feature = "challenge-authorization")]
                     Some(ConnectionAuthorizationType::Challenge { .. }) => {
                         accepted_authorization_type = vec![PeerAuthorizationType::Challenge]
                     }
                     // if None, check required local authorization type as well
                     _ => {
                         match self.local_authorization {
+                            #[cfg(feature = "trust-authorization")]
                             Some(ConnectionAuthorizationType::Trust { .. }) => (),
                             Some(ConnectionAuthorizationType::Challenge { .. }) => {
                                 accepted_authorization_type = vec![PeerAuthorizationType::Challenge]
                             }
                             _ => {
                                 // if trust is enabled it was already added
-                                #[cfg(feature = "challenge-authorization")]
-                                if self.challenge_configured {
-                                    accepted_authorization_type
-                                        .push(PeerAuthorizationType::Challenge)
-                                }
+                                accepted_authorization_type.push(PeerAuthorizationType::Challenge)
                             }
                         }
                     }

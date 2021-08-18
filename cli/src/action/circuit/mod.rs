@@ -140,8 +140,21 @@ impl Action for CircuitProposeAction {
         #[cfg(feature = "challenge-authorization")]
         #[allow(clippy::single_match)]
         match args.value_of("authorization_type") {
-            Some(auth_type) => builder.set_authorization_type(auth_type)?,
-            None => (),
+            Some(auth_type) => {
+                if args.value_of("compat_version") == Some("0.4") && auth_type == "challenge" {
+                    return Err(CliError::ActionError(
+                        "Challlenge authorization is not compatible with \
+                        Splinter v0.4"
+                            .to_string(),
+                    ));
+                }
+                builder.set_authorization_type(auth_type)?;
+            }
+            None => {
+                if args.value_of("compat_version") == Some("0.4") {
+                    builder.set_authorization_type("trust")?;
+                }
+            }
         }
 
         if let Some(management_type) = args.value_of("management_type") {
