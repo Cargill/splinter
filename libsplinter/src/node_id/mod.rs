@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Traits, types, and implementations for interacting with node_id's
+//! Traits, types, and implementations for interacting with node_id's.
 
 /// Store logic for accessing and modifying an instances node_id.
 pub mod store;
