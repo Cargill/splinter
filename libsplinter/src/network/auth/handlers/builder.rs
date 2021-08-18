@@ -27,13 +27,13 @@ use crate::protos::network::NetworkMessageType;
 use super::v0_handlers::{
     AuthorizedHandler, ConnectRequestHandler, ConnectResponseHandler, TrustRequestHandler,
 };
-#[cfg(feature = "trust-authorization")]
-use super::v1_handlers::trust::{AuthTrustRequestHandler, AuthTrustResponseHandler};
 #[cfg(feature = "challenge-authorization")]
-use super::v1_handlers::{
+use super::v1_handlers::challenge::{
     AuthChallengeNonceRequestHandler, AuthChallengeNonceResponseHandler,
     AuthChallengeSubmitRequestHandler, AuthChallengeSubmitResponseHandler,
 };
+#[cfg(feature = "trust-authorization")]
+use super::v1_handlers::trust::{AuthTrustRequestHandler, AuthTrustResponseHandler};
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 use super::v1_handlers::{
     AuthCompleteHandler, AuthProtocolRequestHandler, AuthProtocolResponseHandler,
