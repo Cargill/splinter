@@ -50,6 +50,7 @@ impl Error for NodeIdStoreError {
     }
 }
 
+#[cfg(feature = "diesel")]
 impl From<diesel::result::Error> for NodeIdStoreError {
     fn from(err: diesel::result::Error) -> Self {
         Self::InternalError(InternalError::from_source(Box::new(err)))
