@@ -26,7 +26,7 @@ use crate::error::ResourceTemporarilyUnavailableError;
 /// to a NodeIdStoreError enum member.
 
 #[derive(Debug)]
-/// NodeIdStore error enum
+/// Error states for fallible [NodeIdStore](../trait.NodeIdStore.html) operations.
 pub enum NodeIdStoreError {
     InternalError(InternalError),
     ResourceTemporarilyUnavailableError(ResourceTemporarilyUnavailableError),
