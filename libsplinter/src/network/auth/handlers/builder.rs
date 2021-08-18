@@ -27,6 +27,8 @@ use crate::protos::network::NetworkMessageType;
 use super::v0_handlers::{
     AuthorizedHandler, ConnectRequestHandler, ConnectResponseHandler, TrustRequestHandler,
 };
+#[cfg(feature = "trust-authorization")]
+use super::v1_handlers::trust::{AuthTrustRequestHandler, AuthTrustResponseHandler};
 #[cfg(feature = "challenge-authorization")]
 use super::v1_handlers::{
     AuthChallengeNonceRequestHandler, AuthChallengeNonceResponseHandler,
@@ -36,8 +38,6 @@ use super::v1_handlers::{
 use super::v1_handlers::{
     AuthCompleteHandler, AuthProtocolRequestHandler, AuthProtocolResponseHandler,
 };
-#[cfg(feature = "trust-authorization")]
-use super::v1_handlers::{AuthTrustRequestHandler, AuthTrustResponseHandler};
 use super::{AuthorizationErrorHandler, AuthorizationMessageHandler};
 
 /// Builder for creating a Dispatcher for Authorization messages
