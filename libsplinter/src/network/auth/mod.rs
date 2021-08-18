@@ -390,13 +390,13 @@ fn connect_msg_bytes() -> Result<Vec<u8>, AuthorizationManagerError> {
 
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 fn protocol_msg_bytes() -> Result<Vec<u8>, AuthorizationManagerError> {
-    let connect_msg = AuthorizationMessage::AuthProtocolRequest(AuthProtocolRequest {
+    let protocol_msg = AuthorizationMessage::AuthProtocolRequest(AuthProtocolRequest {
         auth_protocol_min: PEER_AUTHORIZATION_PROTOCOL_MIN,
         auth_protocol_max: PEER_AUTHORIZATION_PROTOCOL_VERSION,
     });
 
-    IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(connect_msg)).map_err(
-        |err| AuthorizationManagerError(format!("Unable to send connect request: {}", err)),
+    IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(protocol_msg)).map_err(
+        |err| AuthorizationManagerError(format!("Unable to send protocol request: {}", err)),
     )
 }
 
