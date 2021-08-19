@@ -14,6 +14,7 @@
 
 //! Message handlers for v1 authorization messages
 
+pub mod builders;
 #[cfg(feature = "challenge-authorization")]
 pub mod challenge;
 #[cfg(feature = "trust-authorization")]
@@ -51,26 +52,6 @@ pub struct AuthProtocolRequestHandler {
     expected_authorization: Option<ConnectionAuthorizationType>,
     #[cfg(feature = "challenge-authorization")]
     local_authorization: Option<ConnectionAuthorizationType>,
-}
-
-impl AuthProtocolRequestHandler {
-    pub fn new(
-        auth_manager: AuthorizationManagerStateMachine,
-        #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
-            ConnectionAuthorizationType,
-        >,
-        #[cfg(feature = "challenge-authorization")] local_authorization: Option<
-            ConnectionAuthorizationType,
-        >,
-    ) -> Self {
-        Self {
-            auth_manager,
-            #[cfg(feature = "challenge-authorization")]
-            expected_authorization,
-            #[cfg(feature = "challenge-authorization")]
-            local_authorization,
-        }
-    }
 }
 
 impl Handler for AuthProtocolRequestHandler {
@@ -242,21 +223,6 @@ pub struct AuthProtocolResponseHandler {
     #[cfg(feature = "trust-authorization")]
     identity: String,
     required_local_auth: Option<ConnectionAuthorizationType>,
-}
-
-impl AuthProtocolResponseHandler {
-    pub fn new(
-        auth_manager: AuthorizationManagerStateMachine,
-        #[cfg(feature = "trust-authorization")] identity: String,
-        required_local_auth: Option<ConnectionAuthorizationType>,
-    ) -> Self {
-        Self {
-            auth_manager,
-            #[cfg(feature = "trust-authorization")]
-            identity,
-            required_local_auth,
-        }
-    }
 }
 
 impl Handler for AuthProtocolResponseHandler {

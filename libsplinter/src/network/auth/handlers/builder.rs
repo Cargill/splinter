@@ -36,7 +36,8 @@ use super::v1_handlers::challenge::{
 use super::v1_handlers::trust::{AuthTrustRequestHandler, AuthTrustResponseHandler};
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 use super::v1_handlers::{
-    AuthCompleteHandler, AuthProtocolRequestHandler, AuthProtocolResponseHandler,
+    builders::{AuthProtocolRequestHandlerBuilder, AuthProtocolResponseHandlerBuilder},
+    AuthCompleteHandler,
 };
 use super::{AuthorizationErrorHandler, AuthorizationMessageHandler};
 
@@ -190,23 +191,33 @@ impl AuthorizationDispatchBuilder {
         // v1 message handlers
         #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
         {
-            auth_dispatcher.set_handler(Box::new(AuthProtocolRequestHandler::new(
-                auth_manager.clone(),
-                #[cfg(feature = "challenge-authorization")]
-                self.expected_authorization.clone(),
-                #[cfg(feature = "challenge-authorization")]
-                self.local_authorization.clone(),
-            )));
+            let mut auth_protocol_request_builder = AuthProtocolRequestHandlerBuilder::default()
+                .with_auth_manager(auth_manager.clone());
 
-            auth_dispatcher.set_handler(Box::new(AuthProtocolResponseHandler::new(
-                auth_manager.clone(),
-                #[cfg(feature = "trust-authorization")]
-                identity,
-                #[cfg(feature = "challenge-authorization")]
-                self.local_authorization.clone(),
-                #[cfg(not(feature = "challenge-authorization"))]
-                None,
-            )));
+            #[cfg(feature = "challenge-authorization")]
+            {
+                auth_protocol_request_builder = auth_protocol_request_builder
+                    .with_expected_authorization(self.expected_authorization.clone())
+                    .with_local_authorization(self.local_authorization.clone())
+            }
+
+            auth_dispatcher.set_handler(Box::new(auth_protocol_request_builder.build()?));
+
+            let mut auth_protocol_response_builder = AuthProtocolResponseHandlerBuilder::default()
+                .with_auth_manager(auth_manager.clone());
+
+            #[cfg(feature = "trust-authorization")]
+            {
+                auth_protocol_response_builder =
+                    auth_protocol_response_builder.with_identity(&identity);
+            }
+            #[cfg(feature = "challenge-authorization")]
+            {
+                auth_protocol_response_builder = auth_protocol_response_builder
+                    .with_required_local_auth(self.local_authorization.clone())
+            }
+
+            auth_dispatcher.set_handler(Box::new(auth_protocol_response_builder.build()?));
 
             auth_dispatcher.set_handler(Box::new(AuthCompleteHandler::new(auth_manager.clone())));
         }
