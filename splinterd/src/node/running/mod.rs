@@ -27,6 +27,7 @@ use splinter::admin::client::event::{
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::biome::client::{BiomeClient, ReqwestBiomeClient};
 use splinter::error::InternalError;
+use splinter::peer::PeerManagerConnector;
 use splinter::registry::{
     client::{RegistryClient, ReqwestRegistryClient},
     RegistryWriter,
@@ -52,6 +53,7 @@ pub struct Node {
     pub(super) network_subsystem: network::NetworkSubsystem,
     pub(super) node_id: String,
     pub(super) admin_service_event_client: Box<dyn AdminServiceEventClient>,
+    pub(super) signers: Vec<Box<dyn cylinder::Signer>>,
 }
 
 impl Node {
@@ -67,8 +69,16 @@ impl Node {
         &*self.admin_signer
     }
 
+    pub fn signers(&self) -> &[Box<dyn Signer>] {
+        &self.signers
+    }
+
     pub fn registry_writer(&self) -> &dyn RegistryWriter {
         self.admin_subsystem.registry_writer()
+    }
+
+    pub fn peer_connector(&self) -> &PeerManagerConnector {
+        self.admin_subsystem.peer_connector()
     }
 
     pub fn network_endpoints(&self) -> &[String] {
@@ -123,6 +133,7 @@ impl Node {
             rest_api_port,
             mut network_subsystem,
             admin_service_event_client: _,
+            signers,
         } = self;
 
         let rest_api_variant = match rest_api_variant {
@@ -160,6 +171,7 @@ impl Node {
             .with_node_id(node_id)
             .with_rest_api_variant(rest_api_variant)
             .with_admin_signer(admin_signer.to_owned())
+            .with_signers(signers)
             .with_rest_api_port(rest_api_port.into())
             .with_store_factory(store_factory)
             .build()

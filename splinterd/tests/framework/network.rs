@@ -30,6 +30,7 @@ pub struct Network {
     nodes: Vec<NetworkNode>,
     temp_dirs: HashMap<String, TempDir>,
     external_registries: Option<Vec<String>>,
+    num_of_keys: usize,
 }
 
 pub enum NetworkNode {
@@ -44,6 +45,7 @@ impl Network {
             nodes: Vec::new(),
             temp_dirs: HashMap::new(),
             external_registries: None,
+            num_of_keys: 1,
         }
     }
 
@@ -51,12 +53,18 @@ impl Network {
         let mut registry_info = vec![];
         let context = Secp256k1Context::new();
         for _ in 0..count {
-            let signer = context.new_signer(context.new_random_private_key());
-            let public_key = signer
+            let admin_signer = context.new_signer(context.new_random_private_key());
+            let public_key = admin_signer
                 .public_key()
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
             let temp_dir = TempDir::new("scabbard_data")
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+            let mut signers = Vec::new();
+
+            for _ in 0..self.num_of_keys {
+                signers.push(context.new_signer(context.new_random_private_key()));
+            }
 
             let node = NodeBuilder::new()
                 .with_rest_api_variant(self.default_rest_api_variant)
@@ -65,7 +73,8 @@ impl Network {
                         .with_data_dir(temp_dir.path().to_path_buf())
                         .build()?,
                 )
-                .with_admin_signer(signer)
+                .with_admin_signer(admin_signer)
+                .with_signers(signers)
                 .with_external_registries(self.external_registries.clone())
                 .with_biome_enabled()
                 .build()?
@@ -112,6 +121,11 @@ impl Network {
 
     pub fn with_external_registries(mut self, files: Vec<String>) -> Self {
         self.external_registries = Some(files);
+        self
+    }
+
+    pub fn set_num_of_keys(mut self, num_of_keys: usize) -> Self {
+        self.num_of_keys = num_of_keys;
         self
     }
 

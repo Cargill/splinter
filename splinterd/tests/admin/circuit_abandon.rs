@@ -272,7 +272,13 @@ pub fn test_3_party_circuit_abandon() {
 
     let circuit_id = "ABCDE-01234";
     // Commit a circuit to state
-    commit_3_party_circuit(&circuit_id, node_a, node_b, node_c);
+    commit_3_party_circuit(
+        &circuit_id,
+        node_a,
+        node_b,
+        node_c,
+        AuthorizationType::Trust,
+    );
 
     // Create the `ServiceId` struct based on the first node's associated `service_id` and the
     // committed `circuit_id`
@@ -296,7 +302,13 @@ pub fn test_3_party_circuit_abandon() {
     // abandoned
     let active_circuit_id = "FGHIJ-56789";
     // Commit the circuit to state
-    commit_3_party_circuit(&active_circuit_id, node_a, node_b, node_c);
+    commit_3_party_circuit(
+        &active_circuit_id,
+        node_a,
+        node_b,
+        node_c,
+        AuthorizationType::Trust,
+    );
 
     // Create the `ServiceId` struct based on the first node's associated `service_id` and the
     // committed `circuit_id`
@@ -659,12 +671,24 @@ pub fn test_3_party_circuit_abandon_stop() {
 
     let circuit_id = "ABCDE-01234";
     // Commit a circuit to state
-    commit_3_party_circuit(&circuit_id, node_a, node_b, node_c);
+    commit_3_party_circuit(
+        &circuit_id,
+        node_a,
+        node_b,
+        node_c,
+        AuthorizationType::Trust,
+    );
     // Commit a circuit between the nodes that will remain active while the other circuit is
     // abandoned
     let active_circuit_id = "FGHIJ-56789";
     // Commit the circuit to state
-    commit_3_party_circuit(&active_circuit_id, node_a, node_b, node_c);
+    commit_3_party_circuit(
+        &active_circuit_id,
+        node_a,
+        node_b,
+        node_c,
+        AuthorizationType::Trust,
+    );
 
     // Stop the second node in the network
     network = network.stop(1).expect("Unable to stop second node");

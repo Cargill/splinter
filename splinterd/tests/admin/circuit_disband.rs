@@ -351,7 +351,7 @@ pub fn test_3_party_circuit_lifecycle() {
     let node_c_admin_pubkey = admin_pubkey(node_b);
 
     let circuit_id = "ABCDE-01234";
-    commit_3_party_circuit(circuit_id, node_a, node_b, node_c);
+    commit_3_party_circuit(circuit_id, node_a, node_b, node_c, AuthorizationType::Trust);
 
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
@@ -556,7 +556,7 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
     let node_c_admin_pubkey = admin_pubkey(node_b);
 
     let circuit_id = "ABCDE-01234";
-    commit_3_party_circuit(circuit_id, node_a, node_b, node_c);
+    commit_3_party_circuit(circuit_id, node_a, node_b, node_c, AuthorizationType::Trust);
 
     // As we've started a new event client, we'll skip just past the circuit ready event
     let mut node_a_events = BlockingAdminServiceEventIterator::new(
@@ -1174,7 +1174,7 @@ pub fn test_3_party_circuit_lifecycle_stop() {
     // Get the third node from the network
     let mut node_c = network.node(2).expect("Unable to get third node");
     let circuit_id = "ABCDE-01234";
-    commit_3_party_circuit(circuit_id, node_a, node_b, node_c);
+    commit_3_party_circuit(circuit_id, node_a, node_b, node_c, AuthorizationType::Trust);
     // As we've started a new event client, we'll skip just to the circuit ready event and record
     // this event ID. We will use this again once the node has been restarted to catch back up.
     let mut node_a_last_seen_event_id = *BlockingAdminServiceEventIterator::new(
@@ -1474,7 +1474,7 @@ pub fn test_3_party_circuit_disband_rejected_stop() {
     let mut node_c = network.node(2).expect("Unable to get third node");
 
     let circuit_id = "ABCDE-01234";
-    commit_3_party_circuit(circuit_id, node_a, node_b, node_c);
+    commit_3_party_circuit(circuit_id, node_a, node_b, node_c, AuthorizationType::Trust);
 
     // As we've started a new event client, we'll skip just to the circuit ready event and record
     // this event ID. We will use this again once the node has been restarted to catch back up.

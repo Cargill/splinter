@@ -38,7 +38,9 @@ pub(in crate::admin) fn commit_2_party_circuit(
             (
                 node_a.network_endpoints().to_vec(),
                 node_a
-                    .admin_signer()
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
                     .public_key()
                     .expect("Unable to get first node's public key"),
             ),
@@ -48,9 +50,11 @@ pub(in crate::admin) fn commit_2_party_circuit(
             (
                 node_b.network_endpoints().to_vec(),
                 node_b
-                    .admin_signer()
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
                     .public_key()
-                    .expect("Unable to get seconds node's public key"),
+                    .expect("Unable to get second node's public key"),
             ),
         ),
     ]
@@ -182,6 +186,7 @@ pub(in crate::admin) fn commit_3_party_circuit(
     node_a: &Node,
     node_b: &Node,
     node_c: &Node,
+    auth_type: AuthorizationType,
 ) {
     // Create the list of node details needed to build the `CircuitCreateRequest`
     let node_info = vec![
@@ -190,8 +195,9 @@ pub(in crate::admin) fn commit_3_party_circuit(
             (
                 node_a.network_endpoints().to_vec(),
                 node_a
-                    .admin_signer()
-                    .clone()
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
                     .public_key()
                     .expect("Unable to get first node's public key"),
             ),
@@ -201,8 +207,9 @@ pub(in crate::admin) fn commit_3_party_circuit(
             (
                 node_b.network_endpoints().to_vec(),
                 node_b
-                    .admin_signer()
-                    .clone()
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
                     .public_key()
                     .expect("Unable to get second node's public key"),
             ),
@@ -212,8 +219,9 @@ pub(in crate::admin) fn commit_3_party_circuit(
             (
                 node_c.network_endpoints().to_vec(),
                 node_c
-                    .admin_signer()
-                    .clone()
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
                     .public_key()
                     .expect("Unable to get third node's public key"),
             ),
@@ -258,7 +266,7 @@ pub(in crate::admin) fn commit_3_party_circuit(
                 .expect("Unable to get third node's public key")
                 .as_hex(),
         ],
-        AuthorizationType::Trust,
+        auth_type,
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node

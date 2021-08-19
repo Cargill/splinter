@@ -58,6 +58,7 @@ pub struct NodeBuilder {
     network_subsystem_builder: NetworkSubsystemBuilder,
     node_id: Option<String>,
     enable_biome: bool,
+    signers: Option<Vec<Box<dyn Signer>>>,
 }
 
 impl Default for NodeBuilder {
@@ -77,6 +78,7 @@ impl NodeBuilder {
             network_subsystem_builder: NetworkSubsystemBuilder::new(),
             node_id: None,
             enable_biome: false,
+            signers: None,
         }
     }
 
@@ -90,6 +92,12 @@ impl NodeBuilder {
     /// node.
     pub fn with_admin_signer(mut self, signer: Box<dyn Signer>) -> Self {
         self.admin_signer = Some(signer);
+        self
+    }
+
+    /// Specifies the private key that will be used for challenge authorization
+    pub fn with_signers(mut self, signers: Vec<Box<dyn Signer>>) -> Self {
+        self.signers = Some(signers);
         self
     }
 
@@ -193,6 +201,11 @@ impl NodeBuilder {
             context.new_signer(pk)
         });
 
+        let signers = self
+            .signers
+            .take()
+            .unwrap_or_else(|| vec![admin_signer.clone()]);
+
         let signing_context: Arc<Mutex<Box<dyn VerifierFactory>>> =
             Arc::new(Mutex::new(Box::new(context)));
 
@@ -200,19 +213,24 @@ impl NodeBuilder {
             .network_subsystem_builder
             .with_node_id(node_id.clone())
             .with_signing_context(signing_context.clone())
-            .with_signers(vec![admin_signer.clone()])
+            .with_signers(signers.clone())
             .build()?;
 
         let admin_subsystem_builder = self
             .admin_subsystem_builder
             .with_node_id(node_id.clone())
             .with_signing_context(signing_context.clone())
-            .with_public_keys(vec![PublicKey::from_bytes(
-                admin_signer
-                    .public_key()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?
-                    .into_bytes(),
-            )]);
+            .with_public_keys(
+                signers
+                    .iter()
+                    .map(|signer| {
+                        signer
+                            .public_key()
+                            .map(|public_key| PublicKey::from_bytes(public_key.into_bytes()))
+                            .map_err(|err| InternalError::from_source(Box::new(err)))
+                    })
+                    .collect::<Result<Vec<PublicKey>, InternalError>>()?,
+            );
 
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => RunnableNodeRestApiVariant::ActixWeb1(
@@ -237,6 +255,7 @@ impl NodeBuilder {
             runnable_network_subsystem,
             node_id,
             enable_biome,
+            signers,
         })
     }
 }

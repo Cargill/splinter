@@ -49,6 +49,7 @@ pub struct RunnableNode {
     pub(super) runnable_network_subsystem: RunnableNetworkSubsystem,
     pub(super) node_id: String,
     pub(super) enable_biome: bool,
+    pub(super) signers: Vec<Box<dyn cylinder::Signer>>,
 }
 
 impl RunnableNode {
@@ -66,6 +67,8 @@ impl RunnableNode {
         let mut admin_subsystem = runnable_admin_subsystem.run()?;
 
         let node_id = self.node_id;
+
+        let signers = self.signers;
 
         let rest_api_variant = match self.rest_api_variant {
             RunnableNodeRestApiVariant::ActixWeb1(rest_api) => {
@@ -172,6 +175,7 @@ impl RunnableNode {
             rest_api_port,
             node_id,
             admin_service_event_client,
+            signers,
         })
     }
 }
