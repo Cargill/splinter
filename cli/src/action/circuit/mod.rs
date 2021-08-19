@@ -143,7 +143,7 @@ impl Action for CircuitProposeAction {
             Some(auth_type) => {
                 if args.value_of("compat_version") == Some("0.4") && auth_type == "challenge" {
                     return Err(CliError::ActionError(
-                        "Challlenge authorization is not compatible with \
+                        "Challenge authorization is not compatible with \
                         Splinter v0.4"
                             .to_string(),
                     ));
