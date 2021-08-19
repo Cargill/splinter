@@ -1,5 +1,52 @@
 # Release Notes
 
+## Changes in Splinter 0.5.15
+
+### Highlights
+
+* If `challenge-authorization` is enabled the the default authorization type is
+  now set to challenge and the Splinter daemon must configure at least one
+  public/private key pair that can be used for identification. To configure the
+  key pair run `splinter keygen --system`.
+
+### libsplinter
+
+* Update default authorization type to be challenge if the experimental
+  features `challenge-authorization` is enabled. Otherwise, the default remains
+  trust.
+
+* Stabilize `biome-replace-keys` by removing the feature.
+
+* Convert `network::auth::v1_handlers` into a module and break out `trust` and
+  `challenge` functionality into submodules.
+
+### splinterd
+
+* Update challenge authorization key configuration to require at least one key
+  pair if the experimental feature `challenge-authorization` is enabled.
+
+* Add a new toml configuration option `allow_keys_file` that allows a user to
+  specify the exact location of the key file. This is behind the feature
+  `config-allow-keys`.
+
+### splinter CLI
+
+* Update `splinter circuit propose --compat 0.4` to set the authorization type
+  to trust.
+
+* Add bash completion to auto-complete subcommands and options.
+
+### gameroom
+
+* Update circuit creation to explicitly set authorization type to trust. This
+  will keep gameroom backwards compatible if `challenge-authorization` is
+  enabled. 
+
+### Build
+
+* Disable websocket test that hit `echo.websocket.org`
+
+
 ## Changes in Splinter 0.5.14
 
 ### Highlights
