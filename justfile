@@ -57,6 +57,7 @@ build:
 ci:
     just ci-lint-client
     just ci-lint-splinter
+    just ci-shellcheck
     just ci-test
     just ci-test-gameroom
 
@@ -74,6 +75,12 @@ ci-lint-splinter:
     docker-compose -f docker/compose/run-lint.yaml up \
       --abort-on-container-exit lint-splinter
 
+ci-shellcheck:
+    #!/usr/bin/env sh
+    set -e
+    docker run --rm koalaman/shellcheck:stable --version
+    docker run -t --rm -v $(pwd):/mnt koalaman/shellcheck:stable \
+      cli/packaging/ubuntu/completions/splinter
 
 ci-test:
     #!/usr/bin/env sh
@@ -174,6 +181,12 @@ qtest:
         $cmd
     done
     echo "\n\033[92mTest Success\033[0m\n"
+
+shellcheck:
+    #!/usr/bin/env sh
+    set -e
+    shellcheck cli/packaging/ubuntu/completions/splinter
+    echo "\n\033[92mShellcheck Success\033[0m\n"
 
 test:
     #!/usr/bin/env sh
