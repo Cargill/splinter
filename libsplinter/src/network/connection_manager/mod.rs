@@ -138,6 +138,7 @@ enum CmRequest {
     },
     RemoveConnection {
         endpoint: String,
+        connection_id: String,
         sender: Sender<Result<Option<String>, ConnectionManagerError>>,
     },
     ListConnections {
@@ -205,9 +206,9 @@ pub struct Connector {
 }
 
 impl Connector {
-    /// Request a connection to the given endpoint.
+    /// Request a connection to the given endpoint with a provided connection ID.
     ///
-    /// This operation is idempotent: if a connection to that endpoint already exists, a new
+    /// This operation is idempotent: if a connection to that connection ID already exists, a new
     /// connection is not created. On successful connection Ok is returned. The connection is not
     /// ready to use, it must complete authorization. When the connection is ready a
     /// `ConnectionManagerNotification::Connected`will be sent to subscribers.
@@ -262,12 +263,14 @@ impl Connector {
     pub fn remove_connection(
         &self,
         endpoint: &str,
+        connection_id: &str,
     ) -> Result<Option<String>, ConnectionManagerError> {
         let (sender, recv) = channel();
         self.sender
             .send(CmMessage::Request(CmRequest::RemoveConnection {
                 sender,
                 endpoint: endpoint.to_string(),
+                connection_id: connection_id.to_string(),
             }))
             .map_err(|_| {
                 ConnectionManagerError::SendMessageError(
@@ -596,82 +599,90 @@ where
         authorizer: &dyn Authorizer,
         subscribers: &mut SubscriberMap,
     ) {
-        if let Some(connection) = self.connections.get(&outbound.endpoint) {
+        if let Some(connection) = self.connections.get(&outbound.connection_id) {
             let identity = connection.identity().clone();
-            // if this connection not reconnecting or disconnected, send Connected
-            // notification.
-            match connection.extended_metadata {
-                ConnectionMetadataExt::Outbound {
-                    ref reconnecting, ..
-                } => {
-                    if !reconnecting {
-                        subscribers.broadcast(ConnectionManagerNotification::Connected {
-                            endpoint: outbound.endpoint.to_string(),
-                            connection_id: outbound.connection_id.to_string(),
-                            identity,
-                        });
+            // if endpoints haven't changed, the connection is either connected or reconnecting
+            if outbound.endpoint == connection.endpoint {
+                // if this connection not reconnecting or disconnected, send Connected
+                // notification.
+                match connection.extended_metadata {
+                    ConnectionMetadataExt::Outbound {
+                        ref reconnecting, ..
+                    } => {
+                        if !reconnecting {
+                            subscribers.broadcast(ConnectionManagerNotification::Connected {
+                                endpoint: outbound.endpoint.to_string(),
+                                connection_id: outbound.connection_id.to_string(),
+                                identity,
+                            });
+                        }
+                    }
+                    ConnectionMetadataExt::Inbound { ref disconnected } => {
+                        if !disconnected {
+                            subscribers.broadcast(ConnectionManagerNotification::Connected {
+                                endpoint: outbound.endpoint.to_string(),
+                                connection_id: outbound.connection_id.to_string(),
+                                identity,
+                            });
+                        }
                     }
                 }
-                ConnectionMetadataExt::Inbound { ref disconnected } => {
-                    if !disconnected {
-                        subscribers.broadcast(ConnectionManagerNotification::Connected {
-                            endpoint: outbound.endpoint.to_string(),
-                            connection_id: outbound.connection_id.to_string(),
-                            identity,
-                        });
-                    }
-                }
-            }
 
-            if reply_sender.send(Ok(())).is_err() {
-                warn!("connector dropped before receiving result of add connection");
-            }
-        } else {
-            match self.transport.connect(&outbound.endpoint) {
-                Ok(connection) => {
-                    // add the connection to the authorization pool.
-                    let auth_endpoint = outbound.endpoint.to_string();
-                    if let Err(err) = authorizer.authorize_connection(
-                        outbound.connection_id,
-                        connection,
-                        Box::new(move |auth_result| {
-                            internal_sender
-                                .send(CmMessage::AuthResult(AuthResult::Outbound {
-                                    endpoint: auth_endpoint.clone(),
-                                    auth_result,
-                                }))
-                                .map_err(Box::from)
-                        }),
-                        #[cfg(feature = "challenge-authorization")]
-                        outbound.expected_authorization.clone(),
-                        #[cfg(feature = "challenge-authorization")]
-                        outbound.local_authorization.clone(),
-                    ) {
-                        if reply_sender
-                            .send(Err(ConnectionManagerError::connection_creation_error(
-                                &err.to_string(),
-                            )))
-                            .is_err()
-                        {
-                            warn!("connector dropped before receiving result of add connection");
-                        }
-                    } else if reply_sender.send(Ok(())).is_err() {
-                        warn!("connector dropped before receiving result of add connection");
-                    }
+                if reply_sender.send(Ok(())).is_err() {
+                    warn!("connector dropped before receiving result of add connection");
                 }
-                Err(err) => {
-                    let connection_error = match err {
-                        ConnectError::IoError(io_err) => {
-                            ConnectionManagerError::connection_creation_error_with_io(
-                                &format!("Unable to connect to {}", outbound.endpoint),
-                                io_err.kind(),
-                            )
-                        }
-                        _ => ConnectionManagerError::connection_creation_error(&err.to_string()),
-                    };
-                    if reply_sender.send(Err(connection_error)).is_err() {
+                return;
+            }
+        }
+
+        // The connection id is either new or the associated endpoint has changed
+        match self.transport.connect(&outbound.endpoint) {
+            Ok(connection) => {
+                // add the connection to the authorization pool.
+                let auth_endpoint = outbound.endpoint.to_string();
+                if let Err(err) = authorizer.authorize_connection(
+                    outbound.connection_id,
+                    connection,
+                    Box::new(move |auth_result| {
+                        internal_sender
+                            .send(CmMessage::AuthResult(AuthResult::Outbound {
+                                endpoint: auth_endpoint.clone(),
+                                auth_result,
+                            }))
+                            .map_err(Box::from)
+                    }),
+                    #[cfg(feature = "challenge-authorization")]
+                    outbound.expected_authorization.clone(),
+                    #[cfg(feature = "challenge-authorization")]
+                    outbound.local_authorization.clone(),
+                ) {
+                    if reply_sender
+                        .send(Err(ConnectionManagerError::connection_creation_error(
+                            &err.to_string(),
+                        )))
+                        .is_err()
+                    {
                         warn!("connector dropped before receiving result of add connection");
                     }
+                } else if reply_sender.send(Ok(())).is_err() {
+                    warn!("connector dropped before receiving result of add connection");
+                }
+            }
+            Err(err) => {
+                let connection_error = match err {
+                    ConnectError::IoError(io_err) => {
+                        ConnectionManagerError::connection_creation_error_with_io(
+                            &format!(
+                                "Unable to connect to {} ({})",
+                                outbound.endpoint, outbound.connection_id
+                            ),
+                            io_err.kind(),
+                        )
+                    }
+                    _ => ConnectionManagerError::connection_creation_error(&err.to_string()),
+                };
+                if reply_sender.send(Err(connection_error)).is_err() {
+                    warn!("connector dropped before receiving result of add connection");
                 }
             }
         }
@@ -721,7 +732,7 @@ where
                 }
 
                 self.connections.insert(
-                    endpoint.clone(),
+                    connection_id.to_string(),
                     ConnectionMetadata {
                         connection_id: connection_id.to_string(),
                         identity: identity.clone(),
@@ -746,8 +757,11 @@ where
                 });
             }
             AuthorizationResult::Unauthorized { connection_id, .. } => {
-                if self.connections.remove(&endpoint).is_some() {
-                    warn!("Reconnecting connection failed authorization");
+                if self.connections.remove(&connection_id).is_some() {
+                    warn!(
+                        "Reconnecting connection {} ({}) failed authorization",
+                        endpoint, connection_id
+                    );
                 }
                 // If the connection is unauthorized, notify subscriber this is a bad connection
                 // and will not be added.
@@ -793,7 +807,7 @@ where
                 }
 
                 self.connections.insert(
-                    endpoint.clone(),
+                    connection_id.clone(),
                     ConnectionMetadata {
                         connection_id: connection_id.clone(),
                         endpoint: endpoint.clone(),
@@ -834,21 +848,24 @@ where
     fn remove_connection(
         &mut self,
         endpoint: &str,
+        connection_id: &str,
     ) -> Result<Option<ConnectionMetadata>, ConnectionManagerError> {
-        let meta = if let Some(meta) = self.connections.get_mut(endpoint) {
+        let meta = if let Some(meta) = self.connections.get_mut(connection_id) {
             meta.clone()
         } else {
             return Ok(None);
         };
 
-        self.connections.remove(endpoint);
+        self.connections.remove(connection_id);
         // remove mesh id, this may happen before reconnection is attempted
         self.life_cycle
             .remove(meta.connection_id())
             .map_err(|err| {
                 ConnectionManagerError::ConnectionRemovalError(format!(
-                    "Cannot remove connection {} from life cycle: {}",
-                    endpoint, err
+                    "Cannot remove connection {} ({}) from life cycle: {}",
+                    endpoint,
+                    meta.connection_id(),
+                    err
                 ))
             })?;
 
@@ -864,11 +881,12 @@ where
     fn reconnect(
         &mut self,
         endpoint: &str,
+        connection_id: &str,
         subscribers: &mut SubscriberMap,
         authorizer: &dyn Authorizer,
         internal_sender: Sender<CmMessage>,
     ) -> Result<(), ConnectionManagerError> {
-        let mut meta = if let Some(meta) = self.connections.get_mut(endpoint) {
+        let mut meta = if let Some(meta) = self.connections.get_mut(connection_id) {
             meta.clone()
         } else {
             return Err(ConnectionManagerError::ConnectionRemovalError(
@@ -887,14 +905,16 @@ where
                 .remove(meta.connection_id())
                 .map_err(|err| {
                     ConnectionManagerError::ConnectionRemovalError(format!(
-                        "Cannot remove connection {} from life cycle: {}",
-                        endpoint, err
+                        "Cannot remove connection {} ({}) from life cycle: {}",
+                        endpoint,
+                        meta.connection_id(),
+                        err
                     ))
                 })?;
 
             let auth_endpoint = endpoint.to_string();
             if let Err(err) = authorizer.authorize_connection(
-                meta.connection_id,
+                meta.connection_id().into(),
                 connection,
                 Box::new(move |auth_result| {
                     internal_sender
@@ -909,7 +929,12 @@ where
                 #[cfg(feature = "challenge-authorization")]
                 meta.extended_metadata.local_authorization(),
             ) {
-                error!("Error authorizing {}: {}", endpoint, err);
+                error!(
+                    "Error authorizing {} ({}): {}",
+                    endpoint,
+                    meta.connection_id(),
+                    err
+                );
             }
         } else {
             let reconnection_attempts = match meta.extended_metadata {
@@ -931,7 +956,7 @@ where
                 _ => unreachable!(),
             };
             let identity = meta.identity.clone();
-            self.connections.insert(endpoint.to_string(), meta);
+            self.connections.insert(connection_id.to_string(), meta);
 
             // Notify subscribers of reconnection failure
             subscribers.broadcast(ConnectionManagerNotification::NonFatalConnectionError {
@@ -1292,7 +1317,7 @@ mod tests {
         );
 
         let endpoint_removed = connector
-            .remove_connection(&endpoint)
+            .remove_connection(&endpoint, "test_id")
             .expect("Unable to remove connection");
 
         assert_eq!(Some(endpoint.clone()), endpoint_removed);
@@ -1326,7 +1351,7 @@ mod tests {
         let connector = cm.connector();
 
         let endpoint_removed = connector
-            .remove_connection("tcp://localhost:5000")
+            .remove_connection("tcp://localhost:5000", "test_id")
             .expect("Unable to remove connection");
 
         assert_eq!(None, endpoint_removed);
@@ -1528,7 +1553,14 @@ mod tests {
             .iter()
             .next()
             .expect("Cannot get message from subscriber");
-        if let ConnectionManagerNotification::InboundConnection { endpoint, .. } = notification {
+        let connection_id_for_removal;
+        if let ConnectionManagerNotification::InboundConnection {
+            endpoint,
+            connection_id,
+            ..
+        } = notification
+        {
+            connection_id_for_removal = connection_id.to_string();
             assert_eq!("inproc://test_inbound_connection", &endpoint);
         } else {
             panic!("Incorrect notification received: {:?}", notification);
@@ -1541,7 +1573,10 @@ mod tests {
         );
 
         connector
-            .remove_connection("inproc://test_inbound_connection")
+            .remove_connection(
+                "inproc://test_inbound_connection",
+                &connection_id_for_removal,
+            )
             .unwrap();
         let connection_endpoints = connector.list_connections().unwrap();
         assert!(connection_endpoints.is_empty());
@@ -1616,7 +1651,13 @@ mod tests {
             .next()
             .expect("Cannot get message from subscriber");
 
-        if let ConnectionManagerNotification::InboundConnection { ref identity, .. } = &notification
+        let connection_id_to_remove;
+
+        if let ConnectionManagerNotification::InboundConnection {
+            ref identity,
+            connection_id,
+            ..
+        } = &notification
         {
             assert_eq!(
                 identity,
@@ -1624,6 +1665,7 @@ mod tests {
                     identity: "inbound-identity".into()
                 },
             );
+            connection_id_to_remove = connection_id.to_string();
         } else {
             panic!(
                 "Did not receive the correct notification: {:?}",
@@ -1634,7 +1676,9 @@ mod tests {
         let connection_endpoints = connector.list_connections().unwrap();
         assert_eq!(vec![remote_endpoint.clone()], connection_endpoints);
 
-        connector.remove_connection(&remote_endpoint).unwrap();
+        connector
+            .remove_connection(&remote_endpoint, &connection_id_to_remove)
+            .unwrap();
         let connection_endpoints = connector.list_connections().unwrap();
         assert!(connection_endpoints.is_empty());
 

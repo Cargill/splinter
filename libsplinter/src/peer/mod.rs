@@ -102,6 +102,7 @@ pub(crate) enum PeerManagerRequest {
     },
     RemovePeerByEndpoint {
         endpoint: String,
+        connection_id: String,
         sender: Sender<Result<(), PeerRefRemoveError>>,
     },
     ListPeers {
@@ -442,10 +443,15 @@ fn handle_request(
                 warn!("Connector dropped before receiving result of removing peer");
             }
         }
-        PeerManagerRequest::RemovePeerByEndpoint { endpoint, sender } => {
+        PeerManagerRequest::RemovePeerByEndpoint {
+            endpoint,
+            connection_id,
+            sender,
+        } => {
             if sender
                 .send(remove_peer_by_endpoint(
                     endpoint,
+                    connection_id,
                     connector,
                     peers,
                     ref_map,
@@ -737,7 +743,11 @@ fn add_unidentified(
     if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
         // if there is peer in the peer_map, there is reference in the ref map
         ref_map.add_ref(peer_metadata.id.clone());
-        EndpointPeerRef::new(endpoint, peer_remover.clone())
+        EndpointPeerRef::new(
+            endpoint,
+            peer_metadata.connection_id.clone(),
+            peer_remover.clone(),
+        )
     } else {
         let connection_id = format!("{}", Uuid::new_v4());
         match connector.request_connection(
@@ -761,7 +771,7 @@ fn add_unidentified(
                 local_authorization,
             },
         );
-        EndpointPeerRef::new(endpoint, peer_remover.clone())
+        EndpointPeerRef::new(endpoint, connection_id, peer_remover.clone())
     }
 }
 
@@ -808,7 +818,9 @@ fn remove_peer(
         if peer_metadata.status == PeerStatus::Pending {
             return Ok(());
         }
-        match connector.remove_connection(&peer_metadata.active_endpoint) {
+        match connector
+            .remove_connection(&peer_metadata.active_endpoint, &peer_metadata.connection_id)
+        {
             Ok(Some(_)) => {
                 debug!(
                     "Peer {} has been removed and connection {} has been closed",
@@ -830,12 +842,13 @@ fn remove_peer(
 
 fn remove_peer_by_endpoint(
     endpoint: String,
+    connection_id: String,
     connector: Connector,
     peers: &mut PeerMap,
     ref_map: &mut RefMap<PeerAuthorizationToken>,
     strict_ref_counts: bool,
 ) -> Result<(), PeerRefRemoveError> {
-    let peer_metadata = match peers.get_peer_from_endpoint(&endpoint) {
+    let peer_metadata = match peers.get_by_connection_id(&connection_id) {
         Some(peer_metadata) => peer_metadata,
         None => {
             return Err(PeerRefRemoveError::Remove(format!(
@@ -879,7 +892,9 @@ fn remove_peer_by_endpoint(
             return Ok(());
         }
 
-        match connector.remove_connection(&peer_metadata.active_endpoint) {
+        match connector
+            .remove_connection(&peer_metadata.active_endpoint, &peer_metadata.connection_id)
+        {
             Ok(Some(_)) => {
                 debug!(
                     "Peer {} has been removed and connection {} has been closed",
@@ -1051,7 +1066,9 @@ fn handle_disconnection(
             // the disconnected endpoint is an inbound connection. This connection should
             // be removed, peer set to pending and the endpoints in the peer metadata
             // should be tried
-            if let Err(err) = connector.remove_connection(&peer_metadata.active_endpoint) {
+            if let Err(err) = connector
+                .remove_connection(&peer_metadata.active_endpoint, &peer_metadata.connection_id)
+            {
                 error!("Unable to clean up old connection: {}", err);
             }
 
@@ -1081,7 +1098,9 @@ fn handle_disconnection(
         // check for unreferenced peer and remove if it has disconnected
         debug!("Removing disconnected peer: {}", identity);
         if let Some(unref_peer) = unreferenced_peers.peers.remove(&identity) {
-            if let Err(err) = connector.remove_connection(&unref_peer.endpoint) {
+            if let Err(err) =
+                connector.remove_connection(&unref_peer.endpoint, &unref_peer.connection_id)
+            {
                 error!("Unable to clean up old connection: {}", err);
             }
         }
@@ -1128,7 +1147,7 @@ fn handle_inbound_connection(
                         "Removing inbound connection, already connected to {}",
                         peer_metadata.id
                     );
-                    if let Err(err) = connector.remove_connection(&endpoint) {
+                    if let Err(err) = connector.remove_connection(&endpoint, &connection_id) {
                         error!("Unable to clean up old connection: {}", err);
                     }
                     return;
@@ -1141,6 +1160,7 @@ fn handle_inbound_connection(
             }
         }
         let old_endpoint = peer_metadata.active_endpoint;
+        let old_connection_id = peer_metadata.connection_id;
         let starting_status = peer_metadata.status;
         peer_metadata.status = PeerStatus::Connected;
         peer_metadata.connection_id = connection_id;
@@ -1161,7 +1181,7 @@ fn handle_inbound_connection(
 
         // if peer is pending there is no connection to remove
         if endpoint != old_endpoint && starting_status != PeerStatus::Pending {
-            if let Err(err) = connector.remove_connection(&old_endpoint) {
+            if let Err(err) = connector.remove_connection(&old_endpoint, &old_connection_id) {
                 warn!("Unable to clean up old connection: {}", err);
             }
         }
@@ -1178,7 +1198,9 @@ fn handle_inbound_connection(
         ) {
             if old_peer.endpoint != endpoint {
                 debug!("Removing old peer connection for {}", old_peer.endpoint);
-                if let Err(err) = connector.remove_connection(&old_peer.endpoint) {
+                if let Err(err) =
+                    connector.remove_connection(&old_peer.endpoint, &old_peer.connection_id)
+                {
                     error!("Unable to clean up old connection: {}", err);
                 }
             }
@@ -1224,7 +1246,7 @@ fn handle_connected(
                     );
                     // we are already connected on another connection, remove this connection
                     if endpoint != peer_metadata.active_endpoint {
-                        if let Err(err) = connector.remove_connection(&endpoint) {
+                        if let Err(err) = connector.remove_connection(&endpoint, &connection_id) {
                             error!("Unable to clean up old connection: {}", err);
                         }
                     }
@@ -1240,12 +1262,14 @@ fn handle_connected(
 
         if identity != peer_metadata.id {
             // remove connection that has provided mismatched identity
-            if let Err(err) = connector.remove_connection(&endpoint) {
+            if let Err(err) = connector.remove_connection(&endpoint, &connection_id) {
                 error!("Unable to clean up mismatched identity connection: {}", err);
             }
 
             // also remove current active endpoint because peer is currently invalid
-            if let Err(err) = connector.remove_connection(&peer_metadata.active_endpoint) {
+            if let Err(err) = connector
+                .remove_connection(&peer_metadata.active_endpoint, &peer_metadata.connection_id)
+            {
                 error!("Unable to clean up mismatched identity connection: {}", err);
             }
 
@@ -1278,6 +1302,7 @@ fn handle_connected(
 
         let starting_status = peer_metadata.status;
         let old_endpoint = peer_metadata.active_endpoint;
+        let old_connection_id = peer_metadata.connection_id;
         peer_metadata.active_endpoint = endpoint.to_string();
         peer_metadata.status = PeerStatus::Connected;
         peer_metadata.connection_id = connection_id;
@@ -1291,7 +1316,7 @@ fn handle_connected(
 
         // remove old connection
         if endpoint != old_endpoint && starting_status != PeerStatus::Pending {
-            if let Err(err) = connector.remove_connection(&old_endpoint) {
+            if let Err(err) = connector.remove_connection(&old_endpoint, &old_connection_id) {
                 error!("Unable to clean up old connection: {}", err);
             }
         }
@@ -1333,7 +1358,9 @@ fn handle_connected(
         ) {
             if old_peer.endpoint != endpoint {
                 debug!("Removing old peer connection for {}", old_peer.endpoint);
-                if let Err(err) = connector.remove_connection(&old_peer.endpoint) {
+                if let Err(err) =
+                    connector.remove_connection(&old_peer.endpoint, &old_peer.connection_id)
+                {
                     error!("Unable to clean up old connection: {}", err);
                 }
             }

@@ -61,14 +61,16 @@ impl Drop for PeerRef {
 #[derive(Debug, PartialEq)]
 pub struct EndpointPeerRef {
     endpoint: String,
+    connection_id: String,
     peer_remover: PeerRemover,
 }
 
 impl EndpointPeerRef {
     /// Creates a new `EndpointPeerRef`
-    pub(super) fn new(endpoint: String, peer_remover: PeerRemover) -> Self {
+    pub(super) fn new(endpoint: String, connection_id: String, peer_remover: PeerRemover) -> Self {
         EndpointPeerRef {
             endpoint,
+            connection_id,
             peer_remover,
         }
     }
@@ -83,7 +85,7 @@ impl Drop for EndpointPeerRef {
     fn drop(&mut self) {
         match self
             .peer_remover
-            .remove_peer_ref_by_endpoint(&self.endpoint)
+            .remove_peer_ref_by_endpoint(&self.endpoint, &self.connection_id)
         {
             Ok(_) => (),
             Err(err) => error!(
