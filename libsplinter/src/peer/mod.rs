@@ -1019,15 +1019,17 @@ fn handle_notifications(
             ref_map,
             retry_frequency,
         ),
-        ConnectionManagerNotification::FatalConnectionError { endpoint, error } => {
-            handle_fatal_connection(
-                endpoint,
-                error.to_string(),
-                peers,
-                subscribers,
-                max_retry_attempts,
-            )
-        }
+        ConnectionManagerNotification::FatalConnectionError {
+            connection_id,
+            error,
+            ..
+        } => handle_fatal_connection(
+            connection_id,
+            error.to_string(),
+            peers,
+            subscribers,
+            max_retry_attempts,
+        ),
     }
 }
 
@@ -1222,7 +1224,7 @@ fn handle_connected(
     ref_map: &mut RefMap<PeerAuthorizationToken>,
     retry_frequency: u64,
 ) {
-    if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
+    if let Some(mut peer_metadata) = peers.get_by_connection_id(&connection_id).cloned() {
         match peer_metadata.status {
             PeerStatus::Pending => {
                 info!(
@@ -1369,13 +1371,13 @@ fn handle_connected(
 }
 
 fn handle_fatal_connection(
-    endpoint: String,
+    connection_id: String,
     error: String,
     peers: &mut PeerMap,
     subscribers: &mut SubscriberMap,
     max_retry_frequency: u64,
 ) {
-    if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
+    if let Some(mut peer_metadata) = peers.get_by_connection_id(&connection_id).cloned() {
         warn!(
             "Peer {} encountered a fatal connection error: {}",
             peer_metadata.id, error

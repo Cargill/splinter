@@ -725,6 +725,7 @@ where
                 {
                     subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
                         endpoint,
+                        connection_id,
                         error: err,
                     });
 
@@ -767,6 +768,7 @@ where
                 // and will not be added.
                 subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
                     endpoint,
+                    connection_id: connection_id.clone(),
                     error: ConnectionManagerError::Unauthorized(connection_id),
                 });
             }
@@ -801,6 +803,7 @@ where
                 {
                     subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
                         endpoint,
+                        connection_id,
                         error: err,
                     });
                     return;
@@ -829,6 +832,7 @@ where
                 // and will not be added.
                 subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
                     endpoint,
+                    connection_id: connection_id.clone(),
                     error: ConnectionManagerError::Unauthorized(connection_id),
                 });
             }

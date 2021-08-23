@@ -26,6 +26,7 @@ pub enum ConnectionManagerNotification {
     },
     FatalConnectionError {
         endpoint: String,
+        connection_id: String,
         error: ConnectionManagerError,
     },
     InboundConnection {
