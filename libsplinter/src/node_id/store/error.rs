@@ -23,7 +23,7 @@ use crate::error::ResourceTemporarilyUnavailableError;
 
 /// Error type for the [NodeIdStore](super::NodeIdStore) trait.
 ///
-/// Any errors implimentations of [NodeIdStore](super::NodeIdStore) can generate must be convertable
+/// Any errors implementations of [NodeIdStore](super::NodeIdStore) can generate must be convertible
 /// to a NodeIdStoreError enum member.
 
 #[derive(Debug)]
