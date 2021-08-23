@@ -28,7 +28,7 @@ use operations::{
     get_node_id::NodeIdGetOperation, set_node_id::NodeIdSetOperation, NodeIdOperations,
 };
 
-/// Database backed NodeIdStore implementation.
+/// Database backed [NodeIdStore] implementation.
 pub struct DieselNodeIdStore<Conn: diesel::Connection + 'static> {
     pool: Pool<ConnectionManager<Conn>>,
 }

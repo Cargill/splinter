@@ -21,12 +21,12 @@ use std::fmt::Display;
 use crate::error::InternalError;
 use crate::error::ResourceTemporarilyUnavailableError;
 
-/// Error type for the NodeIdStore trait.
-/// Any errors implimentations of NodeIdStore can generate must be convertable
+/// Error type for the [NodeIdStore](super::NodeIdStore) trait.
+/// Any errors implimentations of [NodeIdStore](super::NodeIdStore) can generate must be convertable
 /// to a NodeIdStoreError enum member.
 
 #[derive(Debug)]
-/// Error states for fallible [NodeIdStore](../trait.NodeIdStore.html) operations.
+/// Error states for fallible [NodeIdStore](super::NodeIdStore) operations.
 pub enum NodeIdStoreError {
     InternalError(InternalError),
     ResourceTemporarilyUnavailableError(ResourceTemporarilyUnavailableError),
