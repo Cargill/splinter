@@ -15,7 +15,7 @@
 FROM cypress/base:10
 
 RUN apt-get update \
- && apt-get install -y \
+ && apt-get install -y --no-install-recommends \
     postgresql-client \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
@@ -26,7 +26,7 @@ ARG http_proxy
 ARG https_proxy
 ARG no_proxy
 
-WORKDIR app/
+WORKDIR /app/
 
 # dependencies will be installed only if the package files change
 COPY /cypress/package*.json ./

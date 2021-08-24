@@ -25,7 +25,7 @@ FROM ubuntu:focal
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
- && apt-get install -y \
+ && apt-get install -y --no-install-recommends \
     curl \
     gcc \
     libssl-dev \
@@ -33,14 +33,12 @@ RUN apt-get update \
     pkg-config \
     unzip \
  && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
-
-RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
  && chmod +x /usr/bin/rustup-init \
- && rustup-init -y
-
-# Install protoc
-RUN curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/protoc-3.7.1-linux-x86_64.zip \
+ && rustup-init -y \
+ # Install protoc
+ && curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/protoc-3.7.1-linux-x86_64.zip \
     && unzip -o protoc-3.7.1-linux-x86_64.zip -d /usr/local \
     && rm protoc-3.7.1-linux-x86_64.zip
 
@@ -48,6 +46,7 @@ ENV PATH=$PATH:/root/.cargo/bin
 
 WORKDIR /project/splinter/libsplinter
 
+# hadolint ignore=DL3025
 CMD cargo login $CARGO_CRED \
  && echo "Publshing version $REPO_VERSION" \
  && rm -f ../Cargo.lock ./Cargo.lock \

@@ -44,10 +44,11 @@ COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
 ARG REPO_VERSION
 ARG CARGO_ARGS
 RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" \
-    services/scabbard/cli/Cargo.toml
-RUN cargo build --manifest-path=services/scabbard/cli/Cargo.toml --release $CARGO_ARGS
-RUN (cd services/scabbard/cli && cargo deb --no-build --deb-version $REPO_VERSION \
-    --manifest-path ./Cargo.toml)
+    services/scabbard/cli/Cargo.toml \
+ && cargo build --manifest-path=services/scabbard/cli/Cargo.toml --release $CARGO_ARGS
+WORKDIR /build/services/scabbard/cli
+RUN cargo deb --no-build --deb-version $REPO_VERSION \
+    --manifest-path ./Cargo.toml
 
 # Log the commit hash
 COPY .git/ /tmp/.git/
@@ -61,13 +62,14 @@ FROM ubuntu:focal
 ARG CARGO_ARGS
 RUN echo "CARGO_ARGS = '$CARGO_ARGS'" > CARGO_ARGS
 
-COPY --from=builder /build/target/debian/scabbard-cli_*.deb /tmp
-COPY --from=builder /commit-hash /commit-hash
+COPY --from=BUILDER /build/target/debian/scabbard-cli_*.deb /tmp
+COPY --from=BUILDER /commit-hash /commit-hash
 
 RUN apt-get update \
- && apt-get install -y \
+ && apt-get install -y --no-install-recommends \
     curl \
     man \
  && mandb \
  && dpkg --unpack /tmp/scabbard-cli_*.deb \
- && apt-get -f -y install
+ && apt-get -f -y install --no-install-recommends \
+ && rm -r /var/lib/apt/lists/*

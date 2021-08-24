@@ -15,7 +15,7 @@
 FROM postgres:alpine as BUILDER
 
 RUN apk update \
- && apk add git
+ && apk add --no-cache git
 
 # Log the commit hash
 COPY .git/ /tmp/.git/

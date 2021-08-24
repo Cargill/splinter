@@ -44,9 +44,10 @@ COPY cli /build/cli
 # Build the project
 ARG REPO_VERSION
 ARG CARGO_ARGS
-RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" cli/Cargo.toml
-RUN cargo build --manifest-path=cli/Cargo.toml --release $CARGO_ARGS
-RUN (cd cli && cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml)
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" cli/Cargo.toml \
+ && cargo build --manifest-path=cli/Cargo.toml --release $CARGO_ARGS
+WORKDIR /build/cli
+RUN cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml
 
 # Log the commit hash
 COPY .git/ /tmp/.git/
@@ -60,15 +61,16 @@ FROM ubuntu:focal
 ARG CARGO_ARGS
 RUN echo "CARGO_ARGS = '$CARGO_ARGS'" > CARGO_ARGS
 
-COPY --from=builder /build/target/debian/splinter-cli_*.deb /tmp
-COPY --from=builder /commit-hash /commit-hash
+COPY --from=BUILDER /build/target/debian/splinter-cli_*.deb /tmp
+COPY --from=BUILDER /commit-hash /commit-hash
 
 RUN apt-get update \
- && apt-get install -y -q \
+ && apt-get install -y -q --no-install-recommends \
    curl \
    man \
  && mandb \
  && dpkg --unpack /tmp/splinter-cli_*.deb \
- && apt-get -f -y install
-
-RUN echo ". /usr/share/bash-completion/bash_completion" >> ~/.bashrc
+ && apt-get -f -y install --no-install-recommends \
+ && rm -r /var/lib/apt/lists/* \
+ # source bash completion script at login
+ && echo ". /usr/share/bash-completion/bash_completion" >> ~/.bashrc

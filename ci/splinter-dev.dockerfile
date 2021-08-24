@@ -16,10 +16,13 @@ FROM ubuntu:focal
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Install base dependencies
 RUN apt-get update \
- && apt-get install -y -q \
+ && apt-get install -y -q --no-install-recommends \
     build-essential \
+    ca-certificates \
     curl \
     g++ \
     gcc \
@@ -42,35 +45,30 @@ ENV PATH=$PATH:/root/.cargo/bin
 # Install Rust
 RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
  && chmod +x /usr/bin/rustup-init \
- && rustup-init -y
-
+ && rustup-init -y \
 # Install cargo deb
-RUN cargo install cargo-deb
-
+ && cargo install cargo-deb \
 # Install protoc
-RUN curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/protoc-3.7.1-linux-x86_64.zip \
+ && curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/protoc-3.7.1-linux-x86_64.zip \
     && unzip -o protoc-3.7.1-linux-x86_64.zip -d /usr/local \
-    && rm protoc-3.7.1-linux-x86_64.zip
-
+    && rm protoc-3.7.1-linux-x86_64.zip \
 # Install just
-RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+ && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
 
 # Create empty cargo projects for top-level projects
 WORKDIR /build
-RUN USER=root cargo new --bin cli
-RUN USER=root cargo new --lib libsplinter
-RUN USER=root cargo new --bin splinterd
-RUN cp libsplinter/src/lib.rs splinterd/src/lib.rs
-
+RUN USER=root cargo new --bin cli \
+ && USER=root cargo new --lib libsplinter \
+ && USER=root cargo new --bin splinterd \
+ && cp libsplinter/src/lib.rs splinterd/src/lib.rs \
 # Create empty Cargo projects for gameroom
-RUN USER=root cargo new --bin examples/gameroom/cli
-RUN USER=root cargo new --bin examples/gameroom/daemon
-RUN USER=root cargo new --bin examples/gameroom/database
-
+ && USER=root cargo new --bin examples/gameroom/cli \
+ && USER=root cargo new --bin examples/gameroom/daemon \
+ && USER=root cargo new --bin examples/gameroom/database \
 # Create empty Cargo projects for splinter services
-RUN USER=root cargo new --bin services/health
-RUN USER=root cargo new --bin services/scabbard/cli
-RUN USER=root cargo new --lib services/scabbard/libscabbard
+ && USER=root cargo new --bin services/health \
+ && USER=root cargo new --bin services/scabbard/cli \
+ && USER=root cargo new --lib services/scabbard/libscabbard
 
 # Copy over splinter files
 COPY Cargo.toml /build/Cargo.toml
@@ -94,28 +92,25 @@ COPY examples/gameroom/database/Cargo.toml \
      /build/examples/gameroom/database/Cargo.toml
 
 # Do release builds for each Cargo.toml
-RUN find ./*/ -name 'Cargo.toml' | \
-    xargs -I '{}' sh -c "echo 'Building {}'; cargo build --tests --release --manifest-path {} --features=experimental"
-
-RUN find ./*/ -name 'Cargo.toml' | \
-    xargs -I '{}' sh -c "echo 'Building {}'; cargo build --tests --release --manifest-path {} --features=stable"
-
-RUN find ./*/ -name 'Cargo.toml' | \
-    xargs -I '{}' sh -c "echo 'Building {}'; cargo build --tests --release --manifest-path {} --features=default"
-
-RUN find ./*/ -name 'Cargo.toml' | \
-    xargs -I '{}' sh -c "echo 'Building {}'; cargo build --tests --release --manifest-path {} --no-default-features"
-
+# Workaround for https://github.com/koalaman/shellcheck/issues/1894
+#hadolint ignore=SC2016
+RUN find ./*/ -name 'Cargo.toml' -print0 | \
+    xargs -0 -I {} sh -c 'echo Building $1; cargo build --tests --release --manifest-path $1 --features=experimental' sh {} \
+ && find ./*/ -name 'Cargo.toml' -print0 | \
+    xargs -0 -I {} sh -c 'echo Building $1; cargo build --tests --release --manifest-path $1 --features=stable' sh {} \
+ && find ./*/ -name 'Cargo.toml' -print0 | \
+    xargs -0 -I {} sh -c 'echo Building $1; cargo build --tests --release --manifest-path $1 --features=default' sh {} \
+ && find ./*/ -name 'Cargo.toml' -print0 | \
+    xargs -0 -I {} sh -c 'echo Building $1; cargo build --tests --release --manifest-path $1 --no-default-features' sh {} \
 # Clean up built files
-RUN find target/release -path target/release/.fingerprint -prune -false -o -name '*gameroom*' | xargs -I '{}' rm -rf '{}'
-RUN find target/release -path target/release/.fingerprint -prune -false -o -name '*health*' | xargs -I '{}' rm -rf '{}'
-RUN find target/release -path target/release/.fingerprint -prune -false -o -name '*scabbard*' | xargs -I '{}' rm -rf '{}'
-RUN find target/release -path target/release/.fingerprint -prune -false -o -name '*splinter*' | xargs -I '{}' rm -rf '{}'
-
+ && find target/release -path target/release/.fingerprint -prune -false -o -name '*gameroom*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
+ && find target/release -path target/release/.fingerprint -prune -false -o -name '*health*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
+ && find target/release -path target/release/.fingerprint -prune -false -o -name '*scabbard*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
+ && find target/release -path target/release/.fingerprint -prune -false -o -name '*splinter*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
 # Clean up leftover files
-RUN find . -name 'Cargo.toml' -exec \
-    sh -c 'x="{}"; rm "$x" ' \;
-RUN rm /build/libsplinter/build.rs \
+find . -name 'Cargo.toml' -exec \
+    sh -c 'x="$1"; rm "$x" ' sh {} \; \
+ &&  rm /build/libsplinter/build.rs \
     /build/libsplinter/protos/* \
     /build/services/scabbard/libscabbard/build.rs \
     /build/services/scabbard/libscabbard/protos/*
