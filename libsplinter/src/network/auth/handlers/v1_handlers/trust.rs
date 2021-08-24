@@ -209,10 +209,9 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
-    use cylinder::{
-        secp256k1::Secp256k1Context, Context, PublicKey, Signature, Signer, VerificationError,
-        Verifier,
-    };
+    #[cfg(feature = "challenge-authorization")]
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+    use cylinder::{PublicKey, Signature, VerificationError, Verifier};
     use protobuf::Message;
 
     use crate::network::auth::state_machine::trust_v1::TrustAuthorizationLocalState;
@@ -664,6 +663,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "challenge-authorization")]
     fn new_signer() -> Box<dyn Signer> {
         let context = Secp256k1Context::new();
         let key = context.new_random_private_key();

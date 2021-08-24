@@ -531,16 +531,16 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
-    use cylinder::{
-        secp256k1::Secp256k1Context, Context, PublicKey, Signature, Signer, VerificationError,
-        Verifier,
-    };
+    #[cfg(feature = "challenge-authorization")]
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+    use cylinder::{PublicKey, Signature, VerificationError, Verifier};
     use protobuf::Message;
 
     use crate::network::auth::{AuthorizationDispatchBuilder, Identity, ManagedAuthorizationState};
     use crate::protocol::authorization::AuthComplete;
     use crate::protos::network::NetworkMessageType;
     use crate::protos::{authorization, network};
+    #[cfg(feature = "challenge-authorization")]
     use crate::public_key;
 
     /// Test that an auth protocol request is properly handled via the dispatcher when no
@@ -851,6 +851,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "challenge-authorization")]
     fn new_signer() -> Box<dyn Signer> {
         let context = Secp256k1Context::new();
         let key = context.new_random_private_key();
