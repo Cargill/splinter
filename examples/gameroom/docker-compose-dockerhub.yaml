@@ -50,8 +50,8 @@ services:
             if [ ! -f /registry/registry.yaml ]
             then
               # generate user keys
-              splinter admin keygen alice -d /registry
-              splinter admin keygen bob -d /registry
+              splinter keygen alice --key-dir /registry
+              splinter keygen bob --key-dir /registry
               # check if splinterd-node-acme is available (will get 401 because no auth is provided)
               while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-acme:8085/status) -ne 401 ]] ; do
                  >&2 echo \"splinterd is unavailable - sleeping\"
@@ -180,7 +180,7 @@ services:
         bash -c "
           if [ ! -f /keys/acme.priv ]
           then
-            splinter admin keygen acme -d /keys
+            splinter keygen acme --key-dir /keys
           fi && \
           if [ ! -s /etc/splinter/allow_keys ]
           then
@@ -306,7 +306,7 @@ services:
         bash -c "
           if [ ! -f /keys/bubba.priv ]
           then
-            splinter admin keygen bubba -d /keys
+            splinter keygen bubba --key-dir /keys
           fi && \
           if [ ! -s /etc/splinter/allow_keys ]
           then

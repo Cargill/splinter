@@ -37,7 +37,7 @@ services:
       bash -c "
         if [ ! -f /acme.priv ]
         then
-          splinter admin keygen acme
+          splinter keygen acme
         fi && \
         if [ ! -s /etc/splinter/allow_keys ]
         then
