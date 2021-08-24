@@ -133,6 +133,21 @@ lint-client:
     cd examples/gameroom/gameroom-app
     npm run lint
 
+lint-dockerfiles:
+    #!/usr/bin/env sh
+    set -e
+    docker pull -q hadolint/hadolint
+    for dockerfile in $(find . -iname *dockerfile* -not -path '*/\.git*';)
+    do
+        echo "\033[1mLinting $dockerfile\033[0m"
+        docker run \
+          --rm \
+          -i \
+          -v $(pwd)/ci/hadolint.yaml:/.config/hadolint.yaml \
+          hadolint/hadolint < $dockerfile
+    done
+    echo "\n\033[92mLint Dockerfile Success\033[0m\n"
+
 lint-ignore:
     #!/usr/bin/env sh
     set -e
