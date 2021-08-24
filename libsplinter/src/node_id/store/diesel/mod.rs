@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Diesel based NodeIdStore
+//! Diesel based NodeIdStore.
 
 mod models;
 mod operations;
@@ -28,13 +28,13 @@ use operations::{
     get_node_id::NodeIdGetOperation, set_node_id::NodeIdSetOperation, NodeIdOperations,
 };
 
-/// Database backed NodeIdStore implementation
+/// Database backed [NodeIdStore] implementation.
 pub struct DieselNodeIdStore<Conn: diesel::Connection + 'static> {
     pool: Pool<ConnectionManager<Conn>>,
 }
 
 impl<C: diesel::Connection> DieselNodeIdStore<C> {
-    /// Constructs new DieselNodeIdStore
+    /// Constructs new DieselNodeIdStore.
     ///
     /// # Arguments
     ///

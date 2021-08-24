@@ -20,7 +20,7 @@ use std::path::PathBuf;
 use super::NodeIdStore;
 use super::NodeIdStoreError;
 
-/// A NodeIdStore backed by a file.
+/// A [NodeIdStore] backed by a file.
 /// The 0.4 node_id file is soft-deprecated, this exists to help migrate the node_id.
 pub struct FileNodeIdStore {
     filename: PathBuf,

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides NodeIdStore Operations to NodeIdStore implementors
+//! Provides [NodeIdStore](super::NodeIdStore) Operations to
+//! [NodeIdStore](super::NodeIdStore) implementors.
 
 pub(super) mod get_node_id;
 pub(super) mod set_node_id;

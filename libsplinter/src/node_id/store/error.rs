@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Error types and logic for NodeIdStores
+//! Error types and logic for NodeIdStores.
 
 use std::convert::From;
 use std::error::Error;
@@ -21,12 +21,13 @@ use std::fmt::Display;
 use crate::error::InternalError;
 use crate::error::ResourceTemporarilyUnavailableError;
 
-/// Error type for the NodeIdStore trait.
-/// Any errors implimentations of NodeIdStore can generate must be convertable
+/// Error type for the [NodeIdStore](super::NodeIdStore) trait.
+///
+/// Any errors implementations of [NodeIdStore](super::NodeIdStore) can generate must be convertible
 /// to a NodeIdStoreError enum member.
 
 #[derive(Debug)]
-/// NodeIdStore error enum
+/// Error states for fallible [NodeIdStore](super::NodeIdStore) operations.
 pub enum NodeIdStoreError {
     InternalError(InternalError),
     ResourceTemporarilyUnavailableError(ResourceTemporarilyUnavailableError),
@@ -50,6 +51,7 @@ impl Error for NodeIdStoreError {
     }
 }
 
+#[cfg(feature = "diesel")]
 impl From<diesel::result::Error> for NodeIdStoreError {
     fn from(err: diesel::result::Error) -> Self {
         Self::InternalError(InternalError::from_source(Box::new(err)))
