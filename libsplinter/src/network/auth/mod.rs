@@ -28,7 +28,7 @@ use protobuf::Message;
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 use crate::protocol::authorization::AuthProtocolRequest;
 use crate::protocol::authorization::AuthorizationMessage;
-#[cfg(not(all(feature = "trust-authorization", feature = "challenge-authorization")))]
+#[cfg(not(any(feature = "trust-authorization", feature = "challenge-authorization")))]
 use crate::protocol::authorization::ConnectRequest;
 use crate::protocol::network::NetworkMessage;
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
@@ -221,7 +221,7 @@ impl AuthorizationConnector {
             })?;
 
         self.executor.execute(move || {
-            #[cfg(not(all(feature = "trust-authorization", feature = "challenge-authorization")))]
+            #[cfg(not(any(feature = "trust-authorization", feature = "challenge-authorization")))]
             {
                 let connect_request_bytes = match connect_msg_bytes() {
                     Ok(bytes) => bytes,
@@ -379,7 +379,7 @@ impl AuthorizationConnector {
     }
 }
 
-#[cfg(not(all(feature = "trust-authorization", feature = "challenge-authorization")))]
+#[cfg(not(any(feature = "trust-authorization", feature = "challenge-authorization")))]
 fn connect_msg_bytes() -> Result<Vec<u8>, AuthorizationManagerError> {
     let connect_msg = AuthorizationMessage::ConnectRequest(ConnectRequest::Bidirectional);
 
@@ -593,7 +593,7 @@ pub(in crate::network) mod tests {
         assert!(matches!(trust_request, AuthorizationMessage::Authorized(_)));
     }
 
-    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
+    #[cfg(feature = "trust-authorization")]
     pub(in crate::network) fn negotiation_connection_auth(
         mesh: &Mesh,
         connection_id: &str,
