@@ -34,7 +34,7 @@ use flexi_logger::FlexiLoggerError;
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
 
-use action::{admin, certs, circuit, keygen, permissions, registry, Action, SubcommandActions};
+use action::{certs, circuit, keygen, permissions, registry, Action, SubcommandActions};
 use error::CliError;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
@@ -87,17 +87,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         (@arg verbose: -v +multiple +global "Log verbosely")
         (@arg quiet: -q --quiet +global "Do not display output")
         (@setting SubcommandRequiredElseHelp)
-        (@subcommand admin =>
-            (about: "Administrative commands")
-            (@setting SubcommandRequiredElseHelp)
-            (@subcommand keygen =>
-                (about: "Generates secp256k1 keys to use when signing circuit proposals")
-                (@arg key_name: +takes_value "Name of the key to create; defaults to \"splinter\"")
-                (@arg key_dir: -d --("key-dir") +takes_value
-                 "Name of the directory in which to create the keys; defaults to current working directory")
-                (@arg force: --force "Overwrite files if they exist")
-            )
-        )
     );
 
     app = app.subcommand(
@@ -1633,10 +1622,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     }
 
     let mut subcommands = SubcommandActions::new()
-        .with_command(
-            "admin",
-            SubcommandActions::new().with_command("keygen", admin::AdminKeyGenAction),
-        )
         .with_command(
             "cert",
             SubcommandActions::new().with_command("generate", certs::CertGenAction),
