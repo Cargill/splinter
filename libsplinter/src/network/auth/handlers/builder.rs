@@ -191,6 +191,8 @@ impl AuthorizationDispatchBuilder {
         // v1 message handlers
         #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
         {
+            // allow unused mut, required if challenge-authorization is enabled
+            #![allow(unused_mut)]
             let mut auth_protocol_request_builder = AuthProtocolRequestHandlerBuilder::default()
                 .with_auth_manager(auth_manager.clone());
 

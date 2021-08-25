@@ -89,6 +89,7 @@ impl AuthProtocolResponseHandlerBuilder {
         self
     }
 
+    #[cfg(feature = "challenge-authorization")]
     pub fn with_required_local_auth(
         mut self,
         required_local_auth: Option<ConnectionAuthorizationType>,
