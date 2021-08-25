@@ -191,6 +191,7 @@ services:
             sleep 1
           done && \
           splinter database migrate -C postgres://admin:admin@splinterd-db-acme:5432/splinter && \
+          splinter upgrade -C postgres://admin:admin@splinterd-db-acme:5432/splinter && \
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-acme.toml -vv \
               --database postgres://admin:admin@splinterd-db-acme:5432/splinter \
@@ -317,6 +318,7 @@ services:
             sleep 1
           done && \
           splinter database migrate -C postgres://admin:admin@splinterd-db-bubba:5432/splinter && \
+          splinter upgrade -C postgres://admin:admin@splinterd-db-bubba:5432/splinter && \
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-bubba.toml -vv \
               --database postgres://admin:admin@splinterd-db-bubba:5432/splinter \
