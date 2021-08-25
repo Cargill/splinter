@@ -19,7 +19,7 @@ services:
   lint-splinter:
     build:
       context: ../
-      dockerfile: ./lint
+      dockerfile: ./lint.dockerfile
       args:
         - http_proxy
         - https_proxy
@@ -32,6 +32,6 @@ services:
   lint-gameroom-client:
     build:
       context: ../../
-      dockerfile: ./docker/lint-client
+      dockerfile: ./docker/lint-client.dockerfile
     image: lint-gameroom-client:${ISOLATION_ID}
     command: just lint-client

@@ -17,7 +17,7 @@
 #   Your crates api token must be passed in as CARGO_CRED at runtime
 #   using Docker's -e option.
 
-# docker build -f ci/publish-splinter-crates -t publish-splinter-crates ci/
+# docker build -f ci/publish-splinter-crates.dockerfile -t publish-splinter-crates ci/
 # docker run --rm -v $(pwd):/project/splinter -e CARGO_CRED=%CREDVALUE% publish-splinter-crates
 
 FROM ubuntu:focal
