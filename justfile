@@ -56,6 +56,7 @@ build:
 
 ci:
     just ci-lint-client
+    just ci-lint-dockerfiles
     just ci-lint-splinter
     just ci-shellcheck
     just ci-test
@@ -67,6 +68,8 @@ ci-lint-client:
     docker-compose -f docker/compose/run-lint.yaml build lint-gameroom-client
     docker-compose -f docker/compose/run-lint.yaml up \
       --abort-on-container-exit lint-gameroom-client
+
+ci-lint-dockerfiles: lint-dockerfiles
 
 ci-lint-splinter:
     #!/usr/bin/env sh
