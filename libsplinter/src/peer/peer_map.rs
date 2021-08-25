@@ -14,7 +14,7 @@
 
 //! Data structure for keeping track of peer information
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use crate::collections::BiHashMap;
@@ -60,7 +60,7 @@ pub struct PeerMetadata {
 pub struct PeerMap {
     peers: HashMap<PeerAuthorizationToken, PeerMetadata>,
     // Endpoint to peer id
-    endpoints: HashMap<String, PeerAuthorizationToken>,
+    endpoints: HashMap<String, HashSet<PeerAuthorizationToken>>,
     initial_retry_frequency: u64,
     #[cfg(not(feature = "challenge-authorization"))]
     local_identity: PeerAuthorizationToken,
@@ -143,7 +143,13 @@ impl PeerMap {
         self.peers.insert(peer_id.clone(), peer_metadata);
 
         for endpoint in endpoints {
-            self.endpoints.insert(endpoint, peer_id.clone());
+            if let Some(peer_tokens) = self.endpoints.get_mut(&endpoint) {
+                peer_tokens.insert(peer_id.clone());
+            } else {
+                let mut peer_tokens = HashSet::new();
+                peer_tokens.insert(peer_id.clone());
+                self.endpoints.insert(endpoint.clone(), peer_tokens);
+            }
         }
 
         gauge!("splinter.peer_manager.peers", self.peers.len() as i64);
@@ -159,7 +165,15 @@ impl PeerMap {
     pub fn remove(&mut self, peer_id: &PeerAuthorizationToken) -> Option<PeerMetadata> {
         if let Some(peer_metadata) = self.peers.remove(peer_id) {
             for endpoint in peer_metadata.endpoints.iter() {
-                self.endpoints.remove(endpoint);
+                if let Some(mut peer_tokens) = self.endpoints.remove(endpoint) {
+                    if peer_tokens.len() > 1 {
+                        peer_tokens = peer_tokens
+                            .into_iter()
+                            .filter(|token| token != peer_id)
+                            .collect();
+                        self.endpoints.insert(endpoint.clone(), peer_tokens);
+                    }
+                }
             }
             gauge!("splinter.peer_manager.peers", self.peers.len() as i64);
             Some(peer_metadata)
@@ -178,8 +192,13 @@ impl PeerMap {
         // Only valid if the peer already exists
         if self.peers.contains_key(&peer_metadata.id) {
             for endpoint in peer_metadata.endpoints.iter() {
-                self.endpoints
-                    .insert(endpoint.to_string(), peer_metadata.id.clone());
+                if let Some(peer_tokens) = self.endpoints.get_mut(endpoint) {
+                    peer_tokens.insert(peer_metadata.id.clone());
+                } else {
+                    let mut peer_tokens = HashSet::new();
+                    peer_tokens.insert(peer_metadata.id.clone());
+                    self.endpoints.insert(endpoint.clone(), peer_tokens);
+                }
             }
 
             self.peers.insert(peer_metadata.id.clone(), peer_metadata);
@@ -193,10 +212,22 @@ impl PeerMap {
         }
     }
 
-    /// Returns the metadata for a peer from the provided endpoint
-    pub fn get_peer_from_endpoint(&self, endpoint: &str) -> Option<&PeerMetadata> {
-        if let Some(peer) = self.endpoints.get(endpoint) {
-            self.peers.get(peer)
+    /// Returns the metadatas for the peers from the provided endpoint
+    pub fn get_peer_from_endpoint(&self, endpoint: &str) -> Option<Vec<PeerMetadata>> {
+        if let Some(peer_tokens) = self.endpoints.get(endpoint) {
+            let mut peers = Vec::new();
+
+            for token in peer_tokens {
+                if let Some(peer_metadata) = self.peers.get(token) {
+                    peers.push(peer_metadata.clone())
+                }
+            }
+
+            if peers.is_empty() {
+                None
+            } else {
+                Some(peers)
+            }
         } else {
             None
         }
@@ -371,18 +402,23 @@ pub mod tests {
             .get_peer_from_endpoint("test_endpoint1")
             .expect("missing expected peer_metadata");
 
+        assert!(!peer_metadata.is_empty());
+
         assert_eq!(
-            peer_metadata.id,
+            peer_metadata[0].id,
             PeerAuthorizationToken::Trust {
                 peer_id: "test_peer".to_string()
             }
         );
         assert_eq!(
-            peer_metadata.endpoints,
+            peer_metadata[0].endpoints,
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()]
         );
-        assert_eq!(peer_metadata.active_endpoint, "test_endpoint2".to_string());
-        assert_eq!(peer_metadata.status, PeerStatus::Pending);
+        assert_eq!(
+            peer_metadata[0].active_endpoint,
+            "test_endpoint2".to_string()
+        );
+        assert_eq!(peer_metadata[0].status, PeerStatus::Pending);
 
         assert_eq!(
             Some(peer_metadata),
@@ -536,7 +572,7 @@ pub mod tests {
         }));
 
         let mut peer_metadata = peer_map
-            .get_peer_from_endpoint("test_endpoint2")
+            .get_by_connection_id("connection_id")
             .cloned()
             .expect("Unable to retrieve peer metadata with endpoint");
 

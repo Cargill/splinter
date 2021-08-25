@@ -587,6 +587,13 @@ fn add_peer(
     subscribers: &mut SubscriberMap,
     #[cfg(feature = "challenge-authorization")] required_local_auth: PeerAuthorizationToken,
 ) -> Result<PeerRef, PeerRefAddError> {
+    if check_for_duplicate_endpoint(&peer_id, &endpoints, peers) {
+        return Err(PeerRefAddError::AddError(format!(
+            "Peer {} contains endpoints that already belong to another peer using trust",
+            peer_id
+        )));
+    }
+
     let new_ref_count = ref_map.add_ref(peer_id.clone());
 
     // if this is not a new peer, return success
@@ -740,39 +747,61 @@ fn add_unidentified(
     #[cfg(feature = "challenge-authorization")] local_authorization: PeerAuthorizationToken,
 ) -> EndpointPeerRef {
     info!("Attempting to peer with peer by endpoint {}", endpoint);
-    if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
-        // if there is peer in the peer_map, there is reference in the ref map
-        ref_map.add_ref(peer_metadata.id.clone());
-        EndpointPeerRef::new(
-            endpoint,
-            peer_metadata.connection_id.clone(),
-            peer_remover.clone(),
-        )
-    } else {
-        let connection_id = format!("{}", Uuid::new_v4());
-        match connector.request_connection(
-            &endpoint,
-            &connection_id,
-            #[cfg(feature = "challenge-authorization")]
-            None,
-            #[cfg(feature = "challenge-authorization")]
-            Some(local_authorization.clone().into()),
-        ) {
-            Ok(()) => (),
-            Err(err) => {
-                warn!("Unable to peer with peer at {}: {}", endpoint, err);
+    if let Some(peer_metadatas) = peers.get_peer_from_endpoint(&endpoint) {
+        // if challenge authorization is not enabled, only one peer will be in the list
+        #[cfg(not(feature = "challenge-authorization"))]
+        {
+            if let Some(peer_metadata) = peer_metadatas.get(0) {
+                // if there is peer in the peer_map, there is reference in the ref map
+                ref_map.add_ref(peer_metadata.id.clone());
+                return EndpointPeerRef::new(
+                    endpoint,
+                    peer_metadata.connection_id.clone(),
+                    peer_remover.clone(),
+                );
             }
-        };
-        unreferenced_peers.requested_endpoints.insert(
-            endpoint.to_string(),
-            RequestedEndpoint {
-                endpoint: endpoint.to_string(),
-                #[cfg(feature = "challenge-authorization")]
-                local_authorization,
-            },
-        );
-        EndpointPeerRef::new(endpoint, connection_id, peer_remover.clone())
+        }
+
+        #[cfg(feature = "challenge-authorization")]
+        {
+            for peer_metadata in peer_metadatas {
+                // need to verify that the existing peer has the correct local authorization
+                if peer_metadata.required_local_auth == local_authorization {
+                    // if there is peer in the peer_map, there is reference in the ref map
+                    ref_map.add_ref(peer_metadata.id.clone());
+                    return EndpointPeerRef::new(
+                        endpoint,
+                        peer_metadata.connection_id,
+                        peer_remover.clone(),
+                    );
+                }
+            }
+        }
     }
+
+    let connection_id = format!("{}", Uuid::new_v4());
+    match connector.request_connection(
+        &endpoint,
+        &connection_id,
+        #[cfg(feature = "challenge-authorization")]
+        None,
+        #[cfg(feature = "challenge-authorization")]
+        Some(local_authorization.clone().into()),
+    ) {
+        Ok(()) => (),
+        Err(err) => {
+            warn!("Unable to peer with peer at {}: {}", endpoint, err);
+        }
+    };
+    unreferenced_peers.requested_endpoints.insert(
+        endpoint.to_string(),
+        RequestedEndpoint {
+            endpoint: endpoint.to_string(),
+            #[cfg(feature = "challenge-authorization")]
+            local_authorization,
+        },
+    );
+    EndpointPeerRef::new(endpoint, connection_id, peer_remover.clone())
 }
 
 fn remove_peer(
@@ -1224,7 +1253,7 @@ fn handle_connected(
     ref_map: &mut RefMap<PeerAuthorizationToken>,
     retry_frequency: u64,
 ) {
-    if let Some(mut peer_metadata) = peers.get_by_connection_id(&connection_id).cloned() {
+    if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
         match peer_metadata.status {
             PeerStatus::Pending => {
                 info!(
@@ -1260,41 +1289,6 @@ fn handle_connected(
                     );
                 }
             }
-        }
-
-        if identity != peer_metadata.id {
-            // remove connection that has provided mismatched identity
-            if let Err(err) = connector.remove_connection(&endpoint, &connection_id) {
-                error!("Unable to clean up mismatched identity connection: {}", err);
-            }
-
-            // also remove current active endpoint because peer is currently invalid
-            if let Err(err) = connector
-                .remove_connection(&peer_metadata.active_endpoint, &peer_metadata.connection_id)
-            {
-                error!("Unable to clean up mismatched identity connection: {}", err);
-            }
-
-            // tell subscribers this Peer is currently disconnected
-            let notification = PeerManagerNotification::Disconnected {
-                peer: peer_metadata.id.clone(),
-            };
-
-            // set its status to pending, this will cause the endpoints to be retried at
-            // a later time
-            peer_metadata.status = PeerStatus::Pending;
-
-            error!(
-                "Peer {} (via {}) presented a mismatched identity {}",
-                identity, endpoint, peer_metadata.id
-            );
-
-            if let Err(err) = peers.update_peer(peer_metadata) {
-                error!("Unable to update peer: {}", err);
-            }
-
-            subscribers.broadcast(notification);
-            return;
         }
 
         // Update peer for new state
@@ -1540,6 +1534,34 @@ fn log_connect_request_err(
     }
 }
 
+/// Check to make sure if multiple peer IDs point to the same endpoint, they are not diffferent
+/// Trust peer token. There can only be one Trust peer per endpoint, but multiple Challenge peers
+/// are okay.
+fn check_for_duplicate_endpoint(
+    peer_id: &PeerAuthorizationToken,
+    endpoints: &[String],
+    peer_map: &PeerMap,
+) -> bool {
+    #[cfg(feature = "challenge-authorization")]
+    if matches!(peer_id, PeerAuthorizationToken::Challenge { .. }) {
+        return false;
+    }
+
+    for endpoint in endpoints {
+        if let Some(peers) = peer_map.get_peer_from_endpoint(endpoint) {
+            for peer_meta in peers {
+                if matches!(peer_meta.id, PeerAuthorizationToken::Trust { .. })
+                    && &peer_meta.id != peer_id
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -1637,16 +1659,16 @@ pub mod tests {
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
 
-    // Test that a call to add_peer_ref, where the authorizer returns an different id than
-    // requested, the connector returns an error.
+    // Test that a call to add_peer_ref, where the peer being added is a different trust peer id
+    // with an endpoint that already belongs to another trust peer id is rejected.
     //
-    // 1. add test_peer, whose identity is different_peer
-    // 2. verify that an AddPeer returns succesfully
-    // 4. validate a Disconnected notification is returned,
-    // 5. drop peer ref
-    // 6. verify that the connection is removed.
+    // 1. add test_peer
+    // 2. verify that the returned PeerRef contains the test_peer id
+    // 3. verify the the a Connected notification is received
+    // 4. try to add different_peer with the same endpoint as test_peer and verify that an error
+    //    is returned
     #[test]
-    fn test_peer_manager_add_peer_identity_mismatch() {
+    fn test_peer_manager_add_peer_duplicate_endpoint() {
         let mut transport = Box::new(InprocTransport::default());
         let mut listener = transport.listen("inproc://test").unwrap();
 
@@ -1656,7 +1678,7 @@ pub mod tests {
 
         let mut mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::builder()
-            .with_authorizer(Box::new(NoopAuthorizer::new("different_peer")))
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
             .with_transport(transport.clone())
@@ -1665,7 +1687,7 @@ pub mod tests {
 
         let connector = cm.connector();
         let mut peer_manager = PeerManager::builder()
-            .with_connector(connector.clone())
+            .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
             .with_strict_ref_counts(true)
@@ -1679,7 +1701,6 @@ pub mod tests {
         peer_connector
             .subscribe_sender(tx)
             .expect("Unable to get subscriber");
-
         let peer_ref = peer_connector
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
@@ -1701,17 +1722,25 @@ pub mod tests {
             .expect("Unable to get new notifications");
         assert!(
             notification
-                == PeerManagerNotification::Disconnected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
+                == PeerManagerNotification::Connected {
+                    peer: PeerAuthorizationToken::from_peer_id("test_peer"),
                 }
         );
 
-        drop(peer_ref);
-
-        assert!(connector
-            .list_connections()
-            .expect("Unable to list connections")
-            .is_empty());
+        if peer_connector
+            .add_peer_ref(
+                PeerAuthorizationToken::from_peer_id("different_peer"),
+                vec!["inproc://test".to_string()],
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
+            .is_ok()
+        {
+            panic!(
+                "Should not have been able to add a different trust peer with duplicate \
+                     endpoint"
+            )
+        }
 
         peer_manager.signal_shutdown();
         cm.signal_shutdown();
