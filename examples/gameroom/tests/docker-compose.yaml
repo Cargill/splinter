@@ -76,6 +76,7 @@ services:
         done &&
         splinter database migrate -C postgres://gameroom_test:gameroom_test@db-test:5432/gameroom_test &&
         splinter cert generate --skip &&
+        splinter keygen --system --skip && \
         splinterd -c ./project/tests/splinterd-node-0-docker.toml -vv \
             --database postgres://gameroom_test:gameroom_test@db-test:5432/gameroom_test \
             --tls-insecure \

@@ -192,6 +192,7 @@ services:
           done && \
           splinter database migrate -C postgres://admin:admin@splinterd-db-acme:5432/splinter && \
           splinter cert generate --skip && \
+          splinter keygen --system --skip && \
           splinterd -c ./configs/splinterd-node-acme.toml -vv \
               --database postgres://admin:admin@splinterd-db-acme:5432/splinter \
               --network-endpoints tcps://0.0.0.0:8044 \
@@ -318,6 +319,7 @@ services:
           done && \
           splinter database migrate -C postgres://admin:admin@splinterd-db-bubba:5432/splinter && \
           splinter cert generate --skip && \
+          splinter keygen --system --skip && \
           splinterd -c ./configs/splinterd-node-bubba.toml -vv \
               --database postgres://admin:admin@splinterd-db-bubba:5432/splinter \
               --network-endpoints tcps://0.0.0.0:8044 \
