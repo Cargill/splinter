@@ -85,6 +85,7 @@ default = [
     "database-postgres",
     "database-sqlite",
     "oauth",
+    "trust-authorization",
 ]
 
 stable = [
@@ -107,7 +108,6 @@ experimental = [
     "scabbard-back-pressure",
     "service-arg-validation",
     "service-endpoint",
-    "trust-authorization",
     "ws-transport",
 ]
 

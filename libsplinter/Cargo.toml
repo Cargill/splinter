@@ -107,6 +107,7 @@ stable = [
     "rest-api-cors",
     "sqlite",
     "store-factory",
+    "trust-authorization",
 ]
 
 experimental = [
@@ -131,7 +132,6 @@ experimental = [
     "rest-api-actix-web-3",
     "service-arg-validation",
     "service-network",
-    "trust-authorization",
     "ws-transport",
     "zmq-transport",
 ]
