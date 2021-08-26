@@ -67,6 +67,7 @@ experimental = [
   "stable",
   # The following features are experimental:
   "back-pressure",
+  "diesel-receipt-store",
   "factory-builder",
   "metrics",
 ]
@@ -75,6 +76,7 @@ authorization = ["splinter/authorization"]
 back-pressure = []
 client = []
 client-reqwest = ["client", "reqwest"]
+diesel-receipt-store = []
 events = ["splinter/events"]
 factory-builder = []
 rest-api = ["futures", "splinter/rest-api"]
