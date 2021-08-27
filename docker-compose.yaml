@@ -49,6 +49,7 @@ services:
         done && \
         splinter database migrate -C postgres://splinter_admin:splinter_test@splinter-db:5432/splinter && \
         splinter cert generate --skip && \
+        splinter keygen --system --skip && \
         splinterd \
             -c ./configs/splinterd-node-0-docker.toml \
             --registries file://./registries/registry.yaml \
