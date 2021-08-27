@@ -1,5 +1,25 @@
 # Release Notes
 
+## Changes in Splinter 0.5.16
+
+### Highlights
+
+* Stabilize v1 Trust authorization. This version fixes a race condition that was
+  present in v0 Trust Authorization. Note: v0 is still supported if
+  ConnectRequest is received first instead of AuthProtocolRequest message.
+
+### libsplinter
+
+* Fix several feature guards for `challenge-authorization`.
+
+* Update rust documentation for NodeIdStore.
+
+* Stabilize the `trust-authorization` feature.
+
+### splinterd
+
+* Stabilize the `trust-authorization` feature by moving it to default.
+
 ## Changes in Splinter 0.5.15
 
 ### Highlights
