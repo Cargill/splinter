@@ -220,6 +220,7 @@ services:
             sleep 1
           done && \
           splinter database migrate -C postgres://admin:admin@splinterd-db-acme:5432/splinter && \
+          splinter upgrade -C postgres://admin:admin@splinterd-db-acme:5432/splinter && \
           splinter cert generate --skip && \
           splinter keygen --system --skip && \
           splinterd -c ./configs/splinterd-node-acme.toml -vv \
@@ -370,6 +371,7 @@ services:
             sleep 1
           done && \
           splinter database migrate -C postgres://admin:admin@splinterd-db-bubba:5432/splinter && \
+          splinter upgrade -C postgres://admin:admin@splinterd-db-bubba:5432/splinter && \
           splinter cert generate --skip && \
           splinter keygen --system --skip && \
           splinterd -c ./configs/splinterd-node-bubba.toml -vv \
