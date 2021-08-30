@@ -370,7 +370,7 @@ impl Handler for AuthChallengeSubmitRequestHandler {
             AuthorizationRemoteAction::Challenge(
                 ChallengeAuthorizationRemoteAction::ReceiveAuthChallengeSubmitRequest(
                     Identity::Challenge {
-                        public_key: identity,
+                        public_key: identity.clone(),
                     },
                 ),
             ),
@@ -389,7 +389,9 @@ impl Handler for AuthChallengeSubmitRequestHandler {
                 ChallengeAuthorizationRemoteState::ReceivedAuthChallengeSubmitRequest(_),
             )) => {
                 let auth_msg =
-                    AuthorizationMessage::AuthChallengeSubmitResponse(AuthChallengeSubmitResponse);
+                    AuthorizationMessage::AuthChallengeSubmitResponse(AuthChallengeSubmitResponse{
+                        public_key: identity.into_bytes()
+                    });
 
                 let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
                     NetworkMessage::from(auth_msg),

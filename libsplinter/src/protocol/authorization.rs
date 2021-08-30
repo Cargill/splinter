@@ -299,7 +299,9 @@ pub struct AuthChallengeSubmitRequest {
 ///
 /// This message is returned if challenge submit request is accepted
 #[derive(Debug)]
-pub struct AuthChallengeSubmitResponse;
+pub struct AuthChallengeSubmitResponse {
+    pub public_key: Vec<u8>,
+}
 
 impl FromProto<authorization::AuthComplete> for AuthComplete {
     fn from_proto(_: authorization::AuthComplete) -> Result<Self, ProtoConversionError> {
@@ -473,16 +475,20 @@ impl FromNative<AuthChallengeSubmitRequest> for authorization::AuthChallengeSubm
 }
 
 impl FromNative<AuthChallengeSubmitResponse> for authorization::AuthChallengeSubmitResponse {
-    fn from_native(_: AuthChallengeSubmitResponse) -> Result<Self, ProtoConversionError> {
-        Ok(authorization::AuthChallengeSubmitResponse::new())
+    fn from_native(response: AuthChallengeSubmitResponse) -> Result<Self, ProtoConversionError> {
+        let mut proto_response = authorization::AuthChallengeSubmitResponse::new();
+        proto_response.set_public_key(response.public_key);
+        Ok(proto_response)
     }
 }
 
 impl FromProto<authorization::AuthChallengeSubmitResponse> for AuthChallengeSubmitResponse {
     fn from_proto(
-        _: authorization::AuthChallengeSubmitResponse,
+        mut source: authorization::AuthChallengeSubmitResponse,
     ) -> Result<Self, ProtoConversionError> {
-        Ok(AuthChallengeSubmitResponse)
+        Ok(AuthChallengeSubmitResponse {
+            public_key: source.take_public_key(),
+        })
     }
 }
 
