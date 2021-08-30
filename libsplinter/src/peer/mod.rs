@@ -30,9 +30,9 @@ mod notification;
 mod peer_map;
 mod peer_ref;
 mod token;
+mod unreferenced;
 
 use std::cmp::min;
-use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
@@ -59,6 +59,7 @@ use self::notification::{Subscriber, SubscriberMap};
 use self::peer_map::{PeerMap, PeerStatus};
 pub use self::peer_ref::{EndpointPeerRef, PeerRef};
 pub use self::token::PeerAuthorizationToken;
+use self::unreferenced::{RequestedEndpoint, UnreferencedPeer, UnreferencedPeerState};
 
 /// Internal messages to drive management
 pub(crate) enum PeerManagerMessage {
@@ -533,44 +534,6 @@ fn handle_request(
             }
         }
     };
-}
-
-/// An entry of unreferenced peers, that may have connected externally, but have not yet been
-/// requested locally.
-#[derive(Debug)]
-struct UnreferencedPeer {
-    endpoint: String,
-    connection_id: String,
-    local_authorization: Option<PeerAuthorizationToken>,
-}
-
-/// An entry for a peer that was only requested by endpoint.
-#[derive(Debug)]
-struct RequestedEndpoint {
-    endpoint: String,
-    #[cfg(feature = "challenge-authorization")]
-    local_authorization: PeerAuthorizationToken,
-}
-
-struct UnreferencedPeerState {
-    peers: HashMap<PeerAuthorizationToken, UnreferencedPeer>,
-    // The list of endpoints that have been requested without an ID
-    requested_endpoints: HashMap<String, RequestedEndpoint>,
-    // Last time connection to the requested endpoints was tried
-    last_connection_attempt: Instant,
-    // How often to try to connect to requested endpoints
-    retry_frequency: u64,
-}
-
-impl UnreferencedPeerState {
-    fn new(retry_frequency: u64) -> Self {
-        UnreferencedPeerState {
-            peers: HashMap::default(),
-            requested_endpoints: HashMap::default(),
-            last_connection_attempt: Instant::now(),
-            retry_frequency,
-        }
-    }
 }
 
 // Allow clippy errors for too_many_arguments. The arguments are required
