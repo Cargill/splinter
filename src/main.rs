@@ -75,7 +75,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                     Arg::with_name("target_rate")
                         .long("target-rate")
                         .takes_value(true)
-                        .required(true)
                         .long_help(
                             "Rate of batch submit, either provide a float, a rate in form <float>/<h,m,s> or \
                      a range with the min and max separated by '-' ex: 5.0-15.0, 1/m, 15/s-2/m, defaults to 1/s",
