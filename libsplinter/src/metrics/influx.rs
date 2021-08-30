@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use influxdb::Client;
 use influxdb::InfluxDbWriteable;
-use metrics_lib::{Key, Recorder};
+use metrics_lib::{Key, Label, Recorder};
 use tokio_0_2::runtime::Runtime;
 use tokio_0_2::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_0_2::task::JoinHandle;
@@ -53,16 +53,19 @@ enum MetricRequest {
     Counter {
         key: String,
         value: u64,
+        labels: Vec<Label>,
         time: DateTime<Utc>,
     },
     Gauge {
         key: String,
         value: i64,
+        labels: Vec<Label>,
         time: DateTime<Utc>,
     },
     Histogram {
         key: String,
         value: u64,
+        labels: Vec<Label>,
         time: DateTime<Utc>,
     },
     Shutdown,
@@ -92,7 +95,12 @@ impl InfluxRecorder {
             let mut counters: HashMap<String, Counter> = HashMap::new();
             loop {
                 match recv.recv().await {
-                    Some(MetricRequest::Counter { key, value, time }) => {
+                    Some(MetricRequest::Counter {
+                        key,
+                        value,
+                        labels,
+                        time,
+                    }) => {
                         let counter = {
                             if let Some(mut counter) = counters.get_mut(&key) {
                                 counter.value += value;
@@ -109,29 +117,48 @@ impl InfluxRecorder {
                             }
                         };
 
-                        let query = counter.into_query(key);
+                        let mut query = counter.into_query(key);
+                        for label in labels {
+                            query = query.add_tag(label.key(), label.value());
+                        }
                         if let Err(err) = client.query(&query).await {
                             error!("Unable to submit influx query: {}", err)
                         };
                     }
-                    Some(MetricRequest::Gauge { key, value, time }) => {
+                    Some(MetricRequest::Gauge {
+                        key,
+                        value,
+                        labels,
+                        time,
+                    }) => {
                         let gauge = Gauge {
                             time,
                             key: key.to_string(),
                             value,
                         };
-                        let query = gauge.into_query(key);
+                        let mut query = gauge.into_query(key);
+                        for label in labels {
+                            query = query.add_tag(label.key(), label.value());
+                        }
                         if let Err(err) = client.query(&query).await {
                             error!("Unable to submit influx query: {}", err)
                         };
                     }
-                    Some(MetricRequest::Histogram { key, value, time }) => {
+                    Some(MetricRequest::Histogram {
+                        key,
+                        value,
+                        labels,
+                        time,
+                    }) => {
                         let histogram = Histogram {
                             time,
                             key: key.to_string(),
                             value,
                         };
-                        let query = histogram.into_query(key);
+                        let mut query = histogram.into_query(key);
+                        for label in labels {
+                            query = query.add_tag(label.key(), label.value());
+                        }
                         if let Err(err) = client.query(&query).await {
                             error!("Unable to submit influx query: {}", err)
                         };
@@ -183,6 +210,7 @@ impl Recorder for InfluxRecorder {
         let name = key.name().to_string();
         if let Err(err) = self.sender.send(MetricRequest::Counter {
             key: name,
+            labels: key.labels().cloned().collect(),
             value,
             time: Utc::now(),
         }) {
@@ -194,6 +222,7 @@ impl Recorder for InfluxRecorder {
         let name = key.name().to_string();
         if let Err(err) = self.sender.send(MetricRequest::Gauge {
             key: name,
+            labels: key.labels().cloned().collect(),
             value,
             time: Utc::now(),
         }) {
@@ -205,6 +234,7 @@ impl Recorder for InfluxRecorder {
         let name = key.name().to_string();
         if let Err(err) = self.sender.send(MetricRequest::Histogram {
             key: name,
+            labels: key.labels().cloned().collect(),
             value,
             time: Utc::now(),
         }) {
