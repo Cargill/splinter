@@ -359,6 +359,7 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
                         subscribers.broadcast(ConnectionManagerNotification::Disconnected {
                             endpoint: metadata.endpoint.clone(),
                             identity: metadata.identity.clone(),
+                            connection_id: metadata.connection_id.clone(),
                         });
                         reconnections.push(metadata.clone());
                     }
@@ -385,6 +386,7 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
                         subscribers.broadcast(ConnectionManagerNotification::Disconnected {
                             endpoint: metadata.endpoint.clone(),
                             identity: metadata.identity.clone(),
+                            connection_id: metadata.connection_id.clone(),
                         });
                     }
                 } else {

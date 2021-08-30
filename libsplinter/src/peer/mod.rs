@@ -958,7 +958,7 @@ fn handle_notifications(
 ) {
     match notification {
         // If a connection has disconnected, forward notification to subscribers
-        ConnectionManagerNotification::Disconnected { endpoint, identity } => handle_disconnection(
+        ConnectionManagerNotification::Disconnected { endpoint, identity, .. } => handle_disconnection(
             endpoint,
             PeerAuthorizationToken::from(identity),
             unreferenced_peers,
@@ -970,6 +970,7 @@ fn handle_notifications(
             endpoint,
             attempts,
             identity,
+            ..
         } => {
             // Check if the disconnected peer has reached the retry limit, if so try to find a
             // different endpoint that can be connected to

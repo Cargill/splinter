@@ -967,6 +967,7 @@ where
                 endpoint: endpoint.to_string(),
                 attempts: reconnection_attempts,
                 identity,
+                connection_id: connection_id.to_string(),
             });
         }
         Ok(())
@@ -1483,6 +1484,7 @@ mod tests {
                     identity: ConnectionAuthorizationType::Trust {
                         identity: "some-peer".into()
                     },
+                    connection_id: "test_id",
                 }
         );
 
