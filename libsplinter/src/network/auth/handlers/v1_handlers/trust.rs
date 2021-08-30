@@ -244,6 +244,7 @@ mod tests {
                     local_state: AuthorizationLocalState::WaitingForAuthProtocolResponse,
                     remote_state: AuthorizationRemoteState::SentAuthProtocolResponse,
                     received_complete: false,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();
@@ -323,6 +324,7 @@ mod tests {
                     ),
                     remote_state: AuthorizationRemoteState::SentAuthProtocolResponse,
                     received_complete: false,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();
@@ -426,6 +428,7 @@ mod tests {
                         identity: "other_identity".to_string(),
                     }),
                     received_complete: false,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();
@@ -525,6 +528,7 @@ mod tests {
                         identity: "other_identity".to_string(),
                     }),
                     received_complete: true,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();

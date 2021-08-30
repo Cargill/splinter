@@ -282,6 +282,7 @@ impl AuthorizationManagerStateMachine {
                     local_state: AuthorizationLocalState::Start,
                     remote_state: AuthorizationRemoteState::Start,
                     received_complete: false,
+                    local_authorization: None,
                 });
 
         if action == AuthorizationLocalAction::Unauthorizing {
@@ -397,6 +398,7 @@ impl AuthorizationManagerStateMachine {
                     local_state: AuthorizationLocalState::Start,
                     remote_state: AuthorizationRemoteState::Start,
                     received_complete: false,
+                    local_authorization: None,
                 });
 
         if action == AuthorizationRemoteAction::Unauthorizing {
@@ -523,6 +525,7 @@ impl AuthorizationManagerStateMachine {
                     local_state: AuthorizationLocalState::Start,
                     remote_state: AuthorizationRemoteState::Start,
                     received_complete: false,
+                    local_authorization: None,
                 });
 
         cur_state.received_complete = true;
@@ -530,6 +533,30 @@ impl AuthorizationManagerStateMachine {
         if cur_state.local_state == AuthorizationLocalState::WaitForComplete {
             cur_state.local_state = AuthorizationLocalState::AuthorizedAndComplete;
         }
+        Ok(())
+    }
+
+    pub(crate) fn set_local_authorization(
+        &self,
+        connection_id: &str,
+        identity: Identity,
+    ) -> Result<(), AuthorizationActionError> {
+        let mut shared = self.shared.lock().map_err(|_| {
+            AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
+        })?;
+
+        let mut cur_state =
+            shared
+                .states
+                .entry(connection_id.to_string())
+                .or_insert(ManagedAuthorizationState {
+                    local_state: AuthorizationLocalState::Start,
+                    remote_state: AuthorizationRemoteState::Start,
+                    received_complete: false,
+                    local_authorization: None,
+                });
+
+        cur_state.local_authorization = Some(identity);
         Ok(())
     }
 }

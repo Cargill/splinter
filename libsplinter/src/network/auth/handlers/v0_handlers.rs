@@ -174,11 +174,15 @@ impl Handler for ConnectRequestHandler {
 /// Handler for the ConnectResponse Authorization Message Type
 pub struct ConnectResponseHandler {
     identity: String,
+    auth_manager: AuthorizationManagerStateMachine,
 }
 
 impl ConnectResponseHandler {
-    pub fn new(identity: String) -> Self {
-        ConnectResponseHandler { identity }
+    pub fn new(identity: String, auth_manager: AuthorizationManagerStateMachine) -> Self {
+        ConnectResponseHandler {
+            identity,
+            auth_manager,
+        }
     }
 }
 
@@ -203,6 +207,17 @@ impl Handler for ConnectResponseHandler {
             context.source_connection_id(),
             connect_response,
         );
+
+        self.auth_manager
+            .set_local_authorization(
+                context.source_connection_id(),
+                Identity::Trust {
+                    identity: self.identity.to_string(),
+                },
+            )
+            .map_err(|err| {
+                DispatchError::HandleError(format!("Unable to set local authorization: {}", err))
+            })?;
 
         if connect_response
             .accepted_authorization_types

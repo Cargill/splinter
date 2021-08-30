@@ -180,7 +180,10 @@ impl AuthorizationDispatchBuilder {
 
         // allow redundant_clone, must be cloned here if trust-authorization is enabled
         #[allow(clippy::redundant_clone)]
-        auth_dispatcher.set_handler(Box::new(ConnectResponseHandler::new(identity.to_string())));
+        auth_dispatcher.set_handler(Box::new(ConnectResponseHandler::new(
+            identity.to_string(),
+            auth_manager.clone(),
+        )));
 
         auth_dispatcher.set_handler(Box::new(TrustRequestHandler::new(auth_manager.clone())));
 

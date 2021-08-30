@@ -62,9 +62,9 @@ pub enum AuthorizationResult {
         identity: ConnectionAuthorizationType,
         connection: Box<dyn Connection>,
         #[cfg(feature = "challenge-authorization")]
-        expected_authorization: Option<ConnectionAuthorizationType>,
+        expected_authorization: ConnectionAuthorizationType,
         #[cfg(feature = "challenge-authorization")]
-        local_authorization: Option<ConnectionAuthorizationType>,
+        local_authorization: ConnectionAuthorizationType,
     },
     Unauthorized {
         connection_id: String,
@@ -471,12 +471,14 @@ enum ConnectionMetadataExt {
         last_connection_attempt: Instant,
         reconnection_attempts: u64,
         #[cfg(feature = "challenge-authorization")]
-        expected_authorization: Option<ConnectionAuthorizationType>,
+        expected_authorization: ConnectionAuthorizationType,
         #[cfg(feature = "challenge-authorization")]
-        local_authorization: Option<ConnectionAuthorizationType>,
+        local_authorization: ConnectionAuthorizationType,
     },
     Inbound {
         disconnected: bool,
+        #[cfg(feature = "challenge-authorization")]
+        local_authorization: ConnectionAuthorizationType,
     },
 }
 
@@ -487,18 +489,21 @@ impl ConnectionMetadataExt {
             ConnectionMetadataExt::Outbound {
                 expected_authorization,
                 ..
-            } => expected_authorization.clone(),
+            } => Some(expected_authorization.clone()),
             _ => None,
         }
     }
 
-    fn local_authorization(&self) -> Option<ConnectionAuthorizationType> {
+    fn local_authorization(&self) -> ConnectionAuthorizationType {
         match self {
             ConnectionMetadataExt::Outbound {
                 local_authorization,
                 ..
             } => local_authorization.clone(),
-            _ => None,
+            ConnectionMetadataExt::Inbound {
+                local_authorization,
+                ..
+            } => local_authorization.clone(),
         }
     }
 }
@@ -617,7 +622,9 @@ where
                             });
                         }
                     }
-                    ConnectionMetadataExt::Inbound { ref disconnected } => {
+                    ConnectionMetadataExt::Inbound {
+                        ref disconnected, ..
+                    } => {
                         if !disconnected {
                             subscribers.broadcast(ConnectionManagerNotification::Connected {
                                 endpoint: outbound.endpoint.to_string(),
@@ -792,6 +799,8 @@ where
                 connection_id,
                 connection,
                 identity,
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
                 ..
             } => {
                 if let Err(err) = self
@@ -817,6 +826,8 @@ where
                         identity: identity.clone(),
                         extended_metadata: ConnectionMetadataExt::Inbound {
                             disconnected: false,
+                            #[cfg(feature = "challenge-authorization")]
+                            local_authorization: local_authorization.clone(),
                         },
                     },
                 );
@@ -825,6 +836,8 @@ where
                     endpoint,
                     connection_id,
                     identity,
+                    #[cfg(feature = "challenge-authorization")]
+                    local_identity: local_authorization,
                 });
             }
             AuthorizationResult::Unauthorized { connection_id, .. } => {
@@ -931,7 +944,7 @@ where
                 #[cfg(feature = "challenge-authorization")]
                 meta.extended_metadata.expected_authorization(),
                 #[cfg(feature = "challenge-authorization")]
-                meta.extended_metadata.local_authorization(),
+                Some(meta.extended_metadata.local_authorization()),
             ) {
                 error!(
                     "Error authorizing {} ({}): {}",
@@ -1715,10 +1728,10 @@ mod tests {
             connection_id: String,
             connection: Box<dyn Connection>,
             callback: AuthorizerCallback,
-            #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+            #[cfg(feature = "challenge-authorization")] _expected_authorization: Option<
                 ConnectionAuthorizationType,
             >,
-            #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+            #[cfg(feature = "challenge-authorization")] _local_authorization: Option<
                 ConnectionAuthorizationType,
             >,
         ) -> Result<(), AuthorizerError> {
@@ -1729,9 +1742,13 @@ mod tests {
                     identity: self.authorized_id.clone(),
                 },
                 #[cfg(feature = "challenge-authorization")]
-                expected_authorization,
+                expected_authorization: ConnectionAuthorizationType::Trust {
+                    identity: self.authorized_id.clone(),
+                },
                 #[cfg(feature = "challenge-authorization")]
-                local_authorization,
+                local_authorization: ConnectionAuthorizationType::Trust {
+                    identity: "test_identity".into(),
+                },
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

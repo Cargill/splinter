@@ -2783,7 +2783,7 @@ pub mod tests {
             callback: Box<
                 dyn Fn(AuthorizationResult) -> Result<(), Box<dyn std::error::Error>> + Send,
             >,
-            #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+            #[cfg(feature = "challenge-authorization")] _expected_authorization: Option<
                 ConnectionAuthorizationType,
             >,
             #[cfg(feature = "challenge-authorization")] local_authorization: Option<
@@ -2798,11 +2798,17 @@ pub mod tests {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                identity: ConnectionAuthorizationType::Trust { identity },
+                identity: ConnectionAuthorizationType::Trust {
+                    identity: identity.clone(),
+                },
                 #[cfg(feature = "challenge-authorization")]
-                expected_authorization,
+                expected_authorization: ConnectionAuthorizationType::Trust { identity },
                 #[cfg(feature = "challenge-authorization")]
-                local_authorization,
+                local_authorization: local_authorization.unwrap_or(
+                    ConnectionAuthorizationType::Trust {
+                        identity: "my_id".into(),
+                    },
+                ),
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

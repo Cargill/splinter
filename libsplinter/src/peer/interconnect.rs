@@ -993,9 +993,9 @@ pub mod tests {
                     identity: self.authorized_id.clone(),
                 },
                 #[cfg(feature = "challenge-authorization")]
-                expected_authorization,
+                expected_authorization: expected_authorization.unwrap(),
                 #[cfg(feature = "challenge-authorization")]
-                local_authorization,
+                local_authorization: local_authorization.unwrap(),
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

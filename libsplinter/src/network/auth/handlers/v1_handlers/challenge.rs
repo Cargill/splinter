@@ -388,10 +388,11 @@ impl Handler for AuthChallengeSubmitRequestHandler {
             Ok(AuthorizationRemoteState::Challenge(
                 ChallengeAuthorizationRemoteState::ReceivedAuthChallengeSubmitRequest(_),
             )) => {
-                let auth_msg =
-                    AuthorizationMessage::AuthChallengeSubmitResponse(AuthChallengeSubmitResponse{
-                        public_key: identity.into_bytes()
-                    });
+                let auth_msg = AuthorizationMessage::AuthChallengeSubmitResponse(
+                    AuthChallengeSubmitResponse {
+                        public_key: identity.into_bytes(),
+                    },
+                );
 
                 let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
                     NetworkMessage::from(auth_msg),
@@ -446,7 +447,7 @@ impl Handler for AuthChallengeSubmitResponseHandler {
 
     fn handle(
         &self,
-        _msg: Self::Message,
+        msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
@@ -455,10 +456,18 @@ impl Handler for AuthChallengeSubmitResponseHandler {
             context.source_connection_id()
         );
 
+        let submit_msg = AuthChallengeSubmitResponse::from_proto(msg)?;
+
+        let public_key = submit_msg.public_key;
+
         match self.auth_manager.next_local_state(
             context.source_connection_id(),
             AuthorizationLocalAction::Challenge(
-                ChallengeAuthorizationLocalAction::ReceiveAuthChallengeSubmitResponse,
+                ChallengeAuthorizationLocalAction::ReceiveAuthChallengeSubmitResponse(
+                    Identity::Challenge {
+                        public_key: public_key::PublicKey::from_bytes(public_key),
+                    },
+                ),
             ),
         ) {
             Err(err) => {
@@ -556,6 +565,7 @@ mod tests {
                     local_state: AuthorizationLocalState::WaitingForAuthProtocolResponse,
                     remote_state: AuthorizationRemoteState::SentAuthProtocolResponse,
                     received_complete: true,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();
@@ -662,6 +672,7 @@ mod tests {
                     ),
                     remote_state: AuthorizationRemoteState::SentAuthProtocolResponse,
                     received_complete: true,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();
@@ -771,6 +782,7 @@ mod tests {
                         ChallengeAuthorizationRemoteState::WaitingForAuthChallengeSubmitRequest,
                     ),
                     received_complete: true,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();
@@ -894,6 +906,7 @@ mod tests {
                         ChallengeAuthorizationRemoteState::WaitingForAuthChallengeSubmitRequest,
                     ),
                     received_complete: false,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();
@@ -1026,6 +1039,7 @@ mod tests {
                         public_key: public_key.clone(),
                     }),
                     received_complete: false,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();
@@ -1057,7 +1071,12 @@ mod tests {
             .expect("Unable to build authorization dispatcher");
 
         let msg_bytes = IntoBytes::<authorization::AuthorizationMessage>::into_bytes(
-            AuthorizationMessage::AuthChallengeSubmitResponse(AuthChallengeSubmitResponse),
+            AuthorizationMessage::AuthChallengeSubmitResponse(AuthChallengeSubmitResponse {
+                public_key: local_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            }),
         )
         .expect("Unable to get message bytes");
 
@@ -1110,7 +1129,6 @@ mod tests {
     /// 2) the handler should send a AuthComplete
     /// 3) verify state is AuthorizedAndComplete and Done(Identity)
     #[test]
-
     fn auth_challenge_submit_response_complete() {
         let connection_id = "test_connection".to_string();
         let other_signer = new_signer();
@@ -1137,6 +1155,7 @@ mod tests {
                         public_key: public_key.clone(),
                     }),
                     received_complete: true,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();
@@ -1168,7 +1187,12 @@ mod tests {
             .expect("Unable to build authorization dispatcher");
 
         let msg_bytes = IntoBytes::<authorization::AuthorizationMessage>::into_bytes(
-            AuthorizationMessage::AuthChallengeSubmitResponse(AuthChallengeSubmitResponse),
+            AuthorizationMessage::AuthChallengeSubmitResponse(AuthChallengeSubmitResponse {
+                public_key: local_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            }),
         )
         .expect("Unable to get message bytes");
 

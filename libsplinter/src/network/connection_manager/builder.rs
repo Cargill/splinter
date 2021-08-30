@@ -367,6 +367,7 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             }
             ConnectionMetadataExt::Inbound {
                 ref mut disconnected,
+                ..
             } => {
                 trace!(
                     "Sending heartbeat to {} ({})",

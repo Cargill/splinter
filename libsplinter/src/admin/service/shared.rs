@@ -7174,20 +7174,24 @@ mod tests {
         };
 
         let mesh = Mesh::new(2, 2);
-        let inproc_authorizer = InprocAuthorizer::new(vec![
-            (
-                "inproc://orchestator".to_string(),
-                "orchestator".to_string(),
-            ),
-            (
-                "inproc://otherplace:8000".to_string(),
-                "other-node".to_string(),
-            ),
-            (
-                "inproc://someplace:8000".to_string(),
-                "test-node".to_string(),
-            ),
-        ]);
+        let inproc_authorizer = InprocAuthorizer::new(
+            vec![
+                (
+                    "inproc://orchestator".to_string(),
+                    "orchestator".to_string(),
+                ),
+                (
+                    "inproc://otherplace:8000".to_string(),
+                    "other-node".to_string(),
+                ),
+                (
+                    "inproc://someplace:8000".to_string(),
+                    "test-node".to_string(),
+                ),
+            ],
+            #[cfg(feature = "challenge-authorization")]
+            "node_id".to_string(),
+        );
 
         let authorization_manager = AuthorizationManager::new(
             "test-node".into(),

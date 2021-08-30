@@ -62,6 +62,9 @@ pub(crate) struct ManagedAuthorizationState {
 
     // Tracks whether the local node has completed authorization with the remote node
     received_complete: bool,
+
+    // Stores the local authorization used
+    local_authorization: Option<Identity>,
 }
 
 #[derive(Debug)]
@@ -201,8 +204,8 @@ impl AuthorizationConnector {
             dispatcher_builder = dispatcher_builder
                 .with_signers(&self.signers)
                 .with_nonce(&nonce)
-                .with_expected_authorization(expected_authorization.clone())
-                .with_local_authorization(local_authorization.clone())
+                .with_expected_authorization(expected_authorization)
+                .with_local_authorization(local_authorization)
                 .with_verifier(verifier)
         }
 
@@ -276,7 +279,7 @@ impl AuthorizationConnector {
                 };
             }
 
-            let authed_identity = 'main: loop {
+            let authed_identities = 'main: loop {
                 match connection.recv() {
                     Ok(bytes) => {
                         let mut msg: network::NetworkMessage =
@@ -341,15 +344,19 @@ impl AuthorizationConnector {
                 }
             };
 
-            let auth_state = if let Some(auth_identity) = authed_identity {
+            // allow unused variable if challenge-authorization is not enabled
+            #[allow(unused_variables)]
+            let auth_state = if let Some((auth_identity, local_authorization)) = authed_identities {
                 match auth_identity {
                     Identity::Trust { identity } => ConnectionAuthorizationState::Authorized {
                         connection_id,
                         connection,
                         #[cfg(feature = "challenge-authorization")]
-                        expected_authorization,
+                        expected_authorization:  ConnectionAuthorizationType::Trust {
+                            identity: identity.clone()
+                        },
                         #[cfg(feature = "challenge-authorization")]
-                        local_authorization,
+                        local_authorization: local_authorization.into(),
                         identity: ConnectionAuthorizationType::Trust { identity },
                     },
                     #[cfg(feature = "challenge-authorization")]
@@ -357,9 +364,13 @@ impl AuthorizationConnector {
                         ConnectionAuthorizationState::Authorized {
                             connection_id: connection_id.clone(),
                             connection,
-                            identity: ConnectionAuthorizationType::Challenge { public_key },
-                            expected_authorization,
-                            local_authorization,
+                            identity: ConnectionAuthorizationType::Challenge {
+                                public_key: public_key.clone()
+                            },
+                            expected_authorization: ConnectionAuthorizationType::Challenge {
+                                public_key
+                            },
+                            local_authorization: local_authorization.into()
                         }
                     }
                 }
@@ -423,11 +434,17 @@ impl ManagedAuthorizations {
         }
     }
 
-    fn take_connection_identity(&mut self, connection_id: &str) -> Option<Identity> {
+    fn take_connection_identity(&mut self, connection_id: &str) -> Option<(Identity, Identity)> {
         self.states.remove(connection_id).and_then(|managed_state| {
-            match managed_state.remote_state {
-                AuthorizationRemoteState::Done(identity) => Some(identity),
-                _ => None,
+            if let Some(local_authorization) = managed_state.local_authorization {
+                match managed_state.remote_state {
+                    AuthorizationRemoteState::Done(identity) => {
+                        Some((identity, local_authorization))
+                    }
+                    _ => None,
+                }
+            } else {
+                None
             }
         })
     }
@@ -466,9 +483,9 @@ pub enum ConnectionAuthorizationState {
         connection: Box<dyn Connection>,
         // information required if reconnect needs to be attempted
         #[cfg(feature = "challenge-authorization")]
-        expected_authorization: Option<ConnectionAuthorizationType>,
+        expected_authorization: ConnectionAuthorizationType,
         #[cfg(feature = "challenge-authorization")]
-        local_authorization: Option<ConnectionAuthorizationType>,
+        local_authorization: ConnectionAuthorizationType,
     },
     Unauthorized {
         connection_id: String,
@@ -492,6 +509,18 @@ impl std::fmt::Debug for ConnectionAuthorizationState {
                 .debug_struct("Unauthorized")
                 .field("connection_id", connection_id)
                 .finish(),
+        }
+    }
+}
+
+impl From<Identity> for ConnectionAuthorizationType {
+    fn from(identity: Identity) -> Self {
+        match identity {
+            Identity::Trust { identity } => ConnectionAuthorizationType::Trust { identity },
+            #[cfg(feature = "challenge-authorization")]
+            Identity::Challenge { public_key } => {
+                ConnectionAuthorizationType::Challenge { public_key }
+            }
         }
     }
 }

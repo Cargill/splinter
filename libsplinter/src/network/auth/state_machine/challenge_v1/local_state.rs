@@ -84,7 +84,8 @@ impl ChallengeAuthorizationLocalState {
             },
             ChallengeAuthorizationLocalState::WaitingForAuthChallengeSubmitResponse => match action
             {
-                ChallengeAuthorizationLocalAction::ReceiveAuthChallengeSubmitResponse => {
+                ChallengeAuthorizationLocalAction::ReceiveAuthChallengeSubmitResponse(identity) => {
+                    cur_state.local_authorization = Some(identity);
                     let new_state = AuthorizationLocalState::Authorized;
                     cur_state.local_state = new_state.clone();
                     Ok(new_state)
