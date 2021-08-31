@@ -49,27 +49,30 @@ COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
 ARG REPO_VERSION
 ARG CARGO_ARGS
 RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" \
-    examples/gameroom/daemon/Cargo.toml
-RUN cargo build --manifest-path=examples/gameroom/daemon/Cargo.toml --release $CARGO_ARGS
-RUN (cd examples/gameroom/daemon && cargo deb --no-build --deb-version $REPO_VERSION \
-    --manifest-path ./Cargo.toml)
+    examples/gameroom/daemon/Cargo.toml \
+ && cargo build --manifest-path=examples/gameroom/daemon/Cargo.toml --release $CARGO_ARGS
+WORKDIR /build/examples/gameroom/daemon
+RUN cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml
 
 # Build the gameroom-cli package
+WORKDIR /build
 ARG REPO_VERSION
 ARG CARGO_ARGS
 RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" \
-    examples/gameroom/cli/Cargo.toml
-RUN cargo build --manifest-path=examples/gameroom/cli/Cargo.toml --release $CARGO_ARGS
-RUN (cd examples/gameroom/cli && cargo deb --no-build --deb-version $REPO_VERSION \
-    --manifest-path ./Cargo.toml)
+    examples/gameroom/cli/Cargo.toml \
+ && cargo build --manifest-path=examples/gameroom/cli/Cargo.toml --release $CARGO_ARGS
+WORKDIR /build/examples/gameroom/cli
+RUN cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml
 
 # Build splinter-cli
+WORKDIR /build
 ARG REPO_VERSION
 ARG CARGO_ARGS
-RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" cli/Cargo.toml
-RUN cargo build --manifest-path=cli/Cargo.toml --release $CARGO_ARGS
-RUN (cd cli && cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml)
-RUN mv /build/target/debian/splinter-cli*.deb /tmp
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" cli/Cargo.toml \
+ && cargo build --manifest-path=cli/Cargo.toml --release $CARGO_ARGS
+WORKDIR /build/cli
+RUN cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml \
+ && mv /build/target/debian/splinter-cli*.deb /tmp
 
 # Log the commit hash
 COPY .git/ /tmp/.git/
@@ -82,26 +85,25 @@ FROM ubuntu:focal
 ARG CARGO_ARGS
 RUN echo "CARGO_ARGS = '$CARGO_ARGS'" > CARGO_ARGS
 
-RUN apt-get update \
- && apt-get install -y \
-    curl \
-    postgresql-client \
-    unzip
-
 COPY --from=BUILDER /build/target/debian/gameroom*.deb /tmp/
 COPY --from=BUILDER /tmp/splinter-*.deb /tmp/
 COPY --from=BUILDER /commit-hash /commit-hash
 
 RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    postgresql-client \
+    unzip \
  && dpkg --unpack /tmp/gameroom*.deb \
  && dpkg --unpack /tmp/splinter*.deb \
- && apt-get -f -y install
-
+ && apt-get -f -y install --no-install-recommends \
+ && rm -r /var/lib/apt/lists/*
 # Fetch the XO smart contract
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN XO_LATEST=$(curl --silent https://files.splinter.dev/scar/index | grep ^xo_ | tail -1) \
- && curl -OLsS https://files.splinter.dev/scar/$XO_LATEST
-
-RUN tar -xvf xo_*.scar \
+ && curl -OLsS https://files.splinter.dev/scar/"$XO_LATEST" \
+ && tar -xvf xo_*.scar \
  && rm xo_*.scar \
  && mv xo-tp-rust.wasm /var/lib/gameroomd/xo-tp-rust.wasm
 

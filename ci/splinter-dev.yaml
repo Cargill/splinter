@@ -20,4 +20,4 @@ services:
     image: splintercommunity/splinter-dev:v8
     build:
       context: ..
-      dockerfile: ci/splinter-dev
+      dockerfile: ci/splinter-dev.dockerfile

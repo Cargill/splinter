@@ -14,12 +14,13 @@
 
 FROM ubuntu:bionic
 
-RUN apt update \
- && apt install -qy \
+RUN apt-get update \
+ && apt-get install -qy --no-install-recommends \
+    ca-certificates \
     tar \
-    wget
-
-RUN wget https://dl.influxdata.com/telegraf/releases/telegraf_1.17.2-1_amd64.deb \
- && dpkg -i telegraf_1.17.2-1_amd64.deb
+    wget \
+ && wget -q https://dl.influxdata.com/telegraf/releases/telegraf_1.17.2-1_amd64.deb \
+ && dpkg -i telegraf_1.17.2-1_amd64.deb \
+ && rm -r /var/lib/apt/lists/*
 
 WORKDIR /project

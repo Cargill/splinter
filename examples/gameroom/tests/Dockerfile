@@ -15,8 +15,9 @@
 FROM splintercommunity/splinter-dev:v8
 
 RUN apt-get update \
- && apt-get install -y \
- postgresql-client
+ && apt-get install -y --no-install-recommends \
+ postgresql-client \
+ && rm -r /var/lib/apt/lists/*
 
 # Build gameroom cli
 

@@ -1,4 +1,4 @@
-# Copyright 2018-2021 Cargill Incorporated
+# Copyright 2021 Cargill Incorporated
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM postgres:alpine as BUILDER
-
-RUN apk update \
- && apk add --no-cache git
-
-# Log the commit hash
-COPY .git/ /tmp/.git/
-WORKDIR /tmp
-RUN git rev-parse HEAD > /commit-hash
-
-# -------------=== gameroom db docker build ===-------------
-
-FROM postgres:alpine
-
-COPY --from=BUILDER /commit-hash /commit-hash
+ignored:
+  - DL3008
+  - DL3018

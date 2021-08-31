@@ -16,15 +16,14 @@
 FROM ubuntu:focal as swagger_downloader
 
 RUN apt-get update \
-  && apt-get install -y -q \
+  && apt-get install -y -q --no-install-recommends \
        curl \
   && apt-get clean \
-  && rm -r /var/lib/apt/lists/*
-
-RUN curl \
+  && rm -r /var/lib/apt/lists/* \
+  && curl \
       -s https://codeload.github.com/swagger-api/swagger-ui/tar.gz/v3.6.0 \
-      -o swagger-ui.tar.gz
-RUN tar xfz swagger-ui.tar.gz
+      -o swagger-ui.tar.gz \
+  && tar xfz swagger-ui.tar.gz
 
 FROM httpd:2.4
 
@@ -32,9 +31,9 @@ COPY --from=swagger_downloader /swagger-ui-3.6.0/dist/* /usr/local/apache2/htdoc
 
 RUN sed -ibak \
       's#http://petstore.swagger.io/v2/swagger.json#http://localhost:9000/api/openapi.yaml#' \
-      /usr/local/apache2/htdocs/index.html
+      /usr/local/apache2/htdocs/index.html \
 
-RUN echo "\
+  && printf "\
 \n\
 ServerName swagger_ui\n\
 AddDefaultCharset utf-8\n\

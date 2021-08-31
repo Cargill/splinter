@@ -15,8 +15,7 @@
 # build stage
 FROM node:lts-alpine as build-stage
 
-RUN apk update \
- && apk add \
+RUN apk add --no-cache \
     curl \
     g++ \
     git \
@@ -24,10 +23,11 @@ RUN apk update \
     python \
  && rm -rf /var/cache/apk/*
 
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh \
     | sh -s -- --to /usr/local/bin
 
-COPY examples/gameroom/gameroom-app/package*.json examples/gameroom/gameroom-app/
+COPY examples/gameroom/gameroom-app/package*.json /examples/gameroom/gameroom-app/
 
 WORKDIR /examples/gameroom/gameroom-app
 
@@ -36,5 +36,5 @@ RUN npm config set unsafe-perm true && npm install
 
 WORKDIR /
 
-COPY examples/gameroom/gameroom-app examples/gameroom/gameroom-app
+COPY examples/gameroom/gameroom-app /examples/gameroom/gameroom-app
 COPY justfile .
