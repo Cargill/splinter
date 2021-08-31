@@ -53,6 +53,9 @@ pub struct ScabbardShared {
     coordinator_service_id: String,
     /// This service's ID
     service_id: String,
+    /// This circuit's ID
+    #[cfg(feature = "metrics")]
+    circuit_id: String,
     /// Tracks which proposals are currently being evaluated along with the batch the proposal is
     /// for
     open_proposals: HashMap<ProposalId, (Proposal, BatchPair)>,
@@ -70,6 +73,7 @@ impl ScabbardShared {
         network_sender: Option<Box<dyn ServiceNetworkSender>>,
         peer_services: HashSet<String>,
         service_id: String,
+        #[cfg(feature = "metrics")] circuit_id: String,
         signature_verifier: Box<dyn SignatureVerifier>,
         #[cfg(feature = "back-pressure")] scabbard_version: ScabbardVersion,
     ) -> Self {
@@ -86,22 +90,26 @@ impl ScabbardShared {
         )
         .expect("String -> PeerId -> String conversion should not fail");
 
-        // initialize pending_batches metric
-        gauge!("splinter.scabbard.pending_batches", 0);
-
-        ScabbardShared {
+        let scabbard_shared = ScabbardShared {
             batch_queue,
             network_sender,
             peer_services,
             coordinator_service_id,
             service_id,
+            #[cfg(feature = "metrics")]
+            circuit_id,
             open_proposals: HashMap::new(),
             signature_verifier,
             #[cfg(feature = "back-pressure")]
             accepting_batches: true,
             #[cfg(feature = "back-pressure")]
             scabbard_version,
-        }
+        };
+
+        // initialize pending_batches metric
+        scabbard_shared.update_pending_batches(0);
+
+        scabbard_shared
     }
 
     /// Determines if this service is the coordinator.
@@ -125,12 +133,24 @@ impl ScabbardShared {
         self.accepting_batches
     }
 
-    pub fn add_batch_to_queue(&mut self, batch: BatchPair) -> Result<(), ScabbardError> {
-        self.batch_queue.push_back(batch);
+    /// Updates pending batches metrics gauge
+    ///
+    /// # Arguments
+    ///
+    /// * `_batches` - The number of pending batches for this service. It is prefixed with an
+    /// underscore due to rust recognizing the metrics macro noop when the metrics feature is
+    /// disabled
+    fn update_pending_batches(&self, _batches: i64) {
         gauge!(
             "splinter.scabbard.pending_batches",
-            self.batch_queue.len() as i64
+            _batches,
+            "service" => format!("{}::{}", self.circuit_id, self.service_id)
         );
+    }
+
+    pub fn add_batch_to_queue(&mut self, batch: BatchPair) -> Result<(), ScabbardError> {
+        self.batch_queue.push_back(batch);
+        self.update_pending_batches(self.batch_queue.len() as i64);
 
         #[cfg(feature = "back-pressure")]
         {
@@ -167,10 +187,7 @@ impl ScabbardShared {
 
         // if the batch is some, the length of pending batches has changed
         if batch.is_some() {
-            gauge!(
-                "splinter.scabbard.pending_batches",
-                self.batch_queue.len() as i64
-            );
+            self.update_pending_batches(self.batch_queue.len() as i64);
         }
 
         #[cfg(feature = "back-pressure")]
@@ -361,6 +378,8 @@ mod tests {
             Some(Box::new(MockServiceNetworkSender)),
             peer_services.clone(),
             "svc0".to_string(),
+            #[cfg(feature = "metrics")]
+            "vzrQS-rvwf4".to_string(),
             context.new_verifier(),
             #[cfg(feature = "back-pressure")]
             ScabbardVersion::V2,
@@ -373,6 +392,8 @@ mod tests {
             Some(Box::new(MockServiceNetworkSender)),
             peer_services,
             "svc3".to_string(),
+            #[cfg(feature = "metrics")]
+            "vzrQS-rvwf4".to_string(),
             context.new_verifier(),
             #[cfg(feature = "back-pressure")]
             ScabbardVersion::V2,

@@ -131,6 +131,8 @@ impl Scabbard {
             None,
             peer_services,
             service_id.clone(),
+            #[cfg(feature = "metrics")]
+            circuit_id.to_string(),
             signature_verifier,
             #[cfg(feature = "back-pressure")]
             version,

@@ -421,6 +421,8 @@ mod tests {
             Some(Box::new(service_sender.clone())),
             peer_services.clone(),
             "svc0".to_string(),
+            #[cfg(feature = "metrics")]
+            "vzrQS-rvwf4".to_string(),
             Secp256k1Context::new().new_verifier(),
             #[cfg(feature = "back-pressure")]
             ScabbardVersion::V2,
