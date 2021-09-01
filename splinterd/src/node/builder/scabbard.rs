@@ -25,6 +25,7 @@ const DEFAULT_TEST_DB_SIZE: usize = 120 * 1024 * 1024;
 pub struct ScabbardConfigBuilder {
     data_dir: Option<PathBuf>,
     database_size: Option<usize>,
+    receipt_db_url: Option<String>,
 }
 
 impl ScabbardConfigBuilder {
@@ -45,6 +46,13 @@ impl ScabbardConfigBuilder {
         self
     }
 
+    /// Sets the receipt db connection url that will be used for the scabbard service
+    /// receipt store
+    pub fn with_receipt_db_url(mut self, receipt_db_url: String) -> Self {
+        self.receipt_db_url = Some(receipt_db_url);
+        self
+    }
+
     /// Constructs the ScabbardConfig.
     ///
     /// # Errors
@@ -55,10 +63,14 @@ impl ScabbardConfigBuilder {
         let data_dir = self
             .data_dir
             .ok_or_else(|| InternalError::with_message("A data directory is required.".into()))?;
+        let receipt_db_url = self.receipt_db_url.ok_or_else(|| {
+            InternalError::with_message("A receipt database url is required.".into())
+        })?;
 
         Ok(ScabbardConfig {
             data_dir,
             database_size,
+            receipt_db_url,
         })
     }
 }
@@ -69,4 +81,6 @@ pub struct ScabbardConfig {
     pub(crate) data_dir: PathBuf,
     /// The size of the LMDB databases that will be generated per scabbard service instance.
     pub(crate) database_size: usize,
+    /// The url of the receipt store database.
+    pub(crate) receipt_db_url: String,
 }
