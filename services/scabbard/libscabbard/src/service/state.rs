@@ -17,13 +17,20 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(feature = "diesel-receipt-store")]
+use std::str::FromStr;
 use std::sync::{
     mpsc::{channel, Receiver, RecvTimeoutError, Sender},
     Arc, RwLock,
 };
 use std::time::{Duration, Instant, SystemTime};
 
+#[cfg(feature = "diesel-receipt-store")]
+use diesel::r2d2::{ConnectionManager, Pool};
 use protobuf::Message;
+#[cfg(feature = "diesel-receipt-store")]
+use sawtooth::receipt::store::{diesel::DieselReceiptStore, ReceiptStore};
+#[cfg(not(feature = "diesel-receipt-store"))]
 use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
 use sawtooth_sabre::{
     handler::SabreTransactionHandler, ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
@@ -70,7 +77,10 @@ pub struct ScabbardState {
     context_manager: ContextManager,
     executor: Executor,
     current_state_root: String,
+    #[cfg(not(feature = "diesel-receipt-store"))]
     transaction_receipt_store: Arc<RwLock<TransactionReceiptStore>>,
+    #[cfg(feature = "diesel-receipt-store")]
+    receipt_store: Arc<RwLock<dyn ReceiptStore>>,
     pending_changes: Option<(String, Vec<TransactionReceipt>)>,
     event_subscribers: Vec<Box<dyn StateSubscriber>>,
     batch_history: BatchHistory,
@@ -83,7 +93,8 @@ impl ScabbardState {
         state_db_path: &Path,
         state_db_size: usize,
         receipt_db_path: &Path,
-        receipt_db_size: usize,
+        // allow unused-variables, receipt_db_size is not used if diesel-receipt-store is enabled
+        #[allow(unused_variables)] receipt_db_size: usize,
         #[cfg(feature = "diesel-receipt-store")] receipt_db_url: String,
         admin_keys: Vec<String>,
     ) -> Result<Self, ScabbardStateError> {
@@ -93,6 +104,7 @@ impl ScabbardState {
         let state_db_file = state_db_path.to_path_buf();
         let receipt_db_file = receipt_db_path.to_path_buf();
         let state_db_path = state_db_path.with_extension("lmdb");
+        #[cfg(not(feature = "diesel-receipt-store"))]
         let receipt_db_path = receipt_db_path.with_extension("lmdb");
         let db = Box::new(LmdbDatabase::new(
             LmdbContext::new(&state_db_path, indexes.len(), Some(state_db_size))?,
@@ -148,17 +160,59 @@ impl ScabbardState {
         // initialize committed_batches metric
         counter!("splinter.scabbard.committed_batches", 0);
 
+        #[cfg(feature = "diesel-receipt-store")]
+        let receipt_store: Arc<RwLock<dyn ReceiptStore>> =
+            match ConnectionUri::from_str(&receipt_db_url).map_err(|_| {
+                ScabbardStateError(format!(
+                    "Failed to convert database url {} to ConnectionUri",
+                    receipt_db_url
+                ))
+            })? {
+                ConnectionUri::Postgres(url) => {
+                    let connection_manager =
+                        ConnectionManager::<diesel::pg::PgConnection>::new(url);
+                    let pool = Pool::builder().build(connection_manager).map_err(|err| {
+                        ScabbardStateError(format!("Failed to build connection pool: {}", err))
+                    })?;
+                    Arc::new(RwLock::new(DieselReceiptStore::new(pool)))
+                }
+                ConnectionUri::Sqlite(conn_str) => {
+                    if (conn_str != ":memory:") && !std::path::Path::new(&conn_str).exists() {
+                        return Err(ScabbardStateError(format!(
+                            "Database file '{}' does not exist",
+                            conn_str
+                        )));
+                    }
+                    let connection_manager =
+                        ConnectionManager::<diesel::sqlite::SqliteConnection>::new(&conn_str);
+                    let mut pool_builder = Pool::builder();
+                    // A new database is created for each connection to the in-memory SQLite
+                    // implementation; to ensure that the resulting stores will operate on the same
+                    // database, only one connection is allowed.
+                    if conn_str == ":memory:" {
+                        pool_builder = pool_builder.max_size(1);
+                    }
+                    let pool = pool_builder.build(connection_manager).map_err(|err| {
+                        ScabbardStateError(format!("Failed to build connection pool: {}", err))
+                    })?;
+                    Arc::new(RwLock::new(DieselReceiptStore::new(pool)))
+                }
+            };
+
         Ok(ScabbardState {
             db,
             context_manager,
             executor,
             current_state_root,
+            #[cfg(not(feature = "diesel-receipt-store"))]
             transaction_receipt_store: Arc::new(RwLock::new(TransactionReceiptStore::new(
                 Box::new(
                     LmdbOrderedStore::new(&receipt_db_path, Some(receipt_db_size))
                         .map_err(|err| ScabbardStateError(err.to_string()))?,
                 ),
             ))),
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_store,
             pending_changes: None,
             event_subscribers: vec![],
             batch_history: BatchHistory::new(),
@@ -405,6 +459,26 @@ impl ScabbardState {
         })?;
 
         Ok(())
+    }
+}
+
+/// The possible connection types and identifiers passed to the migrate command
+#[cfg(feature = "diesel-receipt-store")]
+pub enum ConnectionUri {
+    Postgres(String),
+    Sqlite(String),
+}
+
+#[cfg(feature = "diesel-receipt-store")]
+impl FromStr for ConnectionUri {
+    type Err = ScabbardStateError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("postgres://") {
+            Ok(ConnectionUri::Postgres(s.into()))
+        } else {
+            Ok(ConnectionUri::Sqlite(s.into()))
+        }
     }
 }
 
