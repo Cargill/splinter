@@ -373,6 +373,7 @@ impl ScabbardState {
                     .map(StateChangeEvent::try_from)
                     .collect::<Result<Vec<_>, _>>()?;
 
+                #[cfg(not(feature = "diesel-receipt-store"))]
                 self.transaction_receipt_store
                     .write()
                     .map_err(|err| {
@@ -382,6 +383,23 @@ impl ScabbardState {
                         ))
                     })?
                     .append(txn_receipts)
+                    .map_err(|err| {
+                        ScabbardStateError(format!(
+                            "failed to add transaction receipts to store: {}",
+                            err
+                        ))
+                    })?;
+
+                #[cfg(feature = "diesel-receipt-store")]
+                self.receipt_store
+                    .write()
+                    .map_err(|err| {
+                        ScabbardStateError(format!(
+                            "transaction receipt store lock poisoned: {}",
+                            err
+                        ))
+                    })?
+                    .add_txn_receipts(txn_receipts)
                     .map_err(|err| {
                         ScabbardStateError(format!(
                             "failed to add transaction receipts to store: {}",
