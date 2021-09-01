@@ -117,6 +117,8 @@ impl Scabbard {
         receipt_db_dir: &Path,
         // The size of the transaction receipt store's LMDB database
         receipt_db_size: usize,
+        // The database connection url to use for the receipt store
+        #[cfg(feature = "diesel-receipt-store")] receipt_db_url: String,
         signature_verifier: Box<dyn SignatureVerifier>,
         // The public keys that are authorized to create and manage sabre contracts
         admin_keys: Vec<String>,
@@ -555,6 +557,8 @@ pub mod tests {
             1024 * 1024,
             Path::new("/tmp"),
             1024 * 1024,
+            #[cfg(feature = "diesel-receipt-store")]
+            ":memory:".to_string(),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
@@ -577,6 +581,8 @@ pub mod tests {
             1024 * 1024,
             Path::new("/tmp"),
             1024 * 1024,
+            #[cfg(feature = "diesel-receipt-store")]
+            ":memory:".to_string(),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
@@ -599,6 +605,8 @@ pub mod tests {
             1024 * 1024,
             Path::new("/tmp"),
             1024 * 1024,
+            #[cfg(feature = "diesel-receipt-store")]
+            ":memory:".to_string(),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,

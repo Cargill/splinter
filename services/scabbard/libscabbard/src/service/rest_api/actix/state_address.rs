@@ -79,7 +79,14 @@ mod tests {
     use std::sync::Mutex;
 
     use cylinder::{secp256k1::Secp256k1Context, Context};
+    #[cfg(feature = "diesel-receipt-store")]
+    use diesel::{
+        r2d2::{ConnectionManager, Pool},
+        sqlite::SqliteConnection,
+    };
     use reqwest::{blocking::Client, StatusCode, Url};
+    #[cfg(feature = "diesel-receipt-store")]
+    use sawtooth::migrations::run_sqlite_migrations;
     use tempdir::TempDir;
     use transact::{
         families::command::make_command_transaction,
@@ -124,6 +131,11 @@ mod tests {
     #[test]
     fn state_at_address() {
         let paths = StatePaths::new("state_at_address");
+
+        #[cfg(feature = "diesel-receipt-store")]
+        let receipt_db_uri = paths.temp_dir.path().join("sqlite_receipts.db");
+        #[cfg(feature = "diesel-receipt-store")]
+        create_connection_pool_and_migrate(receipt_db_uri.to_str().unwrap().to_string());
 
         // Initialize a temporary scabbard state and set a value; this will pre-populate the DBs
         let address = "abcdef".to_string();
@@ -170,6 +182,8 @@ mod tests {
             TEMP_DB_SIZE,
             paths.temp_dir.path(),
             TEMP_DB_SIZE,
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_db_uri.to_str().unwrap().to_string(),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
@@ -346,5 +360,21 @@ mod tests {
         fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
             Box::new(self.clone())
         }
+    }
+
+    #[cfg(feature = "diesel-receipt-store")]
+    fn create_connection_pool_and_migrate(
+        connection_string: String,
+    ) -> Pool<ConnectionManager<SqliteConnection>> {
+        let connection_manager = ConnectionManager::<SqliteConnection>::new(connection_string);
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
+
+        run_sqlite_migrations(&*pool.get().expect("Failed to get connection for migrations"))
+            .expect("Failed to run migrations");
+
+        pool
     }
 }

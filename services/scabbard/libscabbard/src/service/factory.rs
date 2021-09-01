@@ -278,6 +278,8 @@ impl ServiceFactory for ScabbardFactory {
             self.state_db_size,
             receipt_db_dir,
             self.receipt_db_size,
+            #[cfg(feature = "diesel-receipt-store")]
+            self.receipt_db_url.clone(),
             self.signature_verifier_factory
                 .lock()
                 .map_err(|_| {
