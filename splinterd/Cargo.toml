@@ -99,6 +99,7 @@ experimental = [
     # The following features are experimental:
     "authorization-handler-maintenance",
     "challenge-authorization",
+    "scabbard-receipt-store",
     "health-service",
     "https-bind",
     "log-config",
@@ -132,6 +133,7 @@ challenge-authorization = [
 config-allow-keys = ["authorization-handler-allow-keys"]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
+scabbard-receipt-store = []
 health-service = ["health", "health/authorization"]
 https-bind = ["splinter/https-bind"]
 log-config = []
