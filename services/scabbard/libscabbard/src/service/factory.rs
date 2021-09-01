@@ -42,6 +42,8 @@ pub struct ScabbardFactoryBuilder {
     state_db_size: Option<usize>,
     receipt_db_dir: Option<String>,
     receipt_db_size: Option<usize>,
+    #[cfg(feature = "diesel-receipt-store")]
+    receipt_db_url: Option<String>,
     signature_verifier_factory: Option<Arc<Mutex<Box<dyn VerifierFactory>>>>,
 }
 
@@ -73,6 +75,13 @@ impl ScabbardFactoryBuilder {
     /// Sets the receipt db size to be used by the resulting factory.
     pub fn with_receipt_db_size(mut self, receipt_db_size: usize) -> Self {
         self.receipt_db_size = Some(receipt_db_size);
+        self
+    }
+
+    #[cfg(feature = "diesel-receipt-store")]
+    /// Sets the receipt db connection url to be used by the resulting factory.
+    pub fn with_receipt_db_url(mut self, receipt_db_url: String) -> Self {
+        self.receipt_db_url = Some(receipt_db_url);
         self
     }
 
@@ -415,6 +424,8 @@ mod tests {
             Some(1024 * 1024),
             Some("/tmp".into()),
             Some(1024 * 1024),
+            #[cfg(feature = "diesel-receipt-store")]
+            "test_receipt_database.db".to_string(),
             Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
         )
     }

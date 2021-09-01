@@ -195,6 +195,7 @@ impl AdminSubsystemBuilder {
                     .with_state_db_size(config.database_size)
                     .with_receipt_db_dir(config.data_dir.to_string_lossy().into())
                     .with_receipt_db_size(config.database_size)
+                    .with_receipt_db_url(config.receipt_db_url)
                     .with_signature_verifier_factory(signing_context.clone())
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))
