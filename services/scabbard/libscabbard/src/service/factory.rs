@@ -107,6 +107,13 @@ impl ScabbardFactoryBuilder {
             )
         })?;
 
+        #[cfg(feature = "diesel-receipt-store")]
+        let receipt_db_url = self.receipt_db_url.ok_or_else(|| {
+            splinter::error::InvalidStateError::with_message(
+                "A scabbard factory requires a receipt database url".into(),
+            )
+        })?;
+
         Ok(ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
             state_db_dir: self
@@ -117,6 +124,8 @@ impl ScabbardFactoryBuilder {
                 .receipt_db_dir
                 .unwrap_or_else(|| DEFAULT_RECEIPT_DB_DIR.into()),
             receipt_db_size: self.receipt_db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_db_url,
             signature_verifier_factory,
         })
     }
@@ -128,6 +137,8 @@ pub struct ScabbardFactory {
     state_db_size: usize,
     receipt_db_dir: String,
     receipt_db_size: usize,
+    #[cfg(feature = "diesel-receipt-store")]
+    receipt_db_url: String,
     signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
@@ -137,6 +148,7 @@ impl ScabbardFactory {
         state_db_size: Option<usize>,
         receipt_db_dir: Option<String>,
         receipt_db_size: Option<usize>,
+        #[cfg(feature = "diesel-receipt-store")] receipt_db_url: String,
         signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
     ) -> Self {
         ScabbardFactory {
@@ -145,6 +157,8 @@ impl ScabbardFactory {
             state_db_size: state_db_size.unwrap_or(DEFAULT_STATE_DB_SIZE),
             receipt_db_dir: receipt_db_dir.unwrap_or_else(|| DEFAULT_RECEIPT_DB_DIR.into()),
             receipt_db_size: receipt_db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_db_url,
             signature_verifier_factory,
         }
     }
@@ -425,7 +439,7 @@ mod tests {
             Some("/tmp".into()),
             Some(1024 * 1024),
             #[cfg(feature = "diesel-receipt-store")]
-            "test_receipt_database.db".to_string(),
+            ":memory:".to_string(),
             Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
         )
     }

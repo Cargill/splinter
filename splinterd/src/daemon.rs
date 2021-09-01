@@ -460,6 +460,8 @@ impl SplinterDaemon {
                 None,
                 Some(self.state_dir.to_string()),
                 None,
+                #[cfg(feature = "scabbard-receipt-store")]
+                self.db_url.to_string(),
                 signing_context,
             )))
             .build()
