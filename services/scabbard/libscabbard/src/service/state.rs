@@ -84,6 +84,7 @@ impl ScabbardState {
         state_db_size: usize,
         receipt_db_path: &Path,
         receipt_db_size: usize,
+        #[cfg(feature = "diesel-receipt-store")] receipt_db_url: String,
         admin_keys: Vec<String>,
     ) -> Result<Self, ScabbardStateError> {
         // Initialize the database
@@ -979,11 +980,19 @@ mod tests {
     fn get_state_at_address() {
         // Initialize state
         let paths = StatePaths::new("get_state_at_address");
+
+        #[cfg(feature = "diesel-receipt-store")]
+        let receipt_db_uri = paths._temp_dir_handle.path().join("sqlite_receipts.db");
+        #[cfg(feature = "diesel-receipt-store")]
+        run_receipt_store_migrations(receipt_db_uri.to_str().unwrap()).expect("migrations failed");
+
         let mut state = ScabbardState::new(
             &paths.state_db_path,
             TEMP_DB_SIZE,
             &paths.receipt_db_path,
             TEMP_DB_SIZE,
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_db_uri.to_str().unwrap().to_string(),
             vec![],
         )
         .expect("Failed to initialize state");
@@ -1043,13 +1052,21 @@ mod tests {
     ///    that no entries are returned (the iterator is empty).
     #[test]
     fn get_state_with_prefix() {
-        // Initialize state
         let paths = StatePaths::new("get_state_at_address");
+
+        #[cfg(feature = "diesel-receipt-store")]
+        let receipt_db_uri = paths._temp_dir_handle.path().join("sqlite_receipts.db");
+        #[cfg(feature = "diesel-receipt-store")]
+        run_receipt_store_migrations(receipt_db_uri.to_str().unwrap()).expect("migrations failed");
+
+        // Initialize state
         let mut state = ScabbardState::new(
             &paths.state_db_path,
             TEMP_DB_SIZE,
             &paths.receipt_db_path,
             TEMP_DB_SIZE,
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_db_uri.to_str().unwrap().to_string(),
             vec![],
         )
         .expect("Failed to initialize state");

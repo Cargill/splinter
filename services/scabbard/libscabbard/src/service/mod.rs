@@ -143,6 +143,8 @@ impl Scabbard {
             state_db_size,
             &receipt_db_path,
             receipt_db_size,
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_db_url,
             admin_keys,
         )
         .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;

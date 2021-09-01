@@ -136,6 +136,8 @@ mod tests {
                 TEMP_DB_SIZE,
                 &paths.receipt_db_path,
                 TEMP_DB_SIZE,
+                #[cfg(feature = "diesel-receipt-store")]
+                receipt_db_uri.to_str().unwrap().to_string(),
                 vec![],
             )
             .expect("Failed to initialize state");
