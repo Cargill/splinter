@@ -227,7 +227,7 @@ services:
               --database postgres://admin:admin@splinterd-db-acme:5432/splinter \
               --network-endpoints tcps://0.0.0.0:8044 \
               --advertised-endpoints tcps://splinterd-node-acme:8044 \
-              --rest-api-endpoint 0.0.0.0:8085 \
+              --rest-api-endpoint http://0.0.0.0:8085 \
               --registries http://registry-server:80/registry.yaml \
               --tls-insecure \
               --enable-biome-credentials
@@ -378,7 +378,7 @@ services:
               --database postgres://admin:admin@splinterd-db-bubba:5432/splinter \
               --network-endpoints tcps://0.0.0.0:8044 \
               --advertised-endpoints tcps://splinterd-node-bubba:8044 \
-              --rest-api-endpoint 0.0.0.0:8085 \
+              --rest-api-endpoint http://0.0.0.0:8085 \
               --registries http://registry-server:80/registry.yaml \
               --tls-insecure \
               --enable-biome-credentials
