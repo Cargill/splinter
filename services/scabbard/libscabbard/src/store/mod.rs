@@ -15,6 +15,8 @@
 //! Stores required for a scabbard services operation.
 
 mod error;
+#[cfg(feature = "lmdb")]
+pub mod lmdb;
 
 pub use error::CommitHashStoreError;
 

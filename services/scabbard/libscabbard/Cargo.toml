@@ -63,6 +63,7 @@ stable = [
   "client-reqwest",
   "default",
   "events",
+  "lmdb",
   "rest-api",
   "rest-api-actix",
 ]
@@ -87,6 +88,7 @@ commit-store = []
 diesel-receipt-store = ["diesel"]
 events = ["splinter/events"]
 factory-builder = []
+lmdb = []
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
 service-arg-validation = ["splinter/service-arg-validation"]
