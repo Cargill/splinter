@@ -38,12 +38,14 @@ clap = "2.32"
 crossbeam-channel = "0.3"
 ctrlc = "3.0"
 cylinder = "0.2.2"
+diesel = { version = "1.0", features = ["postgres"], optional = true }
 health = { path = "../services/health", optional = true }
 log = "0.4"
 log4rs = "1"
 openssl = { version = "0.10", optional = true }
 protobuf = "2.23"
 rand = "0.7"
+sawtooth = { version = "0.6.6", default-features = false, optional = true }
 serde = "1.0.80"
 serde_derive = "1.0.80"
 tempdir = "0.3"
@@ -145,6 +147,8 @@ node = [
     "authorization",
     "https-bind",
     "challenge-authorization",
+    "diesel",
+    "sawtooth",
     "scabbard/client-reqwest",
     "scabbard/factory-builder",
     "splinter/admin-service-client",
