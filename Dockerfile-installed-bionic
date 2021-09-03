@@ -59,7 +59,7 @@ FROM hyperledger/sawtooth-shell:nightly
 COPY --from=sabre-cli-builder /project/cli/target/debian/sabre-cli*.deb /tmp
 
 RUN apt-get update \
- && dpkg -i /tmp/sabre-cli_*.deb || true \
+ && dpkg --unpack /tmp/sabre-cli_*.deb \
  && apt-get -f -y install
 
 ENTRYPOINT ["tail", "-f", "/dev/null"]
