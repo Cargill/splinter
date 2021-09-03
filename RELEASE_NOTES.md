@@ -1,5 +1,23 @@
 # Release Notes
 
+## Changes in Splinter 0.5.17
+
+### libsplinter
+
+* Stabilize `node-id-store` by moving the feature to stable.
+
+### build
+
+* Update docker files to run the system keygen command. If enabled,
+  challenge-authorization requires that a key be configured, the system keygen
+  command generates this key if one does not exist.
+
+* Add the splinter upgrade command to docker files that use the splinter
+  database migrate command. Not running `splinter upgrade` before starting
+  splinterd can block the daemon from starting.
+
+* Add just recipe for linting Dockerfiles with hadolint.
+
 ## Changes in Splinter 0.5.16
 
 ### Highlights
