@@ -14,6 +14,8 @@
 
 //! Stores required for a scabbard services operation.
 
+#[cfg(feature = "diesel")]
+pub mod diesel;
 mod error;
 #[cfg(feature = "lmdb")]
 pub mod lmdb;
