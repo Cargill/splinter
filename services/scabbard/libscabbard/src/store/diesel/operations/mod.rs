@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod models;
-mod operations;
-mod schema;
+pub struct CommitHashStoreOperations<'a, C> {
+    conn: &'a C,
+}
+
+impl<'a, C: diesel::Connection> CommitHashStoreOperations<'a, C> {
+    pub fn new(conn: &'a C) -> Self {
+        CommitHashStoreOperations { conn }
+    }
+}
