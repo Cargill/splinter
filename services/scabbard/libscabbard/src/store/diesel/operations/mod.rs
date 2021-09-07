@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub(super) mod get_current_commit_hash;
+pub(super) mod set_current_commit_hash;
 
 pub struct CommitHashStoreOperations<'a, C> {
     conn: &'a C,
