@@ -15,6 +15,7 @@
 //! Contains the implementation of `Network`.
 
 use std::collections::HashMap;
+use std::fs::File;
 
 use cylinder::{secp256k1::Secp256k1Context, Context};
 use splinter::error::{InternalError, InvalidArgumentError};
@@ -59,6 +60,10 @@ impl Network {
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
             let temp_dir = TempDir::new("scabbard_data")
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
+            let temp_db_path = temp_dir.path().join("sqlite_receipt_store.db");
+
+            File::create(temp_db_path.clone())
+                .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
             let mut signers = Vec::new();
 
@@ -71,6 +76,16 @@ impl Network {
                 .with_scabbard(
                     ScabbardConfigBuilder::new()
                         .with_data_dir(temp_dir.path().to_path_buf())
+                        .with_receipt_db_url(
+                            temp_db_path
+                                .to_str()
+                                .ok_or_else(|| {
+                                    InternalError::with_message(
+                                        "failed to convert db path to str".to_string(),
+                                    )
+                                })?
+                                .to_string(),
+                        )
                         .build()?,
                 )
                 .with_admin_signer(admin_signer)

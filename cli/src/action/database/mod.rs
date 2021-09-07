@@ -25,6 +25,8 @@ use std::{env, fs};
 use clap::ArgMatches;
 use diesel::{connection::Connection as _, pg::PgConnection};
 
+#[cfg(feature = "scabbard-receipt-store")]
+use sawtooth::migrations::run_postgres_migrations as run_receipt_store_postgres_migrations;
 use splinter::migrations::run_postgres_migrations;
 
 #[cfg(feature = "sqlite")]
@@ -64,6 +66,19 @@ impl Action for MigrateAction {
                 run_postgres_migrations(&connection).map_err(|err| {
                     CliError::ActionError(format!("Unable to run Postgres migrations: {}", err))
                 })?;
+                #[cfg(feature = "scabbard-receipt-store")]
+                {
+                    info!(
+                        "Running migrations against PostgreSQL database for receipt store: {}",
+                        url
+                    );
+                    run_receipt_store_postgres_migrations(&connection).map_err(|err| {
+                        CliError::ActionError(format!(
+                            "Unable to run Postgres migrations for receipt store: {}",
+                            err
+                        ))
+                    })?;
+                }
             }
             #[cfg(feature = "sqlite")]
             ConnectionUri::Sqlite(connection_string) => sqlite_migrations(connection_string)?,

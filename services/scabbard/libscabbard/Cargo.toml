@@ -27,19 +27,24 @@ description = """\
 [dependencies]
 actix-web = { version = "1.0", optional = true, default-features = false, features = ["flate2-zlib"] }
 cylinder = "0.2"
+diesel = { version = "1.0", features = ["r2d2", "serde_json"], optional = true }
 futures = { version = "0.1", optional = true }
 log = "0.3.0"
 metrics = { version = "0.12", optional = true}
 openssl = "0.10"
 protobuf = "2.23"
 reqwest = { version = "0.10", optional = true, features = ["blocking", "json"] }
-sawtooth = { version = "0.6", default-features = false, features = ["lmdb-store", "receipt-store"] }
 sawtooth-sabre = "0.7.2"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 splinter = { path = "../../../libsplinter" }
 transact = { version = "0.3", features = ["sawtooth-compat"] }
+
+[dependencies.sawtooth]
+version = "0.6.6"
+default-features = false
+features = ["diesel", "lmdb-store", "postgres", "receipt-store", "sqlite", "transaction-receipt-store"]
 
 [dev-dependencies]
 tempdir = "0.3"
@@ -67,6 +72,7 @@ experimental = [
   "stable",
   # The following features are experimental:
   "back-pressure",
+  "diesel-receipt-store",
   "factory-builder",
   "metrics",
 ]
@@ -75,6 +81,7 @@ authorization = ["splinter/authorization"]
 back-pressure = []
 client = []
 client-reqwest = ["client", "reqwest"]
+diesel-receipt-store = ["diesel"]
 events = ["splinter/events"]
 factory-builder = []
 rest-api = ["futures", "splinter/rest-api"]

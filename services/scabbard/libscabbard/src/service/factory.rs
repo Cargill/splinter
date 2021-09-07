@@ -42,6 +42,8 @@ pub struct ScabbardFactoryBuilder {
     state_db_size: Option<usize>,
     receipt_db_dir: Option<String>,
     receipt_db_size: Option<usize>,
+    #[cfg(feature = "diesel-receipt-store")]
+    receipt_db_url: Option<String>,
     signature_verifier_factory: Option<Arc<Mutex<Box<dyn VerifierFactory>>>>,
 }
 
@@ -76,6 +78,13 @@ impl ScabbardFactoryBuilder {
         self
     }
 
+    #[cfg(feature = "diesel-receipt-store")]
+    /// Sets the receipt db connection url to be used by the resulting factory.
+    pub fn with_receipt_db_url(mut self, receipt_db_url: String) -> Self {
+        self.receipt_db_url = Some(receipt_db_url);
+        self
+    }
+
     /// Set the signature verifier factory to be used by the resulting factory.  This is a required
     /// value, and omitting it will result in an [splinter::error::InvalidStateError] at build-time.
     pub fn with_signature_verifier_factory(
@@ -98,6 +107,13 @@ impl ScabbardFactoryBuilder {
             )
         })?;
 
+        #[cfg(feature = "diesel-receipt-store")]
+        let receipt_db_url = self.receipt_db_url.ok_or_else(|| {
+            splinter::error::InvalidStateError::with_message(
+                "A scabbard factory requires a receipt database url".into(),
+            )
+        })?;
+
         Ok(ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
             state_db_dir: self
@@ -108,6 +124,8 @@ impl ScabbardFactoryBuilder {
                 .receipt_db_dir
                 .unwrap_or_else(|| DEFAULT_RECEIPT_DB_DIR.into()),
             receipt_db_size: self.receipt_db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_db_url,
             signature_verifier_factory,
         })
     }
@@ -119,6 +137,8 @@ pub struct ScabbardFactory {
     state_db_size: usize,
     receipt_db_dir: String,
     receipt_db_size: usize,
+    #[cfg(feature = "diesel-receipt-store")]
+    receipt_db_url: String,
     signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
@@ -128,6 +148,7 @@ impl ScabbardFactory {
         state_db_size: Option<usize>,
         receipt_db_dir: Option<String>,
         receipt_db_size: Option<usize>,
+        #[cfg(feature = "diesel-receipt-store")] receipt_db_url: String,
         signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
     ) -> Self {
         ScabbardFactory {
@@ -136,6 +157,8 @@ impl ScabbardFactory {
             state_db_size: state_db_size.unwrap_or(DEFAULT_STATE_DB_SIZE),
             receipt_db_dir: receipt_db_dir.unwrap_or_else(|| DEFAULT_RECEIPT_DB_DIR.into()),
             receipt_db_size: receipt_db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_db_url,
             signature_verifier_factory,
         }
     }
@@ -255,6 +278,8 @@ impl ServiceFactory for ScabbardFactory {
             self.state_db_size,
             receipt_db_dir,
             self.receipt_db_size,
+            #[cfg(feature = "diesel-receipt-store")]
+            self.receipt_db_url.clone(),
             self.signature_verifier_factory
                 .lock()
                 .map_err(|_| {
@@ -415,6 +440,8 @@ mod tests {
             Some(1024 * 1024),
             Some("/tmp".into()),
             Some(1024 * 1024),
+            #[cfg(feature = "diesel-receipt-store")]
+            ":memory:".to_string(),
             Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
         )
     }

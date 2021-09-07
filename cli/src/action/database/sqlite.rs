@@ -22,6 +22,8 @@ use diesel::{
     sqlite::SqliteConnection,
 };
 
+#[cfg(feature = "scabbard-receipt-store")]
+use sawtooth::migrations::run_sqlite_migrations as run_receipt_store_sqlite_migrations;
 use splinter::migrations::run_sqlite_migrations;
 
 use super::SplinterEnvironment;
@@ -55,14 +57,32 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
             "Running migrations against SQLite database: {}",
             full_path.display()
         );
+        #[cfg(feature = "scabbard-receipt-store")]
+        info!(
+            "Running migrations against SQLite database for receipt store: {}",
+            full_path.display()
+        );
     } else {
         info!("Running migrations against SQLite database: :memory: ");
+        #[cfg(feature = "scabbard-receipt-store")]
+        info!("Running migrations against SQLite database: :memory: for receipt store");
     };
 
     run_sqlite_migrations(&*pool.get().map_err(|_| {
         CliError::ActionError("Failed to get connection for migrations".to_string())
     })?)
     .map_err(|err| CliError::ActionError(format!("Unable to run Sqlite migrations: {}", err)))?;
+
+    #[cfg(feature = "scabbard-receipt-store")]
+    run_receipt_store_sqlite_migrations(&*pool.get().map_err(|_| {
+        CliError::ActionError("Failed to get connection for migrations".to_string())
+    })?)
+    .map_err(|err| {
+        CliError::ActionError(format!(
+            "Unable to run Sqlite migrations for receipt store: {}",
+            err
+        ))
+    })?;
 
     Ok(())
 }

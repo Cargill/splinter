@@ -17,13 +17,20 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(feature = "diesel-receipt-store")]
+use std::str::FromStr;
 use std::sync::{
     mpsc::{channel, Receiver, RecvTimeoutError, Sender},
     Arc, RwLock,
 };
 use std::time::{Duration, Instant, SystemTime};
 
+#[cfg(feature = "diesel-receipt-store")]
+use diesel::r2d2::{ConnectionManager, Pool};
 use protobuf::Message;
+#[cfg(feature = "diesel-receipt-store")]
+use sawtooth::receipt::store::{diesel::DieselReceiptStore, ReceiptStore};
+#[cfg(not(feature = "diesel-receipt-store"))]
 use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
 use sawtooth_sabre::{
     handler::SabreTransactionHandler, ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
@@ -70,7 +77,10 @@ pub struct ScabbardState {
     context_manager: ContextManager,
     executor: Executor,
     current_state_root: String,
+    #[cfg(not(feature = "diesel-receipt-store"))]
     transaction_receipt_store: Arc<RwLock<TransactionReceiptStore>>,
+    #[cfg(feature = "diesel-receipt-store")]
+    receipt_store: Arc<RwLock<dyn ReceiptStore>>,
     pending_changes: Option<(String, Vec<TransactionReceipt>)>,
     event_subscribers: Vec<Box<dyn StateSubscriber>>,
     batch_history: BatchHistory,
@@ -83,7 +93,9 @@ impl ScabbardState {
         state_db_path: &Path,
         state_db_size: usize,
         receipt_db_path: &Path,
-        receipt_db_size: usize,
+        // allow unused-variables, receipt_db_size is not used if diesel-receipt-store is enabled
+        #[allow(unused_variables)] receipt_db_size: usize,
+        #[cfg(feature = "diesel-receipt-store")] receipt_db_url: String,
         admin_keys: Vec<String>,
     ) -> Result<Self, ScabbardStateError> {
         // Initialize the database
@@ -92,6 +104,7 @@ impl ScabbardState {
         let state_db_file = state_db_path.to_path_buf();
         let receipt_db_file = receipt_db_path.to_path_buf();
         let state_db_path = state_db_path.with_extension("lmdb");
+        #[cfg(not(feature = "diesel-receipt-store"))]
         let receipt_db_path = receipt_db_path.with_extension("lmdb");
         let db = Box::new(LmdbDatabase::new(
             LmdbContext::new(&state_db_path, indexes.len(), Some(state_db_size))?,
@@ -147,17 +160,59 @@ impl ScabbardState {
         // initialize committed_batches metric
         counter!("splinter.scabbard.committed_batches", 0);
 
+        #[cfg(feature = "diesel-receipt-store")]
+        let receipt_store: Arc<RwLock<dyn ReceiptStore>> =
+            match ConnectionUri::from_str(&receipt_db_url).map_err(|_| {
+                ScabbardStateError(format!(
+                    "Failed to convert database url {} to ConnectionUri",
+                    receipt_db_url
+                ))
+            })? {
+                ConnectionUri::Postgres(url) => {
+                    let connection_manager =
+                        ConnectionManager::<diesel::pg::PgConnection>::new(url);
+                    let pool = Pool::builder().build(connection_manager).map_err(|err| {
+                        ScabbardStateError(format!("Failed to build connection pool: {}", err))
+                    })?;
+                    Arc::new(RwLock::new(DieselReceiptStore::new(pool)))
+                }
+                ConnectionUri::Sqlite(conn_str) => {
+                    if (conn_str != ":memory:") && !std::path::Path::new(&conn_str).exists() {
+                        return Err(ScabbardStateError(format!(
+                            "Database file '{}' does not exist",
+                            conn_str
+                        )));
+                    }
+                    let connection_manager =
+                        ConnectionManager::<diesel::sqlite::SqliteConnection>::new(&conn_str);
+                    let mut pool_builder = Pool::builder();
+                    // A new database is created for each connection to the in-memory SQLite
+                    // implementation; to ensure that the resulting stores will operate on the same
+                    // database, only one connection is allowed.
+                    if conn_str == ":memory:" {
+                        pool_builder = pool_builder.max_size(1);
+                    }
+                    let pool = pool_builder.build(connection_manager).map_err(|err| {
+                        ScabbardStateError(format!("Failed to build connection pool: {}", err))
+                    })?;
+                    Arc::new(RwLock::new(DieselReceiptStore::new(pool)))
+                }
+            };
+
         Ok(ScabbardState {
             db,
             context_manager,
             executor,
             current_state_root,
+            #[cfg(not(feature = "diesel-receipt-store"))]
             transaction_receipt_store: Arc::new(RwLock::new(TransactionReceiptStore::new(
                 Box::new(
                     LmdbOrderedStore::new(&receipt_db_path, Some(receipt_db_size))
                         .map_err(|err| ScabbardStateError(err.to_string()))?,
                 ),
             ))),
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_store,
             pending_changes: None,
             event_subscribers: vec![],
             batch_history: BatchHistory::new(),
@@ -318,6 +373,7 @@ impl ScabbardState {
                     .map(StateChangeEvent::try_from)
                     .collect::<Result<Vec<_>, _>>()?;
 
+                #[cfg(not(feature = "diesel-receipt-store"))]
                 self.transaction_receipt_store
                     .write()
                     .map_err(|err| {
@@ -327,6 +383,23 @@ impl ScabbardState {
                         ))
                     })?
                     .append(txn_receipts)
+                    .map_err(|err| {
+                        ScabbardStateError(format!(
+                            "failed to add transaction receipts to store: {}",
+                            err
+                        ))
+                    })?;
+
+                #[cfg(feature = "diesel-receipt-store")]
+                self.receipt_store
+                    .write()
+                    .map_err(|err| {
+                        ScabbardStateError(format!(
+                            "transaction receipt store lock poisoned: {}",
+                            err
+                        ))
+                    })?
+                    .add_txn_receipts(txn_receipts)
                     .map_err(|err| {
                         ScabbardStateError(format!(
                             "failed to add transaction receipts to store: {}",
@@ -372,7 +445,11 @@ impl ScabbardState {
     }
 
     pub fn get_events_since(&self, event_id: Option<String>) -> Result<Events, ScabbardStateError> {
-        Events::new(self.transaction_receipt_store.clone(), event_id)
+        #[cfg(not(feature = "diesel-receipt-store"))]
+        let events = Events::new(self.transaction_receipt_store.clone(), event_id);
+        #[cfg(feature = "diesel-receipt-store")]
+        let events = Events::new(self.receipt_store.clone(), event_id);
+        events
     }
 
     pub fn add_subscriber(&mut self, subscriber: Box<dyn StateSubscriber>) {
@@ -404,6 +481,26 @@ impl ScabbardState {
         })?;
 
         Ok(())
+    }
+}
+
+/// The possible connection types and identifiers passed to the migrate command
+#[cfg(feature = "diesel-receipt-store")]
+pub enum ConnectionUri {
+    Postgres(String),
+    Sqlite(String),
+}
+
+#[cfg(feature = "diesel-receipt-store")]
+impl FromStr for ConnectionUri {
+    type Err = ScabbardStateError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("postgres://") {
+            Ok(ConnectionUri::Postgres(s.into()))
+        } else {
+            Ok(ConnectionUri::Sqlite(s.into()))
+        }
     }
 }
 
@@ -503,6 +600,7 @@ enum EventQuery {
     Exhausted,
 }
 
+#[cfg(not(feature = "diesel-receipt-store"))]
 /// An iterator that wraps the `TransactionReceiptStore` and returns `StateChangeEvent`s using an
 /// in-memory cache.
 pub struct Events {
@@ -511,6 +609,7 @@ pub struct Events {
     cache: VecDeque<StateChangeEvent>,
 }
 
+#[cfg(not(feature = "diesel-receipt-store"))]
 impl Events {
     fn new(
         transaction_receipt_store: Arc<RwLock<TransactionReceiptStore>>,
@@ -549,6 +648,73 @@ impl Events {
                 })?
                 .take(ITER_CACHE_SIZE)
                 .map(StateChangeEvent::try_from)
+                .collect::<Result<VecDeque<_>, _>>()?;
+
+                self.query = self
+                    .cache
+                    .back()
+                    .map(|event| EventQuery::Fetch(Some(event.id.clone())))
+                    .unwrap_or(EventQuery::Exhausted);
+
+                Ok(())
+            }
+            EventQuery::Exhausted => Ok(()),
+        }
+    }
+}
+
+#[cfg(feature = "diesel-receipt-store")]
+/// An iterator that wraps the `ReceiptStore` and returns `StateChangeEvent`s using an
+/// in-memory cache.
+pub struct Events {
+    receipt_store: Arc<RwLock<dyn ReceiptStore>>,
+    query: EventQuery,
+    cache: VecDeque<StateChangeEvent>,
+}
+
+#[cfg(feature = "diesel-receipt-store")]
+impl Events {
+    fn new(
+        receipt_store: Arc<RwLock<dyn ReceiptStore>>,
+        start_id: Option<String>,
+    ) -> Result<Self, ScabbardStateError> {
+        let mut iter = Events {
+            receipt_store,
+            query: EventQuery::Fetch(start_id),
+            cache: VecDeque::default(),
+        };
+        iter.reload_cache()?;
+        Ok(iter)
+    }
+
+    fn reload_cache(&mut self) -> Result<(), ScabbardStateError> {
+        match self.query {
+            EventQuery::Fetch(ref start_id) => {
+                let receipt_store = self.receipt_store.read().map_err(|err| {
+                    ScabbardStateError(format!("transaction receipt store lock poisoned: {}", err))
+                })?;
+
+                self.cache = if let Some(id) = start_id.as_ref() {
+                    receipt_store.list_receipts_since(Some(id.clone()))
+                } else {
+                    receipt_store.list_receipts_since(None)
+                }
+                .map_err(|err| {
+                    ScabbardStateError(format!(
+                        "failed to get transaction receipts from store: {}",
+                        err
+                    ))
+                })?
+                .take(ITER_CACHE_SIZE)
+                .map(|res| match res {
+                    Ok(receipt) => StateChangeEvent::try_from(receipt),
+                    Err(err) => {
+                        return Err(ScabbardStateError(format!(
+                            "failed to get transaction receipt: {}",
+                            err
+                        )))
+                    }
+                })
                 .collect::<Result<VecDeque<_>, _>>()?;
 
                 self.query = self
@@ -891,6 +1057,13 @@ mod tests {
     use std::path::PathBuf;
 
     use cylinder::{secp256k1::Secp256k1Context, Context};
+    #[cfg(feature = "diesel-receipt-store")]
+    use diesel::{
+        r2d2::{ConnectionManager, Pool},
+        sqlite::SqliteConnection,
+    };
+    #[cfg(feature = "diesel-receipt-store")]
+    use sawtooth::migrations::run_sqlite_migrations;
     use tempdir::TempDir;
     use transact::{
         families::command::make_command_transaction,
@@ -905,29 +1078,49 @@ mod tests {
     /// Verify that an empty receipt store returns an empty iterator
     #[test]
     fn empty_event_iterator() {
-        let paths = StatePaths::new("empty_event_iterator");
+        #[cfg(not(feature = "diesel-receipt-store"))]
+        {
+            let paths = StatePaths::new("empty_event_iterator");
 
-        let transaction_receipt_store =
-            Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-                LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
-                    .expect("Failed to create LMDB store"),
-            ))));
+            let transaction_receipt_store =
+                Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+                    LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
+                        .expect("Failed to create LMDB store"),
+                ))));
 
-        // Test without a specified start
-        let all_events = Events::new(transaction_receipt_store.clone(), None)
-            .expect("failed to get iterator for all events");
-        let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
-        assert!(
-            all_event_ids.is_empty(),
-            "All events should have been empty"
-        );
+            #[cfg(not(feature = "diesel-receipt-store"))]
+            // Test without a specified start
+            let all_events = Events::new(transaction_receipt_store.clone(), None)
+                .expect("failed to get iterator for all events");
+            let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
+
+            assert!(
+                all_event_ids.is_empty(),
+                "All events should have been empty"
+            );
+        }
+
+        #[cfg(feature = "diesel-receipt-store")]
+        {
+            let pool = create_connection_pool_and_migrate(":memory:".to_string());
+
+            let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(pool)));
+
+            // Test without a specified start
+            let all_events =
+                Events::new(receipt_store, None).expect("failed to get iterator for all events");
+            let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
+
+            assert!(
+                all_event_ids.is_empty(),
+                "All events should have been empty"
+            );
+        }
     }
 
     /// Verify that the event iterator works as expected.
     #[test]
     fn event_iterator() {
-        let paths = StatePaths::new("event_iterator");
-
         let receipts = vec![
             mock_transaction_receipt("ab"),
             mock_transaction_receipt("cd"),
@@ -938,34 +1131,67 @@ mod tests {
             .map(|receipt| receipt.transaction_id.clone())
             .collect::<Vec<_>>();
 
-        let transaction_receipt_store =
-            Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-                LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
-                    .expect("Failed to create LMDB store"),
-            ))));
+        #[cfg(not(feature = "diesel-receipt-store"))]
+        {
+            let paths = StatePaths::new("event_iterator");
 
-        transaction_receipt_store
-            .write()
-            .expect("failed to get write lock")
-            .append(receipts.clone())
-            .expect("failed to add receipts to store");
+            let transaction_receipt_store =
+                Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+                    LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
+                        .expect("Failed to create LMDB store"),
+                ))));
 
-        // Test without a specified start
-        let all_events = Events::new(transaction_receipt_store.clone(), None)
-            .expect("failed to get iterator for all events");
-        let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
-        assert_eq!(all_event_ids, receipt_ids);
+            transaction_receipt_store
+                .write()
+                .expect("failed to get write lock")
+                .append(receipts.clone())
+                .expect("failed to add receipts to store");
 
-        // Test with a specified start
-        let some_events = Events::new(
-            transaction_receipt_store.clone(),
-            Some(receipt_ids[0].clone()),
-        )
-        .expect("failed to get iterator for some events");
-        let some_event_ids = some_events
-            .map(|event| event.id.clone())
-            .collect::<Vec<_>>();
-        assert_eq!(some_event_ids, receipt_ids[1..].to_vec());
+            // Test without a specified start
+            let all_events = Events::new(transaction_receipt_store.clone(), None)
+                .expect("failed to get iterator for all events");
+
+            let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
+            assert_eq!(all_event_ids, receipt_ids);
+
+            // Test with a specified start
+            let some_events = Events::new(transaction_receipt_store, Some(receipt_ids[0].clone()))
+                .expect("failed to get iterator for some events");
+
+            let some_event_ids = some_events
+                .map(|event| event.id.clone())
+                .collect::<Vec<_>>();
+            assert_eq!(some_event_ids, receipt_ids[1..].to_vec());
+        }
+
+        #[cfg(feature = "diesel-receipt-store")]
+        {
+            let pool = create_connection_pool_and_migrate(":memory:".to_string());
+
+            let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(pool)));
+
+            receipt_store
+                .write()
+                .expect("failed to get write lock")
+                .add_txn_receipts(receipts.clone())
+                .expect("failed to add receipts to store");
+
+            // Test without a specified start
+            let all_events = Events::new(receipt_store.clone(), None)
+                .expect("failed to get iterator for all events");
+
+            let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
+            assert_eq!(all_event_ids, receipt_ids);
+
+            // Test with a specified start
+            let some_events = Events::new(receipt_store, Some(receipt_ids[0].clone()))
+                .expect("failed to get iterator for some events");
+
+            let some_event_ids = some_events
+                .map(|event| event.id.clone())
+                .collect::<Vec<_>>();
+            assert_eq!(some_event_ids, receipt_ids[1..].to_vec());
+        }
     }
 
     /// Verify that the `ScabbardState::get_state_at_address` method works properly.
@@ -979,11 +1205,19 @@ mod tests {
     fn get_state_at_address() {
         // Initialize state
         let paths = StatePaths::new("get_state_at_address");
+
+        #[cfg(feature = "diesel-receipt-store")]
+        let receipt_db_uri = paths._temp_dir_handle.path().join("sqlite_receipts.db");
+        #[cfg(feature = "diesel-receipt-store")]
+        create_connection_pool_and_migrate(receipt_db_uri.to_str().unwrap().to_string());
+
         let mut state = ScabbardState::new(
             &paths.state_db_path,
             TEMP_DB_SIZE,
             &paths.receipt_db_path,
             TEMP_DB_SIZE,
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_db_uri.to_str().unwrap().to_string(),
             vec![],
         )
         .expect("Failed to initialize state");
@@ -1043,13 +1277,21 @@ mod tests {
     ///    that no entries are returned (the iterator is empty).
     #[test]
     fn get_state_with_prefix() {
-        // Initialize state
         let paths = StatePaths::new("get_state_at_address");
+
+        #[cfg(feature = "diesel-receipt-store")]
+        let receipt_db_uri = paths._temp_dir_handle.path().join("sqlite_receipts.db");
+        #[cfg(feature = "diesel-receipt-store")]
+        create_connection_pool_and_migrate(receipt_db_uri.to_str().unwrap().to_string());
+
+        // Initialize state
         let mut state = ScabbardState::new(
             &paths.state_db_path,
             TEMP_DB_SIZE,
             &paths.receipt_db_path,
             TEMP_DB_SIZE,
+            #[cfg(feature = "diesel-receipt-store")]
+            receipt_db_uri.to_str().unwrap().to_string(),
             vec![],
         )
         .expect("Failed to initialize state");
@@ -1144,5 +1386,21 @@ mod tests {
                 data: vec![],
             },
         }
+    }
+
+    #[cfg(feature = "diesel-receipt-store")]
+    fn create_connection_pool_and_migrate(
+        connection_string: String,
+    ) -> Pool<ConnectionManager<SqliteConnection>> {
+        let connection_manager = ConnectionManager::<SqliteConnection>::new(connection_string);
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
+
+        run_sqlite_migrations(&*pool.get().expect("Failed to get connection for migrations"))
+            .expect("Failed to run migrations");
+
+        pool
     }
 }
