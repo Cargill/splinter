@@ -109,7 +109,7 @@ services:
       bash -c "
         if [ ! -f /keys/cypress.priv ]
         then
-          splinter admin keygen cypress -d /keys
+          splinter keygen cypress --key-dir /keys
         fi && \
         if [ ! -s /etc/splinter/allow_keys ]
         then

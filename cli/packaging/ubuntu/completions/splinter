@@ -46,7 +46,6 @@ __splinter()
   SPLINTER_OPTS="
     $GLOBAL_OPTS
     --version
-    admin
     cert
     circuit
     database
@@ -56,12 +55,6 @@ __splinter()
     registry
     upgrade
     user
-  "
-
-  SPLINTER_ADMIN_OPTS="
-    $GLOBAL_OPTS
-    help
-    keygen
   "
 
   SPLINTER_CERT_OPTS="
@@ -121,19 +114,6 @@ __splinter()
   "
 
   case "${subcommand}" in
-    admin)
-      case "${prev}" in
-        keygen)
-          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --force --key-dir --quiet" \
-                      -- "${cur}"))
-          ;;
-
-        *)
-          COMPREPLY=($(compgen -W "$SPLINTER_ADMIN_OPTS" -- "${cur}"))
-          ;;
-
-      esac
-      ;;
 
     cert)
       case "${prev}" in
