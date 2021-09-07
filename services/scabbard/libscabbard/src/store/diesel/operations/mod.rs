@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub(super) mod get_current_commit_hash;
+
 pub struct CommitHashStoreOperations<'a, C> {
     conn: &'a C,
 }
