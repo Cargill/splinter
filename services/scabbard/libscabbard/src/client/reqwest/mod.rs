@@ -338,14 +338,14 @@ fn wait_for_batches(
 fn parse_http_url(url: &str) -> Result<Url, ScabbardClientError> {
     let url = Url::parse(url)
         .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
-    if url.scheme() != "http" {
-        Err(ScabbardClientError::new(&format!(
+    match url.scheme() {
+        "http" => Ok(url),
+        #[cfg(feature = "https")]
+        "https" => Ok(url),
+        scheme => Err(ScabbardClientError::new(&format!(
             "unsupported scheme ({}) in URL: {}",
-            url.scheme(),
-            url
-        )))
-    } else {
-        Ok(url)
+            scheme, url
+        ))),
     }
 }
 
@@ -1155,6 +1155,46 @@ mod tests {
 
         fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
             Box::new(self.clone())
+        }
+    }
+
+    #[test]
+    fn parse_http_url_handles_http() {
+        let parsed = Url::parse("http://some.domain");
+        match parse_http_url("http://some.domain") {
+            Ok(url) => assert_eq!(Ok(url), parsed),
+            Err(err) => panic!("expected Ok({:?}), got Err({})", parsed, err),
+        }
+    }
+
+    #[cfg(feature = "https")]
+    #[test]
+    fn parse_http_url_handles_https() {
+        let parsed = Url::parse("https://some.domain");
+        match parse_http_url("https://some.domain") {
+            Ok(url) => assert_eq!(Ok(url), parsed),
+            Err(err) => panic!("expected Ok({:?}), got Err({})", parsed, err),
+        }
+    }
+
+    #[cfg(not(feature = "https"))]
+    #[test]
+    fn parse_http_url_throws_on_https() {
+        match parse_http_url("https://some.domain") {
+            Err(err) => assert!(err
+                .to_string()
+                .starts_with("unsupported scheme (https) in URL: https://some.domain")),
+            Ok(url) => panic!("expected Err(_), got Ok({})", url),
+        }
+    }
+
+    #[test]
+    fn parse_http_url_throws_on_bad_schema() {
+        match parse_http_url("badschema://some.domain") {
+            Err(err) => assert!(err
+                .to_string()
+                .starts_with("unsupported scheme (badschema) in URL: badschema://some.domain")),
+            Ok(url) => panic!("expected Err(_), got Ok({})", url),
         }
     }
 }

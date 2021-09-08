@@ -75,6 +75,7 @@ experimental = [
   "diesel-receipt-store",
   "factory-builder",
   "metrics",
+  "https",
 ]
 
 authorization = ["splinter/authorization"]
@@ -87,3 +88,4 @@ factory-builder = []
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
 service-arg-validation = ["splinter/service-arg-validation"]
+https = []
