@@ -19,6 +19,7 @@ pub mod influx;
 #[macro_export]
 macro_rules! counter {
     ($t:tt, $v:expr) => {};
+    ($t:tt, $v:expr, $($key:expr => $value:expr)*) => {};
 }
 
 // no-op `gauge` macro for when the `metrics` feature is not enabled
@@ -26,6 +27,7 @@ macro_rules! counter {
 #[macro_export]
 macro_rules! gauge {
     ($t:tt, $v:expr) => {};
+    ($t:tt, $v:expr, $($key:expr => $value:expr)*) => {};
 }
 
 // no-op `histogram` macro for when the `metrics` feature is not enabled
@@ -33,4 +35,5 @@ macro_rules! gauge {
 #[macro_export]
 macro_rules! histogram {
     ($t:tt, $v:expr) => {};
+    ($t:tt, $v:expr, $($key:expr => $value:expr)*) => {};
 }

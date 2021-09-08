@@ -316,12 +316,19 @@
       "steppedLine": false,
       "targets": [
         {
+          "alias": "pending batches [[tag_service]]",
           "groupBy": [
             {
               "params": [
                 "$__interval"
               ],
               "type": "time"
+            },
+            {
+              "params": [
+                "service"
+              ],
+              "type": "tag"
             },
             {
               "params": [
