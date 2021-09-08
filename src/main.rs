@@ -31,11 +31,10 @@ use std::time::Instant;
 use clap::{AppSettings, Arg, SubCommand};
 use sabre_sdk::protocol::payload::{
     CreateContractRegistryActionBuilder, CreateNamespaceRegistryActionBuilder,
-    CreateNamespaceRegistryPermissionActionBuilder, CreateSmartPermissionActionBuilder,
-    DeleteContractRegistryActionBuilder, DeleteNamespaceRegistryActionBuilder,
-    DeleteNamespaceRegistryPermissionActionBuilder, DeleteSmartPermissionActionBuilder,
+    CreateNamespaceRegistryPermissionActionBuilder, DeleteContractRegistryActionBuilder,
+    DeleteNamespaceRegistryActionBuilder, DeleteNamespaceRegistryPermissionActionBuilder,
     ExecuteContractActionBuilder, UpdateContractRegistryOwnersActionBuilder,
-    UpdateNamespaceRegistryOwnersActionBuilder, UpdateSmartPermissionActionBuilder,
+    UpdateNamespaceRegistryOwnersActionBuilder,
 };
 use sabre_sdk::protocol::{
     compute_contract_address,
@@ -119,28 +118,6 @@ fn run() -> Result<(), CliError> {
             (@arg owner: -O --owner +takes_value +multiple "Owner of this contract registry")
             (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
         )
-        (@subcommand sp =>
-          (about: "Create, update or delete smart permissions")
-          (@arg url: -U --url +takes_value "URL to the Sawtooth REST API")
-          (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
-          (@subcommand create =>
-                (@arg org_id: +required "Organization ID ")
-                (@arg name: +required "Name of the Smart Permission")
-                (@arg filename: -f --filename +required +takes_value "Path to smart_permission")
-                (@arg key: -k --key +takes_value "Signing key name")
-            )
-            (@subcommand update =>
-                (@arg org_id: +required "Organization IDs")
-                (@arg name: +required "Name of the Smart Permission")
-                (@arg filename: -f --filename +required +takes_value "Path to smart_permission")
-                (@arg key: -k --key +takes_value "Signing key name")
-            )
-            (@subcommand delete =>
-                (@arg org_id: +required "Organization IDs")
-                (@arg name: +required "Name of the Smart Permission")
-                (@arg key: -k --key +takes_value "Signing key name")
-            )
-        )
     );
 
     let app = app.subcommand(
@@ -201,8 +178,6 @@ fn run() -> Result<(), CliError> {
                 namespace_permission(perm_matches)?
             } else if let Some(cr_matches) = matches.subcommand_matches("cr") {
                 contract_registry(cr_matches)?
-            } else if let Some(sp_matches) = matches.subcommand_matches("sp") {
-                smart_permission(sp_matches)?
             } else {
                 return Err(CliError::User("Subcommand required".into()));
             };
@@ -487,86 +462,6 @@ fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), Cli
 
         submit_batches(url, vec![batch])?
     };
-    Ok((batch_link, wait))
-}
-
-fn smart_permission(sp_matches: &clap::ArgMatches) -> Result<(String, u64), CliError> {
-    let url = sp_matches
-        .value_of("url")
-        .unwrap_or(DEFAULT_REST_API_ENDPOINT);
-
-    let wait = match value_t!(sp_matches, "wait", u64) {
-        Ok(wait) => wait,
-        Err(err) => match err.kind {
-            clap::ErrorKind::ArgumentNotFound => 0,
-            _ => return Err(CliError::User("Wait must be an integer".into())),
-        },
-    };
-
-    let batch_link = match sp_matches.subcommand() {
-        ("create", Some(m)) => {
-            let org_id = m.value_of("org_id").unwrap();
-            let name = m.value_of("name").unwrap();
-            let filename = m.value_of("filename").unwrap();
-            let key = m.value_of("key");
-
-            let function = load_bytes_from_file(filename)?;
-
-            let signer = new_signer(key)?;
-            let batch = CreateSmartPermissionActionBuilder::new()
-                .with_name(name.into())
-                .with_org_id(org_id.into())
-                .with_function(function)
-                .into_payload_builder()?
-                .into_transaction_builder(&*signer)?
-                .into_batch_builder(&*signer)?
-                .build(&*signer)?;
-
-            submit_batches(url, vec![batch])?
-        }
-        ("update", Some(m)) => {
-            let org_id = m.value_of("org_id").unwrap();
-            let name = m.value_of("name").unwrap();
-            let filename = m.value_of("filename").unwrap();
-            let key = m.value_of("key");
-
-            let function = load_bytes_from_file(filename)?;
-
-            let signer = new_signer(key)?;
-            let batch = UpdateSmartPermissionActionBuilder::new()
-                .with_name(name.to_string())
-                .with_org_id(org_id.to_string())
-                .with_function(function)
-                .into_payload_builder()?
-                .into_transaction_builder(&*signer)?
-                .into_batch_builder(&*signer)?
-                .build(&*signer)?;
-
-            submit_batches(url, vec![batch])?
-        }
-        ("delete", Some(m)) => {
-            let org_id = m.value_of("org_id").unwrap();
-            let name = m.value_of("name").unwrap();
-            let key = m.value_of("key");
-
-            let signer = new_signer(key)?;
-            let batch = DeleteSmartPermissionActionBuilder::new()
-                .with_name(name.to_string())
-                .with_org_id(org_id.to_string())
-                .into_payload_builder()?
-                .into_transaction_builder(&*signer)?
-                .into_batch_builder(&*signer)?
-                .build(&*signer)?;
-
-            submit_batches(url, vec![batch])?
-        }
-        _ => {
-            return Err(CliError::User(
-                "Unrecognized smart permission subcommand".into(),
-            ));
-        }
-    };
-
     Ok((batch_link, wait))
 }
 
