@@ -612,24 +612,33 @@ where
                 // notification.
                 match connection.extended_metadata {
                     ConnectionMetadataExt::Outbound {
-                        ref reconnecting, ..
+                        ref reconnecting,
+                        #[cfg(feature = "challenge-authorization")]
+                        ref local_authorization,
+                        ..
                     } => {
                         if !reconnecting {
                             subscribers.broadcast(ConnectionManagerNotification::Connected {
                                 endpoint: outbound.endpoint.to_string(),
                                 connection_id: outbound.connection_id.to_string(),
                                 identity,
+                                #[cfg(feature = "challenge-authorization")]
+                                local_identity: local_authorization.clone(),
                             });
                         }
                     }
                     ConnectionMetadataExt::Inbound {
-                        ref disconnected, ..
+                        ref disconnected,
+                        #[cfg(feature = "challenge-authorization")]
+                        ref local_authorization,
                     } => {
                         if !disconnected {
                             subscribers.broadcast(ConnectionManagerNotification::Connected {
                                 endpoint: outbound.endpoint.to_string(),
                                 connection_id: outbound.connection_id.to_string(),
                                 identity,
+                                #[cfg(feature = "challenge-authorization")]
+                                local_identity: local_authorization.clone(),
                             });
                         }
                     }
@@ -753,7 +762,7 @@ where
                             #[cfg(feature = "challenge-authorization")]
                             expected_authorization,
                             #[cfg(feature = "challenge-authorization")]
-                            local_authorization,
+                            local_authorization: local_authorization.clone(),
                         },
                     },
                 );
@@ -762,6 +771,8 @@ where
                     endpoint,
                     connection_id,
                     identity,
+                    #[cfg(feature = "challenge-authorization")]
+                    local_identity: local_authorization,
                 });
             }
             AuthorizationResult::Unauthorized { connection_id, .. } => {
@@ -1247,6 +1258,10 @@ mod tests {
                     identity: ConnectionAuthorizationType::Trust {
                         identity: "some-peer".into()
                     },
+                    #[cfg(feature = "challenge-authorization")]
+                    local_identity: ConnectionAuthorizationType::Trust {
+                        identity: "test_identity".into()
+                    }
                 }
         );
 
@@ -1324,6 +1339,10 @@ mod tests {
                     identity: ConnectionAuthorizationType::Trust {
                         identity: "some-peer".into()
                     },
+                    #[cfg(feature = "challenge-authorization")]
+                    local_identity: ConnectionAuthorizationType::Trust {
+                        identity: "test_identity".into()
+                    }
                 }
         );
 
@@ -1478,6 +1497,10 @@ mod tests {
                     identity: ConnectionAuthorizationType::Trust {
                         identity: "some-peer".into()
                     },
+                    #[cfg(feature = "challenge-authorization")]
+                    local_identity: ConnectionAuthorizationType::Trust {
+                        identity: "test_identity".into()
+                    }
                 }
         );
 
@@ -1497,7 +1520,7 @@ mod tests {
                     identity: ConnectionAuthorizationType::Trust {
                         identity: "some-peer".into()
                     },
-                    connection_id: "test_id",
+                    connection_id: "test_id".into(),
                 }
         );
 
@@ -1514,6 +1537,10 @@ mod tests {
                 identity: ConnectionAuthorizationType::Trust {
                     identity: "some-peer".into()
                 },
+                #[cfg(feature = "challenge-authorization")]
+                local_identity: ConnectionAuthorizationType::Trust {
+                    identity: "test_identity".into()
+                }
             }
         );
 

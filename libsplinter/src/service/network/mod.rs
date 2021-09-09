@@ -523,6 +523,7 @@ impl ServiceConnectionAgent {
                 endpoint,
                 connection_id,
                 identity,
+                ..
             } => {
                 let identity = match identity {
                     ConnectionAuthorizationType::Trust { identity } => identity,
