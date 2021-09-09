@@ -37,7 +37,7 @@ use crate::consensus::Proposal;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
-use crate::peer::{PeerManagerConnector, PeerManagerNotification};
+use crate::peer::{PeerManagerConnector, PeerManagerNotification, PeerTokenPair};
 use crate::protocol::{ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION};
 use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
@@ -310,7 +310,11 @@ impl AdminService {
                     }
 
                     token_to_peer.insert(
-                        member.token.clone(),
+                        PeerTokenPair::new(
+                            member.token.clone(),
+                            #[cfg(feature = "challenge-authorization")]
+                            local_required_auth.clone(),
+                        ),
                         PeerNodePair {
                             peer_node: member.clone(),
                             local_peer_token: local_required_auth.clone(),
@@ -505,7 +509,11 @@ impl AdminService {
                     }
 
                     token_to_peer.insert(
-                        member.token.clone(),
+                        PeerTokenPair::new(
+                            member.token.clone(),
+                            #[cfg(feature = "challenge-authorization")]
+                            local_required_auth.clone(),
+                        ),
                         PeerNodePair {
                             peer_node: member.clone(),
                             local_peer_token: local_required_auth.clone(),
@@ -1032,7 +1040,7 @@ mod tests {
                 ),
             ],
             #[cfg(feature = "challenge-authorization")]
-            "node_id".to_string(),
+            "test-node".to_string(),
         );
 
         let authorization_manager = AuthorizationManager::new(

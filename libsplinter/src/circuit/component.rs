@@ -15,7 +15,7 @@
 //! trait implementations to support service components.
 
 use crate::circuit::routing::{RoutingTableReader, RoutingTableWriter, Service, ServiceId};
-use crate::peer::PeerAuthorizationToken;
+use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
 use crate::service::network::handlers::{
     ServiceAddInstanceError, ServiceInstances, ServiceRemoveInstanceError,
 };
@@ -103,7 +103,11 @@ impl ServiceInstances for RoutingTableServiceInstances {
             return Err(ServiceAddInstanceError::AlreadyRegistered);
         }
 
-        service.set_peer_id(PeerAuthorizationToken::from_peer_id(&component_id));
+        service.set_peer_id(PeerTokenPair::new(
+            PeerAuthorizationToken::from_peer_id(&component_id),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from_peer_id(&self.node_id),
+        ));
 
         let mut writer = self.routing_table_writer.clone();
         writer.add_service(unique_id, service).map_err(|err| {
@@ -220,7 +224,12 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .expect("Missing service");
-        service.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network".into()));
+        service.set_peer_id(PeerTokenPair::new(
+            PeerAuthorizationToken::from_peer_id("abc_network"),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from_peer_id("123"),
+        ));
+
         writer
             .add_service(id, service)
             .expect("Unable to add service");
@@ -266,7 +275,11 @@ mod tests {
                 .expect("cannot check if it has the service")
                 .expect("no service returned")
                 .peer_id(),
-            &Some(PeerAuthorizationToken::from_peer_id("my_component"))
+            &Some(PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("my_component"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            ))
         );
     }
 
@@ -315,7 +328,12 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .expect("Missing service");
-        service.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
+        service.set_peer_id(PeerTokenPair::new(
+            PeerAuthorizationToken::from_peer_id("abc_network"),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from_peer_id("123"),
+        ));
+
         writer
             .add_service(id.clone(), service)
             .expect("Unable to add service");

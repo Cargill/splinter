@@ -23,8 +23,8 @@ use super::error::{
     PeerRefRemoveError, PeerUnknownAddError,
 };
 use super::notification::{PeerManagerNotification, PeerNotificationIter, SubscriberId};
-use super::PeerAuthorizationToken;
 use super::{EndpointPeerRef, PeerRef};
+use super::{PeerAuthorizationToken, PeerTokenPair};
 use super::{PeerManagerMessage, PeerManagerRequest};
 
 /// The `PeerLookup` trait provides an interface for looking up details about individual peer
@@ -35,20 +35,14 @@ pub trait PeerLookup: Send {
     /// # Errors
     ///
     /// Returns a `PeerLookupError` if the connection ID cannot be retrieved.
-    fn connection_id(
-        &self,
-        peer_id: &PeerAuthorizationToken,
-    ) -> Result<Option<String>, PeerLookupError>;
+    fn connection_id(&self, peer_id: &PeerTokenPair) -> Result<Option<String>, PeerLookupError>;
 
     /// Retrieves the peer ID for a given connection ID, if found.
     ///
     /// # Errors
     ///
     /// Returns a `PeerLookupError` if the peer ID cannot be retrieved.
-    fn peer_id(
-        &self,
-        connection_id: &str,
-    ) -> Result<Option<PeerAuthorizationToken>, PeerLookupError>;
+    fn peer_id(&self, connection_id: &str) -> Result<Option<PeerTokenPair>, PeerLookupError>;
 }
 
 /// The `PeerLookupProvider` trait facilitates getting the peer IDs and connection IDs for
@@ -175,7 +169,7 @@ impl PeerManagerConnector {
     /// Unreferenced peers are those peers that have successfully connected from a remote node, but
     /// have not yet been referenced by a circuit. These peers are available to be promoted to
     /// fully refrerenced peers.
-    pub fn list_unreferenced_peers(&self) -> Result<Vec<PeerAuthorizationToken>, PeerListError> {
+    pub fn list_unreferenced_peers(&self) -> Result<Vec<PeerTokenPair>, PeerListError> {
         let (sender, recv) = channel();
         let message =
             PeerManagerMessage::Request(PeerManagerRequest::ListUnreferencedPeers { sender });
@@ -198,7 +192,7 @@ impl PeerManagerConnector {
     /// Returns a map of peer IDs to connection IDs
     pub fn connection_ids(
         &self,
-    ) -> Result<BiHashMap<PeerAuthorizationToken, String>, PeerConnectionIdError> {
+    ) -> Result<BiHashMap<PeerTokenPair, String>, PeerConnectionIdError> {
         let (sender, recv) = channel();
         let message = PeerManagerMessage::Request(PeerManagerRequest::ConnectionIds { sender });
 
@@ -292,10 +286,7 @@ impl PeerManagerConnector {
 }
 
 impl PeerLookup for PeerManagerConnector {
-    fn connection_id(
-        &self,
-        peer_id: &PeerAuthorizationToken,
-    ) -> Result<Option<String>, PeerLookupError> {
+    fn connection_id(&self, peer_id: &PeerTokenPair) -> Result<Option<String>, PeerLookupError> {
         let (sender, recv) = channel();
         let message = PeerManagerMessage::Request(PeerManagerRequest::GetConnectionId {
             peer_id: peer_id.clone(),
@@ -315,10 +306,7 @@ impl PeerLookup for PeerManagerConnector {
             .map_err(|err| PeerLookupError(format!("{:?}", err)))?
     }
 
-    fn peer_id(
-        &self,
-        connection_id: &str,
-    ) -> Result<Option<PeerAuthorizationToken>, PeerLookupError> {
+    fn peer_id(&self, connection_id: &str) -> Result<Option<PeerTokenPair>, PeerLookupError> {
         let (sender, recv) = channel();
         let message = PeerManagerMessage::Request(PeerManagerRequest::GetPeerId {
             connection_id: connection_id.to_string(),
@@ -359,10 +347,7 @@ impl PeerRemover {
     ///
     /// # Arguments
     /// * `peer_id` - the peer ID of the `PeerRef` that has been dropped
-    pub fn remove_peer_ref(
-        &self,
-        peer_id: &PeerAuthorizationToken,
-    ) -> Result<(), PeerRefRemoveError> {
+    pub fn remove_peer_ref(&self, peer_id: &PeerTokenPair) -> Result<(), PeerRefRemoveError> {
         let (sender, recv) = channel();
 
         let message = PeerManagerMessage::Request(PeerManagerRequest::RemovePeer {

@@ -14,13 +14,14 @@
 
 //! Data structure for keeping track of peer information
 
+use std::collections::hash_map::Entry::Occupied;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use crate::collections::BiHashMap;
 
 use super::error::PeerUpdateError;
-use super::PeerAuthorizationToken;
+use super::{PeerAuthorizationToken, PeerTokenPair};
 
 /// Enum for the current status of a peer
 #[derive(Clone, PartialEq, Debug)]
@@ -58,9 +59,9 @@ pub struct PeerMetadata {
 ///
 /// Peer metadata includes the peer ID, the list of endpoints, and the current active endpoint.
 pub struct PeerMap {
-    peers: HashMap<PeerAuthorizationToken, PeerMetadata>,
+    peers: HashMap<PeerTokenPair, PeerMetadata>,
     // Endpoint to peer id
-    endpoints: HashMap<String, HashSet<PeerAuthorizationToken>>,
+    endpoints: HashMap<String, HashSet<PeerTokenPair>>,
     initial_retry_frequency: u64,
     #[cfg(not(feature = "challenge-authorization"))]
     local_identity: PeerAuthorizationToken,
@@ -99,7 +100,7 @@ impl PeerMap {
     }
 
     /// Returns the current map of peer IDs to connection IDs
-    pub fn connection_ids(&self) -> BiHashMap<PeerAuthorizationToken, String> {
+    pub fn connection_ids(&self) -> BiHashMap<PeerTokenPair, String> {
         let mut peer_to_connection_id = BiHashMap::new();
         for (peer, metadata) in self.peers.iter() {
             peer_to_connection_id.insert(peer.clone(), metadata.connection_id.to_string());
@@ -135,19 +136,25 @@ impl PeerMap {
             last_connection_attempt: Instant::now(),
             retry_frequency: self.initial_retry_frequency,
             #[cfg(feature = "challenge-authorization")]
-            required_local_auth,
+            required_local_auth: required_local_auth.clone(),
             #[cfg(not(feature = "challenge-authorization"))]
             required_local_auth: self.local_identity.clone(),
         };
 
-        self.peers.insert(peer_id.clone(), peer_metadata);
+        let peer_token_pair = PeerTokenPair::new(
+            peer_id,
+            #[cfg(feature = "challenge-authorization")]
+            required_local_auth,
+        );
+
+        self.peers.insert(peer_token_pair.clone(), peer_metadata);
 
         for endpoint in endpoints {
             if let Some(peer_tokens) = self.endpoints.get_mut(&endpoint) {
-                peer_tokens.insert(peer_id.clone());
+                peer_tokens.insert(peer_token_pair.clone());
             } else {
                 let mut peer_tokens = HashSet::new();
-                peer_tokens.insert(peer_id.clone());
+                peer_tokens.insert(peer_token_pair.clone());
                 self.endpoints.insert(endpoint.clone(), peer_tokens);
             }
         }
@@ -162,7 +169,7 @@ impl PeerMap {
     /// * `peer_id` - The unique ID for the peer
     ///
     /// Returns the metadata for the peer if it exists.
-    pub fn remove(&mut self, peer_id: &PeerAuthorizationToken) -> Option<PeerMetadata> {
+    pub fn remove(&mut self, peer_id: &PeerTokenPair) -> Option<PeerMetadata> {
         if let Some(peer_metadata) = self.peers.remove(peer_id) {
             for endpoint in peer_metadata.endpoints.iter() {
                 if let Some(mut peer_tokens) = self.endpoints.remove(endpoint) {
@@ -190,24 +197,29 @@ impl PeerMap {
     /// * `peer_metadata` - The updated peer metadata for the peer
     pub fn update_peer(&mut self, peer_metadata: PeerMetadata) -> Result<(), PeerUpdateError> {
         // Only valid if the peer already exists
-        if self.peers.contains_key(&peer_metadata.id) {
+        let peer_token_pair = PeerTokenPair::new(
+            peer_metadata.id.clone(),
+            #[cfg(feature = "challenge-authorization")]
+            peer_metadata.required_local_auth.clone(),
+        );
+        if let Occupied(mut peer_entry) = self.peers.entry(peer_token_pair.clone()) {
             for endpoint in peer_metadata.endpoints.iter() {
                 if let Some(peer_tokens) = self.endpoints.get_mut(endpoint) {
-                    peer_tokens.insert(peer_metadata.id.clone());
+                    peer_tokens.insert(peer_token_pair.clone());
                 } else {
                     let mut peer_tokens = HashSet::new();
-                    peer_tokens.insert(peer_metadata.id.clone());
+                    peer_tokens.insert(peer_token_pair.clone());
                     self.endpoints.insert(endpoint.clone(), peer_tokens);
                 }
             }
 
-            self.peers.insert(peer_metadata.id.clone(), peer_metadata);
+            peer_entry.insert(peer_metadata);
 
             Ok(())
         } else {
             Err(PeerUpdateError(format!(
                 "Unable to update peer {}, does not exist",
-                peer_metadata.id
+                peer_token_pair
             )))
         }
     }
@@ -234,7 +246,7 @@ impl PeerMap {
     }
 
     /// Returns the metadata for a peer from the provided peer ID
-    pub fn get_by_peer_id(&self, peer_id: &PeerAuthorizationToken) -> Option<&PeerMetadata> {
+    pub fn get_by_peer_id(&self, peer_id: &PeerTokenPair) -> Option<&PeerMetadata> {
         self.peers.get(peer_id)
     }
 
@@ -246,7 +258,7 @@ impl PeerMap {
     }
 
     /// Returns the list of peers whose peer status is pending
-    pub fn get_pending(&self) -> impl Iterator<Item = (&PeerAuthorizationToken, &PeerMetadata)> {
+    pub fn get_pending(&self) -> impl Iterator<Item = (&PeerTokenPair, &PeerMetadata)> {
         self.peers
             .iter()
             .filter(|(_id, peer_meta)| peer_meta.status == PeerStatus::Pending)
@@ -356,15 +368,27 @@ pub mod tests {
 
         let peers = peer_map.connection_ids();
         assert_eq!(
-            peers.get_by_key(&PeerAuthorizationToken::Trust {
-                peer_id: "test_peer".to_string()
-            }),
+            peers.get_by_key(&PeerTokenPair::new(
+                PeerAuthorizationToken::Trust {
+                    peer_id: "test_peer".to_string(),
+                },
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::Trust {
+                    peer_id: "my_id".to_string(),
+                },
+            )),
             Some(&"connection_id_1".to_string())
         );
         assert_eq!(
-            peers.get_by_key(&PeerAuthorizationToken::Trust {
-                peer_id: "next_peer".to_string()
-            }),
+            peers.get_by_key(&PeerTokenPair::new(
+                PeerAuthorizationToken::Trust {
+                    peer_id: "next_peer".to_string(),
+                },
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::Trust {
+                    peer_id: "my_id".to_string(),
+                },
+            )),
             Some(&"connection_id_2".to_string())
         );
     }
@@ -449,15 +473,27 @@ pub mod tests {
             #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::from_peer_id("my_id"),
         );
-        assert!(peer_map.peers.contains_key(&PeerAuthorizationToken::Trust {
-            peer_id: "test_peer".to_string(),
-        }));
+        assert!(peer_map.peers.contains_key(&PeerTokenPair::new(
+            PeerAuthorizationToken::Trust {
+                peer_id: "test_peer".to_string(),
+            },
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::Trust {
+                peer_id: "my_id".to_string(),
+            },
+        )));
 
         let peer_metadata = peer_map
             .peers
-            .get(&PeerAuthorizationToken::Trust {
-                peer_id: "test_peer".to_string(),
-            })
+            .get(&PeerTokenPair::new(
+                PeerAuthorizationToken::Trust {
+                    peer_id: "test_peer".to_string(),
+                },
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::Trust {
+                    peer_id: "my_id".to_string(),
+                },
+            ))
             .expect("Missing peer_metadata");
         assert_eq!(
             peer_metadata.id,
@@ -485,9 +521,15 @@ pub mod tests {
             PeerAuthorizationToken::from_peer_id("my_id"),
         );
 
-        let peer_metdata = peer_map.remove(&PeerAuthorizationToken::Trust {
-            peer_id: "test_peer".to_string(),
-        });
+        let peer_metdata = peer_map.remove(&PeerTokenPair::new(
+            PeerAuthorizationToken::Trust {
+                peer_id: "next_peer".to_string(),
+            },
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::Trust {
+                peer_id: "my_id".to_string(),
+            },
+        ));
 
         assert_eq!(peer_metdata, None);
 
@@ -502,20 +544,36 @@ pub mod tests {
             #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::from_peer_id("my_id"),
         );
-        assert!(peer_map.peers.contains_key(&PeerAuthorizationToken::Trust {
-            peer_id: "test_peer".to_string()
-        }));
+        assert!(peer_map.peers.contains_key(&PeerTokenPair::new(
+            PeerAuthorizationToken::Trust {
+                peer_id: "test_peer".to_string(),
+            },
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::Trust {
+                peer_id: "my_id".to_string(),
+            },
+        )));
 
         let peer_metadata = peer_map
-            .remove(&PeerAuthorizationToken::Trust {
-                peer_id: "test_peer".to_string(),
-            })
+            .remove(&PeerTokenPair::new(
+                PeerAuthorizationToken::Trust {
+                    peer_id: "test_peer".to_string(),
+                },
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::Trust {
+                    peer_id: "my_id".to_string(),
+                },
+            ))
             .expect("Missing peer_metadata");
-        assert!(
-            !peer_map.peers.contains_key(&PeerAuthorizationToken::Trust {
-                peer_id: "test_peer".to_string()
-            })
-        );
+        assert!(!peer_map.peers.contains_key(&PeerTokenPair::new(
+            PeerAuthorizationToken::Trust {
+                peer_id: "test_peer".to_string(),
+            },
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::Trust {
+                peer_id: "my_id".to_string(),
+            },
+        )));
 
         assert_eq!(peer_metadata.active_endpoint, "test_endpoint2".to_string());
         assert_eq!(
@@ -567,9 +625,15 @@ pub mod tests {
             #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::from_peer_id("my_id"),
         );
-        assert!(peer_map.peers.contains_key(&PeerAuthorizationToken::Trust {
-            peer_id: "test_peer".to_string(),
-        }));
+        assert!(peer_map.peers.contains_key(&PeerTokenPair::new(
+            PeerAuthorizationToken::Trust {
+                peer_id: "test_peer".to_string(),
+            },
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::Trust {
+                peer_id: "my_id".to_string(),
+            },
+        )));
 
         let mut peer_metadata = peer_map
             .get_by_connection_id("connection_id")
@@ -586,9 +650,15 @@ pub mod tests {
 
         let peer_metadata = peer_map
             .peers
-            .get(&PeerAuthorizationToken::Trust {
-                peer_id: "test_peer".to_string(),
-            })
+            .get(&PeerTokenPair::new(
+                PeerAuthorizationToken::Trust {
+                    peer_id: "test_peer".to_string(),
+                },
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::Trust {
+                    peer_id: "my_id".to_string(),
+                },
+            ))
             .expect("Missing peer_metadata");
 
         assert_eq!(

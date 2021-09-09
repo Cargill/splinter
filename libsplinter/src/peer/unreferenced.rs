@@ -17,15 +17,18 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
+#[cfg(feature = "challenge-authorization")]
 use super::PeerAuthorizationToken;
+use super::PeerTokenPair;
 
 /// An entry of unreferenced peers, that may have connected externally, but have not yet been
 /// requested locally.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnreferencedPeer {
     pub endpoint: String,
     pub connection_id: String,
-    pub local_authorization: Option<PeerAuthorizationToken>,
+    #[cfg(feature = "challenge-authorization")]
+    pub local_authorization: PeerAuthorizationToken,
 }
 
 /// An entry for a peer that was only requested by endpoint.
@@ -37,7 +40,7 @@ pub struct RequestedEndpoint {
 }
 
 pub struct UnreferencedPeerState {
-    pub peers: HashMap<PeerAuthorizationToken, UnreferencedPeer>,
+    pub peers: HashMap<PeerTokenPair, UnreferencedPeer>,
     // The list of endpoints that have been requested without an ID
     pub requested_endpoints: HashMap<String, RequestedEndpoint>,
     // Last time connection to the requested endpoints was tried
@@ -47,12 +50,22 @@ pub struct UnreferencedPeerState {
 }
 
 impl UnreferencedPeerState {
-    fn new(retry_frequency: u64) -> Self {
+    pub fn new(retry_frequency: u64) -> Self {
         UnreferencedPeerState {
             peers: HashMap::default(),
             requested_endpoints: HashMap::default(),
             last_connection_attempt: Instant::now(),
             retry_frequency,
         }
+    }
+
+    pub fn get_by_connection_id(
+        &self,
+        connection_id: &str,
+    ) -> Option<(PeerTokenPair, UnreferencedPeer)> {
+        self.peers
+            .iter()
+            .find(|(_, peer)| peer.connection_id == connection_id)
+            .map(|(id, peer)| (id.clone(), peer.clone()))
     }
 }

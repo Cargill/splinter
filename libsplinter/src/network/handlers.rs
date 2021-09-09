@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
-use crate::peer::PeerAuthorizationToken;
+use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
 use crate::protocol::network::{NetworkEcho, NetworkMessage};
 use crate::protos::network;
 use crate::protos::prelude::*;
@@ -48,7 +48,12 @@ impl Handler for NetworkEchoHandler {
             } else {
                 // NetworkEcho currently only can be sent to peers who are using Trust
                 // authorization
-                PeerAuthorizationToken::from_peer_id(&echo_message.recipient).into()
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id(&echo_message.recipient),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id(&self.node_id),
+                )
+                .into()
             }
         };
 
@@ -144,7 +149,12 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                PeerAuthorizationToken::from_peer_id("OTHER_PEER").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("OTHER_PEER").into(),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("TestPeer").into(),
+                )
+                .into(),
                 &NetworkMessageType::NETWORK_ECHO,
                 outgoing_message_bytes.clone()
             )

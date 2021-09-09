@@ -58,7 +58,7 @@ pub use self::notification::{PeerManagerNotification, PeerNotificationIter, Subs
 use self::notification::{Subscriber, SubscriberMap};
 use self::peer_map::{PeerMap, PeerStatus};
 pub use self::peer_ref::{EndpointPeerRef, PeerRef};
-pub use self::token::PeerAuthorizationToken;
+pub use self::token::{PeerAuthorizationToken, PeerTokenPair};
 use self::unreferenced::{RequestedEndpoint, UnreferencedPeer, UnreferencedPeerState};
 
 /// Internal messages to drive management
@@ -98,7 +98,7 @@ pub(crate) enum PeerManagerRequest {
         sender: Sender<Result<EndpointPeerRef, PeerUnknownAddError>>,
     },
     RemovePeer {
-        peer_id: PeerAuthorizationToken,
+        peer_id: PeerTokenPair,
         sender: Sender<Result<(), PeerRefRemoveError>>,
     },
     RemovePeerByEndpoint {
@@ -110,18 +110,18 @@ pub(crate) enum PeerManagerRequest {
         sender: Sender<Result<Vec<PeerAuthorizationToken>, PeerListError>>,
     },
     ListUnreferencedPeers {
-        sender: Sender<Result<Vec<PeerAuthorizationToken>, PeerListError>>,
+        sender: Sender<Result<Vec<PeerTokenPair>, PeerListError>>,
     },
     ConnectionIds {
-        sender: Sender<Result<BiHashMap<PeerAuthorizationToken, String>, PeerConnectionIdError>>,
+        sender: Sender<Result<BiHashMap<PeerTokenPair, String>, PeerConnectionIdError>>,
     },
     GetConnectionId {
-        peer_id: PeerAuthorizationToken,
+        peer_id: PeerTokenPair,
         sender: Sender<Result<Option<String>, PeerLookupError>>,
     },
     GetPeerId {
         connection_id: String,
-        sender: Sender<Result<Option<PeerAuthorizationToken>, PeerLookupError>>,
+        sender: Sender<Result<Option<PeerTokenPair>, PeerLookupError>>,
     },
     Subscribe {
         sender: Sender<Result<SubscriberId, PeerManagerError>>,
@@ -377,7 +377,7 @@ fn handle_request(
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
-    ref_map: &mut RefMap<PeerAuthorizationToken>,
+    ref_map: &mut RefMap<PeerTokenPair>,
     subscribers: &mut SubscriberMap,
     strict_ref_counts: bool,
 ) {
@@ -505,7 +505,13 @@ fn handle_request(
         } => {
             let peer_id = peers
                 .get_by_connection_id(&connection_id)
-                .map(|meta| meta.id.clone())
+                .map(|meta| {
+                    PeerTokenPair::new(
+                        meta.id.clone(),
+                        #[cfg(feature = "challenge-authorization")]
+                        meta.required_local_auth.clone(),
+                    )
+                })
                 .or_else(|| {
                     unreferenced_peers
                         .peers
@@ -546,10 +552,16 @@ fn add_peer(
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
-    ref_map: &mut RefMap<PeerAuthorizationToken>,
+    ref_map: &mut RefMap<PeerTokenPair>,
     subscribers: &mut SubscriberMap,
     #[cfg(feature = "challenge-authorization")] required_local_auth: PeerAuthorizationToken,
 ) -> Result<PeerRef, PeerRefAddError> {
+    let peer_token_pair = PeerTokenPair::new(
+        peer_id.clone(),
+        #[cfg(feature = "challenge-authorization")]
+        required_local_auth.clone(),
+    );
+
     if check_for_duplicate_endpoint(&peer_id, &endpoints, peers) {
         return Err(PeerRefAddError::AddError(format!(
             "Peer {} contains endpoints that already belong to another peer using trust",
@@ -557,11 +569,11 @@ fn add_peer(
         )));
     }
 
-    let new_ref_count = ref_map.add_ref(peer_id.clone());
+    let new_ref_count = ref_map.add_ref(peer_token_pair.clone());
 
     // if this is not a new peer, return success
     if new_ref_count > 1 {
-        if let Some(mut peer_metadata) = peers.get_by_peer_id(&peer_id).cloned() {
+        if let Some(mut peer_metadata) = peers.get_by_peer_id(&peer_token_pair).cloned() {
             if peer_metadata.endpoints.len() == 1 && endpoints.len() > 1 {
                 // this should always be true
                 if let Some(endpoint) = peer_metadata.endpoints.get(0) {
@@ -585,7 +597,7 @@ fn add_peer(
                         })?
                     } else {
                         // remove ref we just added
-                        if let Err(err) = ref_map.remove_ref(&peer_id) {
+                        if let Err(err) = ref_map.remove_ref(&peer_token_pair) {
                             error!(
                                 "Unable to remove ref that was just added for peer {}: {}",
                                 peer_id, err
@@ -610,12 +622,12 @@ fn add_peer(
             if peer_metadata.status == PeerStatus::Connected {
                 // Update peer for new state
                 let notification = PeerManagerNotification::Connected {
-                    peer: peer_id.clone(),
+                    peer: peer_token_pair.clone(),
                 };
                 subscribers.broadcast(notification);
             }
 
-            let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
+            let peer_ref = PeerRef::new(peer_token_pair, peer_remover.clone());
             return Ok(peer_ref);
         } else {
             return Err(PeerRefAddError::AddError(format!(
@@ -630,10 +642,10 @@ fn add_peer(
         connection_id,
         endpoint,
         ..
-    }) = unreferenced_peers.peers.remove(&peer_id)
+    }) = unreferenced_peers.peers.remove(&peer_token_pair)
     {
         peers.insert(
-            peer_id.clone(),
+            peer_id,
             connection_id,
             endpoints,
             endpoint,
@@ -642,7 +654,7 @@ fn add_peer(
             required_local_auth,
         );
 
-        let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
+        let peer_ref = PeerRef::new(peer_token_pair.clone(), peer_remover.clone());
         return Ok(peer_ref);
     }
 
@@ -653,7 +665,7 @@ fn add_peer(
         Some(endpoint) => endpoint.to_string(),
         None => {
             // remove ref we just added
-            if let Err(err) = ref_map.remove_ref(&peer_id) {
+            if let Err(err) = ref_map.remove_ref(&peer_token_pair) {
                 error!(
                     "Unable to remove ref that was just added for peer {}: {}",
                     peer_id, err
@@ -687,7 +699,7 @@ fn add_peer(
     }
 
     peers.insert(
-        peer_id.clone(),
+        peer_id,
         connection_id,
         endpoints.to_vec(),
         active_endpoint,
@@ -695,7 +707,7 @@ fn add_peer(
         #[cfg(feature = "challenge-authorization")]
         required_local_auth,
     );
-    let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
+    let peer_ref = PeerRef::new(peer_token_pair, peer_remover.clone());
     Ok(peer_ref)
 }
 
@@ -706,7 +718,7 @@ fn add_unidentified(
     unreferenced_peers: &mut UnreferencedPeerState,
     peer_remover: &PeerRemover,
     peers: &PeerMap,
-    ref_map: &mut RefMap<PeerAuthorizationToken>,
+    ref_map: &mut RefMap<PeerTokenPair>,
     #[cfg(feature = "challenge-authorization")] local_authorization: PeerAuthorizationToken,
 ) -> EndpointPeerRef {
     info!("Attempting to peer with peer by endpoint {}", endpoint);
@@ -716,7 +728,7 @@ fn add_unidentified(
         {
             if let Some(peer_metadata) = peer_metadatas.get(0) {
                 // if there is peer in the peer_map, there is reference in the ref map
-                ref_map.add_ref(peer_metadata.id.clone());
+                ref_map.add_ref(PeerTokenPair::new(peer_metadata.id.clone()));
                 return EndpointPeerRef::new(
                     endpoint,
                     peer_metadata.connection_id.clone(),
@@ -730,8 +742,12 @@ fn add_unidentified(
             for peer_metadata in peer_metadatas {
                 // need to verify that the existing peer has the correct local authorization
                 if peer_metadata.required_local_auth == local_authorization {
+                    let peer_token_pair = PeerTokenPair::new(
+                        peer_metadata.id.clone(),
+                        peer_metadata.required_local_auth.clone(),
+                    );
                     // if there is peer in the peer_map, there is reference in the ref map
-                    ref_map.add_ref(peer_metadata.id.clone());
+                    ref_map.add_ref(peer_token_pair);
                     return EndpointPeerRef::new(
                         endpoint,
                         peer_metadata.connection_id,
@@ -768,11 +784,11 @@ fn add_unidentified(
 }
 
 fn remove_peer(
-    peer_id: PeerAuthorizationToken,
+    peer_id: PeerTokenPair,
     connector: Connector,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
-    ref_map: &mut RefMap<PeerAuthorizationToken>,
+    ref_map: &mut RefMap<PeerTokenPair>,
     strict_ref_counts: bool,
 ) -> Result<(), PeerRefRemoveError> {
     debug!("Removing peer: {}", peer_id);
@@ -798,8 +814,8 @@ fn remove_peer(
         }
     };
 
-    if let Some(removed_peer) = removed_peer {
-        let peer_metadata = peers.remove(&removed_peer).ok_or_else(|| {
+    if removed_peer.is_some() {
+        let peer_metadata = peers.remove(&peer_id).ok_or_else(|| {
             PeerRefRemoveError::Remove(format!(
                 "Peer {} has already been removed from the peer map",
                 peer_id
@@ -837,7 +853,7 @@ fn remove_peer_by_endpoint(
     connection_id: String,
     connector: Connector,
     peers: &mut PeerMap,
-    ref_map: &mut RefMap<PeerAuthorizationToken>,
+    ref_map: &mut RefMap<PeerTokenPair>,
     strict_ref_counts: bool,
 ) -> Result<(), PeerRefRemoveError> {
     let peer_metadata = match peers.get_by_connection_id(&connection_id) {
@@ -850,23 +866,29 @@ fn remove_peer_by_endpoint(
         }
     };
 
+    let peer_token_pair = PeerTokenPair::new(
+        peer_metadata.id.clone(),
+        #[cfg(feature = "challenge-authorization")]
+        peer_metadata.required_local_auth.clone(),
+    );
+
     debug!(
         "Removing peer {} by endpoint: {}",
-        peer_metadata.id, endpoint
+        peer_token_pair, endpoint
     );
     // remove the reference
-    let removed_peer = match ref_map.remove_ref(&peer_metadata.id) {
+    let removed_peer = match ref_map.remove_ref(&peer_token_pair) {
         Ok(removed_peer) => removed_peer,
         Err(err) => {
             if strict_ref_counts {
                 panic!(
                     "Trying to remove a reference that does not exist: {}",
-                    peer_metadata.id
+                    peer_token_pair
                 );
             } else {
                 return Err(PeerRefRemoveError::Remove(format!(
                     "Failed to remove ref for peer {} from ref map: {}",
-                    peer_metadata.id, err
+                    peer_token_pair, err
                 )));
             }
         }
@@ -890,13 +912,13 @@ fn remove_peer_by_endpoint(
             Ok(Some(_)) => {
                 debug!(
                     "Peer {} has been removed and connection {} has been closed",
-                    peer_metadata.id, peer_metadata.active_endpoint
+                    peer_token_pair, peer_metadata.active_endpoint
                 );
                 Ok(())
             }
             Ok(None) => Err(PeerRefRemoveError::Remove(format!(
                 "The connection for peer {}'s active endpoint ({}) has already been removed",
-                peer_metadata.id, peer_metadata.active_endpoint
+                peer_token_pair, peer_metadata.active_endpoint
             ))),
             Err(err) => Err(PeerRefRemoveError::Remove(format!("{}", err))),
         }
@@ -916,14 +938,19 @@ fn handle_notifications(
     connector: Connector,
     subscribers: &mut SubscriberMap,
     max_retry_attempts: u64,
-    ref_map: &mut RefMap<PeerAuthorizationToken>,
+    ref_map: &mut RefMap<PeerTokenPair>,
     retry_frequency: u64,
 ) {
     match notification {
         // If a connection has disconnected, forward notification to subscribers
-        ConnectionManagerNotification::Disconnected { endpoint, identity, .. } => handle_disconnection(
+        ConnectionManagerNotification::Disconnected {
+            endpoint,
+            identity,
+            connection_id,
+        } => handle_disconnection(
             endpoint,
             PeerAuthorizationToken::from(identity),
+            connection_id,
             unreferenced_peers,
             peers,
             connector,
@@ -932,27 +959,29 @@ fn handle_notifications(
         ConnectionManagerNotification::NonFatalConnectionError {
             endpoint,
             attempts,
-            identity,
+            connection_id,
             ..
         } => {
             // Check if the disconnected peer has reached the retry limit, if so try to find a
             // different endpoint that can be connected to
-            let identity = PeerAuthorizationToken::from(identity);
-            if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
+            if let Some(mut peer_metadata) = peers.get_by_connection_id(&connection_id).cloned() {
                 info!(
                     "{} reconnection attempts have been made to peer {}",
-                    attempts, identity
+                    attempts, peer_metadata.id
                 );
                 if attempts >= max_retry_attempts {
                     if endpoint != peer_metadata.active_endpoint {
                         warn!(
                             "Received non fatal connection notification for peer {} with \
                             different endpoint {}",
-                            identity, endpoint
+                            peer_metadata.id, endpoint
                         );
                         return;
                     };
-                    info!("Attempting to find available endpoint for {}", identity);
+                    info!(
+                        "Attempting to find available endpoint for {}",
+                        peer_metadata.id
+                    );
                     for endpoint in peer_metadata.endpoints.iter() {
                         // do not retry the connection that is currently failing
                         if endpoint == &peer_metadata.active_endpoint {
@@ -987,10 +1016,14 @@ fn handle_notifications(
             endpoint,
             connection_id,
             identity,
+            #[cfg(feature = "challenge-authorization")]
+            local_identity,
         } => handle_inbound_connection(
             endpoint,
             PeerAuthorizationToken::from(identity),
             connection_id,
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from(local_identity),
             unreferenced_peers,
             peers,
             connector,
@@ -1000,11 +1033,15 @@ fn handle_notifications(
         ConnectionManagerNotification::Connected {
             endpoint,
             identity,
+            #[cfg(feature = "challenge-authorization")]
+            local_identity,
             connection_id,
         } => handle_connected(
             endpoint,
             PeerAuthorizationToken::from(identity),
             connection_id,
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from(local_identity),
             unreferenced_peers,
             peers,
             connector,
@@ -1029,25 +1066,30 @@ fn handle_notifications(
 fn handle_disconnection(
     endpoint: String,
     identity: PeerAuthorizationToken,
+    connection_id: String,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut SubscriberMap,
 ) {
-    if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
+    if let Some(mut peer_metadata) = peers.get_by_connection_id(&connection_id).cloned() {
         if endpoint != peer_metadata.active_endpoint {
             warn!(
                 "Received disconnection notification for peer {} with \
                 different endpoint {}",
-                identity, endpoint
+                peer_metadata.id, endpoint
             );
             return;
         }
 
         let notification = PeerManagerNotification::Disconnected {
-            peer: peer_metadata.id.clone(),
+            peer: PeerTokenPair::new(
+                peer_metadata.id.clone(),
+                #[cfg(feature = "challenge-authorization")]
+                peer_metadata.required_local_auth.clone(),
+            ),
         };
-        info!("Peer {} is currently disconnected", identity);
+        info!("Peer {} is currently disconnected", peer_metadata.id);
         if peer_metadata.endpoints.contains(&endpoint) {
             // allow peer manager to retry connection to that endpoint until the retry max is
             // reached
@@ -1092,7 +1134,10 @@ fn handle_disconnection(
     } else {
         // check for unreferenced peer and remove if it has disconnected
         debug!("Removing disconnected peer: {}", identity);
-        if let Some(unref_peer) = unreferenced_peers.peers.remove(&identity) {
+        let unreferenced_peer = unreferenced_peers.get_by_connection_id(&connection_id);
+
+        if let Some((id, unref_peer)) = unreferenced_peer {
+            unreferenced_peers.peers.remove(&id);
             if let Err(err) =
                 connector.remove_connection(&unref_peer.endpoint, &unref_peer.connection_id)
             {
@@ -1109,6 +1154,7 @@ fn handle_inbound_connection(
     endpoint: String,
     identity: PeerAuthorizationToken,
     connection_id: String,
+    #[cfg(feature = "challenge-authorization")] local_authorization: PeerAuthorizationToken,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
@@ -1120,14 +1166,19 @@ fn handle_inbound_connection(
         identity, endpoint
     );
 
+    let peer_token_pair = PeerTokenPair::new(
+        identity.clone(),
+        #[cfg(feature = "challenge-authorization")]
+        local_authorization.clone(),
+    );
     // If we got an inbound counnection for an existing peer, replace old connection with
     // this new one unless we are already connected.
-    if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
+    if let Some(mut peer_metadata) = peers.get_by_peer_id(&peer_token_pair).cloned() {
         match peer_metadata.status {
             PeerStatus::Disconnected { .. } => {
                 info!(
                     "Adding inbound connection to Disconnected peer: {}",
-                    identity
+                    peer_metadata.id
                 );
             }
             PeerStatus::Pending => {
@@ -1164,7 +1215,7 @@ fn handle_inbound_connection(
         peer_metadata.last_connection_attempt = Instant::now();
 
         let notification = PeerManagerNotification::Connected {
-            peer: peer_metadata.id.clone(),
+            peer: peer_token_pair.clone(),
         };
 
         peer_metadata.active_endpoint = endpoint.to_string();
@@ -1181,14 +1232,15 @@ fn handle_inbound_connection(
             }
         }
     } else {
-        debug!("Adding peer with id: {}", identity);
+        debug!("Adding peer with id: {}", peer_token_pair);
 
         if let Some(old_peer) = unreferenced_peers.peers.insert(
-            identity,
+            peer_token_pair,
             UnreferencedPeer {
                 connection_id,
                 endpoint: endpoint.to_string(),
-                local_authorization: None,
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
             },
         ) {
             if old_peer.endpoint != endpoint {
@@ -1210,14 +1262,20 @@ fn handle_connected(
     endpoint: String,
     identity: PeerAuthorizationToken,
     connection_id: String,
+    #[cfg(feature = "challenge-authorization")] local_authorization: PeerAuthorizationToken,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut SubscriberMap,
-    ref_map: &mut RefMap<PeerAuthorizationToken>,
+    ref_map: &mut RefMap<PeerTokenPair>,
     retry_frequency: u64,
 ) {
-    if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
+    let peer_token_pair = PeerTokenPair::new(
+        identity.clone(),
+        #[cfg(feature = "challenge-authorization")]
+        local_authorization.clone(),
+    );
+    if let Some(mut peer_metadata) = peers.get_by_peer_id(&peer_token_pair).cloned() {
         match peer_metadata.status {
             PeerStatus::Pending => {
                 info!(
@@ -1257,7 +1315,7 @@ fn handle_connected(
 
         // Update peer for new state
         let notification = PeerManagerNotification::Connected {
-            peer: peer_metadata.id.clone(),
+            peer: peer_token_pair.clone(),
         };
 
         let starting_status = peer_metadata.status;
@@ -1284,16 +1342,16 @@ fn handle_connected(
         // notify subscribers we are connected
         subscribers.broadcast(notification);
     } else {
-        debug!("Adding peer {} by endpoint {}", identity, endpoint);
+        debug!("Adding peer {} by endpoint {}", peer_token_pair, endpoint);
 
         // if this endpoint has been requested, add this connection to peers with the provided
         // endpoint
         // allow unused-variables, variable required if challenge-authorization is enabled
         #[allow(unused_variables)]
         if let Some(requested_endpoint) = unreferenced_peers.requested_endpoints.get(&endpoint) {
-            ref_map.add_ref(identity.clone());
+            ref_map.add_ref(peer_token_pair.clone());
             peers.insert(
-                identity.clone(),
+                identity,
                 connection_id,
                 vec![endpoint.to_string()],
                 endpoint,
@@ -1302,18 +1360,21 @@ fn handle_connected(
                 requested_endpoint.local_authorization.clone(),
             );
 
-            let notification = PeerManagerNotification::Connected { peer: identity };
+            let notification = PeerManagerNotification::Connected {
+                peer: peer_token_pair.clone(),
+            };
             subscribers.broadcast(notification);
             return;
         }
 
         // Treat unknown peer as unreferenced
         if let Some(old_peer) = unreferenced_peers.peers.insert(
-            identity,
+            peer_token_pair,
             UnreferencedPeer {
                 connection_id,
                 endpoint: endpoint.to_string(),
-                local_authorization: None,
+                #[cfg(feature = "challenge-authorization")]
+                local_authorization,
             },
         ) {
             if old_peer.endpoint != endpoint {
@@ -1343,7 +1404,11 @@ fn handle_fatal_connection(
 
         // Tell subscribers this peer is disconnected
         let notification = PeerManagerNotification::Disconnected {
-            peer: peer_metadata.id.clone(),
+            peer: PeerTokenPair::new(
+                peer_metadata.id.clone(),
+                #[cfg(feature = "challenge-authorization")]
+                peer_metadata.required_local_auth.clone(),
+            ),
         };
 
         // reset retry settings
@@ -1597,7 +1662,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer")
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         // timeout after 60 seconds
@@ -1608,7 +1677,11 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer"),
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -1676,7 +1749,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer")
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         // timeout after 60 seconds
@@ -1687,7 +1764,11 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer"),
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -1772,7 +1853,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer")
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         // timeout after 60 seconds
@@ -1783,7 +1868,11 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -1848,7 +1937,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer")
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         // timeout after 60 seconds
@@ -1859,7 +1952,11 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer"),
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -1874,7 +1971,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer"),
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         peer_manager.signal_shutdown();
@@ -1949,7 +2050,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref_1.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer"),
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         // timeout after 60 seconds
@@ -1960,7 +2065,11 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer"),
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -1975,7 +2084,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref_2.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("next_peer")
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("next_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         let notification = notification_rx
@@ -1984,7 +2097,11 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("next_peer")
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("next_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -2072,7 +2189,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref_1.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer")
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         // timeout after 60 seconds
@@ -2083,7 +2204,11 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -2098,7 +2223,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref_2.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("next_peer")
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("next_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         let notification = notification_rx
@@ -2107,7 +2236,11 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("next_peer")
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("next_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -2116,11 +2249,19 @@ pub mod tests {
             .expect("Unable to get peer list");
 
         assert!(peers
-            .get_by_key(&PeerAuthorizationToken::from_peer_id("next_peer"))
+            .get_by_key(&PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("next_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            ))
             .is_some());
 
         assert!(peers
-            .get_by_key(&PeerAuthorizationToken::from_peer_id("test_peer"))
+            .get_by_key(&PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            ))
             .is_some());
 
         peer_manager.signal_shutdown();
@@ -2190,7 +2331,11 @@ pub mod tests {
 
             assert_eq!(
                 peer_ref.peer_id(),
-                &PeerAuthorizationToken::from_peer_id("test_peer")
+                &PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("test_peer"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("my_id"),
+                )
             );
 
             // timeout after 60 seconds
@@ -2201,7 +2346,11 @@ pub mod tests {
             assert!(
                 notification
                     == PeerManagerNotification::Connected {
-                        peer: PeerAuthorizationToken::from_peer_id("test_peer")
+                        peer: PeerTokenPair::new(
+                            PeerAuthorizationToken::from_peer_id("test_peer"),
+                            #[cfg(feature = "challenge-authorization")]
+                            PeerAuthorizationToken::from_peer_id("my_id"),
+                        )
                     }
             );
 
@@ -2299,7 +2448,11 @@ pub mod tests {
             assert!(
                 notification
                     == PeerManagerNotification::Connected {
-                        peer: PeerAuthorizationToken::from_peer_id("test_peer")
+                        peer: PeerTokenPair::new(
+                            PeerAuthorizationToken::from_peer_id("test_peer"),
+                            #[cfg(feature = "challenge-authorization")]
+                            PeerAuthorizationToken::from_peer_id("my_id"),
+                        )
                     }
             );
 
@@ -2314,7 +2467,11 @@ pub mod tests {
 
             assert_eq!(
                 peer_ref.peer_id(),
-                &PeerAuthorizationToken::from_peer_id("test_peer")
+                &PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("test_peer"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("my_id"),
+                )
             );
 
             let peer_list = peer_connector
@@ -2458,7 +2615,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer")
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         // timeout after 60 seconds
@@ -2469,7 +2630,11 @@ pub mod tests {
         assert!(
             notification
                 == PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -2480,7 +2645,11 @@ pub mod tests {
         assert!(
             disconnected_notification
                 == PeerManagerNotification::Disconnected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -2492,7 +2661,11 @@ pub mod tests {
         assert!(
             connected_notification
                 == PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 }
         );
 
@@ -2595,7 +2768,11 @@ pub mod tests {
         assert!(peer_connector.list_peers().unwrap().is_empty());
 
         assert_eq!(
-            vec![PeerAuthorizationToken::from_peer_id("test_peer")],
+            vec![PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )],
             peer_connector.list_unreferenced_peers().unwrap()
         );
 
@@ -2610,7 +2787,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer")
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         let peer_list = peer_connector
@@ -2716,7 +2897,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer")
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         // timeout after 60 seconds
@@ -2727,7 +2912,11 @@ pub mod tests {
         assert!(
             notification
                 == TestEnum::Notification(PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::from_peer_id("test_peer")
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
                 })
         );
 

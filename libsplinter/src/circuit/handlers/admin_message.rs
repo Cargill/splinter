@@ -19,7 +19,7 @@ use crate::circuit::routing::RoutingTableReader;
 #[cfg(feature = "challenge-authorization")]
 use crate::hex::parse_hex;
 use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
-use crate::peer::PeerAuthorizationToken;
+use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
 use crate::protos::circuit::{
     AdminDirectMessage, CircuitError, CircuitError_Error, CircuitMessageType,
 };
@@ -189,18 +189,54 @@ impl AdminDirectMessageHandler {
                     ));
                 }
 
+                let second_public_key = iter
+                    .next()
+                    .ok_or_else(|| {
+                        DispatchError::HandleError("Missing local public key for recipient".into())
+                    })?
+                    .to_string();
+
+                if second_public_key != ADMIN_SERVICE_PUBLIC_KEY_PREFIX {
+                    return Err(DispatchError::HandleError(
+                        "Local authorization not provided".into(),
+                    ));
+                }
+
+                let local_public_key = iter
+                    .next()
+                    .ok_or_else(|| {
+                        DispatchError::HandleError("Missing local public key for recipient".into())
+                    })?
+                    .to_string();
+
+                if local_public_key.is_empty() {
+                    return Err(DispatchError::HandleError(
+                        "Empty public key provided".into(),
+                    ));
+                }
+
                 if self.public_keys.contains(&public_key) {
                     // The internal admin service is at the node and connected using trust
                     let mut msg = msg.clone();
                     let recipient = admin_service_id(&self.node_id);
                     msg.set_recipient(recipient.clone());
                     msg_bytes = msg.write_to_bytes().map_err(DispatchError::from)?;
-                    PeerAuthorizationToken::from_peer_id(&recipient).into()
+                    PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id(&recipient),
+                        PeerAuthorizationToken::from_peer_id(&self.node_id),
+                    )
+                    .into()
                 } else {
                     // The admin service is on another node and connected via challenge
-                    PeerAuthorizationToken::from_public_key(
-                        &parse_hex(&public_key)
-                            .map_err(|err| DispatchError::HandleError(err.to_string()))?,
+                    PeerTokenPair::new(
+                        PeerAuthorizationToken::from_public_key(
+                            &parse_hex(&public_key)
+                                .map_err(|err| DispatchError::HandleError(err.to_string()))?,
+                        ),
+                        PeerAuthorizationToken::from_public_key(
+                            &parse_hex(&local_public_key)
+                                .map_err(|err| DispatchError::HandleError(err.to_string()))?,
+                        ),
                     )
                     .into()
                 }
@@ -208,10 +244,18 @@ impl AdminDirectMessageHandler {
                 // If the service is on this node send message to the service, otherwise
                 // send the message to the node the service is connected to
                 if node_id != self.node_id {
-                    PeerAuthorizationToken::from_peer_id(node_id).into()
+                    PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id(node_id),
+                        PeerAuthorizationToken::from_peer_id(&self.node_id),
+                    )
+                    .into()
                 } else {
                     // The internal admin service is at the node id with an identical name
-                    PeerAuthorizationToken::from_peer_id(recipient).into()
+                    PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id(recipient),
+                        PeerAuthorizationToken::from_peer_id(&self.node_id),
+                    )
+                    .into()
                 }
             };
 
@@ -219,10 +263,10 @@ impl AdminDirectMessageHandler {
             // send the message to the node the service is connected to
             #[cfg(not(feature = "challenge-authorization"))]
             let target_node = if node_id != self.node_id {
-                PeerAuthorizationToken::from_peer_id(node_id).into()
+                PeerTokenPair::new(PeerAuthorizationToken::from_peer_id(node_id)).into()
             } else {
                 // The internal admin service is at the node id with an identical name
-                PeerAuthorizationToken::from_peer_id(recipient).into()
+                PeerTokenPair::new(PeerAuthorizationToken::from_peer_id(recipient)).into()
             };
 
             let network_msg_bytes =
@@ -359,7 +403,12 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                PeerAuthorizationToken::from_peer_id("5678").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("5678"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("1234"),
+                )
+                .into(),
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
@@ -369,7 +418,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("5678").into(),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("5678"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("1234"),
+            ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |error_msg: CircuitError| {
                 assert_eq!(error_msg.get_service_id(), "abc");
@@ -456,7 +509,12 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                PeerAuthorizationToken::from_peer_id("5678").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("5678"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("1234"),
+                )
+                .into(),
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
@@ -466,7 +524,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("5678").into(),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("5678"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("1234"),
+            ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |error_msg: CircuitError| {
                 assert_eq!(error_msg.get_service_id(), "admin::5678");
@@ -553,7 +615,12 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                PeerAuthorizationToken::from_peer_id("1234").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("1234"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("5678"),
+                )
+                .into(),
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
@@ -562,7 +629,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("5678").into(),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("5678"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("1234"),
+            ),
             CircuitMessageType::ADMIN_DIRECT_MESSAGE,
             |msg: AdminDirectMessage| {
                 assert_eq!(msg.get_circuit(), "alpha");
@@ -604,7 +675,12 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                PeerAuthorizationToken::from_peer_id("1234").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("1234"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("5678"),
+                )
+                .into(),
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
@@ -614,7 +690,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("5678").into(),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("5678"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("1234"),
+            ),
             CircuitMessageType::ADMIN_DIRECT_MESSAGE,
             |msg: AdminDirectMessage| {
                 assert_eq!(msg.get_circuit(), "admin");
@@ -649,7 +729,7 @@ mod tests {
         let mut direct_message = AdminDirectMessage::new();
         direct_message.set_circuit("admin".into());
         direct_message.set_sender("admin::1234".into());
-        direct_message.set_recipient("admin::public_key::5678".into());
+        direct_message.set_recipient("admin::public_key::5678::public_key::1234".into());
         direct_message.set_payload(b"test".to_vec());
         direct_message.set_correlation_id("random_corr_id".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
@@ -657,7 +737,16 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                PeerAuthorizationToken::from_peer_id("1234").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_public_key(
+                        &parse_hex("5678").expect("Unable to parse hex"),
+                    ),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_public_key(
+                        &parse_hex("1234").expect("Unable to parse hex"),
+                    ),
+                )
+                .into(),
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
@@ -667,15 +756,23 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_public_key(
-                &parse_hex("5678").expect("Unable to parse hex"),
-            )
-            .into(),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_public_key(
+                    &parse_hex("5678").expect("Unable to parse hex"),
+                ),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_public_key(
+                    &parse_hex("1234").expect("Unable to parse hex"),
+                ),
+            ),
             CircuitMessageType::ADMIN_DIRECT_MESSAGE,
             |msg: AdminDirectMessage| {
                 assert_eq!(msg.get_circuit(), "admin");
                 assert_eq!(msg.get_sender(), "admin::1234");
-                assert_eq!(msg.get_recipient(), "admin::public_key::5678");
+                assert_eq!(
+                    msg.get_recipient(),
+                    "admin::public_key::5678::public_key::1234"
+                );
                 assert_eq!(msg.get_payload(), b"test");
                 assert_eq!(msg.get_correlation_id(), "random_corr_id");
             },
@@ -712,7 +809,12 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                PeerAuthorizationToken::from_peer_id("1234").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("1234"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("5678"),
+                )
+                .into(),
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
@@ -721,7 +823,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("admin::1234").into(),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("admin::1234"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("1234"),
+            ),
             CircuitMessageType::ADMIN_DIRECT_MESSAGE,
             |msg: AdminDirectMessage| {
                 assert_eq!(msg.get_circuit(), "admin");
@@ -735,8 +841,8 @@ mod tests {
 
     fn assert_network_message<M: protobuf::Message, F: Fn(M)>(
         message: Vec<u8>,
-        recipient: PeerAuthorizationToken,
-        expected_recipient: PeerAuthorizationToken,
+        recipient: PeerTokenPair,
+        expected_recipient: PeerTokenPair,
         expected_circuit_msg_type: CircuitMessageType,
         detail_assertions: F,
     ) {

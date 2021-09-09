@@ -15,6 +15,7 @@
 use crate::circuit::handlers::create_message;
 use crate::circuit::routing::{RoutingTableReader, ServiceId};
 use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
+use crate::peer::PeerTokenPair;
 use crate::protos::circuit::{
     CircuitDirectMessage, CircuitError, CircuitError_Error, CircuitMessageType,
 };
@@ -113,19 +114,41 @@ impl Handler for CircuitDirectMessageHandler {
                         // If the service is on this node send message to the service, otherwise
                         // send the message to the node the service is connected to
                         if node_id != self.node_id {
-                            let node_peer_id: PeerId = self
-                                .routing_table
-                                .get_node(&node_id)
-                                .map_err(|err| DispatchError::HandleError(err.to_string()))?
-                                .ok_or_else(|| {
-                                    DispatchError::HandleError(format!(
-                                        "Node {} not in routing table",
-                                        node_id
-                                    ))
-                                })?
-                                .get_peer_auth_token(circuit.authorization_type())
-                                .map_err(|err| DispatchError::HandleError(err.to_string()))?
-                                .into();
+                            let node_peer_id: PeerId = {
+                                let peer_id = self
+                                    .routing_table
+                                    .get_node(&node_id)
+                                    .map_err(|err| DispatchError::HandleError(err.to_string()))?
+                                    .ok_or_else(|| {
+                                        DispatchError::HandleError(format!(
+                                            "Node {} not in routing table",
+                                            node_id
+                                        ))
+                                    })?
+                                    .get_peer_auth_token(circuit.authorization_type())
+                                    .map_err(|err| DispatchError::HandleError(err.to_string()))?;
+
+                                #[cfg(feature = "challenge-authorization")]
+                                let local_peer_id = self
+                                    .routing_table
+                                    .get_node(&self.node_id)
+                                    .map_err(|err| DispatchError::HandleError(err.to_string()))?
+                                    .ok_or_else(|| {
+                                        DispatchError::HandleError(format!(
+                                            "Local Node {} not in routing table",
+                                            node_id
+                                        ))
+                                    })?
+                                    .get_peer_auth_token(circuit.authorization_type())
+                                    .map_err(|err| DispatchError::HandleError(err.to_string()))?;
+
+                                PeerTokenPair::new(
+                                    peer_id,
+                                    #[cfg(feature = "challenge-authorization")]
+                                    local_peer_id,
+                                )
+                            }
+                            .into();
 
                             (network_msg_bytes, node_peer_id)
                         } else {
@@ -268,8 +291,16 @@ mod tests {
             vec![],
         );
 
-        service_abc.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
-        service_def.set_peer_id(PeerAuthorizationToken::from_peer_id("def_network"));
+        service_abc.set_peer_id(PeerTokenPair::new(
+            PeerAuthorizationToken::from_peer_id("abc_network"),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from_peer_id("123"),
+        ));
+        service_def.set_peer_id(PeerTokenPair::new(
+            PeerAuthorizationToken::from_peer_id("def_network"),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from_peer_id("345"),
+        ));
 
         // Add circuit and service to splinter state
         let circuit = Circuit::new(
@@ -304,7 +335,12 @@ mod tests {
         // dispatch the direct message
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("def").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("def"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("345"),
+                )
+                .into(),
                 &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                 direct_bytes.clone(),
             )
@@ -314,7 +350,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("abc_network"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("abc_network"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            ),
             CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
             |msg: CircuitDirectMessage| {
                 assert_eq!(msg.get_sender(), "def");
@@ -364,8 +404,16 @@ mod tests {
             vec![],
         );
 
-        service_abc.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
-        service_def.set_peer_id(PeerAuthorizationToken::from_peer_id("def_network"));
+        service_abc.set_peer_id(PeerTokenPair::new(
+            PeerAuthorizationToken::from_peer_id("abc_network"),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from_peer_id("123"),
+        ));
+        service_def.set_peer_id(PeerTokenPair::new(
+            PeerAuthorizationToken::from_peer_id("def_network"),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from_peer_id("345"),
+        ));
 
         // Add circuit and service to splinter state
         let circuit = Circuit::new(
@@ -401,7 +449,12 @@ mod tests {
         // dispatch the message
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("def").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("def"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("345"),
+                )
+                .into(),
                 &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                 direct_bytes.clone(),
             )
@@ -411,7 +464,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("123"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("123"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("345"),
+            ),
             CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
             |msg: CircuitDirectMessage| {
                 assert_eq!(msg.get_sender(), "def");
@@ -454,7 +511,11 @@ mod tests {
             vec![],
         );
 
-        service_abc.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
+        service_abc.set_peer_id(PeerTokenPair::new(
+            PeerAuthorizationToken::from_peer_id("abc_network"),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from_peer_id("123"),
+        ));
 
         // Add circuit and service to splinter state
         let circuit = Circuit::new(
@@ -490,7 +551,12 @@ mod tests {
         // dispatcher message
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("def").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("def"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("345"),
+                )
+                .into(),
                 &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                 direct_bytes.clone(),
             )
@@ -500,7 +566,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("def"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("def"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("345"),
+            ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
                 assert_eq!(msg.get_service_id(), "def");
@@ -544,7 +614,11 @@ mod tests {
             vec![],
         );
 
-        service_def.set_peer_id(PeerAuthorizationToken::from_peer_id("def_network"));
+        service_def.set_peer_id(PeerTokenPair::new(
+            PeerAuthorizationToken::from_peer_id("def_network"),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::from_peer_id("345"),
+        ));
 
         // Add circuit and service to splinter state
         let circuit = Circuit::new(
@@ -579,7 +653,12 @@ mod tests {
         // dispatch message
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("def").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("def"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("345"),
+                )
+                .into(),
                 &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                 direct_bytes.clone(),
             )
@@ -589,7 +668,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("def"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("def"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("345"),
+            ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
                 assert_eq!(msg.get_service_id(), "def");
@@ -628,7 +711,12 @@ mod tests {
         // dispatch message
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("def").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("def"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("345"),
+                )
+                .into(),
                 &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                 direct_bytes.clone(),
             )
@@ -638,7 +726,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("def"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("def"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("345"),
+            ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
                 assert_eq!(msg.get_service_id(), "def");
@@ -653,8 +745,8 @@ mod tests {
 
     fn assert_network_message<M: protobuf::Message, F: Fn(M)>(
         message: Vec<u8>,
-        recipient: PeerAuthorizationToken,
-        expected_recipient: PeerAuthorizationToken,
+        recipient: PeerTokenPair,
+        expected_recipient: PeerTokenPair,
         expected_circuit_msg_type: CircuitMessageType,
         detail_assertions: F,
     ) {

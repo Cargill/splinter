@@ -15,7 +15,7 @@
 use crate::circuit::handlers::create_message;
 use crate::circuit::routing::{RoutingTableReader, RoutingTableWriter, Service, ServiceId};
 use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
-use crate::peer::PeerAuthorizationToken;
+use crate::peer::PeerTokenPair;
 use crate::protos::circuit::{
     CircuitMessageType, ServiceConnectRequest, ServiceConnectResponse,
     ServiceConnectResponse_Status, ServiceDisconnectRequest, ServiceDisconnectResponse,
@@ -105,9 +105,7 @@ impl Handler for ServiceConnectRequestHandler {
                     response.set_status(ServiceConnectResponse_Status::ERROR_NOT_AN_ALLOWED_NODE);
                     response.set_error_message(format!("{} is not allowed on this node", unique_id))
                 } else {
-                    service.set_peer_id(PeerAuthorizationToken::from(
-                        context.source_peer_id().clone(),
-                    ));
+                    service.set_peer_id(PeerTokenPair::from(context.source_peer_id().clone()));
                     let mut writer = self.routing_table_writer.clone();
                     writer
                         .add_service(unique_id, service)
@@ -320,7 +318,12 @@ mod tests {
 
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("abc").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("abc"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("123"),
+                )
+                .into(),
                 &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                 connect_bytes.clone(),
             )
@@ -330,7 +333,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("abc"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("abc"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            ),
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -370,7 +377,12 @@ mod tests {
 
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("BAD").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("BAD"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("123"),
+                )
+                .into(),
                 &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                 connect_bytes.clone(),
             )
@@ -380,7 +392,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("BAD"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("BAD"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            ),
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "BAD");
@@ -419,7 +435,12 @@ mod tests {
 
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("abc").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("abc"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("123"),
+                )
+                .into(),
                 &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                 connect_bytes.clone(),
             )
@@ -432,7 +453,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("abc"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("abc"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            ),
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -464,7 +489,14 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .unwrap();
-        service.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
+        service.set_peer_id(
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("abc_network"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            )
+            .into(),
+        );
         writer
             .add_service(id, service)
             .expect("Unable to add circuit");
@@ -479,7 +511,12 @@ mod tests {
 
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("abc").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("abc"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("123"),
+                )
+                .into(),
                 &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                 connect_bytes.clone(),
             )
@@ -489,7 +526,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("abc"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("abc"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            ),
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -523,7 +564,12 @@ mod tests {
 
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("abc").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("abc"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("123"),
+                )
+                .into(),
                 &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                 disconnect_bytes.clone(),
             )
@@ -533,7 +579,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("abc"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("abc"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            ),
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -574,7 +624,12 @@ mod tests {
 
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("BAD").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("BAD"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("123"),
+                )
+                .into(),
                 &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                 disconnect_bytes.clone(),
             )
@@ -584,7 +639,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("BAD"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("BAD"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            ),
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "BAD");
@@ -619,7 +678,14 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .unwrap();
-        service.set_peer_id(PeerAuthorizationToken::from_peer_id("abc_network"));
+        service.set_peer_id(
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("abc_network"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            )
+            .into(),
+        );
         writer
             .add_service(id, service)
             .expect("Unable to add circuit");
@@ -634,7 +700,12 @@ mod tests {
 
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("abc").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("abc"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("123"),
+                )
+                .into(),
                 &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                 disconnect_bytes.clone(),
             )
@@ -644,7 +715,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("abc"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("abc"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            ),
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -681,7 +756,12 @@ mod tests {
 
         dispatcher
             .dispatch(
-                PeerAuthorizationToken::from_peer_id("abc").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("abc"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("123"),
+                )
+                .into(),
                 &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                 disconnect_bytes.clone(),
             )
@@ -691,7 +771,11 @@ mod tests {
         assert_network_message(
             message,
             id.into(),
-            PeerAuthorizationToken::from_peer_id("abc"),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("abc"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("123"),
+            ),
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -745,8 +829,8 @@ mod tests {
 
     fn assert_network_message<M: protobuf::Message, F: Fn(M)>(
         message: Vec<u8>,
-        recipient: PeerAuthorizationToken,
-        expected_recipient: PeerAuthorizationToken,
+        recipient: PeerTokenPair,
+        expected_recipient: PeerTokenPair,
         expected_circuit_msg_type: CircuitMessageType,
         detail_assertions: F,
     ) {

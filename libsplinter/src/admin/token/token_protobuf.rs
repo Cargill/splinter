@@ -13,28 +13,42 @@
 // limitations under the License.
 
 use crate::error::InvalidStateError;
-use crate::peer::PeerAuthorizationToken;
+use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
 use crate::protos::admin::{Circuit, Circuit_AuthorizationType};
 
 use super::{admin_service_id, PeerAuthorizationTokenReader, PeerNode};
 
 impl PeerAuthorizationTokenReader for Circuit {
-    fn list_tokens(&self) -> Result<Vec<PeerAuthorizationToken>, InvalidStateError> {
+    fn list_tokens(
+        &self,
+        #[cfg(feature = "challenge-authorization")] local_node: &str,
+    ) -> Result<Vec<PeerTokenPair>, InvalidStateError> {
+        #[cfg(feature = "challenge-authorization")]
+        let local_required_auth = self.get_node_token(local_node)?.ok_or_else(|| {
+            InvalidStateError::with_message(format!(
+                "Requested local node {} does not exist in the circuit",
+                local_node,
+            ))
+        })?;
+
         self.get_members()
             .iter()
             .map(|member| match self.get_authorization_type() {
-                Circuit_AuthorizationType::TRUST_AUTHORIZATION => {
-                    Ok(PeerAuthorizationToken::from_peer_id(member.get_node_id()))
-                }
+                Circuit_AuthorizationType::TRUST_AUTHORIZATION => Ok(PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id(member.get_node_id()),
+                    #[cfg(feature = "challenge-authorization")]
+                    local_required_auth.clone(),
+                )),
                 #[cfg(feature = "challenge-authorization")]
                 Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION => {
                     if !member.get_public_key().is_empty() {
-                        Ok(PeerAuthorizationToken::from_public_key(
-                            member.get_public_key(),
+                        Ok(PeerTokenPair::new(
+                            PeerAuthorizationToken::from_public_key(member.get_public_key()),
+                            local_required_auth.clone(),
                         ))
                     } else {
                         Err(InvalidStateError::with_message(format!(
-                            "No public key set when circuit requries challenge \
+                            "No public key set when circuit requires challenge \
                              authorization: {}",
                             self.get_circuit_id()
                         )))
@@ -45,7 +59,7 @@ impl PeerAuthorizationTokenReader for Circuit {
                     self.get_circuit_id()
                 ))),
             })
-            .collect::<Result<Vec<PeerAuthorizationToken>, InvalidStateError>>()
+            .collect::<Result<Vec<PeerTokenPair>, InvalidStateError>>()
     }
 
     fn list_nodes(&self) -> Result<Vec<PeerNode>, InvalidStateError> {
@@ -69,7 +83,7 @@ impl PeerAuthorizationTokenReader for Circuit {
                         })
                     } else {
                         Err(InvalidStateError::with_message(format!(
-                            "No public key set when circuit requries challenge \
+                            "No public key set when circuit requires challenge \
                                  authorization: {}",
                             self.get_circuit_id()
                         )))
@@ -104,7 +118,7 @@ impl PeerAuthorizationTokenReader for Circuit {
                         )))
                     } else {
                         Err(InvalidStateError::with_message(
-                            "Public key not set when requied by a circuit".to_string(),
+                            "Public key not set when required by a circuit".to_string(),
                         ))
                     }
                 }
