@@ -176,7 +176,6 @@ pub fn test_2_party_circuit_creation_challenge_authorization_unidentified_peer()
 /// 9. Repeat steps 1-8 for a different circuit that sets the member public key for the first node
 ///    to the second configured key.
 #[test]
-#[ignore]
 pub fn test_2_party_circuit_creation_challenge_authorization_different_key() {
     // Start a 2-node network
     let mut network = Network::new()
