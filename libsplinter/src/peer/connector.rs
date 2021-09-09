@@ -389,11 +389,17 @@ impl PeerRemover {
     ///
     /// # Arguments
     /// * `endpoint` - the endpoint of the `EndpointPeerRef` that has been dropped
-    pub fn remove_peer_ref_by_endpoint(&self, endpoint: &str) -> Result<(), PeerRefRemoveError> {
+    /// * `connection_id` - the connection id used for the endpoint
+    pub fn remove_peer_ref_by_endpoint(
+        &self,
+        endpoint: &str,
+        connection_id: &str,
+    ) -> Result<(), PeerRefRemoveError> {
         let (sender, recv) = channel();
 
         let message = PeerManagerMessage::Request(PeerManagerRequest::RemovePeerByEndpoint {
             endpoint: endpoint.to_string(),
+            connection_id: connection_id.to_string(),
             sender,
         });
 

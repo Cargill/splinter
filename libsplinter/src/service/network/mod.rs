@@ -574,7 +574,9 @@ impl ServiceConnectionAgent {
                     );
                 }
             }
-            ConnectionManagerNotification::FatalConnectionError { endpoint, error } => {
+            ConnectionManagerNotification::FatalConnectionError {
+                endpoint, error, ..
+            } => {
                 if let Some(info) = self.services.remove_connection_by_endoint(&endpoint) {
                     error!(
                         "Service processor {} connection failed: {}; removing",

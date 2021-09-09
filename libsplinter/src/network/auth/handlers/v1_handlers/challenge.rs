@@ -174,8 +174,6 @@ impl Handler for AuthChallengeNonceResponseHandler {
 
         let nonce_request = AuthChallengeNonceResponse::from_proto(msg)?;
 
-        let mut public_keys = vec![];
-
         let submit_requests = self
             .signers
             .iter()
@@ -199,8 +197,6 @@ impl Handler for AuthChallengeNonceResponseHandler {
                         ))
                     })?
                     .into_bytes();
-
-                public_keys.push(public_key.clone());
 
                 Ok(SubmitRequest {
                     public_key,

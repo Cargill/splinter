@@ -240,9 +240,13 @@ fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             authorizer,
             subscribers,
         ),
-        CmRequest::RemoveConnection { endpoint, sender } => {
+        CmRequest::RemoveConnection {
+            endpoint,
+            connection_id,
+            sender,
+        } => {
             let response = state
-                .remove_connection(&endpoint)
+                .remove_connection(&endpoint, &connection_id)
                 .map(|meta_opt| meta_opt.map(|meta| meta.endpoint().to_owned()));
 
             if sender.send(response).is_err() {
@@ -254,7 +258,7 @@ fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
                 .send(Ok(state
                     .connection_metadata()
                     .iter()
-                    .map(|(key, _)| key.to_string())
+                    .map(|(_, metadata)| metadata.endpoint().to_string())
                     .collect()))
                 .is_err()
             {
@@ -322,7 +326,7 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
 
     let matrix_sender = state.matrix_sender();
     let mut reconnections = vec![];
-    for (endpoint, metadata) in state.connection_metadata_mut().iter_mut() {
+    for (connection_id, metadata) in state.connection_metadata_mut().iter_mut() {
         match metadata.extended_metadata {
             ConnectionMetadataExt::Outbound {
                 reconnecting,
@@ -333,42 +337,53 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
                 // if connection is already attempting reconnection, call reconnect
                 if reconnecting {
                     if last_connection_attempt.elapsed().as_secs() > retry_frequency {
-                        reconnections.push(endpoint.to_string());
+                        reconnections.push(metadata.clone());
                     }
                 } else {
-                    trace!("Sending heartbeat to {}", endpoint);
-                    if let Err(err) = matrix_sender
-                        .send(metadata.connection_id.clone(), heartbeat_message.clone())
+                    trace!(
+                        "Sending heartbeat to {} ({})",
+                        metadata.endpoint(),
+                        metadata.connection_id(),
+                    );
+                    if let Err(err) =
+                        matrix_sender.send(connection_id.clone(), heartbeat_message.clone())
                     {
                         debug!(
-                            "Outbound: failed to send heartbeat to {}: {:?} attempting reconnection",
-                            endpoint, err
+                            "Outbound: failed to send heartbeat to {} ({}): \
+                                {:?} attempting reconnection",
+                            metadata.endpoint(),
+                            metadata.connection_id(),
+                            err
                         );
 
                         subscribers.broadcast(ConnectionManagerNotification::Disconnected {
-                            endpoint: endpoint.clone(),
+                            endpoint: metadata.endpoint.clone(),
                             identity: metadata.identity.clone(),
                         });
-                        reconnections.push(endpoint.to_string());
+                        reconnections.push(metadata.clone());
                     }
                 }
             }
             ConnectionMetadataExt::Inbound {
                 ref mut disconnected,
             } => {
-                trace!("Sending heartbeat to {}", endpoint);
+                trace!(
+                    "Sending heartbeat to {} ({})",
+                    metadata.endpoint,
+                    metadata.connection_id,
+                );
                 if let Err(err) =
-                    matrix_sender.send(metadata.connection_id.clone(), heartbeat_message.clone())
+                    matrix_sender.send(connection_id.clone(), heartbeat_message.clone())
                 {
                     debug!(
-                        "Inbound: failed to send heartbeat to {}: {:?} ",
-                        endpoint, err,
+                        "Inbound: failed to send heartbeat to {} ({}): {:?} ",
+                        metadata.endpoint, metadata.connection_id, err,
                     );
 
                     if !*disconnected {
                         *disconnected = true;
                         subscribers.broadcast(ConnectionManagerNotification::Disconnected {
-                            endpoint: endpoint.clone(),
+                            endpoint: metadata.endpoint.clone(),
                             identity: metadata.identity.clone(),
                         });
                     }
@@ -379,14 +394,20 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
         }
     }
 
-    for endpoint in reconnections {
+    for metadata in reconnections {
         if let Err(err) = state.reconnect(
-            &endpoint,
+            metadata.endpoint(),
+            metadata.connection_id(),
             subscribers,
             &*authorizer,
             internal_sender.clone(),
         ) {
-            error!("Reconnection attempt to {} failed: {:?}", endpoint, err);
+            error!(
+                "Reconnection attempt to {} ({}): failed: {:?}",
+                metadata.endpoint(),
+                metadata.connection_id(),
+                err
+            );
         }
     }
 }
