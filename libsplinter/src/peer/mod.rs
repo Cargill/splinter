@@ -735,7 +735,6 @@ fn add_unidentified(
     if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
         // if there is peer in the peer_map, there is reference in the ref map
         ref_map.add_ref(peer_metadata.id.to_string());
-        Ok(EndpointPeerRef::new(endpoint, peer_remover.clone()))
     } else {
         let connection_id = format!("{}", Uuid::new_v4());
         match connector.request_connection(&endpoint, &connection_id) {
@@ -747,8 +746,8 @@ fn add_unidentified(
         unreferenced_peers
             .requested_endpoints
             .push(endpoint.to_string());
-        Ok(EndpointPeerRef::new(endpoint, peer_remover.clone()))
     }
+    Ok(EndpointPeerRef::new(endpoint, peer_remover.clone()))
 }
 
 fn remove_peer(
