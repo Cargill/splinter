@@ -270,7 +270,7 @@ fn execute(exec_matches: &clap::ArgMatches) -> Result<(String, u64), CliError> {
         .with_outputs(outputs)
         .with_payload(contract_payload)
         .into_payload_builder()?
-        .into_transaction_builder(&*signer)?
+        .into_transaction_builder()?
         .into_batch_builder(&*signer)?
         .build(&*signer)?;
 
@@ -311,7 +311,7 @@ fn namespace_registry(ns_matches: &clap::ArgMatches) -> Result<(String, u64), Cl
             .with_namespace(namespace.into())
             .with_owners(owners)
             .into_payload_builder()?
-            .into_transaction_builder(&*signer)?
+            .into_transaction_builder()?
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
@@ -326,7 +326,7 @@ fn namespace_registry(ns_matches: &clap::ArgMatches) -> Result<(String, u64), Cl
         let batch = DeleteNamespaceRegistryActionBuilder::new()
             .with_namespace(namespace.into())
             .into_payload_builder()?
-            .into_transaction_builder(&*signer)?
+            .into_transaction_builder()?
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
@@ -340,7 +340,7 @@ fn namespace_registry(ns_matches: &clap::ArgMatches) -> Result<(String, u64), Cl
             .with_namespace(namespace.into())
             .with_owners(owners)
             .into_payload_builder()?
-            .into_transaction_builder(&*signer)?
+            .into_transaction_builder()?
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
@@ -372,7 +372,7 @@ fn namespace_permission(perm_matches: &clap::ArgMatches) -> Result<(String, u64)
         let batch = DeleteNamespaceRegistryPermissionActionBuilder::new()
             .with_namespace(namespace.into())
             .into_payload_builder()?
-            .into_transaction_builder(&*signer)?
+            .into_transaction_builder()?
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
@@ -391,7 +391,7 @@ fn namespace_permission(perm_matches: &clap::ArgMatches) -> Result<(String, u64)
             .with_read(read)
             .with_write(write)
             .into_payload_builder()?
-            .into_transaction_builder(&*signer)?
+            .into_transaction_builder()?
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
@@ -427,7 +427,7 @@ fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), Cli
             .with_name(name.into())
             .with_owners(owners)
             .into_payload_builder()?
-            .into_transaction_builder(&*signer)?
+            .into_transaction_builder()?
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
@@ -442,7 +442,7 @@ fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), Cli
         let batch = DeleteContractRegistryActionBuilder::new()
             .with_name(name.into())
             .into_payload_builder()?
-            .into_transaction_builder(&*signer)?
+            .into_transaction_builder()?
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
@@ -456,7 +456,7 @@ fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), Cli
             .with_name(name.into())
             .with_owners(owners)
             .into_payload_builder()?
-            .into_transaction_builder(&*signer)?
+            .into_transaction_builder()?
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 

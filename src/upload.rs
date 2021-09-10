@@ -59,7 +59,7 @@ pub fn do_upload(
         .with_outputs(definition.outputs)
         .with_contract(contract)
         .into_payload_builder()?
-        .into_transaction_builder(&*signer)?
+        .into_transaction_builder()?
         .into_batch_builder(&*signer)?
         .build(&*signer)?;
 
