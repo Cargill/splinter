@@ -18,6 +18,7 @@
 //!
 //! Available if the `metrics` feature is enabled
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
@@ -31,42 +32,42 @@ use tokio_0_2::task::JoinHandle;
 use crate::error::InternalError;
 use crate::threading::lifecycle::ShutdownHandle;
 
-#[derive(InfluxDbWriteable, Clone)]
-struct Counter {
+#[derive(InfluxDbWriteable)]
+struct Counter<'a> {
     time: DateTime<Utc>,
-    key: String,
+    key: &'a str,
     value: u64,
 }
 
-#[derive(InfluxDbWriteable, Clone)]
-struct Gauge {
+#[derive(InfluxDbWriteable)]
+struct Gauge<'a> {
     time: DateTime<Utc>,
-    key: String,
+    key: &'a str,
     value: i64,
 }
 
-#[derive(InfluxDbWriteable, Clone)]
-struct Histogram {
+#[derive(InfluxDbWriteable)]
+struct Histogram<'a> {
     time: DateTime<Utc>,
-    key: String,
+    key: &'a str,
     value: u64,
 }
 
 enum MetricRequest {
     Counter {
-        key: String,
+        key: Cow<'static, str>,
         value: u64,
         labels: Vec<Label>,
         time: DateTime<Utc>,
     },
     Gauge {
-        key: String,
+        key: Cow<'static, str>,
         value: i64,
         labels: Vec<Label>,
         time: DateTime<Utc>,
     },
     Histogram {
-        key: String,
+        key: Cow<'static, str>,
         value: u64,
         labels: Vec<Label>,
         time: DateTime<Utc>,
@@ -96,7 +97,7 @@ impl InfluxRecorder {
         let client = Client::new(db_url, db_name).with_auth(username, password);
 
         let join_handle = rt.spawn(async move {
-            let mut counters: HashMap<String, Counter> = HashMap::new();
+            let mut counters = HashMap::new();
             loop {
                 match recv.recv().await {
                     Some(MetricRequest::Counter {
@@ -106,22 +107,29 @@ impl InfluxRecorder {
                         time,
                     }) => {
                         let counter = {
-                            if let Some(mut counter) = counters.get_mut(&key) {
-                                counter.value += value;
-                                counter.time = time;
-                                counter.clone()
+                            if let Some((mut counter, mut count_time)) = counters.get_mut(&*key) {
+                                counter += value;
+                                count_time = time;
+                                Counter {
+                                    key: &*key,
+                                    value: counter,
+                                    time: count_time,
+                                }
                             } else {
                                 let counter = Counter {
                                     time,
-                                    key: key.to_string(),
+                                    key: &*key,
                                     value,
                                 };
-                                counters.insert(key.to_string(), counter.clone());
+                                // Convert the Cow<'_, str> to a Box<str> to only create a pointer
+                                // to the immutable str
+                                counters.insert(Box::from(&*key), (value, time));
+
                                 counter
                             }
                         };
 
-                        let mut query = counter.into_query(key);
+                        let mut query = counter.into_query(&*key);
                         for label in labels {
                             query = query.add_tag(label.key(), label.value());
                         }
@@ -137,10 +145,10 @@ impl InfluxRecorder {
                     }) => {
                         let gauge = Gauge {
                             time,
-                            key: key.to_string(),
+                            key: &*key,
                             value,
                         };
-                        let mut query = gauge.into_query(key);
+                        let mut query = gauge.into_query(&*key);
                         for label in labels {
                             query = query.add_tag(label.key(), label.value());
                         }
@@ -156,10 +164,10 @@ impl InfluxRecorder {
                     }) => {
                         let histogram = Histogram {
                             time,
-                            key: key.to_string(),
+                            key: &key,
                             value,
                         };
-                        let mut query = histogram.into_query(key);
+                        let mut query = histogram.into_query(&*key);
                         for label in labels {
                             query = query.add_tag(label.key(), label.value());
                         }
@@ -221,10 +229,10 @@ impl ShutdownHandle for InfluxRecorder {
 
 impl Recorder for InfluxRecorder {
     fn increment_counter(&self, key: Key, value: u64) {
-        let name = key.name().to_string();
+        let (name, labels) = key.into_parts();
         if let Err(err) = self.sender.send(MetricRequest::Counter {
             key: name,
-            labels: key.labels().cloned().collect(),
+            labels,
             value,
             time: Utc::now(),
         }) {
@@ -233,10 +241,10 @@ impl Recorder for InfluxRecorder {
     }
 
     fn update_gauge(&self, key: Key, value: i64) {
-        let name = key.name().to_string();
+        let (name, labels) = key.into_parts();
         if let Err(err) = self.sender.send(MetricRequest::Gauge {
             key: name,
-            labels: key.labels().cloned().collect(),
+            labels,
             value,
             time: Utc::now(),
         }) {
@@ -245,10 +253,10 @@ impl Recorder for InfluxRecorder {
     }
 
     fn record_histogram(&self, key: Key, value: u64) {
-        let name = key.name().to_string();
+        let (name, labels) = key.into_parts();
         if let Err(err) = self.sender.send(MetricRequest::Histogram {
             key: name,
-            labels: key.labels().cloned().collect(),
+            labels,
             value,
             time: Utc::now(),
         }) {
