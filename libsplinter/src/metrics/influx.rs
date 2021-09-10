@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Contains an influxdb specific implementation of the metrics::Recorder trait. InfluxRecorder
-//! enables using the metrics macros and sending the metrics data to a running Influx database.
+//! Contains an influxdb specific implementation of the [metrics::Recorder](https://docs.rs/metrics/0.12.0/metrics/trait.Recorder.html)
+//! trait. InfluxRecorder enables using the metrics macros and sending the metrics data to a
+//! running Influx database.
+//!
+//! Available if the `metrics` feature is enabled
 
 use std::collections::HashMap;
 
@@ -71,6 +74,7 @@ enum MetricRequest {
     Shutdown,
 }
 
+/// Enables using the metrics macros and sending the metrics data to a running Influx database
 pub struct InfluxRecorder {
     sender: UnboundedSender<MetricRequest>,
     join_handle: JoinHandle<()>,
@@ -179,6 +183,16 @@ impl InfluxRecorder {
         })
     }
 
+    /// Initialize metric collection by creating the InfluxRecorder that will connect to the
+    /// InfluxDB instance. The record is then added to the metrics library as the recorder which
+    /// enables sending the metrics data to the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `db_url` - The URL to connect the InfluxDB database for metrics collection
+    /// * `db_name` - The name of the InfluxDB database for metrics Collection.
+    /// * `username` - The username used for authorization with the InfluxDB.
+    /// * `password` - The password used for authorization with the InfluxDB.
     pub fn init(
         db_url: &str,
         db_name: &str,
