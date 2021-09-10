@@ -82,7 +82,7 @@ pub struct InfluxRecorder {
 }
 
 impl InfluxRecorder {
-    pub fn new(
+    fn new(
         db_url: &str,
         db_name: &str,
         username: &str,
