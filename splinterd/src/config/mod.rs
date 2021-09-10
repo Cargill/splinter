@@ -89,13 +89,13 @@ pub struct Config {
     #[cfg(feature = "oauth")]
     oauth_openid_scopes: Option<(Vec<String>, ConfigSource)>,
     strict_ref_counts: (bool, ConfigSource),
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     metrics_db: Option<(String, ConfigSource)>,
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     metrics_url: Option<(String, ConfigSource)>,
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     metrics_username: Option<(String, ConfigSource)>,
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     metrics_password: Option<(String, ConfigSource)>,
     #[cfg(feature = "challenge-authorization")]
     peering_key: (String, ConfigSource),
@@ -304,7 +304,7 @@ impl Config {
         self.strict_ref_counts.0
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_db(&self) -> Option<&str> {
         if let Some((db, _)) = &self.metrics_db {
             Some(db)
@@ -313,7 +313,7 @@ impl Config {
         }
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_url(&self) -> Option<&str> {
         if let Some((url, _)) = &self.metrics_url {
             Some(url)
@@ -322,7 +322,7 @@ impl Config {
         }
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_username(&self) -> Option<&str> {
         if let Some((username, _)) = &self.metrics_username {
             Some(username)
@@ -331,7 +331,7 @@ impl Config {
         }
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_password(&self) -> Option<&str> {
         if let Some((password, _)) = &self.metrics_password {
             Some(password)
@@ -537,7 +537,7 @@ impl Config {
         &self.strict_ref_counts.1
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_db_source(&self) -> Option<&ConfigSource> {
         if let Some((_, source)) = &self.metrics_db {
             Some(source)
@@ -546,7 +546,7 @@ impl Config {
         }
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_url_source(&self) -> Option<&ConfigSource> {
         if let Some((_, source)) = &self.metrics_url {
             Some(source)
@@ -555,7 +555,7 @@ impl Config {
         }
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_username_source(&self) -> Option<&ConfigSource> {
         if let Some((_, source)) = &self.metrics_username {
             Some(source)
@@ -564,7 +564,7 @@ impl Config {
         }
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_password_source(&self) -> Option<&ConfigSource> {
         if let Some((_, source)) = &self.metrics_password {
             Some(source)
@@ -828,7 +828,7 @@ impl Config {
             self.strict_ref_counts(),
             self.strict_ref_counts_source()
         );
-        #[cfg(feature = "metrics")]
+        #[cfg(feature = "tap")]
         {
             if let (Some(db), Some(source)) = (self.metrics_db(), self.metrics_db_source()) {
                 debug!("Config: metrics_db: {:?} (source: {:?})", db, source,);

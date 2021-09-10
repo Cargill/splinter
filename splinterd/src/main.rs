@@ -42,12 +42,12 @@ use std::convert::TryInto;
 use rand::{thread_rng, Rng};
 #[cfg(any(feature = "challenge-authorization", feature = "node-file-block"))]
 use splinter::error::InternalError;
-#[cfg(feature = "metrics")]
-use splinter::metrics::influx::InfluxRecorder;
 #[cfg(feature = "challenge-authorization")]
 use splinter::peer::PeerAuthorizationToken;
 #[cfg(feature = "node-file-block")]
 use splinter::store::create_store_factory;
+#[cfg(feature = "tap")]
+use splinter::tap::influx::InfluxRecorder;
 
 use crate::config::{
     ClapPartialConfigBuilder, Config, ConfigBuilder, ConfigError, DefaultPartialConfigBuilder,
@@ -582,7 +582,7 @@ fn main() {
                 .multiple(true),
         );
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     let app = app
         .arg(
             Arg::with_name("metrics_db")
@@ -677,7 +677,7 @@ fn main() {
     }
 }
 
-#[cfg(feature = "metrics")]
+#[cfg(feature = "tap")]
 fn setup_metrics_recorder(config: &Config) -> Result<(), UserError> {
     let metrics_configured = config.metrics_db().is_some()
         || config.metrics_url().is_some()
@@ -779,7 +779,7 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
     }
 
     // set up metric recorder as soon as possilbe
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     setup_metrics_recorder(&config)?;
 
     let transport = build_transport(&config)?;

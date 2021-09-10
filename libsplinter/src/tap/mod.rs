@@ -22,11 +22,11 @@
 //! - `gauge`: Updates a gauge.
 //! - `histogram`: Records a histogram.
 
-#[cfg(feature = "metrics")]
+#[cfg(feature = "tap")]
 pub mod influx;
 
 /// no-op `counter` macro for when the `metrics` feature is not enabled
-#[cfg(not(feature = "metrics"))]
+#[cfg(not(feature = "tap"))]
 #[macro_export]
 macro_rules! counter {
     ($t:tt, $v:expr) => {};
@@ -34,7 +34,7 @@ macro_rules! counter {
 }
 
 /// no-op `gauge` macro for when the `metrics` feature is not enabled
-#[cfg(not(feature = "metrics"))]
+#[cfg(not(feature = "tap"))]
 #[macro_export]
 macro_rules! gauge {
     ($t:tt, $v:expr) => {};
@@ -42,7 +42,7 @@ macro_rules! gauge {
 }
 
 /// no-op `histogram` macro for when the `metrics` feature is not enabled
-#[cfg(not(feature = "metrics"))]
+#[cfg(not(feature = "tap"))]
 #[macro_export]
 macro_rules! histogram {
     ($t:tt, $v:expr) => {};

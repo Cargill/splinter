@@ -28,13 +28,13 @@ extern crate diesel;
 #[macro_use]
 #[cfg(feature = "diesel")]
 extern crate diesel_migrations;
-#[cfg(feature = "metrics")]
+#[cfg(feature = "tap")]
 #[macro_use]
-extern crate metrics_lib;
+extern crate metrics;
 
 // macros_use must come before any modules that make use of the macro
 #[macro_use]
-pub mod metrics;
+pub mod tap;
 
 #[macro_export]
 macro_rules! rwlock_read_unwrap {

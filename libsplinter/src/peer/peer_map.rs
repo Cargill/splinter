@@ -79,7 +79,7 @@ impl PeerMap {
         #[cfg(not(feature = "challenge-authorization"))] local_identity: PeerAuthorizationToken,
     ) -> Self {
         // initialize peers metric
-        gauge!("splinter.peer_manager.peers", 0);
+        gauge!("splinter.peer_manager.peers", 0.0);
 
         PeerMap {
             peers: HashMap::new(),
@@ -152,7 +152,7 @@ impl PeerMap {
             }
         }
 
-        gauge!("splinter.peer_manager.peers", self.peers.len() as i64);
+        gauge!("splinter.peer_manager.peers", self.peers.len() as f64);
     }
 
     /// Removes a peer and its endpoints.
@@ -175,10 +175,10 @@ impl PeerMap {
                     }
                 }
             }
-            gauge!("splinter.peer_manager.peers", self.peers.len() as i64);
+            gauge!("splinter.peer_manager.peers", self.peers.len() as f64);
             Some(peer_metadata)
         } else {
-            gauge!("splinter.peer_manager.peers", self.peers.len() as i64);
+            gauge!("splinter.peer_manager.peers", self.peers.len() as f64);
             None
         }
     }

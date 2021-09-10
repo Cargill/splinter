@@ -85,13 +85,13 @@ pub struct PartialConfig {
     #[cfg(feature = "oauth")]
     oauth_openid_scopes: Option<Vec<String>>,
     strict_ref_counts: Option<bool>,
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     metrics_db: Option<String>,
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     metrics_url: Option<String>,
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     metrics_username: Option<String>,
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     metrics_password: Option<String>,
     #[cfg(feature = "challenge-authorization")]
     peering_key: Option<String>,
@@ -159,13 +159,13 @@ impl PartialConfig {
             #[cfg(feature = "oauth")]
             oauth_openid_scopes: None,
             strict_ref_counts: None,
-            #[cfg(feature = "metrics")]
+            #[cfg(feature = "tap")]
             metrics_db: None,
-            #[cfg(feature = "metrics")]
+            #[cfg(feature = "tap")]
             metrics_url: None,
-            #[cfg(feature = "metrics")]
+            #[cfg(feature = "tap")]
             metrics_username: None,
-            #[cfg(feature = "metrics")]
+            #[cfg(feature = "tap")]
             metrics_password: None,
             #[cfg(feature = "challenge-authorization")]
             peering_key: None,
@@ -338,22 +338,22 @@ impl PartialConfig {
         self.strict_ref_counts
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_db(&self) -> Option<String> {
         self.metrics_db.clone()
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_url(&self) -> Option<String> {
         self.metrics_url.clone()
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_username(&self) -> Option<String> {
         self.metrics_username.clone()
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     pub fn metrics_password(&self) -> Option<String> {
         self.metrics_password.clone()
     }
@@ -792,7 +792,7 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     /// Adds an `metrics_db` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -804,7 +804,7 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     /// Adds an `metrics_url` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -816,7 +816,7 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     /// Adds an `metrics_username` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -829,7 +829,7 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "metrics")]
+    #[cfg(feature = "tap")]
     /// Adds an `metrics_password` value to the `PartialConfig` object.
     ///
     /// # Arguments

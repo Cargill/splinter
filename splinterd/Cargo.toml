@@ -105,7 +105,7 @@ experimental = [
     "health-service",
     "https-bind",
     "log-config",
-    "metrics",
+    "tap",
     "node",
     "node-file-block",
     "scabbard-back-pressure",
@@ -139,8 +139,8 @@ scabbard-receipt-store = ["scabbard/diesel-receipt-store"]
 health-service = ["health", "health/authorization"]
 https-bind = ["splinter/https-bind"]
 log-config = []
-metrics = [
-  "splinter/metrics",
+tap = [
+  "splinter/tap",
   "scabbard/metrics",
 ]
 node = [
