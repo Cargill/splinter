@@ -1,5 +1,53 @@
 # Release Notes
 
+## Changes in Splinter 0.5.18
+
+### Highlights
+
+* The `splinter admin keygen` command has been removed from the splinter CLI.
+  This command duplicated the functionality of `splinter keygen` with no
+  additional value.
+
+### libsplinter
+
+* Update connection manager to allow multiple connections for an endpoint. With
+  challenge authorization, it is possible to have more then one connection
+  connected to the same endpoint if the peer authorization token is different.
+
+* Add `connection_id` to FatalConnectionError. Endpoints are no longer 1:1 with
+  a connection, as such if there is a FatalConnectionError the `connection_id`
+  should be returned as well.
+
+* Update PeerManager to support multiple peers having the same endpoint. Before
+  challenge authorization was implemented, endpoints to peer ID were expected to
+  be 1:1. Now that is no longer true because the same peer may support multiple
+  peer IDs with different authorization types that have the same endpoints.
+
+* Add tag support for experimental metrics collection.
+
+### scabbard
+
+* Add the new diesel backed receipt store to scabbard as an alternative to the
+  existing LMDB backed receipt store. The new receipt store is behind the
+  experimental feature `diesel-receipt-store`.
+
+* Add service ID to the batch queue metric, in order to differentiate between
+  multiple scabbard instances on a node.
+
+### scabbard CLI
+
+* Relaxed the URL check to all for `https` endpoints in all subcommands that use
+  `--url`.
+
+### splinter CLI
+
+* Update the `splinter database migrate` command to run migrations for the new
+  diesel backed receipt store if the experimental feature
+  'scabbard-receipt-store' is enabled.
+
+* Remove the `splinter admin keygen` subcommand. This command was a duplicate of
+  the `splinter keygen` subcommand.
+
 ## Changes in Splinter 0.5.17
 
 ### libsplinter
