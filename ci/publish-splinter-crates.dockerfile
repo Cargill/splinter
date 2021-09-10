@@ -29,6 +29,8 @@ RUN apt-get update \
     ca-certificates \
     curl \
     gcc \
+    libpq-dev \
+    libsqlite3-dev \
     libssl-dev \
     libzmq3-dev \
     pkg-config \
