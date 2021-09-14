@@ -17,21 +17,21 @@ use std::fmt;
 use crate::network::auth::ManagedAuthorizationState;
 
 use super::{
-    AuthorizationActionError, AuthorizationLocalAction, AuthorizationLocalState,
-    AuthorizationRemoteAction, AuthorizationRemoteState, Identity,
+    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationActionError,
+    AuthorizationInitiatingAction, AuthorizationInitiatingState, Identity,
 };
 
 #[derive(PartialEq, Debug, Clone)]
-pub(crate) enum TrustAuthorizationLocalState {
+pub(crate) enum TrustAuthorizationInitiatingState {
     TrustConnecting,
     WaitingForAuthTrustResponse,
 }
 
-impl fmt::Display for TrustAuthorizationLocalState {
+impl fmt::Display for TrustAuthorizationInitiatingState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(match self {
-            TrustAuthorizationLocalState::TrustConnecting => "TrustConnecting",
-            TrustAuthorizationLocalState::WaitingForAuthTrustResponse => {
+            TrustAuthorizationInitiatingState::TrustConnecting => "TrustConnecting",
+            TrustAuthorizationInitiatingState::WaitingForAuthTrustResponse => {
                 "WaitingForAuthTrustResponse"
             }
         })
@@ -39,34 +39,36 @@ impl fmt::Display for TrustAuthorizationLocalState {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub(crate) enum TrustAuthorizationRemoteState {
+pub(crate) enum TrustAuthorizationAcceptingState {
     TrustConnecting,
     ReceivedAuthTrustRequest(Identity),
 }
 
-impl fmt::Display for TrustAuthorizationRemoteState {
+impl fmt::Display for TrustAuthorizationAcceptingState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(match self {
-            TrustAuthorizationRemoteState::TrustConnecting => "TrustConnecting",
-            TrustAuthorizationRemoteState::ReceivedAuthTrustRequest(_) => "ReceiveAuthTrustRequest",
+            TrustAuthorizationAcceptingState::TrustConnecting => "TrustConnecting",
+            TrustAuthorizationAcceptingState::ReceivedAuthTrustRequest(_) => {
+                "ReceiveAuthTrustRequest"
+            }
         })
     }
 }
 
 /// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
-pub(crate) enum TrustAuthorizationRemoteAction {
+pub(crate) enum TrustAuthorizationAcceptingAction {
     ReceiveAuthTrustRequest(Identity),
     SendAuthTrustResponse,
 }
 
-impl fmt::Display for TrustAuthorizationRemoteAction {
+impl fmt::Display for TrustAuthorizationAcceptingAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TrustAuthorizationRemoteAction::ReceiveAuthTrustRequest(_) => {
+            TrustAuthorizationAcceptingAction::ReceiveAuthTrustRequest(_) => {
                 f.write_str("ReceiveAuthTrustRequest")
             }
-            TrustAuthorizationRemoteAction::SendAuthTrustResponse => {
+            TrustAuthorizationAcceptingAction::SendAuthTrustResponse => {
                 f.write_str("SendAuthTrustResponse")
             }
         }
@@ -75,98 +77,98 @@ impl fmt::Display for TrustAuthorizationRemoteAction {
 
 /// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
-pub(crate) enum TrustAuthorizationLocalAction {
+pub(crate) enum TrustAuthorizationInitiatingAction {
     SendAuthTrustRequest(Identity),
     ReceiveAuthTrustResponse,
 }
 
-impl fmt::Display for TrustAuthorizationLocalAction {
+impl fmt::Display for TrustAuthorizationInitiatingAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TrustAuthorizationLocalAction::SendAuthTrustRequest(_) => {
+            TrustAuthorizationInitiatingAction::SendAuthTrustRequest(_) => {
                 f.write_str("SendAuthTrustRequest")
             }
-            TrustAuthorizationLocalAction::ReceiveAuthTrustResponse => {
+            TrustAuthorizationInitiatingAction::ReceiveAuthTrustResponse => {
                 f.write_str("ReceiveAuthTrustResponse")
             }
         }
     }
 }
 
-impl TrustAuthorizationLocalState {
+impl TrustAuthorizationInitiatingState {
     /// Transitions from one authorization state to another
     ///
     /// Errors
     ///
     /// The errors are error messages that should be returned on the appropriate message
-    pub(crate) fn next_local_state(
+    pub(crate) fn next_initiating_state(
         &self,
-        action: TrustAuthorizationLocalAction,
+        action: TrustAuthorizationInitiatingAction,
         cur_state: &mut ManagedAuthorizationState,
-    ) -> Result<AuthorizationLocalState, AuthorizationActionError> {
+    ) -> Result<AuthorizationInitiatingState, AuthorizationActionError> {
         match &self {
-            TrustAuthorizationLocalState::TrustConnecting => match action {
-                TrustAuthorizationLocalAction::SendAuthTrustRequest(identity) => {
+            TrustAuthorizationInitiatingState::TrustConnecting => match action {
+                TrustAuthorizationInitiatingAction::SendAuthTrustRequest(identity) => {
                     cur_state.local_authorization = Some(identity);
-                    let new_state = AuthorizationLocalState::Trust(
-                        TrustAuthorizationLocalState::WaitingForAuthTrustResponse,
+                    let new_state = AuthorizationInitiatingState::Trust(
+                        TrustAuthorizationInitiatingState::WaitingForAuthTrustResponse,
                     );
-                    cur_state.local_state = new_state.clone();
+                    cur_state.initiating_state = new_state.clone();
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
-                    AuthorizationLocalState::Trust(self.clone()),
-                    AuthorizationLocalAction::Trust(action),
+                _ => Err(AuthorizationActionError::InvalidInitiatingMessageOrder(
+                    AuthorizationInitiatingState::Trust(self.clone()),
+                    AuthorizationInitiatingAction::Trust(action),
                 )),
             },
-            TrustAuthorizationLocalState::WaitingForAuthTrustResponse => match action {
-                TrustAuthorizationLocalAction::ReceiveAuthTrustResponse => {
-                    let new_state = AuthorizationLocalState::Authorized;
-                    cur_state.local_state = new_state.clone();
+            TrustAuthorizationInitiatingState::WaitingForAuthTrustResponse => match action {
+                TrustAuthorizationInitiatingAction::ReceiveAuthTrustResponse => {
+                    let new_state = AuthorizationInitiatingState::Authorized;
+                    cur_state.initiating_state = new_state.clone();
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
-                    AuthorizationLocalState::Trust(self.clone()),
-                    AuthorizationLocalAction::Trust(action),
+                _ => Err(AuthorizationActionError::InvalidInitiatingMessageOrder(
+                    AuthorizationInitiatingState::Trust(self.clone()),
+                    AuthorizationInitiatingAction::Trust(action),
                 )),
             },
         }
     }
 }
 
-impl TrustAuthorizationRemoteState {
+impl TrustAuthorizationAcceptingState {
     /// Transitions from one authorization state to another
     ///
     /// Errors
     ///
     /// The errors are error messages that should be returned on the appropriate message
-    pub(crate) fn next_remote_state(
+    pub(crate) fn next_accepting_state(
         &self,
-        action: TrustAuthorizationRemoteAction,
+        action: TrustAuthorizationAcceptingAction,
         cur_state: &mut ManagedAuthorizationState,
-    ) -> Result<AuthorizationRemoteState, AuthorizationActionError> {
+    ) -> Result<AuthorizationAcceptingState, AuthorizationActionError> {
         match &self {
-            TrustAuthorizationRemoteState::TrustConnecting => match action {
-                TrustAuthorizationRemoteAction::ReceiveAuthTrustRequest(identity) => {
-                    let new_state = AuthorizationRemoteState::Trust(
-                        TrustAuthorizationRemoteState::ReceivedAuthTrustRequest(identity),
+            TrustAuthorizationAcceptingState::TrustConnecting => match action {
+                TrustAuthorizationAcceptingAction::ReceiveAuthTrustRequest(identity) => {
+                    let new_state = AuthorizationAcceptingState::Trust(
+                        TrustAuthorizationAcceptingState::ReceivedAuthTrustRequest(identity),
                     );
-                    cur_state.remote_state = new_state.clone();
+                    cur_state.accepting_state = new_state.clone();
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
-                    AuthorizationRemoteState::Trust(self.clone()),
-                    AuthorizationRemoteAction::Trust(action),
+                _ => Err(AuthorizationActionError::InvalidAcceptingMessageOrder(
+                    AuthorizationAcceptingState::Trust(self.clone()),
+                    AuthorizationAcceptingAction::Trust(action),
                 )),
             },
-            TrustAuthorizationRemoteState::ReceivedAuthTrustRequest(identity) => match action {
-                TrustAuthorizationRemoteAction::SendAuthTrustResponse => {
-                    cur_state.remote_state = AuthorizationRemoteState::Done(identity.clone());
-                    Ok(AuthorizationRemoteState::Done(identity.clone()))
+            TrustAuthorizationAcceptingState::ReceivedAuthTrustRequest(identity) => match action {
+                TrustAuthorizationAcceptingAction::SendAuthTrustResponse => {
+                    cur_state.accepting_state = AuthorizationAcceptingState::Done(identity.clone());
+                    Ok(AuthorizationAcceptingState::Done(identity.clone()))
                 }
-                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
-                    AuthorizationRemoteState::Trust(self.clone()),
-                    AuthorizationRemoteAction::Trust(action),
+                _ => Err(AuthorizationActionError::InvalidAcceptingMessageOrder(
+                    AuthorizationAcceptingState::Trust(self.clone()),
+                    AuthorizationAcceptingAction::Trust(action),
                 )),
             },
         }

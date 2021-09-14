@@ -22,14 +22,14 @@ pub mod trust;
 
 use crate::error::InternalError;
 #[cfg(feature = "challenge-authorization")]
-use crate::network::auth::state_machine::challenge_v1::ChallengeAuthorizationLocalAction;
+use crate::network::auth::state_machine::challenge_v1::ChallengeAuthorizationInitiatingAction;
 #[cfg(feature = "trust-authorization")]
-use crate::network::auth::state_machine::trust_v1::TrustAuthorizationLocalAction;
+use crate::network::auth::state_machine::trust_v1::TrustAuthorizationInitiatingAction;
 #[cfg(feature = "trust-authorization")]
 use crate::network::auth::Identity;
 use crate::network::auth::{
-    AuthorizationLocalAction, AuthorizationLocalState, AuthorizationManagerStateMachine,
-    AuthorizationMessage, AuthorizationRemoteAction, AuthorizationRemoteState,
+    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationInitiatingAction,
+    AuthorizationInitiatingState, AuthorizationManagerStateMachine, AuthorizationMessage,
     ConnectionAuthorizationType,
 };
 use crate::network::dispatch::{
@@ -75,9 +75,9 @@ impl Handler for AuthProtocolRequestHandler {
         );
         let protocol_request = AuthProtocolRequest::from_proto(msg)?;
 
-        match self.auth_manager.next_remote_state(
+        match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
-            AuthorizationRemoteAction::ReceiveAuthProtocolRequest,
+            AuthorizationAcceptingAction::ReceiveAuthProtocolRequest,
         ) {
             Err(err) => {
                 send_authorization_error(
@@ -90,7 +90,7 @@ impl Handler for AuthProtocolRequestHandler {
                 return Ok(());
             }
 
-            Ok(AuthorizationRemoteState::ReceivedAuthProtocolRequest) => {
+            Ok(AuthorizationAcceptingState::ReceivedAuthProtocolRequest) => {
                 let version = supported_protocol_version(
                     protocol_request.auth_protocol_min,
                     protocol_request.auth_protocol_max,
@@ -130,9 +130,9 @@ impl Handler for AuthProtocolRequestHandler {
 
                 if self
                     .auth_manager
-                    .next_remote_state(
+                    .next_accepting_state(
                         context.source_connection_id(),
-                        AuthorizationRemoteAction::SendAuthProtocolResponse,
+                        AuthorizationAcceptingAction::SendAuthProtocolResponse,
                     )
                     .is_err()
                 {
@@ -216,9 +216,9 @@ impl Handler for AuthProtocolResponseHandler {
         let protocol_request = AuthProtocolResponse::from_proto(msg)?;
 
         let mut msg_bytes = vec![];
-        match self.auth_manager.next_local_state(
+        match self.auth_manager.next_initiating_state(
             context.source_connection_id(),
-            AuthorizationLocalAction::ReceiveAuthProtocolResponse,
+            AuthorizationInitiatingAction::ReceiveAuthProtocolResponse,
         ) {
             Err(err) => {
                 send_authorization_error(
@@ -230,7 +230,7 @@ impl Handler for AuthProtocolResponseHandler {
                 )?;
                 return Ok(());
             }
-            Ok(AuthorizationLocalState::ReceivedAuthProtocolResponse) => {
+            Ok(AuthorizationInitiatingState::ReceivedAuthProtocolResponse) => {
                 match self.required_local_auth {
                     #[cfg(feature = "challenge-authorization")]
                     Some(ConnectionAuthorizationType::Challenge { .. }) => {
@@ -243,12 +243,12 @@ impl Handler for AuthProtocolResponseHandler {
                                 AuthChallengeNonceRequest,
                             );
 
-                            let action = AuthorizationLocalAction::Challenge(
-                                ChallengeAuthorizationLocalAction::SendAuthChallengeNonceRequest,
+                            let action = AuthorizationInitiatingAction::Challenge(
+                                ChallengeAuthorizationInitiatingAction::SendAuthChallengeNonceRequest,
                             );
                             if self
                                 .auth_manager
-                                .next_local_state(context.source_connection_id(), action)
+                                .next_initiating_state(context.source_connection_id(), action)
                                 .is_err()
                             {
                                 error!(
@@ -286,10 +286,10 @@ impl Handler for AuthProtocolResponseHandler {
 
                             if self
                                 .auth_manager
-                                .next_local_state(
+                                .next_initiating_state(
                                     context.source_connection_id(),
-                                    AuthorizationLocalAction::Trust(
-                                        TrustAuthorizationLocalAction::SendAuthTrustRequest(
+                                    AuthorizationInitiatingAction::Trust(
+                                        TrustAuthorizationInitiatingAction::SendAuthTrustRequest(
                                             Identity::Trust {
                                                 identity: self.identity.to_string(),
                                             },
@@ -333,10 +333,10 @@ impl Handler for AuthProtocolResponseHandler {
 
                             if self
                                 .auth_manager
-                                .next_local_state(
+                                .next_initiating_state(
                                     context.source_connection_id(),
-                                    AuthorizationLocalAction::Trust(
-                                        TrustAuthorizationLocalAction::SendAuthTrustRequest(
+                                    AuthorizationInitiatingAction::Trust(
+                                        TrustAuthorizationInitiatingAction::SendAuthTrustRequest(
                                             Identity::Trust {
                                                 identity: self.identity.to_string(),
                                             },
@@ -366,12 +366,12 @@ impl Handler for AuthProtocolResponseHandler {
                                 AuthChallengeNonceRequest,
                             );
 
-                            let action = AuthorizationLocalAction::Challenge(
-                                ChallengeAuthorizationLocalAction::SendAuthChallengeNonceRequest,
+                            let action = AuthorizationInitiatingAction::Challenge(
+                                ChallengeAuthorizationInitiatingAction::SendAuthChallengeNonceRequest,
                             );
                             if self
                                 .auth_manager
-                                .next_local_state(context.source_connection_id(), action)
+                                .next_initiating_state(context.source_connection_id(), action)
                                 .is_err()
                             {
                                 error!(
@@ -492,7 +492,7 @@ fn send_authorization_error(
         })?;
 
     if auth_manager
-        .next_remote_state(connection_id, AuthorizationRemoteAction::Unauthorizing)
+        .next_accepting_state(connection_id, AuthorizationAcceptingAction::Unauthorizing)
         .is_err()
     {
         warn!(
@@ -695,8 +695,8 @@ mod tests {
             .insert(
                 connection_id.to_string(),
                 ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::WaitForComplete,
-                    remote_state: AuthorizationRemoteState::Done(Identity::Trust {
+                    initiating_state: AuthorizationInitiatingState::WaitForComplete,
+                    accepting_state: AuthorizationAcceptingState::Done(Identity::Trust {
                         identity: "other_identity".to_string(),
                     }),
                     received_complete: false,
@@ -749,12 +749,12 @@ mod tests {
             .expect("missing managed state for connection id");
 
         assert_eq!(
-            managed_state.local_state,
-            AuthorizationLocalState::AuthorizedAndComplete,
+            managed_state.initiating_state,
+            AuthorizationInitiatingState::AuthorizedAndComplete,
         );
         assert_eq!(
-            managed_state.remote_state,
-            AuthorizationRemoteState::Done(Identity::Trust {
+            managed_state.accepting_state,
+            AuthorizationAcceptingState::Done(Identity::Trust {
                 identity: "other_identity".to_string()
             })
         );

@@ -18,12 +18,12 @@ use cylinder::{PublicKey, Signature, Signer, Verifier};
 
 use crate::error::InternalError;
 use crate::network::auth::state_machine::challenge_v1::{
-    ChallengeAuthorizationLocalAction, ChallengeAuthorizationLocalState,
-    ChallengeAuthorizationRemoteAction, ChallengeAuthorizationRemoteState,
+    ChallengeAuthorizationAcceptingAction, ChallengeAuthorizationAcceptingState,
+    ChallengeAuthorizationInitiatingAction, ChallengeAuthorizationInitiatingState,
 };
 use crate::network::auth::{
-    AuthorizationLocalAction, AuthorizationLocalState, AuthorizationManagerStateMachine,
-    AuthorizationMessage, AuthorizationRemoteAction, AuthorizationRemoteState, Identity,
+    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationInitiatingAction,
+    AuthorizationInitiatingState, AuthorizationManagerStateMachine, AuthorizationMessage, Identity,
 };
 use crate::network::dispatch::{
     ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
@@ -77,10 +77,10 @@ impl Handler for AuthChallengeNonceRequestHandler {
             context.source_connection_id()
         );
 
-        match self.auth_manager.next_remote_state(
+        match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
-            AuthorizationRemoteAction::Challenge(
-                ChallengeAuthorizationRemoteAction::ReceiveAuthChallengeNonceRequest,
+            AuthorizationAcceptingAction::Challenge(
+                ChallengeAuthorizationAcceptingAction::ReceiveAuthChallengeNonceRequest,
             ),
         ) {
             Err(err) => {
@@ -93,8 +93,8 @@ impl Handler for AuthChallengeNonceRequestHandler {
                 )?;
                 return Ok(());
             }
-            Ok(AuthorizationRemoteState::Challenge(
-                ChallengeAuthorizationRemoteState::ReceivedAuthChallengeNonce,
+            Ok(AuthorizationAcceptingState::Challenge(
+                ChallengeAuthorizationAcceptingState::ReceivedAuthChallengeNonce,
             )) => {
                 let auth_msg =
                     AuthorizationMessage::AuthChallengeNonceResponse(AuthChallengeNonceResponse {
@@ -113,10 +113,10 @@ impl Handler for AuthChallengeNonceRequestHandler {
 
                 if self
                     .auth_manager
-                    .next_remote_state(
+                    .next_accepting_state(
                         context.source_connection_id(),
-                        AuthorizationRemoteAction::Challenge(
-                            ChallengeAuthorizationRemoteAction::SendAuthChallengeNonceResponse,
+                        AuthorizationAcceptingAction::Challenge(
+                            ChallengeAuthorizationAcceptingAction::SendAuthChallengeNonceResponse,
                         ),
                     )
                     .is_err()
@@ -210,10 +210,10 @@ impl Handler for AuthChallengeNonceResponseHandler {
             })
             .collect::<Result<Vec<SubmitRequest>, DispatchError>>()?;
 
-        match self.auth_manager.next_local_state(
+        match self.auth_manager.next_initiating_state(
             context.source_connection_id(),
-            AuthorizationLocalAction::Challenge(
-                ChallengeAuthorizationLocalAction::ReceiveAuthChallengeNonceResponse,
+            AuthorizationInitiatingAction::Challenge(
+                ChallengeAuthorizationInitiatingAction::ReceiveAuthChallengeNonceResponse,
             ),
         ) {
             Err(err) => {
@@ -226,8 +226,8 @@ impl Handler for AuthChallengeNonceResponseHandler {
                 )?;
                 return Ok(());
             }
-            Ok(AuthorizationLocalState::Challenge(
-                ChallengeAuthorizationLocalState::ReceivedAuthChallengeNonceResponse,
+            Ok(AuthorizationInitiatingState::Challenge(
+                ChallengeAuthorizationInitiatingState::ReceivedAuthChallengeNonceResponse,
             )) => {
                 let auth_msg =
                     AuthorizationMessage::AuthChallengeSubmitRequest(AuthChallengeSubmitRequest {
@@ -240,10 +240,10 @@ impl Handler for AuthChallengeNonceResponseHandler {
 
                 if self
                     .auth_manager
-                    .next_local_state(
+                    .next_initiating_state(
                         context.source_connection_id(),
-                        AuthorizationLocalAction::Challenge(
-                            ChallengeAuthorizationLocalAction::SendAuthChallengeSubmitRequest,
+                        AuthorizationInitiatingAction::Challenge(
+                            ChallengeAuthorizationInitiatingAction::SendAuthChallengeSubmitRequest,
                         ),
                     )
                     .is_err()
@@ -374,10 +374,10 @@ impl Handler for AuthChallengeSubmitRequestHandler {
             return Ok(());
         };
 
-        match self.auth_manager.next_remote_state(
+        match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
-            AuthorizationRemoteAction::Challenge(
-                ChallengeAuthorizationRemoteAction::ReceiveAuthChallengeSubmitRequest(
+            AuthorizationAcceptingAction::Challenge(
+                ChallengeAuthorizationAcceptingAction::ReceiveAuthChallengeSubmitRequest(
                     Identity::Challenge {
                         public_key: identity.clone(),
                     },
@@ -394,8 +394,8 @@ impl Handler for AuthChallengeSubmitRequestHandler {
                 )?;
                 return Ok(());
             }
-            Ok(AuthorizationRemoteState::Challenge(
-                ChallengeAuthorizationRemoteState::ReceivedAuthChallengeSubmitRequest(_),
+            Ok(AuthorizationAcceptingState::Challenge(
+                ChallengeAuthorizationAcceptingState::ReceivedAuthChallengeSubmitRequest(_),
             )) => {
                 let auth_msg = AuthorizationMessage::AuthChallengeSubmitResponse(
                     AuthChallengeSubmitResponse {
@@ -422,10 +422,10 @@ impl Handler for AuthChallengeSubmitRequestHandler {
 
         if self
             .auth_manager
-            .next_remote_state(
+            .next_accepting_state(
                 context.source_connection_id(),
-                AuthorizationRemoteAction::Challenge(
-                    ChallengeAuthorizationRemoteAction::SendAuthChallengeSubmitResponse,
+                AuthorizationAcceptingAction::Challenge(
+                    ChallengeAuthorizationAcceptingAction::SendAuthChallengeSubmitResponse,
                 ),
             )
             .is_err()
@@ -473,10 +473,10 @@ impl Handler for AuthChallengeSubmitResponseHandler {
 
         let public_key = submit_msg.public_key;
 
-        match self.auth_manager.next_local_state(
+        match self.auth_manager.next_initiating_state(
             context.source_connection_id(),
-            AuthorizationLocalAction::Challenge(
-                ChallengeAuthorizationLocalAction::ReceiveAuthChallengeSubmitResponse(
+            AuthorizationInitiatingAction::Challenge(
+                ChallengeAuthorizationInitiatingAction::ReceiveAuthChallengeSubmitResponse(
                     Identity::Challenge {
                         public_key: public_key::PublicKey::from_bytes(public_key),
                     },
@@ -493,7 +493,7 @@ impl Handler for AuthChallengeSubmitResponseHandler {
                 )?;
                 return Ok(());
             }
-            Ok(AuthorizationLocalState::Authorized) => {
+            Ok(AuthorizationInitiatingState::Authorized) => {
                 let auth_msg = AuthorizationMessage::AuthComplete(AuthComplete);
                 let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
                     NetworkMessage::from(auth_msg),
@@ -504,9 +504,9 @@ impl Handler for AuthChallengeSubmitResponseHandler {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
 
-                match self.auth_manager.next_local_state(
+                match self.auth_manager.next_initiating_state(
                     context.source_connection_id(),
-                    AuthorizationLocalAction::SendAuthComplete,
+                    AuthorizationInitiatingAction::SendAuthComplete,
                 ) {
                     Err(err) => {
                         send_authorization_error(
@@ -518,8 +518,8 @@ impl Handler for AuthChallengeSubmitResponseHandler {
                         )?;
                         return Ok(());
                     }
-                    Ok(AuthorizationLocalState::WaitForComplete) => (),
-                    Ok(AuthorizationLocalState::AuthorizedAndComplete) => (),
+                    Ok(AuthorizationInitiatingState::WaitForComplete) => (),
+                    Ok(AuthorizationInitiatingState::AuthorizedAndComplete) => (),
                     Ok(next_state) => {
                         return Err(DispatchError::InternalError(InternalError::with_message(
                             format!("Should not have been able to transition to {}", next_state),
@@ -550,7 +550,7 @@ mod tests {
     };
     use protobuf::Message;
 
-    use crate::network::auth::state_machine::challenge_v1::ChallengeAuthorizationLocalState;
+    use crate::network::auth::state_machine::challenge_v1::ChallengeAuthorizationInitiatingState;
     use crate::network::auth::{
         AuthorizationDispatchBuilder, ConnectionAuthorizationType, ManagedAuthorizationState,
     };
@@ -581,8 +581,8 @@ mod tests {
             .insert(
                 connection_id.to_string(),
                 ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::WaitingForAuthProtocolResponse,
-                    remote_state: AuthorizationRemoteState::SentAuthProtocolResponse,
+                    initiating_state: AuthorizationInitiatingState::WaitingForAuthProtocolResponse,
+                    accepting_state: AuthorizationAcceptingState::SentAuthProtocolResponse,
                     received_complete: true,
                     local_authorization: None,
                 },
@@ -653,14 +653,14 @@ mod tests {
             .expect("missing managed state for connection id");
 
         assert_eq!(
-            managed_state.local_state,
-            AuthorizationLocalState::Challenge(
-                ChallengeAuthorizationLocalState::WaitingForAuthChallengeNonceResponse
+            managed_state.initiating_state,
+            AuthorizationInitiatingState::Challenge(
+                ChallengeAuthorizationInitiatingState::WaitingForAuthChallengeNonceResponse
             ),
         );
         assert_eq!(
-            managed_state.remote_state,
-            AuthorizationRemoteState::SentAuthProtocolResponse
+            managed_state.accepting_state,
+            AuthorizationAcceptingState::SentAuthProtocolResponse
         );
         assert_eq!(managed_state.received_complete, true);
     }
@@ -685,10 +685,10 @@ mod tests {
             .insert(
                 connection_id.to_string(),
                 ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Challenge(
-                        ChallengeAuthorizationLocalState::WaitingForAuthChallengeNonceResponse,
+                    initiating_state: AuthorizationInitiatingState::Challenge(
+                        ChallengeAuthorizationInitiatingState::WaitingForAuthChallengeNonceResponse,
                     ),
-                    remote_state: AuthorizationRemoteState::SentAuthProtocolResponse,
+                    accepting_state: AuthorizationAcceptingState::SentAuthProtocolResponse,
                     received_complete: true,
                     local_authorization: None,
                 },
@@ -758,15 +758,15 @@ mod tests {
             .expect("missing managed state for connection id");
 
         assert_eq!(
-            managed_state.local_state,
-            AuthorizationLocalState::Challenge(
-                ChallengeAuthorizationLocalState::WaitingForAuthChallengeNonceResponse
+            managed_state.initiating_state,
+            AuthorizationInitiatingState::Challenge(
+                ChallengeAuthorizationInitiatingState::WaitingForAuthChallengeNonceResponse
             ),
         );
         assert_eq!(
-            managed_state.remote_state,
-            AuthorizationRemoteState::Challenge(
-                ChallengeAuthorizationRemoteState::WaitingForAuthChallengeSubmitRequest
+            managed_state.accepting_state,
+            AuthorizationAcceptingState::Challenge(
+                ChallengeAuthorizationAcceptingState::WaitingForAuthChallengeSubmitRequest
             )
         );
         assert_eq!(managed_state.received_complete, true);
@@ -792,11 +792,11 @@ mod tests {
             .insert(
                 connection_id.to_string(),
                 ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Challenge(
-                        ChallengeAuthorizationLocalState::WaitingForAuthChallengeNonceResponse,
+                    initiating_state: AuthorizationInitiatingState::Challenge(
+                        ChallengeAuthorizationInitiatingState::WaitingForAuthChallengeNonceResponse,
                     ),
-                    remote_state: AuthorizationRemoteState::Challenge(
-                        ChallengeAuthorizationRemoteState::WaitingForAuthChallengeSubmitRequest,
+                    accepting_state: AuthorizationAcceptingState::Challenge(
+                        ChallengeAuthorizationAcceptingState::WaitingForAuthChallengeSubmitRequest,
                     ),
                     received_complete: true,
                     local_authorization: None,
@@ -882,15 +882,15 @@ mod tests {
             .expect("missing managed state for connection id");
 
         assert_eq!(
-            managed_state.local_state,
-            AuthorizationLocalState::Challenge(
-                ChallengeAuthorizationLocalState::WaitingForAuthChallengeSubmitResponse
+            managed_state.initiating_state,
+            AuthorizationInitiatingState::Challenge(
+                ChallengeAuthorizationInitiatingState::WaitingForAuthChallengeSubmitResponse
             ),
         );
         assert_eq!(
-            managed_state.remote_state,
-            AuthorizationRemoteState::Challenge(
-                ChallengeAuthorizationRemoteState::WaitingForAuthChallengeSubmitRequest
+            managed_state.accepting_state,
+            AuthorizationAcceptingState::Challenge(
+                ChallengeAuthorizationAcceptingState::WaitingForAuthChallengeSubmitRequest
             )
         );
         assert_eq!(managed_state.received_complete, true);
@@ -913,18 +913,18 @@ mod tests {
             .expect("lock poisoned")
             .states
             .insert(
-                connection_id.to_string(),
-                ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Challenge(
-                        ChallengeAuthorizationLocalState::WaitingForAuthChallengeSubmitResponse,
-                    ),
-                    remote_state: AuthorizationRemoteState::Challenge(
-                        ChallengeAuthorizationRemoteState::WaitingForAuthChallengeSubmitRequest,
-                    ),
-                    received_complete: false,
-                    local_authorization: None,
-                },
-            );
+            connection_id.to_string(),
+            ManagedAuthorizationState {
+                initiating_state: AuthorizationInitiatingState::Challenge(
+                    ChallengeAuthorizationInitiatingState::WaitingForAuthChallengeSubmitResponse,
+                ),
+                accepting_state: AuthorizationAcceptingState::Challenge(
+                    ChallengeAuthorizationAcceptingState::WaitingForAuthChallengeSubmitRequest,
+                ),
+                received_complete: false,
+                local_authorization: None,
+            },
+        );
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
         let local_signer = new_signer();
@@ -999,14 +999,14 @@ mod tests {
             .expect("missing managed state for connection id");
 
         assert_eq!(
-            managed_state.local_state,
-            AuthorizationLocalState::Challenge(
-                ChallengeAuthorizationLocalState::WaitingForAuthChallengeSubmitResponse
+            managed_state.initiating_state,
+            AuthorizationInitiatingState::Challenge(
+                ChallengeAuthorizationInitiatingState::WaitingForAuthChallengeSubmitResponse
             ),
         );
         assert_eq!(
-            managed_state.remote_state,
-            AuthorizationRemoteState::Done(Identity::Challenge {
+            managed_state.accepting_state,
+            AuthorizationAcceptingState::Done(Identity::Challenge {
                 public_key: public_key::PublicKey::from_bytes(
                     other_signer
                         .public_key()
@@ -1045,18 +1045,18 @@ mod tests {
             .expect("lock poisoned")
             .states
             .insert(
-                connection_id.to_string(),
-                ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Challenge(
-                        ChallengeAuthorizationLocalState::WaitingForAuthChallengeSubmitResponse,
-                    ),
-                    remote_state: AuthorizationRemoteState::Done(Identity::Challenge {
-                        public_key: public_key.clone(),
-                    }),
-                    received_complete: false,
-                    local_authorization: None,
-                },
-            );
+            connection_id.to_string(),
+            ManagedAuthorizationState {
+                initiating_state: AuthorizationInitiatingState::Challenge(
+                    ChallengeAuthorizationInitiatingState::WaitingForAuthChallengeSubmitResponse,
+                ),
+                accepting_state: AuthorizationAcceptingState::Done(Identity::Challenge {
+                    public_key: public_key.clone(),
+                }),
+                received_complete: false,
+                local_authorization: None,
+            },
+        );
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
         let local_signer = new_signer();
@@ -1124,12 +1124,12 @@ mod tests {
             .expect("missing managed state for connection id");
 
         assert_eq!(
-            managed_state.local_state,
-            AuthorizationLocalState::WaitForComplete
+            managed_state.initiating_state,
+            AuthorizationInitiatingState::WaitForComplete
         );
         assert_eq!(
-            managed_state.remote_state,
-            AuthorizationRemoteState::Done(Identity::Challenge { public_key })
+            managed_state.accepting_state,
+            AuthorizationAcceptingState::Done(Identity::Challenge { public_key })
         );
         assert_eq!(managed_state.received_complete, false);
     }
@@ -1160,18 +1160,18 @@ mod tests {
             .expect("lock poisoned")
             .states
             .insert(
-                connection_id.to_string(),
-                ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Challenge(
-                        ChallengeAuthorizationLocalState::WaitingForAuthChallengeSubmitResponse,
-                    ),
-                    remote_state: AuthorizationRemoteState::Done(Identity::Challenge {
-                        public_key: public_key.clone(),
-                    }),
-                    received_complete: true,
-                    local_authorization: None,
-                },
-            );
+            connection_id.to_string(),
+            ManagedAuthorizationState {
+                initiating_state: AuthorizationInitiatingState::Challenge(
+                    ChallengeAuthorizationInitiatingState::WaitingForAuthChallengeSubmitResponse,
+                ),
+                accepting_state: AuthorizationAcceptingState::Done(Identity::Challenge {
+                    public_key: public_key.clone(),
+                }),
+                received_complete: true,
+                local_authorization: None,
+            },
+        );
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
         let local_signer = new_signer();
@@ -1239,12 +1239,12 @@ mod tests {
             .expect("missing managed state for connection id");
 
         assert_eq!(
-            managed_state.local_state,
-            AuthorizationLocalState::AuthorizedAndComplete,
+            managed_state.initiating_state,
+            AuthorizationInitiatingState::AuthorizedAndComplete,
         );
         assert_eq!(
-            managed_state.remote_state,
-            AuthorizationRemoteState::Done(Identity::Challenge { public_key })
+            managed_state.accepting_state,
+            AuthorizationAcceptingState::Done(Identity::Challenge { public_key })
         );
         assert_eq!(managed_state.received_complete, true);
     }
