@@ -16,6 +16,7 @@
 
 use crate::error::InvalidStateError;
 use crate::network::auth::{AuthorizationManagerStateMachine, ConnectionAuthorizationType};
+use crate::protocol::authorization::PeerAuthorizationType;
 
 use super::{AuthProtocolRequestHandler, AuthProtocolResponseHandler};
 
@@ -58,12 +59,45 @@ impl AuthProtocolRequestHandlerBuilder {
             InvalidStateError::with_message("Missing required `auth_manager` field".to_string())
         })?;
 
+        let mut accepted_authorizations = vec![];
+        #[cfg(feature = "trust-authorization")]
+        {
+            accepted_authorizations.push(PeerAuthorizationType::Trust);
+        }
+
+        // If expected_authorization type is set, that means we are the side that has
+        // circuit/proposal and we need to make sure that we only send the authorization
+        // type that is required, otherwise the other side (which does not yet have a
+        // circuit/proposal information) could choose the wrong type of authorization. If
+        // we do not have an expected authorization type we want to include all of the
+        // supported authorization types so the other side can make the decision on what
+        // type of authorization to do.
+        #[cfg(feature = "challenge-authorization")]
+        match self.expected_authorization {
+            #[cfg(feature = "trust-authorization")]
+            Some(ConnectionAuthorizationType::Trust { .. }) => (),
+            Some(ConnectionAuthorizationType::Challenge { .. }) => {
+                accepted_authorizations = vec![PeerAuthorizationType::Challenge]
+            }
+            // if None, check required local authorization type as well
+            _ => {
+                match self.local_authorization {
+                    #[cfg(feature = "trust-authorization")]
+                    Some(ConnectionAuthorizationType::Trust { .. }) => (),
+                    Some(ConnectionAuthorizationType::Challenge { .. }) => {
+                        accepted_authorizations = vec![PeerAuthorizationType::Challenge]
+                    }
+                    _ => {
+                        // if trust is enabled it was already added
+                        accepted_authorizations.push(PeerAuthorizationType::Challenge)
+                    }
+                }
+            }
+        };
+
         Ok(AuthProtocolRequestHandler {
             auth_manager,
-            #[cfg(feature = "challenge-authorization")]
-            expected_authorization: self.expected_authorization,
-            #[cfg(feature = "challenge-authorization")]
-            local_authorization: self.local_authorization,
+            accepted_authorizations,
         })
     }
 }

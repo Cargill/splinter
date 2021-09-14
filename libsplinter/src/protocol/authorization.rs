@@ -233,7 +233,7 @@ pub struct AuthProtocolRequest {
     pub auth_protocol_max: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PeerAuthorizationType {
     Trust,
     Challenge,

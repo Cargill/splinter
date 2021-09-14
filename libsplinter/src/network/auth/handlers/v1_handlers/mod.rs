@@ -51,10 +51,7 @@ use crate::protos::prelude::*;
 /// Handler for the Authorization Protocol Request Message Type
 pub struct AuthProtocolRequestHandler {
     auth_manager: AuthorizationManagerStateMachine,
-    #[cfg(feature = "challenge-authorization")]
-    expected_authorization: Option<ConnectionAuthorizationType>,
-    #[cfg(feature = "challenge-authorization")]
-    local_authorization: Option<ConnectionAuthorizationType>,
+    accepted_authorizations: Vec<PeerAuthorizationType>,
 }
 
 impl Handler for AuthProtocolRequestHandler {
@@ -116,45 +113,9 @@ impl Handler for AuthProtocolRequestHandler {
                     version
                 );
 
-                let mut accepted_authorization_type = vec![];
-                #[cfg(feature = "trust-authorization")]
-                {
-                    accepted_authorization_type.push(PeerAuthorizationType::Trust);
-                }
-
-                // If expected_authorization type is set, that means we are the side that has
-                // circuit/proposal and we need to make sure that we only send the authorization
-                // type that is required, otherwise the other side (which does not yet have a
-                // circuit/proposal information) could choose the wrong type of authorization. If
-                // we do not have an expected authorization type we want to include all of the
-                // supported authorization types so the other side can make the decision on what
-                // type of authorization to do.
-                #[cfg(feature = "challenge-authorization")]
-                match self.expected_authorization {
-                    #[cfg(feature = "trust-authorization")]
-                    Some(ConnectionAuthorizationType::Trust { .. }) => (),
-                    Some(ConnectionAuthorizationType::Challenge { .. }) => {
-                        accepted_authorization_type = vec![PeerAuthorizationType::Challenge]
-                    }
-                    // if None, check required local authorization type as well
-                    _ => {
-                        match self.local_authorization {
-                            #[cfg(feature = "trust-authorization")]
-                            Some(ConnectionAuthorizationType::Trust { .. }) => (),
-                            Some(ConnectionAuthorizationType::Challenge { .. }) => {
-                                accepted_authorization_type = vec![PeerAuthorizationType::Challenge]
-                            }
-                            _ => {
-                                // if trust is enabled it was already added
-                                accepted_authorization_type.push(PeerAuthorizationType::Challenge)
-                            }
-                        }
-                    }
-                };
-
                 let response = AuthorizationMessage::AuthProtocolResponse(AuthProtocolResponse {
                     auth_protocol: version,
-                    accepted_authorization_type,
+                    accepted_authorization_type: self.accepted_authorizations.to_vec(),
                 });
 
                 let msg_bytes = IntoBytes::<network::NetworkMessage>::into_bytes(
