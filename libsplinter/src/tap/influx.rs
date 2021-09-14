@@ -38,10 +38,20 @@ struct Counter<'a> {
     value: u64,
 }
 
+struct CounterEntry {
+    time: DateTime<Utc>,
+    value: u64,
+}
+
 #[derive(InfluxDbWriteable)]
 struct Gauge<'a> {
     time: DateTime<Utc>,
     key: &'a str,
+    value: f64,
+}
+
+struct GaugeEntry {
+    time: DateTime<Utc>,
     value: f64,
 }
 
@@ -96,8 +106,8 @@ impl InfluxRecorder {
         let client = Client::new(db_url, db_name).with_auth(username, password);
 
         let join_handle = rt.spawn(async move {
-            let mut counters = HashMap::new();
-            let mut gauges = HashMap::new();
+            let mut counters: HashMap<Box<str>, CounterEntry> = HashMap::new();
+            let mut gauges: HashMap<Box<str>, GaugeEntry> = HashMap::new();
             loop {
                 match recv.recv().await {
                     Some(MetricRequest::Counter {
@@ -107,13 +117,13 @@ impl InfluxRecorder {
                         time,
                     }) => {
                         let counter = {
-                            if let Some((mut counter, mut count_time)) = counters.get_mut(&*key) {
-                                counter += value;
-                                count_time = time;
+                            if let Some(mut counter_entry) = counters.get_mut(&*key) {
+                                counter_entry.value += value;
+                                counter_entry.time = time;
                                 Counter {
                                     key: &*key,
-                                    value: counter,
-                                    time: count_time,
+                                    value: counter_entry.value,
+                                    time: counter_entry.time,
                                 }
                             } else {
                                 let counter = Counter {
@@ -123,7 +133,7 @@ impl InfluxRecorder {
                                 };
                                 // Convert the Cow<'_, str> to a Box<str> to only create a pointer
                                 // to the immutable str
-                                counters.insert(Box::from(&*key), (value, time));
+                                counters.insert(Box::from(&*key), CounterEntry { value, time });
 
                                 counter
                             }
@@ -144,17 +154,17 @@ impl InfluxRecorder {
                         time,
                     }) => {
                         let gauge = {
-                            if let Some((mut gauge_value, mut gauge_time)) = gauges.get_mut(&*key) {
+                            if let Some(mut gauge_entry) = gauges.get_mut(&*key) {
                                 match value {
-                                    GaugeValue::Absolute(total) => gauge_value = total,
-                                    GaugeValue::Increment(amount) => gauge_value += amount,
-                                    GaugeValue::Decrement(amount) => gauge_value -= amount,
+                                    GaugeValue::Absolute(total) => gauge_entry.value = total,
+                                    GaugeValue::Increment(amount) => gauge_entry.value += amount,
+                                    GaugeValue::Decrement(amount) => gauge_entry.value -= amount,
                                 }
-                                gauge_time = time;
+                                gauge_entry.time = time;
                                 Gauge {
-                                    time: gauge_time,
+                                    time: gauge_entry.time,
                                     key: &*key,
-                                    value: gauge_value,
+                                    value: gauge_entry.value,
                                 }
                             } else {
                                 let mut gauge_value = 0.0;
@@ -163,7 +173,13 @@ impl InfluxRecorder {
                                     GaugeValue::Increment(amount) => gauge_value += amount,
                                     GaugeValue::Decrement(amount) => gauge_value -= amount,
                                 }
-                                gauges.insert(Box::from(&*key), (gauge_value, time));
+                                gauges.insert(
+                                    Box::from(&*key),
+                                    GaugeEntry {
+                                        value: gauge_value,
+                                        time,
+                                    },
+                                );
 
                                 Gauge {
                                     time,
