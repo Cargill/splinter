@@ -362,14 +362,13 @@ mod tests {
         auth_msg.set_payload(msg.write_to_bytes().unwrap());
         let msg_bytes = auth_msg.write_to_bytes().unwrap();
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (recipient, message_bytes) = mock_sender
             .next_outbound()
@@ -438,14 +437,13 @@ mod tests {
         auth_msg.set_payload(msg.write_to_bytes().unwrap());
         let msg_bytes = auth_msg.write_to_bytes().unwrap();
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (_, msg_bytes) = mock_sender
             .next_outbound()
@@ -497,14 +495,13 @@ mod tests {
         auth_msg.set_payload(msg.write_to_bytes().unwrap());
 
         let msg_bytes = auth_msg.write_to_bytes().unwrap();
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (_, msg_bytes) = mock_sender
             .next_outbound()
@@ -521,14 +518,13 @@ mod tests {
         auth_msg.set_message_type(authorization::AuthorizationMessageType::TRUST_REQUEST);
         auth_msg.set_payload(trust_req.write_to_bytes().unwrap());
         let msg_bytes = auth_msg.write_to_bytes().unwrap();
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (_, msg_bytes) = mock_sender
             .next_outbound()

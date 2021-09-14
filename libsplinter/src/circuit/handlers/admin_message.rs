@@ -400,9 +400,8 @@ mod tests {
         direct_message.set_correlation_id("random_corr_id".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("5678"),
                     #[cfg(feature = "challenge-authorization")]
@@ -412,7 +411,7 @@ mod tests {
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
-        );
+            .is_ok());
 
         let (id, message) = mock_sender.next_outbound().expect("No message was sent");
         assert_network_message(
@@ -506,9 +505,8 @@ mod tests {
         direct_message.set_correlation_id("random_corr_id".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("5678"),
                     #[cfg(feature = "challenge-authorization")]
@@ -518,7 +516,7 @@ mod tests {
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
-        );
+            .is_ok());
 
         let (id, message) = mock_sender.next_outbound().expect("No message was sent");
         assert_network_message(
@@ -612,9 +610,8 @@ mod tests {
         direct_message.set_correlation_id("random_corr_id".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("1234"),
                     #[cfg(feature = "challenge-authorization")]
@@ -624,7 +621,7 @@ mod tests {
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
-        );
+            .is_ok());
         let (id, message) = mock_sender.next_outbound().expect("No message was sent");
         assert_network_message(
             message,
@@ -672,9 +669,8 @@ mod tests {
         direct_message.set_correlation_id("random_corr_id".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("1234"),
                     #[cfg(feature = "challenge-authorization")]
@@ -684,7 +680,7 @@ mod tests {
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
-        );
+            .is_ok());
 
         let (id, message) = mock_sender.next_outbound().expect("No message was sent");
         assert_network_message(
@@ -734,9 +730,8 @@ mod tests {
         direct_message.set_correlation_id("random_corr_id".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_public_key(
                         &parse_hex("5678").expect("Unable to parse hex"),
@@ -750,7 +745,7 @@ mod tests {
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
-        );
+            .is_ok());
 
         let (id, message) = mock_sender.next_outbound().expect("No message was sent");
         assert_network_message(
@@ -806,9 +801,8 @@ mod tests {
         direct_message.set_correlation_id("random_corr_id".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("1234"),
                     #[cfg(feature = "challenge-authorization")]
@@ -818,7 +812,7 @@ mod tests {
                 &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                 direct_bytes
             )
-        );
+            .is_ok());
         let (id, message) = mock_sender.next_outbound().expect("No message was sent");
         assert_network_message(
             message,

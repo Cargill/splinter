@@ -595,14 +595,13 @@ mod tests {
         )
         .expect("Unable to get message bytes for auth protocol request");
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (recipient, message_bytes) = mock_sender
             .next_outbound()
@@ -676,14 +675,13 @@ mod tests {
         )
         .expect("Unable to get message bytes");
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (recipient, message_bytes) = mock_sender
             .next_outbound()
@@ -761,14 +759,13 @@ mod tests {
         )
         .expect("Unable to get message bytes");
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         assert_eq!(mock_sender.next_outbound(), None);
 
