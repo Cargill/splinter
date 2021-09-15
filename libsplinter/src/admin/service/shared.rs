@@ -1158,11 +1158,11 @@ impl AdminServiceShared {
         // initialize circuit and proposal metrics
         gauge!(
             "splinter.admin.circuits.active",
-            self.admin_store.count_circuits(&[])? as i64
+            self.admin_store.count_circuits(&[])? as f64
         );
         gauge!(
             "splinter.admin.proposals",
-            self.admin_store.count_proposals(&[])? as i64
+            self.admin_store.count_proposals(&[])? as f64
         );
         Ok(())
     }
@@ -1285,7 +1285,7 @@ impl AdminServiceShared {
                 ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
                     String::from("Unable to get count of circuits"),
                 )))
-            })? as i64
+            })? as f64
         );
 
         // The circuit is able to be abandoned, so we will proceed with removing the circuit's

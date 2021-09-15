@@ -107,7 +107,7 @@ impl ScabbardShared {
         };
 
         // initialize pending_batches metric
-        scabbard_shared.update_pending_batches(0);
+        scabbard_shared.update_pending_batches(0.0);
 
         scabbard_shared
     }
@@ -140,7 +140,7 @@ impl ScabbardShared {
     /// * `_batches` - The number of pending batches for this service. It is prefixed with an
     /// underscore due to rust recognizing the metrics macro noop when the metrics feature is
     /// disabled
-    fn update_pending_batches(&self, _batches: i64) {
+    fn update_pending_batches(&self, _batches: f64) {
         gauge!(
             "splinter.scabbard.pending_batches",
             _batches,
@@ -150,7 +150,7 @@ impl ScabbardShared {
 
     pub fn add_batch_to_queue(&mut self, batch: BatchPair) -> Result<(), ScabbardError> {
         self.batch_queue.push_back(batch);
-        self.update_pending_batches(self.batch_queue.len() as i64);
+        self.update_pending_batches(self.batch_queue.len() as f64);
 
         #[cfg(feature = "back-pressure")]
         {
@@ -187,7 +187,7 @@ impl ScabbardShared {
 
         // if the batch is some, the length of pending batches has changed
         if batch.is_some() {
-            self.update_pending_batches(self.batch_queue.len() as i64);
+            self.update_pending_batches(self.batch_queue.len() as f64);
         }
 
         #[cfg(feature = "back-pressure")]

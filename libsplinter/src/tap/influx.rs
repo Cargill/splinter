@@ -18,13 +18,12 @@
 //!
 //! Available if the `metrics` feature is enabled
 
-use std::borrow::Cow;
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use influxdb::Client;
 use influxdb::InfluxDbWriteable;
-use metrics_lib::{Key, Label, Recorder};
+use metrics::{GaugeValue, Key, Label, Recorder, SharedString, Unit};
 use tokio_0_2::runtime::Runtime;
 use tokio_0_2::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_0_2::task::JoinHandle;
@@ -39,36 +38,46 @@ struct Counter<'a> {
     value: u64,
 }
 
+struct CounterEntry {
+    time: DateTime<Utc>,
+    value: u64,
+}
+
 #[derive(InfluxDbWriteable)]
 struct Gauge<'a> {
     time: DateTime<Utc>,
     key: &'a str,
-    value: i64,
+    value: f64,
+}
+
+struct GaugeEntry {
+    time: DateTime<Utc>,
+    value: f64,
 }
 
 #[derive(InfluxDbWriteable)]
 struct Histogram<'a> {
     time: DateTime<Utc>,
     key: &'a str,
-    value: u64,
+    value: f64,
 }
 
 enum MetricRequest {
     Counter {
-        key: Cow<'static, str>,
+        key: SharedString,
         value: u64,
         labels: Vec<Label>,
         time: DateTime<Utc>,
     },
     Gauge {
-        key: Cow<'static, str>,
-        value: i64,
+        key: SharedString,
+        value: GaugeValue,
         labels: Vec<Label>,
         time: DateTime<Utc>,
     },
     Histogram {
-        key: Cow<'static, str>,
-        value: u64,
+        key: SharedString,
+        value: f64,
         labels: Vec<Label>,
         time: DateTime<Utc>,
     },
@@ -97,7 +106,8 @@ impl InfluxRecorder {
         let client = Client::new(db_url, db_name).with_auth(username, password);
 
         let join_handle = rt.spawn(async move {
-            let mut counters = HashMap::new();
+            let mut counters: HashMap<Box<str>, CounterEntry> = HashMap::new();
+            let mut gauges: HashMap<Box<str>, GaugeEntry> = HashMap::new();
             loop {
                 match recv.recv().await {
                     Some(MetricRequest::Counter {
@@ -107,13 +117,13 @@ impl InfluxRecorder {
                         time,
                     }) => {
                         let counter = {
-                            if let Some((mut counter, mut count_time)) = counters.get_mut(&*key) {
-                                counter += value;
-                                count_time = time;
+                            if let Some(mut counter_entry) = counters.get_mut(&*key) {
+                                counter_entry.value += value;
+                                counter_entry.time = time;
                                 Counter {
                                     key: &*key,
-                                    value: counter,
-                                    time: count_time,
+                                    value: counter_entry.value,
+                                    time: counter_entry.time,
                                 }
                             } else {
                                 let counter = Counter {
@@ -123,7 +133,7 @@ impl InfluxRecorder {
                                 };
                                 // Convert the Cow<'_, str> to a Box<str> to only create a pointer
                                 // to the immutable str
-                                counters.insert(Box::from(&*key), (value, time));
+                                counters.insert(Box::from(&*key), CounterEntry { value, time });
 
                                 counter
                             }
@@ -143,10 +153,40 @@ impl InfluxRecorder {
                         labels,
                         time,
                     }) => {
-                        let gauge = Gauge {
-                            time,
-                            key: &*key,
-                            value,
+                        let gauge = {
+                            if let Some(mut gauge_entry) = gauges.get_mut(&*key) {
+                                match value {
+                                    GaugeValue::Absolute(total) => gauge_entry.value = total,
+                                    GaugeValue::Increment(amount) => gauge_entry.value += amount,
+                                    GaugeValue::Decrement(amount) => gauge_entry.value -= amount,
+                                }
+                                gauge_entry.time = time;
+                                Gauge {
+                                    time: gauge_entry.time,
+                                    key: &*key,
+                                    value: gauge_entry.value,
+                                }
+                            } else {
+                                let mut gauge_value = 0.0;
+                                match value {
+                                    GaugeValue::Absolute(total) => gauge_value = total,
+                                    GaugeValue::Increment(amount) => gauge_value += amount,
+                                    GaugeValue::Decrement(amount) => gauge_value -= amount,
+                                }
+                                gauges.insert(
+                                    Box::from(&*key),
+                                    GaugeEntry {
+                                        value: gauge_value,
+                                        time,
+                                    },
+                                );
+
+                                Gauge {
+                                    time,
+                                    key: &*key,
+                                    value: gauge_value,
+                                }
+                            }
                         };
                         let mut query = gauge.into_query(&*key);
                         for label in labels {
@@ -208,7 +248,7 @@ impl InfluxRecorder {
         password: &str,
     ) -> Result<(), InternalError> {
         let recorder = Self::new(db_url, db_name, username, password)?;
-        metrics_lib::set_boxed_recorder(Box::new(recorder))
+        metrics::set_boxed_recorder(Box::new(recorder))
             .map_err(|err| InternalError::from_source(Box::new(err)))
     }
 }
@@ -228,8 +268,8 @@ impl ShutdownHandle for InfluxRecorder {
 }
 
 impl Recorder for InfluxRecorder {
-    fn increment_counter(&self, key: Key, value: u64) {
-        let (name, labels) = key.into_parts();
+    fn increment_counter(&self, key: &Key, value: u64) {
+        let (name, labels) = key.clone().into_parts();
         if let Err(err) = self.sender.send(MetricRequest::Counter {
             key: name,
             labels,
@@ -240,8 +280,8 @@ impl Recorder for InfluxRecorder {
         };
     }
 
-    fn update_gauge(&self, key: Key, value: i64) {
-        let (name, labels) = key.into_parts();
+    fn update_gauge(&self, key: &Key, value: GaugeValue) {
+        let (name, labels) = key.clone().into_parts();
         if let Err(err) = self.sender.send(MetricRequest::Gauge {
             key: name,
             labels,
@@ -252,8 +292,8 @@ impl Recorder for InfluxRecorder {
         };
     }
 
-    fn record_histogram(&self, key: Key, value: u64) {
-        let (name, labels) = key.into_parts();
+    fn record_histogram(&self, key: &Key, value: f64) {
+        let (name, labels) = key.clone().into_parts();
         if let Err(err) = self.sender.send(MetricRequest::Histogram {
             key: name,
             labels,
@@ -261,6 +301,47 @@ impl Recorder for InfluxRecorder {
             time: Utc::now(),
         }) {
             error!("Unable to record histogram metric, {}", err);
+        };
+    }
+
+    fn register_counter(&self, key: &Key, _unit: Option<Unit>, _description: Option<&'static str>) {
+        let (name, labels) = key.clone().into_parts();
+        if let Err(err) = self.sender.send(MetricRequest::Counter {
+            key: name,
+            labels,
+            value: 0,
+            time: Utc::now(),
+        }) {
+            error!("Unable to to register counter metric, {}", err);
+        };
+    }
+
+    fn register_gauge(&self, key: &Key, _unit: Option<Unit>, _description: Option<&'static str>) {
+        let (name, labels) = key.clone().into_parts();
+        if let Err(err) = self.sender.send(MetricRequest::Gauge {
+            key: name,
+            labels,
+            value: GaugeValue::Absolute(0.0),
+            time: Utc::now(),
+        }) {
+            error!("Unable to register gauge metric, {}", err);
+        };
+    }
+
+    fn register_histogram(
+        &self,
+        key: &Key,
+        _unit: Option<Unit>,
+        _description: Option<&'static str>,
+    ) {
+        let (name, labels) = key.clone().into_parts();
+        if let Err(err) = self.sender.send(MetricRequest::Histogram {
+            key: name,
+            labels,
+            value: 0.0,
+            time: Utc::now(),
+        }) {
+            error!("Unable to register histogram metric, {}", err);
         };
     }
 }

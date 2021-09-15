@@ -170,7 +170,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 )
         }
 
-        #[cfg(feature = "metrics")]
+        #[cfg(feature = "tap")]
         {
             partial_config = partial_config
                 .with_metrics_db(self.matches.value_of("metrics_db").map(String::from))

@@ -51,8 +51,7 @@ hyper = { version = "0.12", optional = true }
 jsonwebtoken = { version = "6.0", optional = true }
 influxdb = { version = "0.4.0", features = ["derive"], optional = true }
 log = "0.3.0"
-# rename to not conflict with splinter::metrics
-metrics-lib = {package = "metrics", version = "0.12", features = ["std"], optional = true}
+metrics = {version = "0.17", features = ["std"], optional = true}
 mio = { version = "0.6", default-features = false }
 mio-extras = "2"
 oauth2 = { version = "3.0", optional = true }
@@ -126,12 +125,12 @@ experimental = [
     "challenge-authorization",
     "client-reqwest",
     "https-bind",
-    "metrics",
     "registry-client",
     "registry-client-reqwest",
     "rest-api-actix-web-3",
     "service-arg-validation",
     "service-network",
+    "tap",
     "ws-transport",
     "zmq-transport",
 ]
@@ -165,7 +164,6 @@ cylinder-jwt = ["cylinder/jwt", "rest-api"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
 memory = ["sqlite"]
-metrics = ["chrono", "futures-0-3", "influxdb", "metrics-lib", "tokio-0-2"]
 node-id-store = []
 oauth = ["biome", "base64", "oauth2", "reqwest", "rest-api"]
 postgres = ["diesel/postgres", "diesel_migrations"]
@@ -189,6 +187,7 @@ service-arg-validation = []
 service-network = []
 sqlite = ["diesel/sqlite", "diesel_migrations"]
 store-factory = []
+tap = ["chrono", "futures-0-3", "influxdb", "metrics", "tokio-0-2"]
 trust-authorization = []
 ws-transport = ["tungstenite"]
 zmq-transport = ["zmq"]

@@ -338,22 +338,22 @@ impl ConfigBuilder {
                 .iter()
                 .find_map(|p| p.strict_ref_counts().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("strict_ref_counts".to_string()))?,
-            #[cfg(feature = "metrics")]
+            #[cfg(feature = "tap")]
             metrics_db: self
                 .partial_configs
                 .iter()
                 .find_map(|p| p.metrics_db().map(|v| (v, p.source()))),
-            #[cfg(feature = "metrics")]
+            #[cfg(feature = "tap")]
             metrics_url: self
                 .partial_configs
                 .iter()
                 .find_map(|p| p.metrics_url().map(|v| (v, p.source()))),
-            #[cfg(feature = "metrics")]
+            #[cfg(feature = "tap")]
             metrics_username: self
                 .partial_configs
                 .iter()
                 .find_map(|p| p.metrics_username().map(|v| (v, p.source()))),
-            #[cfg(feature = "metrics")]
+            #[cfg(feature = "tap")]
             metrics_password: self
                 .partial_configs
                 .iter()
