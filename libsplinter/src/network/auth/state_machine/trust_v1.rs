@@ -76,14 +76,14 @@ impl fmt::Display for TrustAuthorizationRemoteAction {
 /// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
 pub(crate) enum TrustAuthorizationLocalAction {
-    SendAuthTrustRequest,
+    SendAuthTrustRequest(Identity),
     ReceiveAuthTrustResponse,
 }
 
 impl fmt::Display for TrustAuthorizationLocalAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TrustAuthorizationLocalAction::SendAuthTrustRequest => {
+            TrustAuthorizationLocalAction::SendAuthTrustRequest(_) => {
                 f.write_str("SendAuthTrustRequest")
             }
             TrustAuthorizationLocalAction::ReceiveAuthTrustResponse => {
@@ -106,7 +106,8 @@ impl TrustAuthorizationLocalState {
     ) -> Result<AuthorizationLocalState, AuthorizationActionError> {
         match &self {
             TrustAuthorizationLocalState::TrustConnecting => match action {
-                TrustAuthorizationLocalAction::SendAuthTrustRequest => {
+                TrustAuthorizationLocalAction::SendAuthTrustRequest(identity) => {
+                    cur_state.local_authorization = Some(identity);
                     let new_state = AuthorizationLocalState::Trust(
                         TrustAuthorizationLocalState::WaitingForAuthTrustResponse,
                     );

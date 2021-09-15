@@ -41,7 +41,7 @@ use crate::transport::matrix::{
 
 use super::connector::{PeerLookup, PeerLookupProvider};
 use super::error::PeerInterconnectError;
-use super::PeerAuthorizationToken;
+use super::PeerTokenPair;
 
 const DEFAULT_PENDING_QUEUE_SIZE: usize = 100;
 const DEFAULT_TIME_BETWEEN_ATTEMPTS: u64 = 10; // 10 seconds
@@ -52,7 +52,7 @@ const DEFAULT_INITIAL_ATTEMPTS: usize = 3; // 3 attempts
 pub(crate) enum SendRequest {
     Shutdown,
     Message {
-        recipient: PeerAuthorizationToken,
+        recipient: PeerTokenPair,
         payload: Vec<u8>,
     },
 }
@@ -81,9 +81,9 @@ impl NetworkMessageSender {
     /// * `payload` - the bytes of the message that should be sent
     pub fn send(
         &self,
-        recipient: PeerAuthorizationToken,
+        recipient: PeerTokenPair,
         payload: Vec<u8>,
-    ) -> Result<(), (PeerAuthorizationToken, Vec<u8>)> {
+    ) -> Result<(), (PeerTokenPair, Vec<u8>)> {
         self.sender
             .send(SendRequest::Message { recipient, payload })
             .map_err(|err| match err.0 {
@@ -373,7 +373,7 @@ fn run_recv_loop<R>(
 where
     R: ConnectionMatrixReceiver + 'static,
 {
-    let mut connection_id_to_peer_id: HashMap<String, PeerAuthorizationToken> = HashMap::new();
+    let mut connection_id_to_peer_id: HashMap<String, PeerTokenPair> = HashMap::new();
     loop {
         // receive messages from peers
         let envelope = match message_receiver.recv() {
@@ -456,7 +456,7 @@ fn run_send_loop<S>(
 where
     S: ConnectionMatrixSender + 'static,
 {
-    let mut peer_id_to_connection_id: HashMap<PeerAuthorizationToken, String> = HashMap::new();
+    let mut peer_id_to_connection_id: HashMap<PeerTokenPair, String> = HashMap::new();
     loop {
         // receive message from internal handlers to send over the network
         let (recipient, payload) = match receiver.recv() {
@@ -538,7 +538,7 @@ fn run_pending_recv_loop(
     receiver: Receiver<RetryIncoming>,
     dispatch_msg_sender: DispatchMessageSender<NetworkMessageType>,
 ) -> Result<(), String> {
-    let mut connection_id_to_peer_id: HashMap<String, PeerAuthorizationToken> = HashMap::new();
+    let mut connection_id_to_peer_id: HashMap<String, PeerTokenPair> = HashMap::new();
     let mut pending_queue = VecDeque::new();
     loop {
         match receiver.recv() {
@@ -646,7 +646,7 @@ pub mod tests {
         dispatch_channel, DispatchError, DispatchLoopBuilder, Dispatcher, Handler, MessageContext,
         MessageSender, PeerId,
     };
-    use crate::peer::{PeerManager, PeerManagerNotification};
+    use crate::peer::{PeerAuthorizationToken, PeerManager, PeerManagerNotification};
     use crate::protos::network::NetworkEcho;
     use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
@@ -800,7 +800,11 @@ pub mod tests {
 
         assert_eq!(
             peer_ref.peer_id(),
-            &PeerAuthorizationToken::from_peer_id("test_peer"),
+            &PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("test_peer"),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_peer_id("my_id"),
+            )
         );
 
         // timeout after 60 seconds
@@ -811,7 +815,11 @@ pub mod tests {
         assert_eq!(
             notification,
             PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::from_peer_id("test_peer")
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("test_peer"),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("my_id"),
+                )
             }
         );
 
@@ -930,7 +938,12 @@ pub mod tests {
             } else {
                 assert_eq!(
                     message_context.source_peer_id(),
-                    &PeerId::from(PeerAuthorizationToken::from_peer_id("test_peer"))
+                    &PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("test_peer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("my_id"),
+                    )
+                    .into()
                 );
                 let echo_bytes = message.write_to_bytes().unwrap();
 
@@ -993,9 +1006,9 @@ pub mod tests {
                     identity: self.authorized_id.clone(),
                 },
                 #[cfg(feature = "challenge-authorization")]
-                expected_authorization,
+                expected_authorization: expected_authorization.unwrap(),
                 #[cfg(feature = "challenge-authorization")]
-                local_authorization,
+                local_authorization: local_authorization.unwrap(),
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

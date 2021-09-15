@@ -20,16 +20,16 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::{Receiver, TryRecvError};
 
 use super::error::PeerManagerError;
-use super::PeerAuthorizationToken;
+use super::PeerTokenPair;
 
 /// Messages that will be dispatched to all subscription handlers
 #[derive(Debug, PartialEq, Clone)]
 pub enum PeerManagerNotification {
     /// Notifies subscribers that a peer is connected. Includes the peer ID of the connected peer.
-    Connected { peer: PeerAuthorizationToken },
+    Connected { peer: PeerTokenPair },
     /// Notifies subscribers that a peer is disconnected. Include the peer ID of the disconnected
     /// peer.
-    Disconnected { peer: PeerAuthorizationToken },
+    Disconnected { peer: PeerTokenPair },
 }
 
 /// `PeerNotificationIter` is used to receive notfications from the `PeerManager`. The notifications
@@ -154,6 +154,8 @@ pub mod tests {
     use std::sync::mpsc::channel;
     use std::thread;
 
+    use crate::peer::PeerAuthorizationToken;
+
     /// Tests that notifier iterator correctly exists when sender
     /// is dropped.
     ///
@@ -178,9 +180,15 @@ pub mod tests {
         let join_handle = thread::spawn(move || {
             for i in 0..5 {
                 send.send(PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::Trust {
-                        peer_id: format!("test_peer{}", i),
-                    },
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::Trust {
+                            peer_id: format!("test_peer{}", i),
+                        },
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::Trust {
+                            peer_id: "local".into(),
+                        },
+                    ),
                 })
                 .unwrap();
             }
@@ -191,9 +199,15 @@ pub mod tests {
             assert_eq!(
                 notifcation,
                 PeerManagerNotification::Connected {
-                    peer: PeerAuthorizationToken::Trust {
-                        peer_id: format!("test_peer{}", notifications_sent),
-                    },
+                    peer: PeerTokenPair::new(
+                        PeerAuthorizationToken::Trust {
+                            peer_id: format!("test_peer{}", notifications_sent),
+                        },
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::Trust {
+                            peer_id: "local".into(),
+                        },
+                    ),
                 }
             );
             notifications_sent += 1;
@@ -222,9 +236,15 @@ pub mod tests {
 
         for i in 0..3 {
             subscriber_map.broadcast(PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::Trust {
-                    peer_id: format!("test_peer_{}", i),
-                },
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::Trust {
+                        peer_id: format!("test_peer_{}", i),
+                    },
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "local".into(),
+                    },
+                ),
             })
         }
 
@@ -236,25 +256,43 @@ pub mod tests {
         assert_eq!(
             sub1.try_recv().expect("Unable to receive value"),
             PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::Trust {
-                    peer_id: "test_peer_0".into()
-                },
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "test_peer_0".into()
+                    },
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "local".into()
+                    },
+                )
             }
         );
         assert_eq!(
             sub1.try_recv().expect("Unable to receive value"),
             PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::Trust {
-                    peer_id: "test_peer_1".into()
-                },
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "test_peer_1".into()
+                    },
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "local".into()
+                    },
+                )
             }
         );
         assert_eq!(
             sub1.try_recv().expect("Unable to receive value"),
             PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::Trust {
-                    peer_id: "test_peer_2".into()
-                },
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "test_peer_2".into()
+                    },
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "local".into()
+                    },
+                )
             }
         );
 
@@ -269,25 +307,43 @@ pub mod tests {
         }));
 
         subscriber_map.broadcast(PeerManagerNotification::Connected {
-            peer: PeerAuthorizationToken::Trust {
-                peer_id: "test_peer_3".into(),
-            },
+            peer: PeerTokenPair::new(
+                PeerAuthorizationToken::Trust {
+                    peer_id: "test_peer_3".into(),
+                },
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::Trust {
+                    peer_id: "local".into(),
+                },
+            ),
         });
 
         assert_eq!(
             sub1.try_recv().expect("Unable to receive value"),
             PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::Trust {
-                    peer_id: "test_peer_3".into()
-                },
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "test_peer_3".into()
+                    },
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "local".into()
+                    },
+                )
             }
         );
         assert_eq!(
             sub2.try_recv().expect("Unable to receive value"),
             PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::Trust {
-                    peer_id: "test_peer_3".into()
-                },
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "test_peer_3".into()
+                    },
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "local".into()
+                    },
+                )
             }
         );
     }
@@ -309,7 +365,15 @@ pub mod tests {
 
         for i in 0..3 {
             subscriber_map.broadcast(PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::from_peer_id(&format!("test_peer_{}", i)),
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::Trust {
+                        peer_id: format!("test_peer_{}", i),
+                    },
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "local".into(),
+                    },
+                ),
             })
         }
 
@@ -321,9 +385,15 @@ pub mod tests {
         assert_eq!(
             sub1.try_recv().expect("Unable to receive value"),
             PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::Trust {
-                    peer_id: "test_peer_2".into()
-                },
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "test_peer_2".into()
+                    },
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "local".into()
+                    },
+                )
             }
         );
         assert!(matches!(
@@ -332,30 +402,54 @@ pub mod tests {
         ));
 
         subscriber_map.broadcast(PeerManagerNotification::Connected {
-            peer: PeerAuthorizationToken::Trust {
-                peer_id: "test_peer_3".into(),
-            },
+            peer: PeerTokenPair::new(
+                PeerAuthorizationToken::Trust {
+                    peer_id: "test_peer_3".into(),
+                },
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::Trust {
+                    peer_id: "local".into(),
+                },
+            ),
         });
         subscriber_map.broadcast(PeerManagerNotification::Connected {
-            peer: PeerAuthorizationToken::Trust {
-                peer_id: "test_peer_4".into(),
-            },
+            peer: PeerTokenPair::new(
+                PeerAuthorizationToken::Trust {
+                    peer_id: "test_peer_4".into(),
+                },
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::Trust {
+                    peer_id: "local".into(),
+                },
+            ),
         });
 
         assert_eq!(
             sub1.try_recv().expect("Unable to receive value"),
             PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::Trust {
-                    peer_id: "test_peer_3".into()
-                },
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "test_peer_3".into()
+                    },
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "local".into()
+                    },
+                )
             }
         );
         assert_eq!(
             sub1.try_recv().expect("Unable to receive value"),
             PeerManagerNotification::Connected {
-                peer: PeerAuthorizationToken::Trust {
-                    peer_id: "test_peer_4".into()
-                },
+                peer: PeerTokenPair::new(
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "test_peer_4".into()
+                    },
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::Trust {
+                        peer_id: "local".into()
+                    },
+                )
             }
         );
         assert!(matches!(

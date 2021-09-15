@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use splinter::admin::client::event::{EventType, PublicKey};
 use splinter::admin::messages::AuthorizationType;
-use splinter::peer::{PeerAuthorizationToken, PeerManagerNotification};
+use splinter::peer::{PeerAuthorizationToken, PeerManagerNotification, PeerTokenPair};
 use splinterd::node::{Node, RestApiVariant};
 
 use crate::admin::circuit_commit::{commit_2_party_circuit, commit_3_party_circuit};
@@ -131,14 +131,26 @@ pub fn test_2_party_circuit_creation_challenge_authorization_unidentified_peer()
     assert_eq!(
         notification,
         TestEnum::Notification(PeerManagerNotification::Connected {
-            peer: PeerAuthorizationToken::from_public_key(
-                node_b
-                    .signers()
-                    .get(0)
-                    .expect("node does not have enough signers configured")
-                    .public_key()
-                    .expect("Unable to get first node's public key")
-                    .as_slice(),
+            peer: PeerTokenPair::new(
+                PeerAuthorizationToken::from_public_key(
+                    node_b
+                        .signers()
+                        .get(0)
+                        .expect("node does not have enough signers configured")
+                        .public_key()
+                        .expect("Unable to get first node's public key")
+                        .as_slice(),
+                ),
+                #[cfg(feature = "challenge-authorization")]
+                PeerAuthorizationToken::from_public_key(
+                    node_a
+                        .signers()
+                        .get(0)
+                        .expect("node does not have enough signers configured")
+                        .public_key()
+                        .expect("Unable to get first node's public key")
+                        .as_slice(),
+                )
             )
         })
     );
@@ -164,7 +176,6 @@ pub fn test_2_party_circuit_creation_challenge_authorization_unidentified_peer()
 /// 9. Repeat steps 1-8 for a different circuit that sets the member public key for the first node
 ///    to the second configured key.
 #[test]
-#[ignore]
 pub fn test_2_party_circuit_creation_challenge_authorization_different_key() {
     // Start a 2-node network
     let mut network = Network::new()

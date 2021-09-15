@@ -35,16 +35,23 @@ use super::{AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError
 /// intended to only be used for known, internal connections.
 pub struct InprocAuthorizer {
     endpoint_to_identities: HashMap<String, String>,
+    #[cfg(feature = "challenge-authorization")]
+    node_id: String,
 }
 
 impl InprocAuthorizer {
     /// Construct a new InprocAuthorizer with a given mapping of endpoints to identities.
-    pub fn new<I>(identities: I) -> Self
+    pub fn new<I>(
+        identities: I,
+        #[cfg(feature = "challenge-authorization")] node_id: String,
+    ) -> Self
     where
         I: IntoIterator<Item = (String, String)>,
     {
         Self {
             endpoint_to_identities: identities.into_iter().collect(),
+            #[cfg(feature = "challenge-authorization")]
+            node_id,
         }
     }
 }
@@ -55,10 +62,10 @@ impl Authorizer for InprocAuthorizer {
         connection_id: String,
         connection: Box<dyn Connection>,
         on_complete: AuthorizerCallback,
-        #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+        #[cfg(feature = "challenge-authorization")] _expected_authorization: Option<
             ConnectionAuthorizationType,
         >,
-        #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+        #[cfg(feature = "challenge-authorization")] _local_authorization: Option<
             ConnectionAuthorizationType,
         >,
     ) -> Result<(), AuthorizerError> {
@@ -67,14 +74,20 @@ impl Authorizer for InprocAuthorizer {
             .get(&connection.remote_endpoint())
             .cloned()
         {
+            // Allow redundant_clone if challenge-authorization is not enabled
+            #[allow(clippy::redundant_clone)]
             (*on_complete)(AuthorizationResult::Authorized {
                 connection_id,
-                identity: ConnectionAuthorizationType::Trust { identity },
+                identity: ConnectionAuthorizationType::Trust {
+                    identity: identity.clone(),
+                },
                 connection,
                 #[cfg(feature = "challenge-authorization")]
-                expected_authorization,
+                expected_authorization: ConnectionAuthorizationType::Trust { identity },
                 #[cfg(feature = "challenge-authorization")]
-                local_authorization,
+                local_authorization: ConnectionAuthorizationType::Trust {
+                    identity: self.node_id.clone(),
+                },
             })
             .map_err(|err| AuthorizerError(err.to_string()))
         } else {
@@ -164,10 +177,11 @@ mod tests {
     // Test that the inproc authorizer will return a valid identity for the configured value.
     #[test]
     fn inproc_configured_authorization() {
-        let authorizer = InprocAuthorizer::new(vec![(
-            "inproc://test-conn".to_string(),
-            "test-ident1".to_string(),
-        )]);
+        let authorizer = InprocAuthorizer::new(
+            vec![("inproc://test-conn".to_string(), "test-ident1".to_string())],
+            #[cfg(feature = "challenge-authorization")]
+            "node_id".to_string(),
+        );
         let (tx, rx) = mpsc::channel();
 
         authorizer
@@ -200,10 +214,11 @@ mod tests {
     // Test that the inproc authorizer will return a Unauthorized result for a unconfigured value.
     #[test]
     fn inproc_unconfigured_authorization() {
-        let authorizer = InprocAuthorizer::new(vec![(
-            "inproc://test-conn".to_string(),
-            "test-ident1".to_string(),
-        )]);
+        let authorizer = InprocAuthorizer::new(
+            vec![("inproc://test-conn".to_string(), "test-ident1".to_string())],
+            #[cfg(feature = "challenge-authorization")]
+            "node_id".to_string(),
+        );
         let (tx, rx) = mpsc::channel();
 
         authorizer
@@ -236,17 +251,22 @@ mod tests {
     //    default.
     #[test]
     fn authorizers_configured_authorizations() {
-        let inproc_authorizer = InprocAuthorizer::new(vec![(
-            "inproc://test-conn".to_string(),
-            "test-ident1".to_string(),
-        )]);
+        let inproc_authorizer = InprocAuthorizer::new(
+            vec![("inproc://test-conn".to_string(), "test-ident1".to_string())],
+            #[cfg(feature = "challenge-authorization")]
+            "node_id".to_string(),
+        );
 
         let future_inproc_authorizer = NoopAuthorizer::new("test-ident2");
 
-        let default_authorizer = InprocAuthorizer::new(vec![(
-            "protocol://other-conn".to_string(),
-            "test-ident3".to_string(),
-        )]);
+        let default_authorizer = InprocAuthorizer::new(
+            vec![(
+                "protocol://other-conn".to_string(),
+                "test-ident3".to_string(),
+            )],
+            #[cfg(feature = "challenge-authorization")]
+            "node_id".to_string(),
+        );
 
         let mut authorizers = Authorizers::new();
         authorizers.add_authorizer("inproc2", future_inproc_authorizer);
@@ -413,10 +433,10 @@ mod tests {
             connection_id: String,
             connection: Box<dyn Connection>,
             callback: AuthorizerCallback,
-            #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+            #[cfg(feature = "challenge-authorization")] _expected_authorization: Option<
                 ConnectionAuthorizationType,
             >,
-            #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+            #[cfg(feature = "challenge-authorization")] _local_authorization: Option<
                 ConnectionAuthorizationType,
             >,
         ) -> Result<(), AuthorizerError> {
@@ -427,9 +447,13 @@ mod tests {
                     identity: self.authorized_id.clone(),
                 },
                 #[cfg(feature = "challenge-authorization")]
-                expected_authorization,
+                expected_authorization: ConnectionAuthorizationType::Trust {
+                    identity: self.authorized_id.clone(),
+                },
                 #[cfg(feature = "challenge-authorization")]
-                local_authorization,
+                local_authorization: ConnectionAuthorizationType::Trust {
+                    identity: "node_id".to_string(),
+                },
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

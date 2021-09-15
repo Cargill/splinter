@@ -186,7 +186,9 @@ message AuthChallengeSubmitRequest {
 // v1 challenge response
 //
 // Returned if the signature and public key are valid
-message AuthChallengeSubmitResponse {}
+message AuthChallengeSubmitResponse {
+    bytes public_key = 1;
+}
 
 // Returned if authorization is complete
 message AuthComplete {}

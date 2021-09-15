@@ -29,7 +29,10 @@ use crate::consensus::{
     ProposalUpdate,
 };
 use crate::consensus::{ConsensusEngine, StartupState};
+#[cfg(feature = "challenge-authorization")]
+use crate::error::InvalidStateError;
 use crate::hex::to_hex;
+use crate::peer::PeerTokenPair;
 use crate::protos::admin::{AdminMessage, AdminMessage_Type, ProposedCircuit};
 use crate::protos::two_phase::RequiredVerifiers;
 use crate::service::ServiceError;
@@ -212,11 +215,33 @@ impl ProposalManager for AdminProposalManager {
                 .get_circuit_proposal()
                 .list_nodes()
                 .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?;
+
+            #[cfg(feature = "challenge-authorization")]
+            let local_node = circuit_proposal
+                .get_circuit_proposal()
+                .get_node_token(shared.node_id())
+                .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?
+                .ok_or_else(|| {
+                    ProposalManagerError::Internal(Box::new(InvalidStateError::with_message(
+                        format!(
+                            "Proposal is missing required local authorization for node {}",
+                            shared.node_id()
+                        ),
+                    )))
+                })?;
+
             for node in peer_node {
                 if node.node_id != shared.node_id() {
                     network_sender
                         .send(
-                            &admin_service_id(&node.token.id_as_string()),
+                            &admin_service_id(
+                                &PeerTokenPair::new(
+                                    node.token.clone(),
+                                    #[cfg(feature = "challenge-authorization")]
+                                    local_node.clone(),
+                                )
+                                .id_as_string(),
+                            ),
                             &envelope_bytes,
                         )
                         .unwrap();
@@ -389,7 +414,7 @@ impl ConsensusNetworkSender for AdminConsensusNetworkSender {
         for verifier in shared.current_consensus_verifiers() {
             {
                 // don't send a message back to this service
-                if !shared.is_local_node(verifier) {
+                if !shared.is_local_node(verifier.peer_id()) {
                     network_sender
                         .send(
                             &admin_service_id(&verifier.id_as_string()),

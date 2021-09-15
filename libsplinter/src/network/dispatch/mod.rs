@@ -31,30 +31,30 @@ pub use r#loop::{
     DispatchMessageReceiver, DispatchMessageSender,
 };
 
-use crate::peer::PeerAuthorizationToken;
+use crate::peer::PeerTokenPair;
 
 /// A wrapper for a PeerId.
 ///
 /// This type constrains a dispatcher to peer-specific messages
 #[derive(Debug, Clone, PartialEq)]
-pub struct PeerId(PeerAuthorizationToken);
+pub struct PeerId(PeerTokenPair);
 
 impl std::ops::Deref for PeerId {
-    type Target = PeerAuthorizationToken;
+    type Target = PeerTokenPair;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl From<PeerAuthorizationToken> for PeerId {
-    fn from(p: PeerAuthorizationToken) -> PeerId {
+impl From<PeerTokenPair> for PeerId {
+    fn from(p: PeerTokenPair) -> PeerId {
         PeerId(p)
     }
 }
 
-impl From<PeerId> for PeerAuthorizationToken {
-    fn from(p: PeerId) -> PeerAuthorizationToken {
+impl From<PeerId> for PeerTokenPair {
+    fn from(p: PeerId) -> PeerTokenPair {
         p.0
     }
 }
@@ -398,6 +398,7 @@ mod tests {
 
     use protobuf::Message;
 
+    use crate::peer::PeerAuthorizationToken;
     use crate::protos::network::{NetworkEcho, NetworkMessageType};
 
     /// Verify that messages can be dispatched to handlers via the trait.
@@ -424,7 +425,12 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                PeerAuthorizationToken::from_peer_id("TestPeer").into(),
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("TestPeer").into(),
+                    #[cfg(feature = "challenge-authorization")]
+                    PeerAuthorizationToken::from_peer_id("MyID").into(),
+                )
+                .into(),
                 &NetworkMessageType::NETWORK_ECHO,
                 outgoing_message_bytes
             )
@@ -462,7 +468,12 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 dispatcher.dispatch(
-                    PeerAuthorizationToken::from_peer_id("TestPeer").into(),
+                    PeerTokenPair::new(
+                        PeerAuthorizationToken::from_peer_id("TestPeer"),
+                        #[cfg(feature = "challenge-authorization")]
+                        PeerAuthorizationToken::from_peer_id("MyID"),
+                    )
+                    .into(),
                     &NetworkMessageType::NETWORK_ECHO,
                     outgoing_message_bytes
                 )

@@ -24,6 +24,8 @@ pub mod trust;
 use crate::network::auth::state_machine::challenge_v1::ChallengeAuthorizationLocalAction;
 #[cfg(feature = "trust-authorization")]
 use crate::network::auth::state_machine::trust_v1::TrustAuthorizationLocalAction;
+#[cfg(feature = "trust-authorization")]
+use crate::network::auth::Identity;
 use crate::network::auth::{
     AuthorizationLocalAction, AuthorizationLocalState, AuthorizationManagerStateMachine,
     AuthorizationMessage, AuthorizationRemoteAction, AuthorizationRemoteState,
@@ -321,7 +323,11 @@ impl Handler for AuthProtocolResponseHandler {
                                 .next_local_state(
                                     context.source_connection_id(),
                                     AuthorizationLocalAction::Trust(
-                                        TrustAuthorizationLocalAction::SendAuthTrustRequest,
+                                        TrustAuthorizationLocalAction::SendAuthTrustRequest(
+                                            Identity::Trust {
+                                                identity: self.identity.to_string(),
+                                            },
+                                        ),
                                     ),
                                 )
                                 .is_err()
@@ -364,7 +370,11 @@ impl Handler for AuthProtocolResponseHandler {
                                 .next_local_state(
                                     context.source_connection_id(),
                                     AuthorizationLocalAction::Trust(
-                                        TrustAuthorizationLocalAction::SendAuthTrustRequest,
+                                        TrustAuthorizationLocalAction::SendAuthTrustRequest(
+                                            Identity::Trust {
+                                                identity: self.identity.to_string(),
+                                            },
+                                        ),
                                     ),
                                 )
                                 .is_err()
@@ -722,6 +732,7 @@ mod tests {
                         identity: "other_identity".to_string(),
                     }),
                     received_complete: false,
+                    local_authorization: None,
                 },
             );
         let mock_sender = MockSender::new();

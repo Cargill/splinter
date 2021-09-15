@@ -23,6 +23,8 @@ pub enum ConnectionManagerNotification {
         endpoint: String,
         connection_id: String,
         identity: ConnectionAuthorizationType,
+        #[cfg(feature = "challenge-authorization")]
+        local_identity: ConnectionAuthorizationType,
     },
     FatalConnectionError {
         endpoint: String,
@@ -33,14 +35,18 @@ pub enum ConnectionManagerNotification {
         endpoint: String,
         connection_id: String,
         identity: ConnectionAuthorizationType,
+        #[cfg(feature = "challenge-authorization")]
+        local_identity: ConnectionAuthorizationType,
     },
     Disconnected {
         endpoint: String,
         identity: ConnectionAuthorizationType,
+        connection_id: String,
     },
     NonFatalConnectionError {
         endpoint: String,
         attempts: u64,
         identity: ConnectionAuthorizationType,
+        connection_id: String,
     },
 }

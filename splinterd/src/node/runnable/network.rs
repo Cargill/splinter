@@ -227,7 +227,7 @@ impl RunnableNetworkSubsystem {
         ];
 
         // Set up Authorization
-        let inproc_authorizer = InprocAuthorizer::new(inproc_ids);
+        let inproc_authorizer = InprocAuthorizer::new(inproc_ids, node_id.to_string());
 
         let authorization_manager =
             AuthorizationManager::new(node_id.to_string(), signers, signing_context)

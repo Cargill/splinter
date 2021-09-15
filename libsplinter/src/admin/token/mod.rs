@@ -20,7 +20,7 @@ pub mod token_protobuf;
 pub mod token_protocol;
 
 use crate::error::InvalidStateError;
-use crate::peer::PeerAuthorizationToken;
+use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
 
 /// Struct used to correlate a `PeerAuthorizationToken` with node information
 #[derive(Clone, Debug, PartialEq)]
@@ -32,7 +32,10 @@ pub struct PeerNode {
 }
 
 pub trait PeerAuthorizationTokenReader {
-    fn list_tokens(&self) -> Result<Vec<PeerAuthorizationToken>, InvalidStateError>;
+    fn list_tokens(
+        &self,
+        #[cfg(feature = "challenge-authorization")] local_node: &str,
+    ) -> Result<Vec<PeerTokenPair>, InvalidStateError>;
 
     fn list_nodes(&self) -> Result<Vec<PeerNode>, InvalidStateError>;
 

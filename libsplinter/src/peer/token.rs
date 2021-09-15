@@ -149,3 +149,63 @@ impl PartialOrd for PeerAuthorizationToken {
         Some(self.cmp(other))
     }
 }
+
+/// The Peer ID that contains both the peer's authorization type at the local authorization for
+/// the local node
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PeerTokenPair {
+    peer_id: PeerAuthorizationToken,
+    #[cfg(feature = "challenge-authorization")]
+    local_id: PeerAuthorizationToken,
+}
+
+impl PeerTokenPair {
+    pub fn new(
+        peer_id: PeerAuthorizationToken,
+        #[cfg(feature = "challenge-authorization")] local_id: PeerAuthorizationToken,
+    ) -> Self {
+        Self {
+            peer_id,
+            #[cfg(feature = "challenge-authorization")]
+            local_id,
+        }
+    }
+
+    pub fn peer_id(&self) -> &PeerAuthorizationToken {
+        &self.peer_id
+    }
+
+    #[cfg(feature = "challenge-authorization")]
+    pub fn local_id(&self) -> &PeerAuthorizationToken {
+        &self.local_id
+    }
+
+    /// Convert the token to a string represention
+    pub fn id_as_string(&self) -> String {
+        match self.peer_id {
+            PeerAuthorizationToken::Trust { .. } => self.peer_id.id_as_string(),
+            #[cfg(feature = "challenge-authorization")]
+            PeerAuthorizationToken::Challenge { .. } => {
+                format!(
+                    "{}::{}",
+                    self.peer_id.id_as_string(),
+                    self.local_id.id_as_string()
+                )
+            }
+        }
+    }
+}
+
+impl fmt::Display for PeerTokenPair {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[cfg(feature = "challenge-authorization")]
+        {
+            write!(f, "Peer: {}, Local: {}", self.peer_id, self.local_id)
+        }
+
+        #[cfg(not(feature = "challenge-authorization"))]
+        {
+            write!(f, "{}", self.peer_id)
+        }
+    }
+}

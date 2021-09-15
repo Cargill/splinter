@@ -14,13 +14,15 @@
 
 use std::fmt;
 
+use crate::network::auth::state_machine::Identity;
+
 /// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
 pub(crate) enum ChallengeAuthorizationLocalAction {
     SendAuthChallengeNonceRequest,
     ReceiveAuthChallengeNonceResponse,
     SendAuthChallengeSubmitRequest,
-    ReceiveAuthChallengeSubmitResponse,
+    ReceiveAuthChallengeSubmitResponse(Identity),
 }
 
 impl fmt::Display for ChallengeAuthorizationLocalAction {
@@ -35,7 +37,7 @@ impl fmt::Display for ChallengeAuthorizationLocalAction {
             ChallengeAuthorizationLocalAction::SendAuthChallengeSubmitRequest => {
                 f.write_str("SendAuthChallengeSubmitRequest")
             }
-            ChallengeAuthorizationLocalAction::ReceiveAuthChallengeSubmitResponse => {
+            ChallengeAuthorizationLocalAction::ReceiveAuthChallengeSubmitResponse(_) => {
                 f.write_str("ReceiveAuthChallengeSubmitResponse")
             }
         }

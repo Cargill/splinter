@@ -44,7 +44,7 @@ use self::error::RoutingTableReaderError;
 use crate::error::InternalError;
 #[cfg(feature = "challenge-authorization")]
 use crate::error::InvalidStateError;
-use crate::peer::PeerAuthorizationToken;
+use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
 
 /// Interface for updating the routing table
 pub trait RoutingTableWriter: Send {
@@ -318,7 +318,7 @@ pub struct Service {
     service_type: String,
     node_id: String,
     arguments: Vec<(String, String)>,
-    peer_id: Option<PeerAuthorizationToken>,
+    peer_id: Option<PeerTokenPair>,
 }
 
 impl Service {
@@ -366,11 +366,11 @@ impl Service {
     }
 
     /// Returns the local peer ID for the service
-    pub fn peer_id(&self) -> &Option<PeerAuthorizationToken> {
+    pub fn peer_id(&self) -> &Option<PeerTokenPair> {
         &self.peer_id
     }
 
-    pub fn set_peer_id(&mut self, peer_id: PeerAuthorizationToken) {
+    pub fn set_peer_id(&mut self, peer_id: PeerTokenPair) {
         self.peer_id = Some(peer_id)
     }
 

@@ -523,6 +523,7 @@ impl ServiceConnectionAgent {
                 endpoint,
                 connection_id,
                 identity,
+                ..
             } => {
                 let identity = match identity {
                     ConnectionAuthorizationType::Trust { identity } => identity,
@@ -777,10 +778,10 @@ mod tests {
             connection_id: String,
             connection: Box<dyn Connection>,
             callback: AuthorizerCallback,
-            #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
+            #[cfg(feature = "challenge-authorization")] _expected_authorization: Option<
                 ConnectionAuthorizationType,
             >,
-            #[cfg(feature = "challenge-authorization")] local_authorization: Option<
+            #[cfg(feature = "challenge-authorization")] _local_authorization: Option<
                 ConnectionAuthorizationType,
             >,
         ) -> Result<(), AuthorizerError> {
@@ -791,9 +792,13 @@ mod tests {
                     identity: self.authorized_id.clone(),
                 },
                 #[cfg(feature = "challenge-authorization")]
-                expected_authorization,
+                expected_authorization: ConnectionAuthorizationType::Trust {
+                    identity: self.authorized_id.clone(),
+                },
                 #[cfg(feature = "challenge-authorization")]
-                local_authorization,
+                local_authorization: ConnectionAuthorizationType::Trust {
+                    identity: "local_id".into(),
+                },
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

@@ -278,7 +278,11 @@ impl SplinterDaemon {
             format!("health::{}", &self.node_id),
         ));
 
-        let inproc_authorizer = InprocAuthorizer::new(inproc_ids);
+        let inproc_authorizer = InprocAuthorizer::new(
+            inproc_ids,
+            #[cfg(feature = "challenge-authorization")]
+            self.node_id.clone(),
+        );
 
         let mut authorizers = Authorizers::new();
         authorizers.add_authorizer("inproc", inproc_authorizer);
