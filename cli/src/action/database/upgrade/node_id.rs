@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides the import action for node ids
+//! Provides the import action for node IDs
 
 use std::path::PathBuf;
 
@@ -22,7 +22,7 @@ use splinter::node_id::store::NodeIdStore;
 
 use crate::error::CliError;
 
-///Import node_id from one store to another
+/// Import node_id from one store to another
 ///
 /// # Arguments
 ///
