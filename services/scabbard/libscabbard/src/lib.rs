@@ -36,3 +36,5 @@ mod hex;
 pub mod protocol;
 pub mod protos;
 pub mod service;
+#[cfg(feature = "commit-store")]
+pub mod store;

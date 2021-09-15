@@ -63,6 +63,7 @@ stable = [
   "client-reqwest",
   "default",
   "events",
+  "lmdb",
   "rest-api",
   "rest-api-actix",
 ]
@@ -72,6 +73,7 @@ experimental = [
   "stable",
   # The following features are experimental:
   "back-pressure",
+  "commit-store",
   "diesel-receipt-store",
   "factory-builder",
   "metrics",
@@ -82,9 +84,11 @@ authorization = ["splinter/authorization"]
 back-pressure = []
 client = []
 client-reqwest = ["client", "reqwest"]
+commit-store = []
 diesel-receipt-store = ["diesel"]
 events = ["splinter/events"]
 factory-builder = []
+lmdb = []
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
 service-arg-validation = ["splinter/service-arg-validation"]
