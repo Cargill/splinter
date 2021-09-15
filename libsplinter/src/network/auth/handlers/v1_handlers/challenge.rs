@@ -16,6 +16,7 @@
 
 use cylinder::{PublicKey, Signature, Signer, Verifier};
 
+use crate::error::InternalError;
 use crate::network::auth::state_machine::challenge_v1::{
     ChallengeAuthorizationLocalAction, ChallengeAuthorizationLocalState,
     ChallengeAuthorizationRemoteAction, ChallengeAuthorizationRemoteState,
@@ -126,7 +127,11 @@ impl Handler for AuthChallengeNonceRequestHandler {
                     );
                 };
             }
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         }
 
         Ok(())
@@ -255,7 +260,11 @@ impl Handler for AuthChallengeNonceResponseHandler {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
             }
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         }
 
         Ok(())
@@ -404,7 +413,11 @@ impl Handler for AuthChallengeSubmitRequestHandler {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
             }
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         }
 
         if self
@@ -508,11 +521,17 @@ impl Handler for AuthChallengeSubmitResponseHandler {
                     Ok(AuthorizationLocalState::WaitForComplete) => (),
                     Ok(AuthorizationLocalState::AuthorizedAndComplete) => (),
                     Ok(next_state) => {
-                        panic!("Should not have been able to transition to {}", next_state)
+                        return Err(DispatchError::InternalError(InternalError::with_message(
+                            format!("Should not have been able to transition to {}", next_state),
+                        )))
                     }
                 };
             }
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         };
         Ok(())
     }

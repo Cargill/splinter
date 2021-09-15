@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::InternalError;
 use crate::network::dispatch::{
     ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
 };
@@ -164,7 +165,11 @@ impl Handler for ConnectRequestHandler {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
             }
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         }
 
         Ok(())
@@ -301,7 +306,11 @@ impl Handler for TrustRequestHandler {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
             }
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         }
         Ok(())
     }
