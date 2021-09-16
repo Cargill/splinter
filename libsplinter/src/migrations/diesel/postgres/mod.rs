@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines methods and utilities to interact with tables in a PostgreSQL database.
+//! Tools to apply database migrations for Postgres.
 
 embed_migrations!("./src/migrations/diesel/postgres/migrations");
 
@@ -22,7 +22,7 @@ use diesel_migrations::MigrationConnection;
 
 use crate::error::InternalError;
 
-/// Run database migrations to create tables defined by biome
+/// Run all pending database migrations.
 ///
 /// # Arguments
 ///
