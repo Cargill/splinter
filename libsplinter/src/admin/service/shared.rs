@@ -1421,7 +1421,7 @@ impl AdminServiceShared {
     ) -> Result<(), ServiceError> {
         if self.service_protocols.get(token).is_none() {
             // we will always have the network sender at this point
-            if let Some(ref network_sender) = self.network_sender {
+            if let Some(ref mut network_sender) = self.network_sender {
                 debug!("Sending service protocol request to {}", admin_service);
                 let mut request = ServiceProtocolVersionRequest::new();
                 request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
@@ -1431,7 +1431,23 @@ impl AdminServiceShared {
                 msg.set_protocol_request(request);
 
                 let envelope_bytes = msg.write_to_bytes()?;
+                #[cfg(not(feature = "challenge-authorization"))]
                 network_sender.send(&admin_service_id(&token.id_as_string()), &envelope_bytes)?;
+
+                // need to set the sender to our local auth that is being used
+                #[cfg(feature = "challenge-authorization")]
+                network_sender.send_with_sender(
+                    &admin_service_id(&token.id_as_string()),
+                    &envelope_bytes,
+                    &admin_service_id(
+                        &PeerTokenPair::new(
+                            token.local_id().clone(),
+                            #[cfg(feature = "challenge-authorization")]
+                            token.peer_id().clone(),
+                        )
+                        .id_as_string(),
+                    ),
+                )?
             }
         } else {
             debug!("Already agreed on protocol version with {}", admin_service);
