@@ -270,6 +270,7 @@ impl From<ServiceSendError> for ServiceError {
 pub enum FactoryCreateError {
     CreationFailed(Box<dyn Error + Send>),
     InvalidArguments(String),
+    Internal(String),
 }
 
 impl Error for FactoryCreateError {
@@ -277,6 +278,7 @@ impl Error for FactoryCreateError {
         match self {
             FactoryCreateError::CreationFailed(err) => Some(&**err),
             FactoryCreateError::InvalidArguments(_) => None,
+            FactoryCreateError::Internal(_) => None,
         }
     }
 }
@@ -290,6 +292,7 @@ impl std::fmt::Display for FactoryCreateError {
             FactoryCreateError::InvalidArguments(err) => {
                 write!(f, "invalid arguments specified: {}", err)
             }
+            FactoryCreateError::Internal(msg) => f.write_str(msg),
         }
     }
 }
