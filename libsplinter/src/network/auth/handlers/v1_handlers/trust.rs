@@ -14,6 +14,7 @@
 
 //! Message handlers for Trust v1 authorization messages
 
+use crate::error::InternalError;
 use crate::network::auth::state_machine::trust_v1::{
     TrustAuthorizationLocalAction, TrustAuthorizationRemoteAction, TrustAuthorizationRemoteState,
 };
@@ -100,7 +101,11 @@ impl Handler for AuthTrustRequestHandler {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
             }
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         }
 
         if self
@@ -167,7 +172,11 @@ impl Handler for AuthTrustResponseHandler {
                 return Ok(());
             }
             Ok(AuthorizationLocalState::Authorized) => (),
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         }
 
         let auth_msg = AuthorizationMessage::AuthComplete(AuthComplete);
@@ -195,7 +204,11 @@ impl Handler for AuthTrustResponseHandler {
             }
             Ok(AuthorizationLocalState::WaitForComplete) => (),
             Ok(AuthorizationLocalState::AuthorizedAndComplete) => (),
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         };
 
         Ok(())
@@ -276,14 +289,13 @@ mod tests {
         )
         .expect("Unable to get message bytes");
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (recipient, message_bytes) = mock_sender
             .next_outbound()
@@ -355,14 +367,13 @@ mod tests {
         )
         .expect("Unable to get message bytes");
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (recipient, message_bytes) = mock_sender
             .next_outbound()
@@ -457,14 +468,13 @@ mod tests {
         )
         .expect("Unable to get message bytes");
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (recipient, message_bytes) = mock_sender
             .next_outbound()
@@ -557,14 +567,13 @@ mod tests {
         )
         .expect("Unable to get message bytes");
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (recipient, message_bytes) = mock_sender
             .next_outbound()

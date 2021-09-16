@@ -146,9 +146,8 @@ mod tests {
 
         let outgoing_message_bytes = msg.write_to_bytes().unwrap();
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("OTHER_PEER").into(),
                     #[cfg(feature = "challenge-authorization")]
@@ -158,7 +157,7 @@ mod tests {
                 &NetworkMessageType::NETWORK_ECHO,
                 outgoing_message_bytes.clone()
             )
-        );
+            .is_ok());
 
         let (_, network_message) = network_sender
             .next_outbound()

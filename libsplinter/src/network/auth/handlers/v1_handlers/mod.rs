@@ -20,6 +20,7 @@ pub mod challenge;
 #[cfg(feature = "trust-authorization")]
 pub mod trust;
 
+use crate::error::InternalError;
 #[cfg(feature = "challenge-authorization")]
 use crate::network::auth::state_machine::challenge_v1::ChallengeAuthorizationLocalAction;
 #[cfg(feature = "trust-authorization")]
@@ -180,7 +181,11 @@ impl Handler for AuthProtocolRequestHandler {
                     )
                 };
             }
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         }
         Ok(())
     }
@@ -443,7 +448,11 @@ impl Handler for AuthProtocolResponseHandler {
                         DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
             }
-            Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
+            Ok(next_state) => {
+                return Err(DispatchError::InternalError(InternalError::with_message(
+                    format!("Should not have been able to transition to {}", next_state),
+                )))
+            }
         }
         Ok(())
     }
@@ -595,14 +604,13 @@ mod tests {
         )
         .expect("Unable to get message bytes for auth protocol request");
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (recipient, message_bytes) = mock_sender
             .next_outbound()
@@ -676,14 +684,13 @@ mod tests {
         )
         .expect("Unable to get message bytes");
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         let (recipient, message_bytes) = mock_sender
             .next_outbound()
@@ -761,14 +768,13 @@ mod tests {
         )
         .expect("Unable to get message bytes");
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 connection_id.clone().into(),
                 &NetworkMessageType::AUTHORIZATION,
                 msg_bytes
             )
-        );
+            .is_ok());
 
         assert_eq!(mock_sender.next_outbound(), None);
 

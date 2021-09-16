@@ -31,6 +31,7 @@ pub use r#loop::{
     DispatchMessageReceiver, DispatchMessageSender,
 };
 
+use crate::error::InternalError;
 use crate::peer::PeerTokenPair;
 
 /// A wrapper for a PeerId.
@@ -191,7 +192,7 @@ impl FromMessageBytes for RawBytes {
 /// Dispatch Errors
 ///
 /// These errors may occur when handling a dispatched message.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum DispatchError {
     /// An error occurred during message deserialization.
     DeserializationError(String),
@@ -205,6 +206,8 @@ pub enum DispatchError {
     HandleError(String),
     /// if no network sender is set
     MissingNetworkSender,
+    ///  An internal error occurred while a handler was executing.
+    InternalError(InternalError),
 }
 
 impl std::error::Error for DispatchError {}
@@ -224,6 +227,7 @@ impl std::fmt::Display for DispatchError {
             }
             DispatchError::HandleError(msg) => write!(f, "unable to handle message: {}", msg),
             DispatchError::MissingNetworkSender => write!(f, "missing network sender"),
+            DispatchError::InternalError(msg) => write!(f, "{}", msg),
         }
     }
 }
@@ -422,9 +426,8 @@ mod tests {
         outgoing_message.set_payload(b"test_dispatcher".to_vec());
         let outgoing_message_bytes = outgoing_message.write_to_bytes().unwrap();
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
+        assert!(dispatcher
+            .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("TestPeer").into(),
                     #[cfg(feature = "challenge-authorization")]
@@ -434,7 +437,7 @@ mod tests {
                 &NetworkMessageType::NETWORK_ECHO,
                 outgoing_message_bytes
             )
-        );
+            .is_ok());
 
         assert_eq!(
             vec!["test_dispatcher".to_string()],
@@ -465,9 +468,8 @@ mod tests {
             outgoing_message.set_payload(b"thread_echo".to_vec());
             let outgoing_message_bytes = outgoing_message.write_to_bytes().unwrap();
 
-            assert_eq!(
-                Ok(()),
-                dispatcher.dispatch(
+            assert!(dispatcher
+                .dispatch(
                     PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("TestPeer"),
                         #[cfg(feature = "challenge-authorization")]
@@ -477,7 +479,7 @@ mod tests {
                     &NetworkMessageType::NETWORK_ECHO,
                     outgoing_message_bytes
                 )
-            );
+                .is_ok());
         })
         .join()
         .unwrap();
