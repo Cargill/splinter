@@ -28,6 +28,7 @@ description = """\
 actix-web = { version = "1.0", optional = true, default-features = false, features = ["flate2-zlib"] }
 cylinder = "0.2"
 diesel = { version = "1.0", features = ["r2d2", "serde_json"], optional = true }
+diesel_migrations = { version = "1.4", optional = true }
 futures = { version = "0.1", optional = true }
 log = "0.3.0"
 metrics = { version = "0.17", optional = true}
@@ -75,8 +76,10 @@ experimental = [
   "commit-store",
   "diesel-receipt-store",
   "factory-builder",
-  "metrics",
   "https",
+  "metrics",
+  "postgres",
+  "sqlite",
 ]
 
 authorization = ["splinter/authorization"]
@@ -86,8 +89,10 @@ commit-store = []
 diesel-receipt-store = ["diesel"]
 events = ["splinter/events"]
 factory-builder = []
+https = []
 lmdb = []
+postgres = ["diesel/postgres", "diesel_migrations"]
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
 service-arg-validation = ["splinter/service-arg-validation"]
-https = []
+sqlite = ["diesel/sqlite", "diesel_migrations"]
