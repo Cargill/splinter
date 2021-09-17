@@ -32,7 +32,7 @@ use cylinder::{Signer, SigningError};
 use health::HealthService;
 #[cfg(feature = "service-arg-validation")]
 use scabbard::service::ScabbardArgValidator;
-use scabbard::service::ScabbardFactory;
+use scabbard::service::ScabbardFactoryBuilder;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService, AdminServiceBuilder};
 #[cfg(feature = "biome-credentials")]
@@ -457,17 +457,28 @@ impl SplinterDaemon {
             }
         }
 
+        let mut scabbard_factory_builder = ScabbardFactoryBuilder::new()
+            .with_state_db_dir(self.state_dir.to_string())
+            .with_signature_verifier_factory(signing_context);
+
+        #[cfg(not(feature = "scabbard-receipt-store"))]
+        {
+            scabbard_factory_builder =
+                scabbard_factory_builder.with_receipt_db_dir(self.state_dir.to_string());
+        }
+        #[cfg(feature = "scabbard-receipt-store")]
+        {
+            scabbard_factory_builder =
+                scabbard_factory_builder.with_receipt_db_url(self.db_url.to_string());
+        }
+
+        let scabbard_factory = scabbard_factory_builder.build().map_err(|err| {
+            StartError::OrchestratorError(format!("failed to create new orchestrator: {}", err))
+        })?;
+
         let mut orchestrator = ServiceOrchestratorBuilder::new()
             .with_connection(orchestrator_connection)
-            .with_service_factory(Box::new(ScabbardFactory::new(
-                Some(self.state_dir.to_string()),
-                None,
-                Some(self.state_dir.to_string()),
-                None,
-                #[cfg(feature = "scabbard-receipt-store")]
-                self.db_url.to_string(),
-                signing_context,
-            )))
+            .with_service_factory(Box::new(scabbard_factory))
             .build()
             .map_err(|err| {
                 StartError::OrchestratorError(format!("failed to create new orchestrator: {}", err))

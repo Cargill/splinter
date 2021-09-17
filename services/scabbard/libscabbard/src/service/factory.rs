@@ -140,28 +140,6 @@ pub struct ScabbardFactory {
     signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
-impl ScabbardFactory {
-    pub fn new(
-        state_db_dir: Option<String>,
-        state_db_size: Option<usize>,
-        receipt_db_dir: Option<String>,
-        receipt_db_size: Option<usize>,
-        #[cfg(feature = "diesel-receipt-store")] receipt_db_url: String,
-        signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
-    ) -> Self {
-        ScabbardFactory {
-            service_types: vec![SERVICE_TYPE.into()],
-            state_db_dir: state_db_dir.unwrap_or_else(|| DEFAULT_STATE_DB_DIR.into()),
-            state_db_size: state_db_size.unwrap_or(DEFAULT_STATE_DB_SIZE),
-            receipt_db_dir: receipt_db_dir.unwrap_or_else(|| DEFAULT_RECEIPT_DB_DIR.into()),
-            receipt_db_size: receipt_db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
-            #[cfg(feature = "diesel-receipt-store")]
-            receipt_db_url,
-            signature_verifier_factory,
-        }
-    }
-}
-
 #[cfg(feature = "service-arg-validation")]
 pub struct ScabbardArgValidator;
 
