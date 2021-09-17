@@ -628,7 +628,7 @@ impl From<store::CircuitProposal> for CircuitProposal {
                     public_key: node.public_key().clone(),
                 })
                 .collect::<Vec<SplinterNode>>(),
-            authorization_type: AuthorizationType::Trust,
+            authorization_type: AuthorizationType::from(store_circuit.authorization_type()),
             persistence: PersistenceType::Any,
             durability: DurabilityType::NoDurability,
             routes: RouteType::Any,
