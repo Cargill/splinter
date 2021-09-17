@@ -364,7 +364,7 @@ impl fmt::Display for ProposalSlice {
         );
 
         for member in self.circuit.members.iter() {
-            display_string += &format!("\n    {} ({:?})\n", member.node_id, member.endpoints);
+            display_string += &format!("\n    {}\n", member.node_id);
             #[cfg(feature = "challenge-authorization")]
             if let Some(public_key) = &member.public_key {
                 display_string += &format!("        Public Key: {}\n", public_key);
@@ -382,6 +382,11 @@ impl fmt::Display for ProposalSlice {
                 }
                 display_string += &format!("{}\n", vote_string);
             }
+            display_string += &"        Endpoints:\n".to_string();
+            for endpoint in member.endpoints.iter() {
+                display_string += &format!("            {}\n", endpoint);
+            }
+
             for service in self.circuit.roster.iter() {
                 if service.node_id == member.node_id {
                     display_string += &format!(
