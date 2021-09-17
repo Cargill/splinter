@@ -108,7 +108,6 @@ experimental = [
     "tap",
     "node",
     "node-file-block",
-    "scabbard-back-pressure",
     "service-arg-validation",
     "service-endpoint",
     "ws-transport",
@@ -167,7 +166,6 @@ oauth = [
     "splinter/oauth"
 ]
 rest-api-cors = ["splinter/rest-api-cors"]
-scabbard-back-pressure = ["scabbard/back-pressure"]
 service-arg-validation = [
     "scabbard/service-arg-validation",
     "splinter/service-arg-validation",

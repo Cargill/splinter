@@ -16,7 +16,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use openssl::hash::{hash, MessageDigest};
-#[cfg(feature = "back-pressure")]
 use protobuf::Message;
 use transact::protocol::batch::BatchPair;
 use transact::protocol::transaction::{HashMethod, TransactionHeader};
@@ -28,14 +27,11 @@ use splinter::{
 };
 
 use crate::hex::parse_hex;
-#[cfg(feature = "back-pressure")]
 use crate::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
 
 use super::error::ScabbardError;
-#[cfg(feature = "back-pressure")]
 use super::ScabbardVersion;
 
-#[cfg(feature = "back-pressure")]
 const DEFAULT_PENDING_BATCH_LIMIT: usize = 30;
 
 /// Data structure used to store information that's shared between components in this service
@@ -61,9 +57,7 @@ pub struct ScabbardShared {
     open_proposals: HashMap<ProposalId, (Proposal, BatchPair)>,
     signature_verifier: Box<dyn SignatureVerifier>,
     /// Whether scabbard is currently accepting new batches, a part of back pressure
-    #[cfg(feature = "back-pressure")]
     accepting_batches: bool,
-    #[cfg(feature = "back-pressure")]
     scabbard_version: ScabbardVersion,
 }
 
@@ -75,7 +69,7 @@ impl ScabbardShared {
         service_id: String,
         #[cfg(feature = "metrics")] circuit_id: String,
         signature_verifier: Box<dyn SignatureVerifier>,
-        #[cfg(feature = "back-pressure")] scabbard_version: ScabbardVersion,
+        scabbard_version: ScabbardVersion,
     ) -> Self {
         // The two-phase commit coordinator is the node with the lowest peer ID. Peer IDs are
         // computed from service IDs.
@@ -100,9 +94,7 @@ impl ScabbardShared {
             circuit_id,
             open_proposals: HashMap::new(),
             signature_verifier,
-            #[cfg(feature = "back-pressure")]
             accepting_batches: true,
-            #[cfg(feature = "back-pressure")]
             scabbard_version,
         };
 
@@ -123,12 +115,10 @@ impl ScabbardShared {
     }
 
     /// set whether we are accepting new batches
-    #[cfg(feature = "back-pressure")]
     pub fn set_accepting_batches(&mut self, accepting: bool) {
         self.accepting_batches = accepting;
     }
 
-    #[cfg(feature = "back-pressure")]
     pub fn accepting_batches(&self) -> bool {
         self.accepting_batches
     }
@@ -152,31 +142,28 @@ impl ScabbardShared {
         self.batch_queue.push_back(batch);
         self.update_pending_batches(self.batch_queue.len() as f64);
 
-        #[cfg(feature = "back-pressure")]
-        {
-            // only the coordinator should change accepting batches and
-            // back pressure is not supported by V1
-            if !self.is_coordinator() || self.scabbard_version == ScabbardVersion::V1 {
-                return Ok(());
-            };
+        // only the coordinator should change accepting batches and
+        // back pressure is not supported by V1
+        if !self.is_coordinator() || self.scabbard_version == ScabbardVersion::V1 {
+            return Ok(());
+        };
 
-            // Check whether the pending batch queue has gotten too big and back pressure
-            // should be enabled.
-            if self.accepting_batches && self.batch_queue.len() >= DEFAULT_PENDING_BATCH_LIMIT {
-                self.set_accepting_batches(false);
-                // notify non_coordinators not to send new batches
-                let mut msg = ScabbardMessage::new();
-                msg.set_message_type(ScabbardMessage_Type::TOO_MANY_REQUESTS);
-                let msg_bytes = msg
-                    .write_to_bytes()
+        // Check whether the pending batch queue has gotten too big and back pressure
+        // should be enabled.
+        if self.accepting_batches && self.batch_queue.len() >= DEFAULT_PENDING_BATCH_LIMIT {
+            self.set_accepting_batches(false);
+            // notify non_coordinators not to send new batches
+            let mut msg = ScabbardMessage::new();
+            msg.set_message_type(ScabbardMessage_Type::TOO_MANY_REQUESTS);
+            let msg_bytes = msg
+                .write_to_bytes()
+                .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
+
+            for service in self.peer_services() {
+                self.network_sender()
+                    .ok_or(ScabbardError::NotConnected)?
+                    .send(service, msg_bytes.as_slice())
                     .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
-
-                for service in self.peer_services() {
-                    self.network_sender()
-                        .ok_or(ScabbardError::NotConnected)?
-                        .send(service, msg_bytes.as_slice())
-                        .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
-                }
             }
         }
         Ok(())
@@ -190,32 +177,29 @@ impl ScabbardShared {
             self.update_pending_batches(self.batch_queue.len() as f64);
         }
 
-        #[cfg(feature = "back-pressure")]
-        {
-            // only the coordinator should change accepting batches and
-            // back pressure is not supported by V1
-            if !self.is_coordinator() || self.scabbard_version == ScabbardVersion::V1 {
-                return Ok(batch);
-            };
+        // only the coordinator should change accepting batches and
+        // back pressure is not supported by V1
+        if !self.is_coordinator() || self.scabbard_version == ScabbardVersion::V1 {
+            return Ok(batch);
+        };
 
-            // If back pressure was enabled, only start accepting transactions again if the queue has
-            // dropped to half the pending batch limit
-            if !self.accepting_batches && self.batch_queue.len() < DEFAULT_PENDING_BATCH_LIMIT / 2 {
-                self.set_accepting_batches(true);
+        // If back pressure was enabled, only start accepting transactions again if the queue has
+        // dropped to half the pending batch limit
+        if !self.accepting_batches && self.batch_queue.len() < DEFAULT_PENDING_BATCH_LIMIT / 2 {
+            self.set_accepting_batches(true);
 
-                // notify non_coordinators that we are accepting batches now
-                let mut msg = ScabbardMessage::new();
-                msg.set_message_type(ScabbardMessage_Type::ACCEPTING_REQUESTS);
-                let msg_bytes = msg
-                    .write_to_bytes()
+            // notify non_coordinators that we are accepting batches now
+            let mut msg = ScabbardMessage::new();
+            msg.set_message_type(ScabbardMessage_Type::ACCEPTING_REQUESTS);
+            let msg_bytes = msg
+                .write_to_bytes()
+                .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
+
+            for service in self.peer_services() {
+                self.network_sender()
+                    .ok_or(ScabbardError::NotConnected)?
+                    .send(service, msg_bytes.as_slice())
                     .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
-
-                for service in self.peer_services() {
-                    self.network_sender()
-                        .ok_or(ScabbardError::NotConnected)?
-                        .send(service, msg_bytes.as_slice())
-                        .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
-                }
             }
         }
 
@@ -381,7 +365,6 @@ mod tests {
             #[cfg(feature = "metrics")]
             "vzrQS-rvwf4".to_string(),
             context.new_verifier(),
-            #[cfg(feature = "back-pressure")]
             ScabbardVersion::V2,
         );
         assert!(coordinator_shared.is_coordinator());
@@ -395,7 +378,6 @@ mod tests {
             #[cfg(feature = "metrics")]
             "vzrQS-rvwf4".to_string(),
             context.new_verifier(),
-            #[cfg(feature = "back-pressure")]
             ScabbardVersion::V2,
         );
         assert!(!non_coordinator_shared.is_coordinator());

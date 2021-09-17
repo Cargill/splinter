@@ -68,7 +68,6 @@ pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
                             }
                         };
 
-                        #[cfg(feature = "back-pressure")]
                         match scabbard.accepting_batches() {
                             Ok(true) => (),
                             Ok(false) => {

@@ -134,7 +134,6 @@ impl Scabbard {
             #[cfg(feature = "metrics")]
             circuit_id.to_string(),
             signature_verifier,
-            #[cfg(feature = "back-pressure")]
             version,
         );
 
@@ -197,7 +196,6 @@ impl Scabbard {
     }
 
     /// Get whether the service is currently accepting batches
-    #[cfg(feature = "back-pressure")]
     pub fn accepting_batches(&self) -> Result<bool, ScabbardError> {
         let shared = self
             .shared
@@ -471,7 +469,6 @@ impl Service for Scabbard {
 
                 Ok(())
             }
-            #[cfg(feature = "back-pressure")]
             ScabbardMessage_Type::TOO_MANY_REQUESTS => {
                 match self.version {
                     ScabbardVersion::V1 => {
@@ -490,7 +487,6 @@ impl Service for Scabbard {
                 }
                 Ok(())
             }
-            #[cfg(feature = "back-pressure")]
             ScabbardMessage_Type::ACCEPTING_REQUESTS => {
                 match self.version {
                     ScabbardVersion::V1 => {
