@@ -34,7 +34,6 @@ const DEFAULT_STATE_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 const DEFAULT_RECEIPT_DB_DIR: &str = "/var/lib/splinter";
 const DEFAULT_RECEIPT_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
-#[cfg(feature = "factory-builder")]
 /// Builds new ScabbardFactory instances.
 #[derive(Default)]
 pub struct ScabbardFactoryBuilder {
@@ -47,7 +46,6 @@ pub struct ScabbardFactoryBuilder {
     signature_verifier_factory: Option<Arc<Mutex<Box<dyn VerifierFactory>>>>,
 }
 
-#[cfg(feature = "factory-builder")]
 impl ScabbardFactoryBuilder {
     /// Constructs a new builder.
     pub fn new() -> Self {

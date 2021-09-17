@@ -75,7 +75,6 @@ experimental = [
   # The following features are experimental:
   "commit-store",
   "diesel-receipt-store",
-  "factory-builder",
   "https",
   "metrics",
   "postgres",
@@ -88,7 +87,6 @@ client-reqwest = ["client", "reqwest"]
 commit-store = []
 diesel-receipt-store = ["diesel", "sawtooth/transaction-receipt-store-lmdb"]
 events = ["splinter/events"]
-factory-builder = []
 https = []
 lmdb = []
 postgres = ["diesel/postgres", "diesel_migrations", "sawtooth/postgres"]

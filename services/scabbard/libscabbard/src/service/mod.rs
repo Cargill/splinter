@@ -53,9 +53,7 @@ use consensus::ScabbardConsensusManager;
 use error::ScabbardError;
 #[cfg(feature = "service-arg-validation")]
 pub use factory::ScabbardArgValidator;
-pub use factory::ScabbardFactory;
-#[cfg(feature = "factory-builder")]
-pub use factory::ScabbardFactoryBuilder;
+pub use factory::{ScabbardFactory, ScabbardFactoryBuilder};
 use shared::ScabbardShared;
 pub use state::{
     BatchInfo, BatchInfoIter, BatchStatus, Events, StateChange, StateChangeEvent, StateIter,
