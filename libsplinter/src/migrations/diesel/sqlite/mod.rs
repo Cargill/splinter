@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines methods and utilities to interact with biome tables in a SQLite database.
+//! Tools to apply database migrations for SQLite.
 
 embed_migrations!("./src/migrations/diesel/sqlite/migrations");
 
@@ -22,7 +22,7 @@ use diesel_migrations::MigrationConnection;
 
 use crate::error::InternalError;
 
-/// Run database migrations to create tables defined by biome
+/// Run all pending database migrations.
 ///
 /// # Arguments
 ///
