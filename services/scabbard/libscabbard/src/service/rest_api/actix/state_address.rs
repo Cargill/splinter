@@ -76,7 +76,7 @@ mod tests {
     use super::*;
 
     use std::path::PathBuf;
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex, RwLock};
 
     use cylinder::{secp256k1::Secp256k1Context, Context};
     #[cfg(feature = "diesel-receipt-store")]
@@ -87,6 +87,10 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     #[cfg(feature = "diesel-receipt-store")]
     use sawtooth::migrations::run_sqlite_migrations;
+    #[cfg(feature = "diesel-receipt-store")]
+    use sawtooth::receipt::store::diesel::DieselReceiptStore;
+    #[cfg(not(feature = "diesel-receipt-store"))]
+    use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
     use tempdir::TempDir;
     use transact::{
         families::command::make_command_transaction,
@@ -112,7 +116,9 @@ mod tests {
         service::Service,
     };
 
-    use crate::service::{compute_db_paths, state::ScabbardState, Scabbard, ScabbardVersion};
+    use crate::service::{
+        factory::compute_db_path, state::ScabbardState, Scabbard, ScabbardVersion,
+    };
 
     const MOCK_CIRCUIT_ID: &str = "abcde-01234";
     const MOCK_SERVICE_ID: &str = "ABCD";
@@ -132,10 +138,18 @@ mod tests {
     fn state_at_address() {
         let paths = StatePaths::new("state_at_address");
 
+        #[cfg(not(feature = "diesel-receipt-store"))]
+        let receipt_store = Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+            LmdbOrderedStore::new(
+                &StatePaths::new("state_at_address").receipt_db_path,
+                Some(TEMP_DB_SIZE),
+            )
+            .expect("Failed to create LMDB store"),
+        ))));
         #[cfg(feature = "diesel-receipt-store")]
-        let receipt_db_uri = paths.temp_dir.path().join("sqlite_receipts.db");
-        #[cfg(feature = "diesel-receipt-store")]
-        create_connection_pool_and_migrate(receipt_db_uri.to_str().unwrap().to_string());
+        let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
+            create_connection_pool_and_migrate(":memory:".to_string()),
+        )));
 
         // Initialize a temporary scabbard state and set a value; this will pre-populate the DBs
         let address = "abcdef".to_string();
@@ -144,10 +158,7 @@ mod tests {
             let mut state = ScabbardState::new(
                 &paths.state_db_path,
                 TEMP_DB_SIZE,
-                &paths.receipt_db_path,
-                TEMP_DB_SIZE,
-                #[cfg(feature = "diesel-receipt-store")]
-                receipt_db_uri.to_str().unwrap().to_string(),
+                receipt_store.clone(),
                 vec![],
             )
             .expect("Failed to initialize state");
@@ -180,12 +191,10 @@ mod tests {
             MOCK_CIRCUIT_ID,
             ScabbardVersion::V1,
             Default::default(),
-            paths.temp_dir.path(),
+            paths.state_db_path.as_path(),
             TEMP_DB_SIZE,
-            paths.temp_dir.path(),
-            TEMP_DB_SIZE,
-            #[cfg(feature = "diesel-receipt-store")]
-            receipt_db_uri.to_str().unwrap().to_string(),
+            receipt_store,
+            Box::new(|| Ok(())),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
@@ -236,8 +245,10 @@ mod tests {
     }
 
     struct StatePaths {
-        pub temp_dir: TempDir,
+        // The temp dir is deleted on drop
+        _temp_dir: TempDir,
         pub state_db_path: PathBuf,
+        #[cfg(not(feature = "diesel-receipt-store"))]
         pub receipt_db_path: PathBuf,
     }
 
@@ -246,16 +257,21 @@ mod tests {
             let temp_dir = TempDir::new(prefix).expect("Failed to create temp dir");
             // This computes the paths such that they're the same ones that will be used by
             // scabbard when it's initialized
-            let (state_db_path, receipt_db_path) = compute_db_paths(
+            let state_db_path =
+                compute_db_path(MOCK_SERVICE_ID, MOCK_CIRCUIT_ID, temp_dir.path(), "-state")
+                    .expect("Failed to compute DB paths");
+            #[cfg(not(feature = "diesel-receipt-store"))]
+            let receipt_db_path = compute_db_path(
                 MOCK_SERVICE_ID,
                 MOCK_CIRCUIT_ID,
                 temp_dir.path(),
-                temp_dir.path(),
+                "-receipts",
             )
             .expect("Failed to compute DB paths");
             Self {
-                temp_dir,
+                _temp_dir: temp_dir,
                 state_db_path,
+                #[cfg(not(feature = "diesel-receipt-store"))]
                 receipt_db_path,
             }
         }

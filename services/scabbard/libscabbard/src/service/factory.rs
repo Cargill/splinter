@@ -14,17 +14,31 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use cylinder::VerifierFactory;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+use diesel::r2d2::{ConnectionManager, Pool};
+use openssl::hash::{hash, MessageDigest};
+#[cfg(all(
+    feature = "diesel-receipt-store",
+    any(feature = "postgres", feature = "sqlite")
+))]
+use sawtooth::receipt::store::diesel::DieselReceiptStore;
+#[cfg(feature = "diesel-receipt-store")]
+use sawtooth::receipt::store::{lmdb::LmdbReceiptStore, ReceiptStore};
+#[cfg(not(feature = "diesel-receipt-store"))]
+use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
+use splinter::error::{InternalError, InvalidStateError};
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::{ServiceArgValidationError, ServiceArgValidator};
 use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 
 #[cfg(feature = "service-arg-validation")]
 use crate::hex::parse_hex;
+use crate::hex::to_hex;
 
 use super::error::ScabbardError;
 use super::{Scabbard, ScabbardVersion, SERVICE_TYPE};
@@ -117,12 +131,8 @@ impl ScabbardStorageConfiguration {
 /// Builds new ScabbardFactory instances.
 #[derive(Default)]
 pub struct ScabbardFactoryBuilder {
-    state_db_dir: Option<String>,
-    state_db_size: Option<usize>,
-    receipt_db_dir: Option<String>,
-    receipt_db_size: Option<usize>,
-    #[cfg(feature = "diesel-receipt-store")]
-    receipt_db_url: Option<String>,
+    state_storage_configuration: Option<ScabbardStorageConfiguration>,
+    receipt_storage_configuration: Option<ScabbardStorageConfiguration>,
     signature_verifier_factory: Option<Arc<Mutex<Box<dyn VerifierFactory>>>>,
 }
 
@@ -134,32 +144,57 @@ impl ScabbardFactoryBuilder {
 
     /// Sets the state db directory to be used by the resulting factory.
     pub fn with_state_db_dir(mut self, state_db_dir: String) -> Self {
-        self.state_db_dir = Some(state_db_dir);
+        self.state_storage_configuration = self
+            .state_storage_configuration
+            .or_else(|| Some(ScabbardStorageConfiguration::lmdb()))
+            .map(|config| config.with_db_dir(state_db_dir));
         self
     }
 
     /// Sets the state db size to be used by the resulting factory.
     pub fn with_state_db_size(mut self, state_db_size: usize) -> Self {
-        self.state_db_size = Some(state_db_size);
+        self.state_storage_configuration = self
+            .state_storage_configuration
+            .or_else(|| Some(ScabbardStorageConfiguration::lmdb()))
+            .map(|config| config.with_db_size(state_db_size));
         self
     }
 
     /// Sets the receipt db directory to be used by the resulting factory.
     pub fn with_receipt_db_dir(mut self, receipt_db_dir: String) -> Self {
-        self.receipt_db_dir = Some(receipt_db_dir);
+        self.state_storage_configuration = self
+            .state_storage_configuration
+            .or_else(|| Some(ScabbardStorageConfiguration::lmdb()))
+            .map(|config| config.with_db_dir(receipt_db_dir));
         self
     }
 
     /// Sets the receipt db size to be used by the resulting factory.
     pub fn with_receipt_db_size(mut self, receipt_db_size: usize) -> Self {
-        self.receipt_db_size = Some(receipt_db_size);
+        self.state_storage_configuration = self
+            .state_storage_configuration
+            .or_else(|| Some(ScabbardStorageConfiguration::lmdb()))
+            .map(|config| config.with_db_size(receipt_db_size));
         self
     }
 
-    #[cfg(feature = "diesel-receipt-store")]
+    #[cfg(all(
+        feature = "diesel-receipt-store",
+        any(feature = "postgres", feature = "sqlite")
+    ))]
     /// Sets the receipt db connection url to be used by the resulting factory.
     pub fn with_receipt_db_url(mut self, receipt_db_url: String) -> Self {
-        self.receipt_db_url = Some(receipt_db_url);
+        self.receipt_storage_configuration = Some(ScabbardStorageConfiguration::connection_uri(
+            &receipt_db_url,
+        ));
+        self
+    }
+
+    pub fn with_receipt_storage_configuration(
+        mut self,
+        storage_config: ScabbardStorageConfiguration,
+    ) -> Self {
+        self.receipt_storage_configuration = Some(storage_config);
         self
     }
 
@@ -178,45 +213,119 @@ impl ScabbardFactoryBuilder {
     /// # Errors
     ///
     /// Returns an InvalidStateError if a signature_verifier_factory has not been set.
-    pub fn build(self) -> Result<ScabbardFactory, splinter::error::InvalidStateError> {
+    pub fn build(self) -> Result<ScabbardFactory, InvalidStateError> {
         let signature_verifier_factory = self.signature_verifier_factory.ok_or_else(|| {
             splinter::error::InvalidStateError::with_message(
                 "A scabbard factory requires a signature verifier factory".into(),
             )
         })?;
 
-        #[cfg(feature = "diesel-receipt-store")]
-        let receipt_db_url = self.receipt_db_url.ok_or_else(|| {
-            splinter::error::InvalidStateError::with_message(
-                "A scabbard factory requires a receipt database url".into(),
-            )
-        })?;
+        let receipt_storage_configuration = self
+            .receipt_storage_configuration
+            .unwrap_or_else(ScabbardStorageConfiguration::lmdb);
+
+        let receipt_store_factory_config = match receipt_storage_configuration {
+            ScabbardStorageConfiguration::Lmdb { db_dir, db_size } => {
+                ScabbardFactoryStorageConfig::Lmdb {
+                    db_dir: db_dir.unwrap_or_else(|| DEFAULT_RECEIPT_DB_DIR.into()),
+                    db_size: db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
+                }
+            }
+            #[cfg(feature = "diesel-receipt-store")]
+            ScabbardStorageConfiguration::DatabaseConnectionUri { connection_uri } => {
+                match connection_uri {
+                    #[cfg(feature = "postgres")]
+                    ConnectionUri::Postgres(url) => {
+                        let connection_manager =
+                            ConnectionManager::<diesel::pg::PgConnection>::new(&*url);
+                        let pool = Pool::builder().build(connection_manager).map_err(|err| {
+                            InvalidStateError::with_message(format!(
+                                "Failed to build connection pool: {}",
+                                err
+                            ))
+                        })?;
+                        ScabbardFactoryStorageConfig::Postgres { pool }
+                    }
+                    #[cfg(feature = "sqlite")]
+                    ConnectionUri::Sqlite(conn_str) => {
+                        if (&*conn_str != ":memory:") && !std::path::Path::new(&*conn_str).exists()
+                        {
+                            return Err(InvalidStateError::with_message(format!(
+                                "Database file '{}' does not exist",
+                                conn_str
+                            )));
+                        }
+                        let connection_manager =
+                            ConnectionManager::<diesel::sqlite::SqliteConnection>::new(&*conn_str);
+                        let mut pool_builder = Pool::builder();
+                        // A new database is created for each connection to the in-memory SQLite
+                        // implementation; to ensure that the resulting stores will operate on the same
+                        // database, only one connection is allowed.
+                        if &*conn_str == ":memory:" {
+                            pool_builder = pool_builder.max_size(1);
+                        }
+                        let pool = pool_builder.build(connection_manager).map_err(|err| {
+                            InvalidStateError::with_message(format!(
+                                "Failed to build connection pool: {}",
+                                err
+                            ))
+                        })?;
+                        ScabbardFactoryStorageConfig::Sqlite { pool }
+                    }
+                    #[cfg(not(feature = "sqlite"))]
+                    ConnectionUri::Unknown(conn_str) => {
+                        return Err(InvalidStateError::with_message(format!(
+                            "Unrecognizable database connection URI {}",
+                            conn_str
+                        )));
+                    }
+                }
+            }
+        };
+
+        let state_storage_configuration = self
+            .state_storage_configuration
+            .unwrap_or_else(ScabbardStorageConfiguration::lmdb);
+        let (state_db_dir, state_db_size) = match state_storage_configuration {
+            ScabbardStorageConfiguration::Lmdb { db_dir, db_size } => (
+                db_dir.unwrap_or_else(|| DEFAULT_STATE_DB_DIR.into()),
+                db_size.unwrap_or(DEFAULT_STATE_DB_SIZE),
+            ),
+            #[cfg(feature = "diesel-receipt-store")]
+            _ => unreachable!(),
+        };
 
         Ok(ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
-            state_db_dir: self
-                .state_db_dir
-                .unwrap_or_else(|| DEFAULT_STATE_DB_DIR.into()),
-            state_db_size: self.state_db_size.unwrap_or(DEFAULT_STATE_DB_SIZE),
-            receipt_db_dir: self
-                .receipt_db_dir
-                .unwrap_or_else(|| DEFAULT_RECEIPT_DB_DIR.into()),
-            receipt_db_size: self.receipt_db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
-            #[cfg(feature = "diesel-receipt-store")]
-            receipt_db_url,
+            state_db_dir,
+            state_db_size,
+            receipt_store_factory_config,
             signature_verifier_factory,
         })
     }
+}
+
+/// Internal Factory storage configuration.
+enum ScabbardFactoryStorageConfig {
+    Lmdb {
+        db_dir: String,
+        db_size: usize,
+    },
+    #[cfg(feature = "postgres")]
+    Postgres {
+        pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
+    },
+    #[cfg(feature = "sqlite")]
+    Sqlite {
+        pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
+    },
 }
 
 pub struct ScabbardFactory {
     service_types: Vec<String>,
     state_db_dir: String,
     state_db_size: usize,
-    receipt_db_dir: String,
-    receipt_db_size: usize,
-    #[cfg(feature = "diesel-receipt-store")]
-    receipt_db_url: String,
+    receipt_store_factory_config: ScabbardFactoryStorageConfig,
     signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
@@ -300,7 +409,6 @@ impl ServiceFactory for ScabbardFactory {
             .collect::<HashSet<String>>();
 
         let state_db_dir = Path::new(&self.state_db_dir);
-        let receipt_db_dir = Path::new(&self.receipt_db_dir);
         let admin_keys_str = args.get("admin_keys").ok_or_else(|| {
             FactoryCreateError::InvalidArguments("admin_keys argument not provided".into())
         })?;
@@ -325,17 +433,108 @@ impl ServiceFactory for ScabbardFactory {
         let version = ScabbardVersion::try_from(args.get("version").map(String::as_str))
             .map_err(FactoryCreateError::InvalidArguments)?;
 
+        let state_db_path = compute_db_path(&service_id, circuit_id, state_db_dir, "-state")?;
+
+        let (receipt_store, receipt_purge): (ScabbardReceiptStore, _) = match &self
+            .receipt_store_factory_config
+        {
+            #[cfg(not(feature = "diesel-receipt-store"))]
+            ScabbardFactoryStorageConfig::Lmdb { db_dir, db_size } => {
+                let receipt_db_path =
+                    compute_db_path(&service_id, circuit_id, Path::new(&db_dir), "-receipts")?;
+
+                let receipt_store = Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+                    LmdbOrderedStore::new(&receipt_db_path.with_extension("lmdb"), Some(*db_size))
+                        .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
+                ))));
+
+                (
+                    receipt_store,
+                    Box::new(move || {
+                        purge_paths(&receipt_db_path)?;
+                        Ok(())
+                    })
+                        as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+                )
+            }
+            #[cfg(feature = "diesel-receipt-store")]
+            ScabbardFactoryStorageConfig::Lmdb { db_dir, db_size } => {
+                let receipt_db_dir_path = Path::new(&db_dir);
+
+                let receipt_db_path =
+                    compute_db_path(&service_id, circuit_id, receipt_db_dir_path, "-receipts")?;
+
+                let file: String = receipt_db_path
+                    .with_extension("lmdb")
+                    .components()
+                    .rev()
+                    .next()
+                    .map(|p| {
+                        let p: &std::path::Path = p.as_ref();
+                        p.to_str().map(|s| s.to_string())
+                    })
+                    .flatten()
+                    .ok_or_else(|| {
+                        FactoryCreateError::Internal(
+                            "File name produced was not valid UTF-8".into(),
+                        )
+                    })?;
+
+                let purge_db_path = receipt_db_path.clone();
+                (
+                    Arc::new(RwLock::new(
+                        LmdbReceiptStore::new(
+                            &receipt_db_path,
+                            &[file.clone()],
+                            file,
+                            Some(*db_size),
+                        )
+                        .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
+                    )),
+                    Box::new(move || {
+                        purge_paths(&purge_db_path)?;
+                        Ok(())
+                    })
+                        as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+                )
+            }
+            #[cfg(all(feature = "diesel-receipt-store", feature = "postgres"))]
+            ScabbardFactoryStorageConfig::Postgres { pool } => (
+                Arc::new(RwLock::new(DieselReceiptStore::new(pool.clone()))),
+                Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+            ),
+            #[cfg(all(feature = "diesel-receipt-store", feature = "sqlite"))]
+            ScabbardFactoryStorageConfig::Sqlite { pool } => (
+                Arc::new(RwLock::new(DieselReceiptStore::new(pool.clone()))),
+                Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+            ),
+            #[cfg(all(
+                feature = "diesel-receipt-store",
+                not(any(feature = "postgres", feature = "sqlite"))
+            ))]
+            _ => {
+                return Err(FactoryCreateError::Internal(
+                    "diesel-receipt-store was enabled, but without any databases".into(),
+                ))
+            }
+        };
+
+        let purge_state_db_path = state_db_path.clone();
+        let purge_fn = Box::new(move || {
+            purge_paths(&purge_state_db_path)?;
+            receipt_purge()?;
+            Ok(())
+        }) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>;
+
         let service = Scabbard::new(
             service_id,
             circuit_id,
             version,
             peer_services,
-            state_db_dir,
+            &state_db_path,
             self.state_db_size,
-            receipt_db_dir,
-            self.receipt_db_size,
-            #[cfg(feature = "diesel-receipt-store")]
-            self.receipt_db_url.clone(),
+            receipt_store,
+            purge_fn,
             self.signature_verifier_factory
                 .lock()
                 .map_err(|_| {
@@ -400,6 +599,35 @@ fn parse_list(values_list: &str) -> Result<Vec<String>, String> {
             .map(String::from)
             .collect::<Vec<String>>())
     }
+}
+
+/// Compute the LMDB file path for a circuit::service-id pair.
+pub fn compute_db_path(
+    service_id: &str,
+    circuit_id: &str,
+    db_dir: &Path,
+    suffix: &str,
+) -> Result<PathBuf, FactoryCreateError> {
+    let hash = hash(
+        MessageDigest::sha256(),
+        format!("{}::{}", service_id, circuit_id).as_bytes(),
+    )
+    .map(|digest| to_hex(&*digest))
+    .map_err(|err| FactoryCreateError::CreationFailed(Box::new(err)))?;
+    let db_path = db_dir.join(format!("{}-{}", hash, suffix));
+    Ok(db_path)
+}
+
+fn purge_paths(lmdb_path: &Path) -> Result<(), InternalError> {
+    let db_path = lmdb_path.with_extension("lmdb");
+    let db_lock_file_path = lmdb_path.with_extension("lmdb-lock");
+
+    std::fs::remove_file(db_path.as_path())
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+    std::fs::remove_file(db_lock_file_path.as_path())
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -491,15 +719,35 @@ mod tests {
     }
 
     fn get_factory() -> ScabbardFactory {
-        ScabbardFactory::new(
-            Some("/tmp".into()),
-            Some(1024 * 1024),
-            Some("/tmp".into()),
-            Some(1024 * 1024),
-            #[cfg(feature = "diesel-receipt-store")]
-            ":memory:".to_string(),
-            Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
-        )
+        #[cfg(not(all(feature = "diesel-receipt-store", feature = "sqlite")))]
+        let receipt_store_factory_config = ScabbardFactoryStorageConfig::Lmdb {
+            db_dir: "/tmp".into(),
+            db_size: 1024 * 1024,
+        };
+        #[cfg(all(feature = "diesel-receipt-store", feature = "sqlite"))]
+        let receipt_store_factory_config = ScabbardFactoryStorageConfig::Sqlite {
+            pool: {
+                let connection_manager =
+                    ConnectionManager::<diesel::SqliteConnection>::new(":memory:");
+                let pool = Pool::builder()
+                    .max_size(1)
+                    .build(connection_manager)
+                    .expect("Failed to build connection pool");
+
+                sawtooth::migrations::run_sqlite_migrations(
+                    &*pool.get().expect("Failed to get connection for migrations"),
+                )
+                .expect("Failed to run migrations");
+                pool
+            },
+        };
+        ScabbardFactory {
+            service_types: vec![SERVICE_TYPE.into()],
+            state_db_dir: "/tmp".into(),
+            state_db_size: 1024 * 1024,
+            receipt_store_factory_config,
+            signature_verifier_factory: Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
+        }
     }
 
     fn get_mock_args() -> HashMap<String, String> {
