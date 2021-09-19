@@ -34,6 +34,86 @@ const DEFAULT_STATE_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 const DEFAULT_RECEIPT_DB_DIR: &str = "/var/lib/splinter";
 const DEFAULT_RECEIPT_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
+#[cfg(not(feature = "diesel-receipt-store"))]
+type ScabbardReceiptStore = Arc<RwLock<TransactionReceiptStore>>;
+
+#[cfg(feature = "diesel-receipt-store")]
+type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
+
+#[cfg(feature = "diesel-receipt-store")]
+pub enum ConnectionUri {
+    #[cfg(feature = "postgres")]
+    Postgres(Box<str>),
+    #[cfg(feature = "sqlite")]
+    Sqlite(Box<str>),
+    #[cfg(not(feature = "sqlite"))]
+    Unknown(Box<str>),
+}
+
+/// Configuration for underlying storage that will be enabled for each service produced by the
+/// resulting ScabbardFactory.
+pub enum ScabbardStorageConfiguration {
+    Lmdb {
+        db_dir: Option<String>,
+        db_size: Option<usize>,
+    },
+    #[cfg(feature = "diesel-receipt-store")]
+    DatabaseConnectionUri { connection_uri: ConnectionUri },
+}
+
+impl ScabbardStorageConfiguration {
+    fn lmdb() -> Self {
+        ScabbardStorageConfiguration::Lmdb {
+            db_dir: None,
+            db_size: None,
+        }
+    }
+
+    #[cfg(all(
+        feature = "diesel-receipt-store",
+        any(feature = "postgres", feature = "sqlite")
+    ))]
+    fn connection_uri(connection_uri: &str) -> Self {
+        let connection_uri = match connection_uri {
+            #[cfg(feature = "postgres")]
+            s if s.starts_with("postgres://") => ConnectionUri::Postgres(s.into()),
+            #[cfg(feature = "sqlite")]
+            s => ConnectionUri::Sqlite(s.into()),
+            #[cfg(not(feature = "sqlite"))]
+            s => ConnectionUri::Unknown(s.into()),
+        };
+        ScabbardStorageConfiguration::DatabaseConnectionUri { connection_uri }
+    }
+
+    fn with_db_dir(self, db_dir: String) -> Self {
+        match self {
+            Self::Lmdb { db_size, .. } => Self::Lmdb {
+                db_dir: Some(db_dir),
+                db_size,
+            },
+            #[cfg(feature = "diesel-receipt-store")]
+            _ => Self::Lmdb {
+                db_dir: Some(db_dir),
+                db_size: None,
+            },
+        }
+    }
+
+    fn with_db_size(self, db_size: usize) -> Self {
+        match self {
+            Self::Lmdb { db_dir, .. } => Self::Lmdb {
+                db_dir,
+                db_size: Some(db_size),
+            },
+            #[cfg(feature = "diesel-receipt-store")]
+            _ => Self::Lmdb {
+                db_dir: None,
+                db_size: Some(db_size),
+            },
+        }
+    }
+}
+
 /// Builds new ScabbardFactory instances.
 #[derive(Default)]
 pub struct ScabbardFactoryBuilder {
