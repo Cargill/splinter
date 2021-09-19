@@ -22,7 +22,7 @@ extern crate log;
 #[cfg_attr(feature = "commit-store", macro_use)]
 extern crate diesel;
 #[cfg(feature = "diesel_migrations")]
-#[macro_use]
+#[cfg_attr(feature = "commit-store", macro_use)]
 extern crate diesel_migrations;
 #[macro_use]
 extern crate serde_derive;
