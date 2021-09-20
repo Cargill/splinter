@@ -87,6 +87,7 @@ default = [
     "database-postgres",
     "database-sqlite",
     "oauth",
+    "tap",
     "trust-authorization",
 ]
 
@@ -105,7 +106,6 @@ experimental = [
     "health-service",
     "https-bind",
     "log-config",
-    "tap",
     "node",
     "node-file-block",
     "service-arg-validation",
