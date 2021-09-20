@@ -21,8 +21,11 @@ pub(super) mod scabbard;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use cylinder::{secp256k1::Secp256k1Context, Context, Signer, VerifierFactory};
+use cylinder::{secp256k1::Secp256k1Context, Context, Signer, Verifier, VerifierFactory};
 use rand::{thread_rng, Rng};
+use splinter::biome::credentials::rest_api::{
+    BiomeCredentialsRestResourceProvider, BiomeCredentialsRestResourceProviderBuilder,
+};
 use splinter::error::InternalError;
 use splinter::public_key::PublicKey;
 use splinter::rest_api::actix_web_1::RestApiBuilder as RestApiBuilder1;
@@ -59,6 +62,8 @@ pub struct NodeBuilder {
     node_id: Option<String>,
     enable_biome: bool,
     signers: Option<Vec<Box<dyn Signer>>>,
+    biome_auth: Option<BiomeCredentialsRestResourceProvider>,
+    cylinder_auth: Option<Box<dyn Verifier>>,
 }
 
 impl Default for NodeBuilder {
@@ -79,6 +84,8 @@ impl NodeBuilder {
             node_id: None,
             enable_biome: false,
             signers: None,
+            biome_auth: None,
+            cylinder_auth: None,
         }
     }
 
@@ -185,6 +192,33 @@ impl NodeBuilder {
         self
     }
 
+    /// Enable Biome Auth
+    #[cfg(feature = "biome-credentials")]
+    pub fn with_biome_auth(
+        self,
+        key_store: Box<dyn splinter::biome::KeyStore>,
+        refresh_token_store: Box<dyn splinter::biome::RefreshTokenStore>,
+        credential_store: Box<dyn splinter::biome::CredentialsStore>,
+    ) -> Self {
+        let biome_auth = BiomeCredentialsRestResourceProviderBuilder::default()
+            .with_key_store(key_store)
+            .with_refresh_token_store(refresh_token_store)
+            .with_credentials_store(credential_store)
+            .build()
+            .ok();
+        Self { biome_auth, ..self }
+    }
+
+    /// Enable Cylinder Auth
+    pub fn with_cylinder_auth(self, context: Box<dyn Context>) -> Self {
+        let verifier = context.new_verifier();
+        let cylinder_auth = Some(verifier);
+        Self {
+            cylinder_auth,
+            ..self
+        }
+    }
+
     /// Builds the `RunnableNode` and consumes the `NodeBuilder`.
     pub fn build(mut self) -> Result<RunnableNode, InternalError> {
         let url = format!("127.0.0.1:{}", self.rest_api_port.take().unwrap_or(0),);
@@ -244,6 +278,19 @@ impl NodeBuilder {
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?,
             ),
+        };
+
+        #[cfg(feature = "biome-credentials")]
+        let rest_api_variant = if let Some(biome) = self.biome_auth {
+            rest_api_variant.with_biome_auth(biome)
+        } else {
+            rest_api_variant
+        };
+
+        let rest_api_variant = if let Some(cylinder) = self.cylinder_auth {
+            rest_api_variant.with_cylinder_auth(cylinder)
+        } else {
+            rest_api_variant
         };
 
         let enable_biome = self.enable_biome;
