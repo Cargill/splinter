@@ -14,7 +14,7 @@
 
 //! Provides sqlite migration support to the database action
 
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::path::PathBuf;
 
 use diesel::{
@@ -33,6 +33,18 @@ const DEFAULT_SQLITE: &str = "splinter_state.db";
 
 /// Run the sqlite migrations against the provided connection string
 pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
+    if connection_string != ":memory:" {
+        if let Err(err) = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&connection_string)
+        {
+            return Err(CliError::ActionError(format!(
+                "While opening: {} received {}",
+                &connection_string, err
+            )));
+        }
+    }
     let connection_manager = ConnectionManager::<SqliteConnection>::new(&connection_string);
     let mut pool_builder = Pool::builder();
 
