@@ -92,7 +92,7 @@ pub struct PartialConfig {
     #[cfg(feature = "tap")]
     influx_username: Option<String>,
     #[cfg(feature = "tap")]
-    metrics_password: Option<String>,
+    influx_password: Option<String>,
     #[cfg(feature = "challenge-authorization")]
     peering_key: Option<String>,
     #[cfg(feature = "log-config")]
@@ -166,7 +166,7 @@ impl PartialConfig {
             #[cfg(feature = "tap")]
             influx_username: None,
             #[cfg(feature = "tap")]
-            metrics_password: None,
+            influx_password: None,
             #[cfg(feature = "challenge-authorization")]
             peering_key: None,
             #[cfg(feature = "log-config")]
@@ -354,8 +354,8 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_password(&self) -> Option<String> {
-        self.metrics_password.clone()
+    pub fn influx_password(&self) -> Option<String> {
+        self.influx_password.clone()
     }
 
     #[cfg(feature = "challenge-authorization")]
@@ -830,15 +830,15 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "tap")]
-    /// Adds an `metrics_password` value to the `PartialConfig` object.
+    /// Adds an `influx_password` value to the `PartialConfig` object.
     ///
     /// # Arguments
     ///
-    /// * `metrics_password` - Add the password for authorization with the InfluxDB database used
+    /// * `influx_password` - Add the password for authorization with the InfluxDB database used
     ///    for metrics
     ///
-    pub fn with_metrics_password(mut self, metrics_password: Option<String>) -> Self {
-        self.metrics_password = metrics_password;
+    pub fn with_influx_password(mut self, influx_password: Option<String>) -> Self {
+        self.influx_password = influx_password;
         self
     }
     #[cfg(feature = "challenge-authorization")]

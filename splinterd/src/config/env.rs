@@ -42,7 +42,7 @@ const METRICS_URL_ENV: &str = "SPLINTER_INFLUX_URL";
 #[cfg(feature = "tap")]
 const METRICS_USERNAME_ENV: &str = "SPLINTER_INFLUX_USERNAME";
 #[cfg(feature = "tap")]
-const METRICS_PASSWORD_ENV: &str = "SPLINTER_METRICS_PASSWORD";
+const METRICS_PASSWORD_ENV: &str = "SPLINTER_INFLUX_PASSWORD";
 
 pub struct EnvPartialConfigBuilder;
 
@@ -131,7 +131,7 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
                 .with_influx_db(env::var(METRICS_DB_ENV).ok())
                 .with_influx_url(env::var(METRICS_URL_ENV).ok())
                 .with_influx_username(env::var(METRICS_USERNAME_ENV).ok())
-                .with_metrics_password(env::var(METRICS_PASSWORD_ENV).ok())
+                .with_influx_password(env::var(METRICS_PASSWORD_ENV).ok())
         }
 
         Ok(config)

@@ -96,7 +96,7 @@ pub struct Config {
     #[cfg(feature = "tap")]
     influx_username: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
-    metrics_password: Option<(String, ConfigSource)>,
+    influx_password: Option<(String, ConfigSource)>,
     #[cfg(feature = "challenge-authorization")]
     peering_key: (String, ConfigSource),
     #[cfg(feature = "log-config")]
@@ -332,8 +332,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_password(&self) -> Option<&str> {
-        if let Some((password, _)) = &self.metrics_password {
+    pub fn influx_password(&self) -> Option<&str> {
+        if let Some((password, _)) = &self.influx_password {
             Some(password)
         } else {
             None
@@ -565,8 +565,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_password_source(&self) -> Option<&ConfigSource> {
-        if let Some((_, source)) = &self.metrics_password {
+    pub fn influx_password_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.influx_password {
             Some(source)
         } else {
             None
@@ -847,10 +847,9 @@ impl Config {
                 );
             }
 
-            if let (Some(_), Some(source)) =
-                (self.metrics_password(), self.metrics_password_source())
+            if let (Some(_), Some(source)) = (self.influx_password(), self.influx_password_source())
             {
-                debug!("Config: metrics_password: <HIDDEN> (source: {:?})", source,);
+                debug!("Config: influx_password: <HIDDEN> (source: {:?})", source,);
             }
         }
         #[cfg(feature = "log-config")]

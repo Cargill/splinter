@@ -354,10 +354,10 @@ impl ConfigBuilder {
                 .iter()
                 .find_map(|p| p.influx_username().map(|v| (v, p.source()))),
             #[cfg(feature = "tap")]
-            metrics_password: self
+            influx_password: self
                 .partial_configs
                 .iter()
-                .find_map(|p| p.metrics_password().map(|v| (v, p.source()))),
+                .find_map(|p| p.influx_password().map(|v| (v, p.source()))),
             #[cfg(feature = "challenge-authorization")]
             peering_key: self
                 .partial_configs

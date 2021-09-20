@@ -145,7 +145,7 @@ OPTIONS
 `--influx-db` `DB_NAME`
 : The name of the InfluxDB database for metrics Collection.
 
-`--metrics-password` `METRICS_PASSWORD`
+`--influx-password` `PASSWORD`
 : The password used for authorization with the InfluxDB.
 
 `--influx-url` `URL`

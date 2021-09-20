@@ -156,4 +156,4 @@ version = "1"
 
 # A username with write access to the database specified above.
 #influx_username = ""
-#metrics_password = ""
+#influx_password = ""

@@ -606,8 +606,9 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("metrics_password")
-                .long("metrics-password")
+            Arg::with_name("influx_password")
+                .long("influx-password")
+                .value_name("password")
                 .long_help("The password used for authorization with the InfluxDB")
                 .takes_value(true),
         );
@@ -685,7 +686,7 @@ fn setup_metrics_recorder(config: &Config) -> Result<(), UserError> {
     let metrics_configured = config.influx_db().is_some()
         || config.influx_url().is_some()
         || config.influx_username().is_some()
-        || config.metrics_password().is_some();
+        || config.influx_password().is_some();
 
     if metrics_configured {
         let influx_db = config.influx_db().ok_or_else(|| {
@@ -700,11 +701,11 @@ fn setup_metrics_recorder(config: &Config) -> Result<(), UserError> {
             UserError::MissingArgument("missing metrics username provider configuration".into())
         })?;
 
-        let metrics_password = config.metrics_password().ok_or_else(|| {
+        let influx_password = config.influx_password().ok_or_else(|| {
             UserError::MissingArgument("missing metrics password provider configuration".into())
         })?;
 
-        InfluxRecorder::init(influx_url, influx_db, influx_username, metrics_password)
+        InfluxRecorder::init(influx_url, influx_db, influx_username, influx_password)
             .map_err(UserError::InternalError)?
     }
 
