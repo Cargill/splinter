@@ -142,16 +142,16 @@ OPTIONS
   This heartbeat is used to check the health of connections to other Splinter
   nodes.
 
-`--metrics-db` `METRICS_DB`
+`--influx-db` `DB_NAME`
 : The name of the InfluxDB database for metrics Collection.
 
-`--metrics-password` `METRICS_PASSWORD`
+`--influx-password` `PASSWORD`
 : The password used for authorization with the InfluxDB.
 
-`--metrics-url` `METRICS_URL`
+`--influx-url` `URL`
 : The URL to connect the InfluxDB database for metrics collection.
 
-`--metrics-username` `METRICS_USERNAME`
+`--influx-username` `USERNAME`
 : The username used for authorization with the InfluxDB.
 
 `-n`, `--network-endpoints` `NETWORK-ENDPOINT`

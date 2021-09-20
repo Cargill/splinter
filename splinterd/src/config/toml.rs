@@ -74,13 +74,13 @@ struct TomlConfig {
     #[cfg(feature = "oauth")]
     oauth_openid_scopes: Option<Vec<String>>,
     #[cfg(feature = "tap")]
-    metrics_db: Option<String>,
+    influx_db: Option<String>,
     #[cfg(feature = "tap")]
-    metrics_url: Option<String>,
+    influx_url: Option<String>,
     #[cfg(feature = "tap")]
-    metrics_username: Option<String>,
+    influx_username: Option<String>,
     #[cfg(feature = "tap")]
-    metrics_password: Option<String>,
+    influx_password: Option<String>,
     #[cfg(feature = "challenge-authorization")]
     peering_key: Option<String>,
     #[cfg(feature = "log-config")]
@@ -200,10 +200,10 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
         #[cfg(feature = "tap")]
         {
             partial_config = partial_config
-                .with_metrics_db(self.toml_config.metrics_db)
-                .with_metrics_url(self.toml_config.metrics_url)
-                .with_metrics_username(self.toml_config.metrics_username)
-                .with_metrics_password(self.toml_config.metrics_password)
+                .with_influx_db(self.toml_config.influx_db)
+                .with_influx_url(self.toml_config.influx_url)
+                .with_influx_username(self.toml_config.influx_username)
+                .with_influx_password(self.toml_config.influx_password)
         }
         #[cfg(feature = "log-config")]
         {

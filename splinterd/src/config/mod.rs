@@ -90,13 +90,13 @@ pub struct Config {
     oauth_openid_scopes: Option<(Vec<String>, ConfigSource)>,
     strict_ref_counts: (bool, ConfigSource),
     #[cfg(feature = "tap")]
-    metrics_db: Option<(String, ConfigSource)>,
+    influx_db: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
-    metrics_url: Option<(String, ConfigSource)>,
+    influx_url: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
-    metrics_username: Option<(String, ConfigSource)>,
+    influx_username: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
-    metrics_password: Option<(String, ConfigSource)>,
+    influx_password: Option<(String, ConfigSource)>,
     #[cfg(feature = "challenge-authorization")]
     peering_key: (String, ConfigSource),
     #[cfg(feature = "log-config")]
@@ -305,8 +305,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_db(&self) -> Option<&str> {
-        if let Some((db, _)) = &self.metrics_db {
+    pub fn influx_db(&self) -> Option<&str> {
+        if let Some((db, _)) = &self.influx_db {
             Some(db)
         } else {
             None
@@ -314,8 +314,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_url(&self) -> Option<&str> {
-        if let Some((url, _)) = &self.metrics_url {
+    pub fn influx_url(&self) -> Option<&str> {
+        if let Some((url, _)) = &self.influx_url {
             Some(url)
         } else {
             None
@@ -323,8 +323,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_username(&self) -> Option<&str> {
-        if let Some((username, _)) = &self.metrics_username {
+    pub fn influx_username(&self) -> Option<&str> {
+        if let Some((username, _)) = &self.influx_username {
             Some(username)
         } else {
             None
@@ -332,8 +332,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_password(&self) -> Option<&str> {
-        if let Some((password, _)) = &self.metrics_password {
+    pub fn influx_password(&self) -> Option<&str> {
+        if let Some((password, _)) = &self.influx_password {
             Some(password)
         } else {
             None
@@ -538,8 +538,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_db_source(&self) -> Option<&ConfigSource> {
-        if let Some((_, source)) = &self.metrics_db {
+    pub fn influx_db_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.influx_db {
             Some(source)
         } else {
             None
@@ -547,8 +547,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_url_source(&self) -> Option<&ConfigSource> {
-        if let Some((_, source)) = &self.metrics_url {
+    pub fn influx_url_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.influx_url {
             Some(source)
         } else {
             None
@@ -556,8 +556,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_username_source(&self) -> Option<&ConfigSource> {
-        if let Some((_, source)) = &self.metrics_username {
+    pub fn influx_username_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.influx_username {
             Some(source)
         } else {
             None
@@ -565,8 +565,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_password_source(&self) -> Option<&ConfigSource> {
-        if let Some((_, source)) = &self.metrics_password {
+    pub fn influx_password_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.influx_password {
             Some(source)
         } else {
             None
@@ -830,27 +830,26 @@ impl Config {
         );
         #[cfg(feature = "tap")]
         {
-            if let (Some(db), Some(source)) = (self.metrics_db(), self.metrics_db_source()) {
-                debug!("Config: metrics_db: {:?} (source: {:?})", db, source,);
+            if let (Some(db), Some(source)) = (self.influx_db(), self.influx_db_source()) {
+                debug!("Config: influx_db: {:?} (source: {:?})", db, source,);
             }
 
-            if let (Some(url), Some(source)) = (self.metrics_url(), self.metrics_url_source()) {
-                debug!("Config: metrics_url: {:?} (source: {:?})", url, source,);
+            if let (Some(url), Some(source)) = (self.influx_url(), self.influx_url_source()) {
+                debug!("Config: influx_url: {:?} (source: {:?})", url, source,);
             }
 
             if let (Some(username), Some(source)) =
-                (self.metrics_username(), self.metrics_username_source())
+                (self.influx_username(), self.influx_username_source())
             {
                 debug!(
-                    "Config: metrics_username: {:?} (source: {:?})",
+                    "Config: influx_username: {:?} (source: {:?})",
                     username, source,
                 );
             }
 
-            if let (Some(_), Some(source)) =
-                (self.metrics_password(), self.metrics_password_source())
+            if let (Some(_), Some(source)) = (self.influx_password(), self.influx_password_source())
             {
-                debug!("Config: metrics_password: <HIDDEN> (source: {:?})", source,);
+                debug!("Config: influx_password: <HIDDEN> (source: {:?})", source,);
             }
         }
         #[cfg(feature = "log-config")]

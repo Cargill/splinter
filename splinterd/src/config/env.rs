@@ -36,13 +36,13 @@ const OAUTH_REDIRECT_URL_ENV: &str = "OAUTH_REDIRECT_URL";
 #[cfg(feature = "oauth")]
 const OAUTH_OPENID_URL_ENV: &str = "OAUTH_OPENID_URL";
 #[cfg(feature = "tap")]
-const METRICS_DB_ENV: &str = "SPLINTER_METRICS_DB";
+const METRICS_DB_ENV: &str = "SPLINTER_INFLUX_DB";
 #[cfg(feature = "tap")]
-const METRICS_URL_ENV: &str = "SPLINTER_METRICS_URL";
+const METRICS_URL_ENV: &str = "SPLINTER_INFLUX_URL";
 #[cfg(feature = "tap")]
-const METRICS_USERNAME_ENV: &str = "SPLINTER_METRICS_USERNAME";
+const METRICS_USERNAME_ENV: &str = "SPLINTER_INFLUX_USERNAME";
 #[cfg(feature = "tap")]
-const METRICS_PASSWORD_ENV: &str = "SPLINTER_METRICS_PASSWORD";
+const METRICS_PASSWORD_ENV: &str = "SPLINTER_INFLUX_PASSWORD";
 
 pub struct EnvPartialConfigBuilder;
 
@@ -128,10 +128,10 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
         #[cfg(feature = "tap")]
         {
             config = config
-                .with_metrics_db(env::var(METRICS_DB_ENV).ok())
-                .with_metrics_url(env::var(METRICS_URL_ENV).ok())
-                .with_metrics_username(env::var(METRICS_USERNAME_ENV).ok())
-                .with_metrics_password(env::var(METRICS_PASSWORD_ENV).ok())
+                .with_influx_db(env::var(METRICS_DB_ENV).ok())
+                .with_influx_url(env::var(METRICS_URL_ENV).ok())
+                .with_influx_username(env::var(METRICS_USERNAME_ENV).ok())
+                .with_influx_password(env::var(METRICS_PASSWORD_ENV).ok())
         }
 
         Ok(config)
