@@ -18,6 +18,8 @@
 /splinterd/target
 /splinterd/Cargo.lock
 /splinterd/packaging/man/*.1
+/splinterd/tests/contracts/command/target
+/splinterd/tests/contracts/command/Cargo.lock
 
 /messaging/src/protos
 /messaging/target
