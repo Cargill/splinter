@@ -65,6 +65,7 @@ stable = [
   "default",
   "events",
   "lmdb",
+  "metrics",
   "rest-api",
   "rest-api-actix",
 ]
@@ -77,7 +78,6 @@ experimental = [
   "diesel-receipt-store",
   "factory-builder",
   "https",
-  "metrics",
   "postgres",
   "sqlite",
 ]
