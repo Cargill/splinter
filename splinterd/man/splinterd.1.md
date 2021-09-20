@@ -142,7 +142,7 @@ OPTIONS
   This heartbeat is used to check the health of connections to other Splinter
   nodes.
 
-`--metrics-db` `METRICS_DB`
+`--influx-db` `DB_NAME`
 : The name of the InfluxDB database for metrics Collection.
 
 `--metrics-password` `METRICS_PASSWORD`

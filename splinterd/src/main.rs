@@ -585,8 +585,9 @@ fn main() {
     #[cfg(feature = "tap")]
     let app = app
         .arg(
-            Arg::with_name("metrics_db")
-                .long("metrics-db")
+            Arg::with_name("influx_db")
+                .long("influx-db")
+                .value_name("db_name")
                 .long_help("The name of the InfluxDB database for metrics collection")
                 .takes_value(true),
         )
@@ -679,13 +680,13 @@ fn main() {
 
 #[cfg(feature = "tap")]
 fn setup_metrics_recorder(config: &Config) -> Result<(), UserError> {
-    let metrics_configured = config.metrics_db().is_some()
+    let metrics_configured = config.influx_db().is_some()
         || config.metrics_url().is_some()
         || config.metrics_username().is_some()
         || config.metrics_password().is_some();
 
     if metrics_configured {
-        let metrics_db = config.metrics_db().ok_or_else(|| {
+        let influx_db = config.influx_db().ok_or_else(|| {
             UserError::MissingArgument("missing metrics db provider configuration".into())
         })?;
 
@@ -701,7 +702,7 @@ fn setup_metrics_recorder(config: &Config) -> Result<(), UserError> {
             UserError::MissingArgument("missing metrics password provider configuration".into())
         })?;
 
-        InfluxRecorder::init(metrics_url, metrics_db, metrics_username, metrics_password)
+        InfluxRecorder::init(metrics_url, influx_db, metrics_username, metrics_password)
             .map_err(UserError::InternalError)?
     }
 

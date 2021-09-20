@@ -90,7 +90,7 @@ pub struct Config {
     oauth_openid_scopes: Option<(Vec<String>, ConfigSource)>,
     strict_ref_counts: (bool, ConfigSource),
     #[cfg(feature = "tap")]
-    metrics_db: Option<(String, ConfigSource)>,
+    influx_db: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
     metrics_url: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
@@ -305,8 +305,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_db(&self) -> Option<&str> {
-        if let Some((db, _)) = &self.metrics_db {
+    pub fn influx_db(&self) -> Option<&str> {
+        if let Some((db, _)) = &self.influx_db {
             Some(db)
         } else {
             None
@@ -538,8 +538,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_db_source(&self) -> Option<&ConfigSource> {
-        if let Some((_, source)) = &self.metrics_db {
+    pub fn influx_db_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.influx_db {
             Some(source)
         } else {
             None
@@ -830,8 +830,8 @@ impl Config {
         );
         #[cfg(feature = "tap")]
         {
-            if let (Some(db), Some(source)) = (self.metrics_db(), self.metrics_db_source()) {
-                debug!("Config: metrics_db: {:?} (source: {:?})", db, source,);
+            if let (Some(db), Some(source)) = (self.influx_db(), self.influx_db_source()) {
+                debug!("Config: influx_db: {:?} (source: {:?})", db, source,);
             }
 
             if let (Some(url), Some(source)) = (self.metrics_url(), self.metrics_url_source()) {

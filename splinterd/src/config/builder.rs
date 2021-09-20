@@ -339,10 +339,10 @@ impl ConfigBuilder {
                 .find_map(|p| p.strict_ref_counts().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("strict_ref_counts".to_string()))?,
             #[cfg(feature = "tap")]
-            metrics_db: self
+            influx_db: self
                 .partial_configs
                 .iter()
-                .find_map(|p| p.metrics_db().map(|v| (v, p.source()))),
+                .find_map(|p| p.influx_db().map(|v| (v, p.source()))),
             #[cfg(feature = "tap")]
             metrics_url: self
                 .partial_configs

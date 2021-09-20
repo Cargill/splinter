@@ -152,7 +152,7 @@ version = "1"
 #metrics_url = ""
 
 # The target database for metrics.
-#metrics_db = ""
+#influx_db = ""
 
 # A username with write access to the database specified above.
 #metrics_username = ""

@@ -86,7 +86,7 @@ pub struct PartialConfig {
     oauth_openid_scopes: Option<Vec<String>>,
     strict_ref_counts: Option<bool>,
     #[cfg(feature = "tap")]
-    metrics_db: Option<String>,
+    influx_db: Option<String>,
     #[cfg(feature = "tap")]
     metrics_url: Option<String>,
     #[cfg(feature = "tap")]
@@ -160,7 +160,7 @@ impl PartialConfig {
             oauth_openid_scopes: None,
             strict_ref_counts: None,
             #[cfg(feature = "tap")]
-            metrics_db: None,
+            influx_db: None,
             #[cfg(feature = "tap")]
             metrics_url: None,
             #[cfg(feature = "tap")]
@@ -339,8 +339,8 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_db(&self) -> Option<String> {
-        self.metrics_db.clone()
+    pub fn influx_db(&self) -> Option<String> {
+        self.influx_db.clone()
     }
 
     #[cfg(feature = "tap")]
@@ -793,14 +793,14 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "tap")]
-    /// Adds an `metrics_db` value to the `PartialConfig` object.
+    /// Adds an `influx_db` value to the `PartialConfig` object.
     ///
     /// # Arguments
     ///
-    /// * `metrics_db` - Add the name of the InfluxDB database used for metrics
+    /// * `influx_db` - Add the name of the InfluxDB database used for metrics
     ///
-    pub fn with_metrics_db(mut self, metrics_db: Option<String>) -> Self {
-        self.metrics_db = metrics_db;
+    pub fn with_influx_db(mut self, influx_db: Option<String>) -> Self {
+        self.influx_db = influx_db;
         self
     }
 
