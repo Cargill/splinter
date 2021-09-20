@@ -149,7 +149,7 @@ version = "1"
 #
 
 # The HTTP or UDP URL for your InfluxDB instance.
-#metrics_url = ""
+#influx_url = ""
 
 # The target database for metrics.
 #influx_db = ""

@@ -88,7 +88,7 @@ pub struct PartialConfig {
     #[cfg(feature = "tap")]
     influx_db: Option<String>,
     #[cfg(feature = "tap")]
-    metrics_url: Option<String>,
+    influx_url: Option<String>,
     #[cfg(feature = "tap")]
     metrics_username: Option<String>,
     #[cfg(feature = "tap")]
@@ -162,7 +162,7 @@ impl PartialConfig {
             #[cfg(feature = "tap")]
             influx_db: None,
             #[cfg(feature = "tap")]
-            metrics_url: None,
+            influx_url: None,
             #[cfg(feature = "tap")]
             metrics_username: None,
             #[cfg(feature = "tap")]
@@ -344,8 +344,8 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_url(&self) -> Option<String> {
-        self.metrics_url.clone()
+    pub fn influx_url(&self) -> Option<String> {
+        self.influx_url.clone()
     }
 
     #[cfg(feature = "tap")]
@@ -805,14 +805,14 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "tap")]
-    /// Adds an `metrics_url` value to the `PartialConfig` object.
+    /// Adds an `influx_url` value to the `PartialConfig` object.
     ///
     /// # Arguments
     ///
-    /// * `metrics_url` - Add the URL of the InfluxDB database used for metrics
+    /// * `influx_url` - Add the URL of the InfluxDB database used for metrics
     ///
-    pub fn with_metrics_url(mut self, metrics_url: Option<String>) -> Self {
-        self.metrics_url = metrics_url;
+    pub fn with_influx_url(mut self, influx_url: Option<String>) -> Self {
+        self.influx_url = influx_url;
         self
     }
 

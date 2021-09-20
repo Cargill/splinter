@@ -344,10 +344,10 @@ impl ConfigBuilder {
                 .iter()
                 .find_map(|p| p.influx_db().map(|v| (v, p.source()))),
             #[cfg(feature = "tap")]
-            metrics_url: self
+            influx_url: self
                 .partial_configs
                 .iter()
-                .find_map(|p| p.metrics_url().map(|v| (v, p.source()))),
+                .find_map(|p| p.influx_url().map(|v| (v, p.source()))),
             #[cfg(feature = "tap")]
             metrics_username: self
                 .partial_configs

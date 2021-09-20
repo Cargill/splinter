@@ -92,7 +92,7 @@ pub struct Config {
     #[cfg(feature = "tap")]
     influx_db: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
-    metrics_url: Option<(String, ConfigSource)>,
+    influx_url: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
     metrics_username: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
@@ -314,8 +314,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_url(&self) -> Option<&str> {
-        if let Some((url, _)) = &self.metrics_url {
+    pub fn influx_url(&self) -> Option<&str> {
+        if let Some((url, _)) = &self.influx_url {
             Some(url)
         } else {
             None
@@ -547,8 +547,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_url_source(&self) -> Option<&ConfigSource> {
-        if let Some((_, source)) = &self.metrics_url {
+    pub fn influx_url_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.influx_url {
             Some(source)
         } else {
             None
@@ -834,8 +834,8 @@ impl Config {
                 debug!("Config: influx_db: {:?} (source: {:?})", db, source,);
             }
 
-            if let (Some(url), Some(source)) = (self.metrics_url(), self.metrics_url_source()) {
-                debug!("Config: metrics_url: {:?} (source: {:?})", url, source,);
+            if let (Some(url), Some(source)) = (self.influx_url(), self.influx_url_source()) {
+                debug!("Config: influx_url: {:?} (source: {:?})", url, source,);
             }
 
             if let (Some(username), Some(source)) =

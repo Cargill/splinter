@@ -148,7 +148,7 @@ OPTIONS
 `--metrics-password` `METRICS_PASSWORD`
 : The password used for authorization with the InfluxDB.
 
-`--metrics-url` `METRICS_URL`
+`--influx-url` `URL`
 : The URL to connect the InfluxDB database for metrics collection.
 
 `--metrics-username` `METRICS_USERNAME`
