@@ -25,14 +25,14 @@ use crate::public_key::PublicKey;
 
 #[cfg(feature = "challenge-authorization")]
 use self::challenge_v1::{
-    ChallengeAuthorizationLocalAction, ChallengeAuthorizationLocalState,
-    ChallengeAuthorizationRemoteAction, ChallengeAuthorizationRemoteState,
+    ChallengeAuthorizationAcceptingAction, ChallengeAuthorizationAcceptingState,
+    ChallengeAuthorizationInitiatingAction, ChallengeAuthorizationInitiatingState,
 };
 use self::trust_v0::{TrustV0AuthorizationAction, TrustV0AuthorizationState};
 #[cfg(feature = "trust-authorization")]
 use self::trust_v1::{
-    TrustAuthorizationLocalAction, TrustAuthorizationLocalState, TrustAuthorizationRemoteAction,
-    TrustAuthorizationRemoteState,
+    TrustAuthorizationAcceptingAction, TrustAuthorizationAcceptingState,
+    TrustAuthorizationInitiatingAction, TrustAuthorizationInitiatingState,
 };
 
 use super::{ManagedAuthorizationState, ManagedAuthorizations};
@@ -49,7 +49,7 @@ pub enum Identity {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub(crate) enum AuthorizationRemoteState {
+pub(crate) enum AuthorizationAcceptingState {
     Start,
     Done(Identity),
     Unauthorized,
@@ -61,37 +61,37 @@ pub(crate) enum AuthorizationRemoteState {
 
     TrustV0(TrustV0AuthorizationState),
     #[cfg(feature = "trust-authorization")]
-    Trust(TrustAuthorizationRemoteState),
+    Trust(TrustAuthorizationAcceptingState),
     #[cfg(feature = "challenge-authorization")]
-    Challenge(ChallengeAuthorizationRemoteState),
+    Challenge(ChallengeAuthorizationAcceptingState),
 }
 
-impl fmt::Display for AuthorizationRemoteState {
+impl fmt::Display for AuthorizationAcceptingState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AuthorizationRemoteState::Start => f.write_str("Start"),
-            AuthorizationRemoteState::Done(_) => f.write_str("Done"),
-            AuthorizationRemoteState::Unauthorized => f.write_str("Unauthorized"),
+            AuthorizationAcceptingState::Start => f.write_str("Start"),
+            AuthorizationAcceptingState::Done(_) => f.write_str("Done"),
+            AuthorizationAcceptingState::Unauthorized => f.write_str("Unauthorized"),
 
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationRemoteState::ReceivedAuthProtocolRequest => {
+            AuthorizationAcceptingState::ReceivedAuthProtocolRequest => {
                 f.write_str("ReceivedAuthProtocolRequest")
             }
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationRemoteState::SentAuthProtocolResponse => {
+            AuthorizationAcceptingState::SentAuthProtocolResponse => {
                 f.write_str("SentAuthProtocolResponse")
             }
-            AuthorizationRemoteState::TrustV0(state) => write!(f, "TrustV0: {}", state),
+            AuthorizationAcceptingState::TrustV0(state) => write!(f, "TrustV0: {}", state),
             #[cfg(feature = "trust-authorization")]
-            AuthorizationRemoteState::Trust(state) => write!(f, "Trust: {}", state),
+            AuthorizationAcceptingState::Trust(state) => write!(f, "Trust: {}", state),
             #[cfg(feature = "challenge-authorization")]
-            AuthorizationRemoteState::Challenge(state) => write!(f, "Challenge: {}", state),
+            AuthorizationAcceptingState::Challenge(state) => write!(f, "Challenge: {}", state),
         }
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub(crate) enum AuthorizationLocalState {
+pub(crate) enum AuthorizationInitiatingState {
     Start,
     #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     WaitingForAuthProtocolResponse,
@@ -105,42 +105,44 @@ pub(crate) enum AuthorizationLocalState {
     Unauthorized,
 
     #[cfg(feature = "trust-authorization")]
-    Trust(TrustAuthorizationLocalState),
+    Trust(TrustAuthorizationInitiatingState),
 
     #[cfg(feature = "challenge-authorization")]
-    Challenge(ChallengeAuthorizationLocalState),
+    Challenge(ChallengeAuthorizationInitiatingState),
 }
 
-impl fmt::Display for AuthorizationLocalState {
+impl fmt::Display for AuthorizationInitiatingState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AuthorizationLocalState::Start => f.write_str("Start"),
+            AuthorizationInitiatingState::Start => f.write_str("Start"),
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationLocalState::Authorized => f.write_str("Authorized"),
-            AuthorizationLocalState::Unauthorized => f.write_str("Unauthorized"),
+            AuthorizationInitiatingState::Authorized => f.write_str("Authorized"),
+            AuthorizationInitiatingState::Unauthorized => f.write_str("Unauthorized"),
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationLocalState::WaitingForAuthProtocolResponse => {
+            AuthorizationInitiatingState::WaitingForAuthProtocolResponse => {
                 f.write_str("WaitingForAuthProtocolResponse")
             }
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationLocalState::ReceivedAuthProtocolResponse => {
+            AuthorizationInitiatingState::ReceivedAuthProtocolResponse => {
                 f.write_str("ReceivedAuthProtocolResponse")
             }
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationLocalState::WaitForComplete => f.write_str("WaitForComplete"),
-            AuthorizationLocalState::AuthorizedAndComplete => f.write_str("AuthorizedAndComplete"),
+            AuthorizationInitiatingState::WaitForComplete => f.write_str("WaitForComplete"),
+            AuthorizationInitiatingState::AuthorizedAndComplete => {
+                f.write_str("AuthorizedAndComplete")
+            }
 
             #[cfg(feature = "trust-authorization")]
-            AuthorizationLocalState::Trust(action) => write!(f, "Trust: {}", action),
+            AuthorizationInitiatingState::Trust(action) => write!(f, "Trust: {}", action),
             #[cfg(feature = "challenge-authorization")]
-            AuthorizationLocalState::Challenge(action) => write!(f, "Challenge: {}", action),
+            AuthorizationInitiatingState::Challenge(action) => write!(f, "Challenge: {}", action),
         }
     }
 }
 
 /// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
-pub(crate) enum AuthorizationRemoteAction {
+pub(crate) enum AuthorizationAcceptingAction {
     Connecting,
 
     #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
@@ -150,32 +152,32 @@ pub(crate) enum AuthorizationRemoteAction {
 
     TrustV0(TrustV0AuthorizationAction),
     #[cfg(feature = "trust-authorization")]
-    Trust(TrustAuthorizationRemoteAction),
+    Trust(TrustAuthorizationAcceptingAction),
     #[cfg(feature = "challenge-authorization")]
-    Challenge(ChallengeAuthorizationRemoteAction),
+    Challenge(ChallengeAuthorizationAcceptingAction),
 
     Unauthorizing,
 }
 
-impl fmt::Display for AuthorizationRemoteAction {
+impl fmt::Display for AuthorizationAcceptingAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AuthorizationRemoteAction::Connecting => f.write_str("Connecting"),
+            AuthorizationAcceptingAction::Connecting => f.write_str("Connecting"),
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationRemoteAction::ReceiveAuthProtocolRequest => {
+            AuthorizationAcceptingAction::ReceiveAuthProtocolRequest => {
                 f.write_str("ReceiveAuthProtocolRequest")
             }
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationRemoteAction::SendAuthProtocolResponse => {
+            AuthorizationAcceptingAction::SendAuthProtocolResponse => {
                 f.write_str("SendAuthProtocolResponse")
             }
-            AuthorizationRemoteAction::TrustV0(action) => write!(f, "TrusV0t: {}", action),
+            AuthorizationAcceptingAction::TrustV0(action) => write!(f, "TrusV0t: {}", action),
             #[cfg(feature = "trust-authorization")]
-            AuthorizationRemoteAction::Trust(action) => write!(f, "Trust: {}", action),
+            AuthorizationAcceptingAction::Trust(action) => write!(f, "Trust: {}", action),
             #[cfg(feature = "challenge-authorization")]
-            AuthorizationRemoteAction::Challenge(action) => write!(f, "Challenge: {}", action),
+            AuthorizationAcceptingAction::Challenge(action) => write!(f, "Challenge: {}", action),
 
-            AuthorizationRemoteAction::Unauthorizing => f.write_str("Unauthorizing"),
+            AuthorizationAcceptingAction::Unauthorizing => f.write_str("Unauthorizing"),
         }
     }
 }
@@ -183,36 +185,36 @@ impl fmt::Display for AuthorizationRemoteAction {
 /// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-pub(crate) enum AuthorizationLocalAction {
+pub(crate) enum AuthorizationInitiatingAction {
     SendAuthProtocolRequest,
     ReceiveAuthProtocolResponse,
 
     #[cfg(feature = "trust-authorization")]
-    Trust(TrustAuthorizationLocalAction),
+    Trust(TrustAuthorizationInitiatingAction),
     #[cfg(feature = "challenge-authorization")]
-    Challenge(ChallengeAuthorizationLocalAction),
+    Challenge(ChallengeAuthorizationInitiatingAction),
 
     SendAuthComplete,
     Unauthorizing,
 }
 
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-impl fmt::Display for AuthorizationLocalAction {
+impl fmt::Display for AuthorizationInitiatingAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AuthorizationLocalAction::SendAuthProtocolRequest => {
+            AuthorizationInitiatingAction::SendAuthProtocolRequest => {
                 f.write_str("SendAuthProtocolRequest")
             }
-            AuthorizationLocalAction::ReceiveAuthProtocolResponse => {
+            AuthorizationInitiatingAction::ReceiveAuthProtocolResponse => {
                 f.write_str("SendAuthProtocolResponse")
             }
 
             #[cfg(feature = "trust-authorization")]
-            AuthorizationLocalAction::Trust(action) => write!(f, "Trust: {}", action),
+            AuthorizationInitiatingAction::Trust(action) => write!(f, "Trust: {}", action),
             #[cfg(feature = "challenge-authorization")]
-            AuthorizationLocalAction::Challenge(action) => write!(f, "Challenge: {}", action),
-            AuthorizationLocalAction::SendAuthComplete => f.write_str("SendAuthComplete"),
-            AuthorizationLocalAction::Unauthorizing => f.write_str("Unauthorizing"),
+            AuthorizationInitiatingAction::Challenge(action) => write!(f, "Challenge: {}", action),
+            AuthorizationInitiatingAction::SendAuthComplete => f.write_str("SendAuthComplete"),
+            AuthorizationInitiatingAction::Unauthorizing => f.write_str("Unauthorizing"),
         }
     }
 }
@@ -221,9 +223,9 @@ impl fmt::Display for AuthorizationLocalAction {
 #[derive(PartialEq, Debug)]
 pub(crate) enum AuthorizationActionError {
     AlreadyConnecting,
-    InvalidRemoteMessageOrder(AuthorizationRemoteState, AuthorizationRemoteAction),
+    InvalidAcceptingMessageOrder(AuthorizationAcceptingState, AuthorizationAcceptingAction),
     #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-    InvalidLocalMessageOrder(AuthorizationLocalState, AuthorizationLocalAction),
+    InvalidInitiatingMessageOrder(AuthorizationInitiatingState, AuthorizationInitiatingAction),
     InternalError(String),
 }
 
@@ -233,7 +235,7 @@ impl fmt::Display for AuthorizationActionError {
             AuthorizationActionError::AlreadyConnecting => {
                 f.write_str("Already attempting to connect")
             }
-            AuthorizationActionError::InvalidRemoteMessageOrder(start, action) => {
+            AuthorizationActionError::InvalidAcceptingMessageOrder(start, action) => {
                 write!(
                     f,
                     "Attempting to transition from remote state {} via {}",
@@ -241,7 +243,7 @@ impl fmt::Display for AuthorizationActionError {
                 )
             }
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationActionError::InvalidLocalMessageOrder(start, action) => {
+            AuthorizationActionError::InvalidInitiatingMessageOrder(start, action) => {
                 write!(
                     f,
                     "Attempting to transition from locale state {} via {}",
@@ -265,11 +267,11 @@ impl AuthorizationManagerStateMachine {
     ///
     /// The errors are error messages that should be returned on the appropriate message
     #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-    pub(crate) fn next_local_state(
+    pub(crate) fn next_initiating_state(
         &self,
         connection_id: &str,
-        action: AuthorizationLocalAction,
-    ) -> Result<AuthorizationLocalState, AuthorizationActionError> {
+        action: AuthorizationInitiatingAction,
+    ) -> Result<AuthorizationInitiatingState, AuthorizationActionError> {
         let mut shared = self.shared.lock().map_err(|_| {
             AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
         })?;
@@ -279,113 +281,115 @@ impl AuthorizationManagerStateMachine {
                 .states
                 .entry(connection_id.to_string())
                 .or_insert(ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Start,
-                    remote_state: AuthorizationRemoteState::Start,
+                    initiating_state: AuthorizationInitiatingState::Start,
+                    accepting_state: AuthorizationAcceptingState::Start,
                     received_complete: false,
                     local_authorization: None,
                 });
 
-        if action == AuthorizationLocalAction::Unauthorizing {
-            cur_state.local_state = AuthorizationLocalState::Unauthorized;
-            cur_state.remote_state = AuthorizationRemoteState::Unauthorized;
-            return Ok(AuthorizationLocalState::Unauthorized);
+        if action == AuthorizationInitiatingAction::Unauthorizing {
+            cur_state.initiating_state = AuthorizationInitiatingState::Unauthorized;
+            cur_state.accepting_state = AuthorizationAcceptingState::Unauthorized;
+            return Ok(AuthorizationInitiatingState::Unauthorized);
         }
 
-        match cur_state.local_state.clone() {
-            AuthorizationLocalState::Start => match action {
-                AuthorizationLocalAction::SendAuthProtocolRequest => {
-                    cur_state.local_state = AuthorizationLocalState::WaitingForAuthProtocolResponse;
-                    Ok(AuthorizationLocalState::WaitingForAuthProtocolResponse)
+        match cur_state.initiating_state.clone() {
+            AuthorizationInitiatingState::Start => match action {
+                AuthorizationInitiatingAction::SendAuthProtocolRequest => {
+                    cur_state.initiating_state =
+                        AuthorizationInitiatingState::WaitingForAuthProtocolResponse;
+                    Ok(AuthorizationInitiatingState::WaitingForAuthProtocolResponse)
                 }
-                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
-                    AuthorizationLocalState::Start,
+                _ => Err(AuthorizationActionError::InvalidInitiatingMessageOrder(
+                    AuthorizationInitiatingState::Start,
                     action,
                 )),
             },
             // v1 state transitions
-            AuthorizationLocalState::WaitingForAuthProtocolResponse => match action {
-                AuthorizationLocalAction::ReceiveAuthProtocolResponse => {
-                    cur_state.local_state = AuthorizationLocalState::ReceivedAuthProtocolResponse;
-                    Ok(AuthorizationLocalState::ReceivedAuthProtocolResponse)
+            AuthorizationInitiatingState::WaitingForAuthProtocolResponse => match action {
+                AuthorizationInitiatingAction::ReceiveAuthProtocolResponse => {
+                    cur_state.initiating_state =
+                        AuthorizationInitiatingState::ReceivedAuthProtocolResponse;
+                    Ok(AuthorizationInitiatingState::ReceivedAuthProtocolResponse)
                 }
-                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
-                    AuthorizationLocalState::Start,
+                _ => Err(AuthorizationActionError::InvalidInitiatingMessageOrder(
+                    AuthorizationInitiatingState::Start,
                     action,
                 )),
             },
-            AuthorizationLocalState::ReceivedAuthProtocolResponse => match action {
+            AuthorizationInitiatingState::ReceivedAuthProtocolResponse => match action {
                 #[cfg(feature = "trust-authorization")]
-                AuthorizationLocalAction::Trust(action) => {
-                    let new_state = TrustAuthorizationLocalState::TrustConnecting
-                        .next_local_state(action, cur_state)?;
+                AuthorizationInitiatingAction::Trust(action) => {
+                    let new_state = TrustAuthorizationInitiatingState::TrustConnecting
+                        .next_initiating_state(action, cur_state)?;
                     Ok(new_state)
                 }
                 #[cfg(feature = "challenge-authorization")]
-                AuthorizationLocalAction::Challenge(action) => {
-                    let new_state = ChallengeAuthorizationLocalState::ChallengeConnecting
-                        .next_local_state(action, cur_state)?;
+                AuthorizationInitiatingAction::Challenge(action) => {
+                    let new_state = ChallengeAuthorizationInitiatingState::ChallengeConnecting
+                        .next_initiating_state(action, cur_state)?;
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
-                    AuthorizationLocalState::WaitingForAuthProtocolResponse,
+                _ => Err(AuthorizationActionError::InvalidInitiatingMessageOrder(
+                    AuthorizationInitiatingState::WaitingForAuthProtocolResponse,
                     action,
                 )),
             },
             #[cfg(feature = "trust-authorization")]
-            AuthorizationLocalState::Trust(state) => match action {
-                AuthorizationLocalAction::Trust(action) => {
-                    let new_state = state.next_local_state(action, cur_state)?;
+            AuthorizationInitiatingState::Trust(state) => match action {
+                AuthorizationInitiatingAction::Trust(action) => {
+                    let new_state = state.next_initiating_state(action, cur_state)?;
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
-                    AuthorizationLocalState::Trust(state),
+                _ => Err(AuthorizationActionError::InvalidInitiatingMessageOrder(
+                    AuthorizationInitiatingState::Trust(state),
                     action,
                 )),
             },
             #[cfg(feature = "challenge-authorization")]
-            AuthorizationLocalState::Challenge(state) => match action {
-                AuthorizationLocalAction::Challenge(action) => {
-                    let new_state = state.next_local_state(action, cur_state)?;
+            AuthorizationInitiatingState::Challenge(state) => match action {
+                AuthorizationInitiatingAction::Challenge(action) => {
+                    let new_state = state.next_initiating_state(action, cur_state)?;
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
-                    AuthorizationLocalState::Challenge(state),
+                _ => Err(AuthorizationActionError::InvalidInitiatingMessageOrder(
+                    AuthorizationInitiatingState::Challenge(state),
                     action,
                 )),
             },
-            AuthorizationLocalState::Authorized => match action {
-                AuthorizationLocalAction::SendAuthComplete => {
+            AuthorizationInitiatingState::Authorized => match action {
+                AuthorizationInitiatingAction::SendAuthComplete => {
                     let new_state = if cur_state.received_complete {
-                        AuthorizationLocalState::AuthorizedAndComplete
+                        AuthorizationInitiatingState::AuthorizedAndComplete
                     } else {
-                        AuthorizationLocalState::WaitForComplete
+                        AuthorizationInitiatingState::WaitForComplete
                     };
 
-                    cur_state.local_state = new_state.clone();
+                    cur_state.initiating_state = new_state.clone();
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
-                    AuthorizationLocalState::Authorized,
+                _ => Err(AuthorizationActionError::InvalidInitiatingMessageOrder(
+                    AuthorizationInitiatingState::Authorized,
                     action,
                 )),
             },
-            _ => Err(AuthorizationActionError::InvalidLocalMessageOrder(
-                cur_state.local_state.clone(),
+            _ => Err(AuthorizationActionError::InvalidInitiatingMessageOrder(
+                cur_state.initiating_state.clone(),
                 action,
             )),
         }
     }
 
-    /// Transitions from one authorization state to another. This is specific to the remote node
+    /// Transitions from one authorization state to another. This is specific to the accepting node
     ///
     /// Errors
     ///
     /// The errors are error messages that should be returned on the appropriate message
-    pub(crate) fn next_remote_state(
+    pub(crate) fn next_accepting_state(
         &self,
         connection_id: &str,
-        action: AuthorizationRemoteAction,
-    ) -> Result<AuthorizationRemoteState, AuthorizationActionError> {
+        action: AuthorizationAcceptingAction,
+    ) -> Result<AuthorizationAcceptingState, AuthorizationActionError> {
         let mut shared = self.shared.lock().map_err(|_| {
             AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
         })?;
@@ -395,114 +399,119 @@ impl AuthorizationManagerStateMachine {
                 .states
                 .entry(connection_id.to_string())
                 .or_insert(ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Start,
-                    remote_state: AuthorizationRemoteState::Start,
+                    initiating_state: AuthorizationInitiatingState::Start,
+                    accepting_state: AuthorizationAcceptingState::Start,
                     received_complete: false,
                     local_authorization: None,
                 });
 
-        if action == AuthorizationRemoteAction::Unauthorizing {
-            cur_state.local_state = AuthorizationLocalState::Unauthorized;
-            cur_state.remote_state = AuthorizationRemoteState::Unauthorized;
-            return Ok(AuthorizationRemoteState::Unauthorized);
+        if action == AuthorizationAcceptingAction::Unauthorizing {
+            cur_state.initiating_state = AuthorizationInitiatingState::Unauthorized;
+            cur_state.accepting_state = AuthorizationAcceptingState::Unauthorized;
+            return Ok(AuthorizationAcceptingState::Unauthorized);
         }
 
-        match cur_state.remote_state.clone() {
-            AuthorizationRemoteState::Start => match action {
-                AuthorizationRemoteAction::Connecting => {
-                    if cur_state.remote_state
-                        == AuthorizationRemoteState::TrustV0(TrustV0AuthorizationState::Connecting)
+        match cur_state.accepting_state.clone() {
+            AuthorizationAcceptingState::Start => match action {
+                AuthorizationAcceptingAction::Connecting => {
+                    if cur_state.accepting_state
+                        == AuthorizationAcceptingState::TrustV0(
+                            TrustV0AuthorizationState::Connecting,
+                        )
                     {
                         return Err(AuthorizationActionError::AlreadyConnecting);
                     };
                     // this state is not used in trust v0 so send to finished
-                    cur_state.local_state = AuthorizationLocalState::AuthorizedAndComplete;
-                    cur_state.remote_state =
-                        AuthorizationRemoteState::TrustV0(TrustV0AuthorizationState::Connecting);
-                    Ok(AuthorizationRemoteState::TrustV0(
+                    cur_state.initiating_state =
+                        AuthorizationInitiatingState::AuthorizedAndComplete;
+                    cur_state.accepting_state =
+                        AuthorizationAcceptingState::TrustV0(TrustV0AuthorizationState::Connecting);
+                    Ok(AuthorizationAcceptingState::TrustV0(
                         TrustV0AuthorizationState::Connecting,
                     ))
                 }
                 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-                AuthorizationRemoteAction::ReceiveAuthProtocolRequest => {
-                    cur_state.remote_state = AuthorizationRemoteState::ReceivedAuthProtocolRequest;
-                    Ok(AuthorizationRemoteState::ReceivedAuthProtocolRequest)
+                AuthorizationAcceptingAction::ReceiveAuthProtocolRequest => {
+                    cur_state.accepting_state =
+                        AuthorizationAcceptingState::ReceivedAuthProtocolRequest;
+                    Ok(AuthorizationAcceptingState::ReceivedAuthProtocolRequest)
                 }
-                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
-                    AuthorizationRemoteState::Start,
+                _ => Err(AuthorizationActionError::InvalidAcceptingMessageOrder(
+                    AuthorizationAcceptingState::Start,
                     action,
                 )),
             },
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationRemoteState::ReceivedAuthProtocolRequest => match action {
-                AuthorizationRemoteAction::SendAuthProtocolResponse => {
-                    cur_state.remote_state = AuthorizationRemoteState::SentAuthProtocolResponse;
-                    Ok(AuthorizationRemoteState::SentAuthProtocolResponse)
+            AuthorizationAcceptingState::ReceivedAuthProtocolRequest => match action {
+                AuthorizationAcceptingAction::SendAuthProtocolResponse => {
+                    cur_state.accepting_state =
+                        AuthorizationAcceptingState::SentAuthProtocolResponse;
+                    Ok(AuthorizationAcceptingState::SentAuthProtocolResponse)
                 }
-                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
-                    AuthorizationRemoteState::Start,
+                _ => Err(AuthorizationActionError::InvalidAcceptingMessageOrder(
+                    AuthorizationAcceptingState::Start,
                     action,
                 )),
             },
-            AuthorizationRemoteState::TrustV0(state) => match action {
-                AuthorizationRemoteAction::TrustV0(action) => {
-                    let new_state = state.next_local_state(action)?;
-                    cur_state.remote_state = new_state.clone();
+            AuthorizationAcceptingState::TrustV0(state) => match action {
+                AuthorizationAcceptingAction::TrustV0(action) => {
+                    let new_state = state.next_initiating_state(action)?;
+                    cur_state.accepting_state = new_state.clone();
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
-                    AuthorizationRemoteState::TrustV0(state),
+                _ => Err(AuthorizationActionError::InvalidAcceptingMessageOrder(
+                    AuthorizationAcceptingState::TrustV0(state),
                     action,
                 )),
             },
             // v1 state transitions
             #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-            AuthorizationRemoteState::SentAuthProtocolResponse => match action {
+            AuthorizationAcceptingState::SentAuthProtocolResponse => match action {
                 #[cfg(feature = "trust-authorization")]
-                AuthorizationRemoteAction::Trust(action) => {
-                    let new_state = TrustAuthorizationRemoteState::TrustConnecting
-                        .next_remote_state(action, cur_state)?;
-                    cur_state.remote_state = new_state.clone();
+                AuthorizationAcceptingAction::Trust(action) => {
+                    let new_state = TrustAuthorizationAcceptingState::TrustConnecting
+                        .next_accepting_state(action, cur_state)?;
+                    cur_state.accepting_state = new_state.clone();
                     Ok(new_state)
                 }
                 #[cfg(feature = "challenge-authorization")]
-                AuthorizationRemoteAction::Challenge(action) => {
-                    let new_state = ChallengeAuthorizationRemoteState::ChallengeConnecting
-                        .next_remote_state(action, cur_state)?;
-                    cur_state.remote_state = new_state.clone();
+                AuthorizationAcceptingAction::Challenge(action) => {
+                    let new_state = ChallengeAuthorizationAcceptingState::ChallengeConnecting
+                        .next_accepting_state(action, cur_state)?;
+                    cur_state.accepting_state = new_state.clone();
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
-                    AuthorizationRemoteState::SentAuthProtocolResponse,
+                _ => Err(AuthorizationActionError::InvalidAcceptingMessageOrder(
+                    AuthorizationAcceptingState::SentAuthProtocolResponse,
                     action,
                 )),
             },
             #[cfg(feature = "trust-authorization")]
-            AuthorizationRemoteState::Trust(state) => match action {
-                AuthorizationRemoteAction::Trust(action) => {
-                    let new_state = state.next_remote_state(action, cur_state)?;
-                    cur_state.remote_state = new_state.clone();
+            AuthorizationAcceptingState::Trust(state) => match action {
+                AuthorizationAcceptingAction::Trust(action) => {
+                    let new_state = state.next_accepting_state(action, cur_state)?;
+                    cur_state.accepting_state = new_state.clone();
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
-                    AuthorizationRemoteState::Trust(state),
+                _ => Err(AuthorizationActionError::InvalidAcceptingMessageOrder(
+                    AuthorizationAcceptingState::Trust(state),
                     action,
                 )),
             },
             #[cfg(feature = "challenge-authorization")]
-            AuthorizationRemoteState::Challenge(state) => match action {
-                AuthorizationRemoteAction::Challenge(action) => {
-                    let new_state = state.next_remote_state(action, cur_state)?;
-                    cur_state.remote_state = new_state.clone();
+            AuthorizationAcceptingState::Challenge(state) => match action {
+                AuthorizationAcceptingAction::Challenge(action) => {
+                    let new_state = state.next_accepting_state(action, cur_state)?;
+                    cur_state.accepting_state = new_state.clone();
                     Ok(new_state)
                 }
-                _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
-                    AuthorizationRemoteState::Challenge(state),
+                _ => Err(AuthorizationActionError::InvalidAcceptingMessageOrder(
+                    AuthorizationAcceptingState::Challenge(state),
                     action,
                 )),
             },
-            _ => Err(AuthorizationActionError::InvalidRemoteMessageOrder(
-                cur_state.remote_state.clone(),
+            _ => Err(AuthorizationActionError::InvalidAcceptingMessageOrder(
+                cur_state.accepting_state.clone(),
                 action,
             )),
         }
@@ -522,16 +531,16 @@ impl AuthorizationManagerStateMachine {
                 .states
                 .entry(connection_id.to_string())
                 .or_insert(ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Start,
-                    remote_state: AuthorizationRemoteState::Start,
+                    initiating_state: AuthorizationInitiatingState::Start,
+                    accepting_state: AuthorizationAcceptingState::Start,
                     received_complete: false,
                     local_authorization: None,
                 });
 
         cur_state.received_complete = true;
 
-        if cur_state.local_state == AuthorizationLocalState::WaitForComplete {
-            cur_state.local_state = AuthorizationLocalState::AuthorizedAndComplete;
+        if cur_state.initiating_state == AuthorizationInitiatingState::WaitForComplete {
+            cur_state.initiating_state = AuthorizationInitiatingState::AuthorizedAndComplete;
         }
         Ok(())
     }
@@ -550,8 +559,8 @@ impl AuthorizationManagerStateMachine {
                 .states
                 .entry(connection_id.to_string())
                 .or_insert(ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Start,
-                    remote_state: AuthorizationRemoteState::Start,
+                    initiating_state: AuthorizationInitiatingState::Start,
+                    accepting_state: AuthorizationAcceptingState::Start,
                     received_complete: false,
                     local_authorization: None,
                 });

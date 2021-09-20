@@ -42,10 +42,10 @@ use crate::transport::{Connection, RecvError};
 use self::handlers::AuthorizationDispatchBuilder;
 use self::pool::{ThreadPool, ThreadPoolBuilder};
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
-pub(crate) use self::state_machine::AuthorizationLocalAction;
+pub(crate) use self::state_machine::AuthorizationInitiatingAction;
 pub(crate) use self::state_machine::{
-    AuthorizationActionError, AuthorizationLocalState, AuthorizationManagerStateMachine,
-    AuthorizationRemoteAction, AuthorizationRemoteState, Identity,
+    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationActionError,
+    AuthorizationInitiatingState, AuthorizationManagerStateMachine, Identity,
 };
 
 const AUTHORIZATION_THREAD_POOL_SIZE: usize = 8;
@@ -55,10 +55,10 @@ const AUTHORIZATION_THREAD_POOL_SIZE: usize = 8;
 /// separately.
 #[derive(Debug, Clone)]
 pub(crate) struct ManagedAuthorizationState {
-    // Local node state while authorizing with remote node
-    local_state: AuthorizationLocalState,
-    // Remote node state
-    remote_state: AuthorizationRemoteState,
+    // Local node state while authorizing with other node
+    initiating_state: AuthorizationInitiatingState,
+    // Accepting node state
+    accepting_state: AuthorizationAcceptingState,
 
     // Tracks whether the local node has completed authorization with the remote node
     received_complete: bool,
@@ -266,9 +266,9 @@ impl AuthorizationConnector {
                 }
 
                 if state_machine
-                    .next_local_state(
+                    .next_initiating_state(
                         &connection_id,
-                        AuthorizationLocalAction::SendAuthProtocolRequest,
+                        AuthorizationInitiatingAction::SendAuthProtocolRequest,
                     )
                     .is_err()
                 {
@@ -437,8 +437,8 @@ impl ManagedAuthorizations {
     fn take_connection_identity(&mut self, connection_id: &str) -> Option<(Identity, Identity)> {
         self.states.remove(connection_id).and_then(|managed_state| {
             if let Some(local_authorization) = managed_state.local_authorization {
-                match managed_state.remote_state {
-                    AuthorizationRemoteState::Done(identity) => {
+                match managed_state.accepting_state {
+                    AuthorizationAcceptingState::Done(identity) => {
                         Some((identity, local_authorization))
                     }
                     _ => None,
@@ -452,13 +452,16 @@ impl ManagedAuthorizations {
     fn is_complete(&self, connection_id: &str) -> Option<bool> {
         self.states.get(connection_id).map(|managed_state| {
             matches!(
-                (&managed_state.local_state, &managed_state.remote_state),
                 (
-                    AuthorizationLocalState::AuthorizedAndComplete,
-                    AuthorizationRemoteState::Done(_),
+                    &managed_state.initiating_state,
+                    &managed_state.accepting_state
+                ),
+                (
+                    AuthorizationInitiatingState::AuthorizedAndComplete,
+                    AuthorizationAcceptingState::Done(_),
                 ) | (
-                    AuthorizationLocalState::Unauthorized,
-                    AuthorizationRemoteState::Unauthorized
+                    AuthorizationInitiatingState::Unauthorized,
+                    AuthorizationAcceptingState::Unauthorized
                 )
             )
         })

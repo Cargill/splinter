@@ -20,8 +20,8 @@ mod v0_handlers;
 mod v1_handlers;
 
 use crate::network::auth::{
-    AuthorizationManagerStateMachine, AuthorizationMessageSender, AuthorizationRemoteAction,
-    AuthorizationRemoteState,
+    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationManagerStateMachine,
+    AuthorizationMessageSender,
 };
 use crate::network::dispatch::{
     ConnectionId, DispatchError, Dispatcher, Handler, MessageContext, MessageSender,
@@ -104,11 +104,11 @@ impl Handler for AuthorizationErrorHandler {
         let auth_error = AuthorizationError::from_proto(msg)?;
         match auth_error {
             AuthorizationError::AuthorizationRejected(err_msg) => {
-                match self.auth_manager.next_remote_state(
+                match self.auth_manager.next_accepting_state(
                     context.source_connection_id(),
-                    AuthorizationRemoteAction::Unauthorizing,
+                    AuthorizationAcceptingAction::Unauthorizing,
                 ) {
-                    Ok(AuthorizationRemoteState::Unauthorized) => {
+                    Ok(AuthorizationAcceptingState::Unauthorized) => {
                         info!(
                             "Connection unauthorized by connection {}: {}",
                             context.source_connection_id(),

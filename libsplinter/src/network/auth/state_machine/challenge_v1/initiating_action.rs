@@ -18,27 +18,27 @@ use crate::network::auth::state_machine::Identity;
 
 /// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
-pub(crate) enum ChallengeAuthorizationRemoteAction {
-    ReceiveAuthChallengeNonceRequest,
-    SendAuthChallengeNonceResponse,
-    ReceiveAuthChallengeSubmitRequest(Identity),
-    SendAuthChallengeSubmitResponse,
+pub(crate) enum ChallengeAuthorizationInitiatingAction {
+    SendAuthChallengeNonceRequest,
+    ReceiveAuthChallengeNonceResponse,
+    SendAuthChallengeSubmitRequest,
+    ReceiveAuthChallengeSubmitResponse(Identity),
 }
 
-impl fmt::Display for ChallengeAuthorizationRemoteAction {
+impl fmt::Display for ChallengeAuthorizationInitiatingAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ChallengeAuthorizationRemoteAction::ReceiveAuthChallengeNonceRequest => {
-                f.write_str("ReceiveAuthChallengeNonceRequest")
+            ChallengeAuthorizationInitiatingAction::SendAuthChallengeNonceRequest => {
+                f.write_str("SendAuthChallengeNonceRequest")
             }
-            ChallengeAuthorizationRemoteAction::SendAuthChallengeNonceResponse => {
-                f.write_str("SendAuthChallengeNonceResponse")
+            ChallengeAuthorizationInitiatingAction::ReceiveAuthChallengeNonceResponse => {
+                f.write_str("ReceiveAuthChallengeNonceResponse")
             }
-            ChallengeAuthorizationRemoteAction::ReceiveAuthChallengeSubmitRequest(_) => {
-                f.write_str("ReceiveAuthChallengeSubmitRequest")
+            ChallengeAuthorizationInitiatingAction::SendAuthChallengeSubmitRequest => {
+                f.write_str("SendAuthChallengeSubmitRequest")
             }
-            ChallengeAuthorizationRemoteAction::SendAuthChallengeSubmitResponse => {
-                f.write_str("SendAuthChallengeSubmitResponse")
+            ChallengeAuthorizationInitiatingAction::ReceiveAuthChallengeSubmitResponse(_) => {
+                f.write_str("ReceiveAuthChallengeSubmitResponse")
             }
         }
     }

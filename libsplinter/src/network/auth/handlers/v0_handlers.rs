@@ -27,8 +27,8 @@ use crate::protos::prelude::*;
 
 use crate::network::auth::{
     state_machine::trust_v0::{TrustV0AuthorizationAction, TrustV0AuthorizationState},
-    AuthorizationActionError, AuthorizationManagerStateMachine, AuthorizationRemoteAction,
-    AuthorizationRemoteState, Identity,
+    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationActionError,
+    AuthorizationManagerStateMachine, Identity,
 };
 
 pub struct AuthorizedHandler {
@@ -60,9 +60,9 @@ impl Handler for AuthorizedHandler {
             "Received authorize message from {}",
             context.source_connection_id()
         );
-        match self.auth_manager.next_remote_state(
+        match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
-            AuthorizationRemoteAction::TrustV0(TrustV0AuthorizationAction::RemoteAuthorizing),
+            AuthorizationAcceptingAction::TrustV0(TrustV0AuthorizationAction::RemoteAuthorizing),
         ) {
             Err(err) => {
                 warn!(
@@ -109,9 +109,9 @@ impl Handler for ConnectRequestHandler {
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         let connect_request = ConnectRequest::from_proto(msg)?;
-        match self.auth_manager.next_remote_state(
+        match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
-            AuthorizationRemoteAction::Connecting,
+            AuthorizationAcceptingAction::Connecting,
         ) {
             Err(AuthorizationActionError::AlreadyConnecting) => {
                 debug!(
@@ -126,7 +126,7 @@ impl Handler for ConnectRequestHandler {
                     err
                 );
             }
-            Ok(AuthorizationRemoteState::TrustV0(TrustV0AuthorizationState::Connecting)) => {
+            Ok(AuthorizationAcceptingState::TrustV0(TrustV0AuthorizationState::Connecting)) => {
                 debug!("Beginning handshake for {}", context.source_connection_id(),);
                 // Send a connect request of our own
 
@@ -272,9 +272,9 @@ impl Handler for TrustRequestHandler {
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         let trust_request = TrustRequest::from_proto(msg)?;
-        match self.auth_manager.next_remote_state(
+        match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
-            AuthorizationRemoteAction::TrustV0(TrustV0AuthorizationAction::TrustIdentifyingV0(
+            AuthorizationAcceptingAction::TrustV0(TrustV0AuthorizationAction::TrustIdentifyingV0(
                 Identity::Trust {
                     identity: trust_request.identity,
                 },
@@ -287,10 +287,10 @@ impl Handler for TrustRequestHandler {
                     err
                 );
             }
-            Ok(AuthorizationRemoteState::TrustV0(TrustV0AuthorizationState::RemoteIdentified(
-                Identity::Trust { identity },
-            )))
-            | Ok(AuthorizationRemoteState::Done(Identity::Trust { identity })) => {
+            Ok(AuthorizationAcceptingState::TrustV0(
+                TrustV0AuthorizationState::RemoteIdentified(Identity::Trust { identity }),
+            ))
+            | Ok(AuthorizationAcceptingState::Done(Identity::Trust { identity })) => {
                 debug!(
                     "Sending Authorized message to connection {} after receiving identity {}",
                     context.source_connection_id(),

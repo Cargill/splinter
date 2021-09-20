@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod local_action;
-mod local_state;
-mod remote_action;
-mod remote_state;
+mod accepting_action;
+mod accepting_state;
+mod initiating_action;
+mod initiating_state;
 
-pub(crate) use local_action::ChallengeAuthorizationLocalAction;
-pub(crate) use local_state::ChallengeAuthorizationLocalState;
-pub(crate) use remote_action::ChallengeAuthorizationRemoteAction;
-pub(crate) use remote_state::ChallengeAuthorizationRemoteState;
+pub(crate) use accepting_action::ChallengeAuthorizationAcceptingAction;
+pub(crate) use accepting_state::ChallengeAuthorizationAcceptingState;
+pub(crate) use initiating_action::ChallengeAuthorizationInitiatingAction;
+pub(crate) use initiating_state::ChallengeAuthorizationInitiatingState;

@@ -16,11 +16,12 @@
 
 use crate::error::InternalError;
 use crate::network::auth::state_machine::trust_v1::{
-    TrustAuthorizationLocalAction, TrustAuthorizationRemoteAction, TrustAuthorizationRemoteState,
+    TrustAuthorizationAcceptingAction, TrustAuthorizationAcceptingState,
+    TrustAuthorizationInitiatingAction,
 };
 use crate::network::auth::{
-    AuthorizationLocalAction, AuthorizationLocalState, AuthorizationManagerStateMachine,
-    AuthorizationMessage, AuthorizationRemoteAction, AuthorizationRemoteState, Identity,
+    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationInitiatingAction,
+    AuthorizationInitiatingState, AuthorizationManagerStateMachine, AuthorizationMessage, Identity,
 };
 use crate::network::dispatch::{
     ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
@@ -65,10 +66,10 @@ impl Handler for AuthTrustRequestHandler {
             context.source_connection_id()
         );
         let trust_request = AuthTrustRequest::from_proto(msg)?;
-        match self.auth_manager.next_remote_state(
+        match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
-            AuthorizationRemoteAction::Trust(
-                TrustAuthorizationRemoteAction::ReceiveAuthTrustRequest(Identity::Trust {
+            AuthorizationAcceptingAction::Trust(
+                TrustAuthorizationAcceptingAction::ReceiveAuthTrustRequest(Identity::Trust {
                     identity: trust_request.identity.to_string(),
                 }),
             ),
@@ -83,8 +84,8 @@ impl Handler for AuthTrustRequestHandler {
                 )?;
                 return Ok(());
             }
-            Ok(AuthorizationRemoteState::Trust(
-                TrustAuthorizationRemoteState::ReceivedAuthTrustRequest(_),
+            Ok(AuthorizationAcceptingState::Trust(
+                TrustAuthorizationAcceptingState::ReceivedAuthTrustRequest(_),
             )) => {
                 debug!(
                     "Sending trust response to connection {} after receiving identity {}",
@@ -110,10 +111,10 @@ impl Handler for AuthTrustRequestHandler {
 
         if self
             .auth_manager
-            .next_remote_state(
+            .next_accepting_state(
                 context.source_connection_id(),
-                AuthorizationRemoteAction::Trust(
-                    TrustAuthorizationRemoteAction::SendAuthTrustResponse,
+                AuthorizationAcceptingAction::Trust(
+                    TrustAuthorizationAcceptingAction::SendAuthTrustResponse,
                 ),
             )
             .is_err()
@@ -155,10 +156,10 @@ impl Handler for AuthTrustResponseHandler {
             "Received authorization trust response from {}",
             context.source_connection_id()
         );
-        match self.auth_manager.next_local_state(
+        match self.auth_manager.next_initiating_state(
             context.source_connection_id(),
-            AuthorizationLocalAction::Trust(
-                TrustAuthorizationLocalAction::ReceiveAuthTrustResponse,
+            AuthorizationInitiatingAction::Trust(
+                TrustAuthorizationInitiatingAction::ReceiveAuthTrustResponse,
             ),
         ) {
             Err(err) => {
@@ -171,7 +172,7 @@ impl Handler for AuthTrustResponseHandler {
                 )?;
                 return Ok(());
             }
-            Ok(AuthorizationLocalState::Authorized) => (),
+            Ok(AuthorizationInitiatingState::Authorized) => (),
             Ok(next_state) => {
                 return Err(DispatchError::InternalError(InternalError::with_message(
                     format!("Should not have been able to transition to {}", next_state),
@@ -188,9 +189,9 @@ impl Handler for AuthTrustResponseHandler {
                 DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
 
-        match self.auth_manager.next_local_state(
+        match self.auth_manager.next_initiating_state(
             context.source_connection_id(),
-            AuthorizationLocalAction::SendAuthComplete,
+            AuthorizationInitiatingAction::SendAuthComplete,
         ) {
             Err(err) => {
                 send_authorization_error(
@@ -202,8 +203,8 @@ impl Handler for AuthTrustResponseHandler {
                 )?;
                 return Ok(());
             }
-            Ok(AuthorizationLocalState::WaitForComplete) => (),
-            Ok(AuthorizationLocalState::AuthorizedAndComplete) => (),
+            Ok(AuthorizationInitiatingState::WaitForComplete) => (),
+            Ok(AuthorizationInitiatingState::AuthorizedAndComplete) => (),
             Ok(next_state) => {
                 return Err(DispatchError::InternalError(InternalError::with_message(
                     format!("Should not have been able to transition to {}", next_state),
@@ -227,7 +228,7 @@ mod tests {
     use cylinder::{PublicKey, Signature, VerificationError, Verifier};
     use protobuf::Message;
 
-    use crate::network::auth::state_machine::trust_v1::TrustAuthorizationLocalState;
+    use crate::network::auth::state_machine::trust_v1::TrustAuthorizationInitiatingState;
     use crate::network::auth::AuthorizationDispatchBuilder;
     use crate::network::auth::ManagedAuthorizationState;
     use crate::protocol::authorization::{AuthProtocolResponse, PeerAuthorizationType};
@@ -254,8 +255,8 @@ mod tests {
             .insert(
                 connection_id.to_string(),
                 ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::WaitingForAuthProtocolResponse,
-                    remote_state: AuthorizationRemoteState::SentAuthProtocolResponse,
+                    initiating_state: AuthorizationInitiatingState::WaitingForAuthProtocolResponse,
+                    accepting_state: AuthorizationAcceptingState::SentAuthProtocolResponse,
                     received_complete: false,
                     local_authorization: None,
                 },
@@ -331,10 +332,10 @@ mod tests {
             .insert(
                 connection_id.to_string(),
                 ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Trust(
-                        TrustAuthorizationLocalState::WaitingForAuthTrustResponse,
+                    initiating_state: AuthorizationInitiatingState::Trust(
+                        TrustAuthorizationInitiatingState::WaitingForAuthTrustResponse,
                     ),
-                    remote_state: AuthorizationRemoteState::SentAuthProtocolResponse,
+                    accepting_state: AuthorizationAcceptingState::SentAuthProtocolResponse,
                     received_complete: false,
                     local_authorization: None,
                 },
@@ -396,14 +397,14 @@ mod tests {
             .expect("missing managed state for connection id");
 
         assert_eq!(
-            managed_state.local_state,
-            AuthorizationLocalState::Trust(
-                TrustAuthorizationLocalState::WaitingForAuthTrustResponse
+            managed_state.initiating_state,
+            AuthorizationInitiatingState::Trust(
+                TrustAuthorizationInitiatingState::WaitingForAuthTrustResponse
             )
         );
         assert_eq!(
-            managed_state.remote_state,
-            AuthorizationRemoteState::Done(Identity::Trust {
+            managed_state.accepting_state,
+            AuthorizationAcceptingState::Done(Identity::Trust {
                 identity: "other_identity".to_string()
             })
         );
@@ -432,10 +433,10 @@ mod tests {
             .insert(
                 connection_id.to_string(),
                 ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Trust(
-                        TrustAuthorizationLocalState::WaitingForAuthTrustResponse,
+                    initiating_state: AuthorizationInitiatingState::Trust(
+                        TrustAuthorizationInitiatingState::WaitingForAuthTrustResponse,
                     ),
-                    remote_state: AuthorizationRemoteState::Done(Identity::Trust {
+                    accepting_state: AuthorizationAcceptingState::Done(Identity::Trust {
                         identity: "other_identity".to_string(),
                     }),
                     received_complete: false,
@@ -497,12 +498,12 @@ mod tests {
             .expect("missing managed state for connection id");
 
         assert_eq!(
-            managed_state.local_state,
-            AuthorizationLocalState::WaitForComplete,
+            managed_state.initiating_state,
+            AuthorizationInitiatingState::WaitForComplete,
         );
         assert_eq!(
-            managed_state.remote_state,
-            AuthorizationRemoteState::Done(Identity::Trust {
+            managed_state.accepting_state,
+            AuthorizationAcceptingState::Done(Identity::Trust {
                 identity: "other_identity".to_string()
             })
         );
@@ -531,10 +532,10 @@ mod tests {
             .insert(
                 connection_id.to_string(),
                 ManagedAuthorizationState {
-                    local_state: AuthorizationLocalState::Trust(
-                        TrustAuthorizationLocalState::WaitingForAuthTrustResponse,
+                    initiating_state: AuthorizationInitiatingState::Trust(
+                        TrustAuthorizationInitiatingState::WaitingForAuthTrustResponse,
                     ),
-                    remote_state: AuthorizationRemoteState::Done(Identity::Trust {
+                    accepting_state: AuthorizationAcceptingState::Done(Identity::Trust {
                         identity: "other_identity".to_string(),
                     }),
                     received_complete: true,
@@ -596,12 +597,12 @@ mod tests {
             .expect("missing managed state for connection id");
 
         assert_eq!(
-            managed_state.local_state,
-            AuthorizationLocalState::AuthorizedAndComplete,
+            managed_state.initiating_state,
+            AuthorizationInitiatingState::AuthorizedAndComplete,
         );
         assert_eq!(
-            managed_state.remote_state,
-            AuthorizationRemoteState::Done(Identity::Trust {
+            managed_state.accepting_state,
+            AuthorizationAcceptingState::Done(Identity::Trust {
                 identity: "other_identity".to_string()
             })
         );
