@@ -151,7 +151,7 @@ OPTIONS
 `--influx-url` `URL`
 : The URL to connect the InfluxDB database for metrics collection.
 
-`--metrics-username` `METRICS_USERNAME`
+`--influx-username` `USERNAME`
 : The username used for authorization with the InfluxDB.
 
 `-n`, `--network-endpoints` `NETWORK-ENDPOINT`

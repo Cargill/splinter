@@ -78,7 +78,7 @@ struct TomlConfig {
     #[cfg(feature = "tap")]
     influx_url: Option<String>,
     #[cfg(feature = "tap")]
-    metrics_username: Option<String>,
+    influx_username: Option<String>,
     #[cfg(feature = "tap")]
     metrics_password: Option<String>,
     #[cfg(feature = "challenge-authorization")]
@@ -202,7 +202,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             partial_config = partial_config
                 .with_influx_db(self.toml_config.influx_db)
                 .with_influx_url(self.toml_config.influx_url)
-                .with_metrics_username(self.toml_config.metrics_username)
+                .with_influx_username(self.toml_config.influx_username)
                 .with_metrics_password(self.toml_config.metrics_password)
         }
         #[cfg(feature = "log-config")]

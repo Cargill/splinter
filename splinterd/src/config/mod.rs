@@ -94,7 +94,7 @@ pub struct Config {
     #[cfg(feature = "tap")]
     influx_url: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
-    metrics_username: Option<(String, ConfigSource)>,
+    influx_username: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
     metrics_password: Option<(String, ConfigSource)>,
     #[cfg(feature = "challenge-authorization")]
@@ -323,8 +323,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_username(&self) -> Option<&str> {
-        if let Some((username, _)) = &self.metrics_username {
+    pub fn influx_username(&self) -> Option<&str> {
+        if let Some((username, _)) = &self.influx_username {
             Some(username)
         } else {
             None
@@ -556,8 +556,8 @@ impl Config {
     }
 
     #[cfg(feature = "tap")]
-    pub fn metrics_username_source(&self) -> Option<&ConfigSource> {
-        if let Some((_, source)) = &self.metrics_username {
+    pub fn influx_username_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.influx_username {
             Some(source)
         } else {
             None
@@ -839,10 +839,10 @@ impl Config {
             }
 
             if let (Some(username), Some(source)) =
-                (self.metrics_username(), self.metrics_username_source())
+                (self.influx_username(), self.influx_username_source())
             {
                 debug!(
-                    "Config: metrics_username: {:?} (source: {:?})",
+                    "Config: influx_username: {:?} (source: {:?})",
                     username, source,
                 );
             }

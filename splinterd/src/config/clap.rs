@@ -175,7 +175,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             partial_config = partial_config
                 .with_influx_db(self.matches.value_of("influx_db").map(String::from))
                 .with_influx_url(self.matches.value_of("influx_url").map(String::from))
-                .with_metrics_username(self.matches.value_of("metrics_username").map(String::from))
+                .with_influx_username(self.matches.value_of("influx_username").map(String::from))
                 .with_metrics_password(self.matches.value_of("metrics_password").map(String::from))
         }
         #[cfg(feature = "log-config")]
