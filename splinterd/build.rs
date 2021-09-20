@@ -27,6 +27,34 @@ const PATH: &str = "PATH";
 /// and skip generating the manpages if it is not. If the build should fail if man pages cannot be
 /// generated set environment variable SPLINTER_FORCE_PANDOC=true
 fn main() -> Result<(), BuildError> {
+    // build the command smart contract with target wasm32-unknown-unknown for
+    // scabbard integration testing
+    match Command::new("cargo")
+        .args([
+            "build",
+            "--manifest-path",
+            "tests/contracts/command/Cargo.toml",
+            "--target",
+            "wasm32-unknown-unknown",
+            "--release",
+        ])
+        .status()
+    {
+        Ok(status) => {
+            if status.success() {
+                println!("Built command smart contract");
+            } else {
+                println!("Unable to build command smart contract {}", status);
+            }
+        }
+        Err(err) => {
+            return Err(BuildError(format!(
+                "Unable to build command smart contract: {}",
+                err,
+            )))
+        }
+    };
+
     let paths = env::var(PATH)
         .map_err(|_| BuildError("Unable to read PATH environment variable".into()))?;
     let mut pandoc_exist = false;
