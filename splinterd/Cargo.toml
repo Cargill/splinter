@@ -54,6 +54,7 @@ toml = "0.5"
 [dev-dependencies]
 openssl = { version = "0.10" }
 sabre-sdk = "0.7"
+sha2 = "0.9"
 transact = { version = "0.3" }
 
 [dependencies.scabbard]

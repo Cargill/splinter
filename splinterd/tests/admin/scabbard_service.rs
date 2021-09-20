@@ -19,6 +19,7 @@ use std::time::Duration;
 
 use cylinder::Signer;
 use rand::prelude::*;
+use scabbard::client::ScabbardClientError;
 use sha2::{Digest, Sha512};
 use splinter::admin::messages::AuthorizationType;
 use splinterd::node::RestApiVariant;
@@ -544,6 +545,17 @@ pub fn test_scabbard_return_internal_error() {
     shutdown!(network).expect("Unable to shutdown network");
 }
 
+/// Test that scabbard can handle a workload of command family batches.
+///
+/// 1. Start a network with 2 nodes
+/// 2. Create a 2 party circuit
+/// 3. Create the 4 batches needed to upload the command smart contract
+///    and grant necessary permissions.
+/// 4. Submit the upload contract batches to scabbard and check that they are
+///    submitted successfully.
+/// 5. Generate 10 batches containing various command family commands
+/// 6. Submit the list of batches individually, checking that each has been submitted
+///    to scabbard successfully.
 #[test]
 fn test_scabbard_command_workload() {
     let mut network = Network::new()
@@ -583,12 +595,13 @@ fn test_scabbard_command_workload() {
         if command_type == "return-internal-error".to_string()
             || command_type == "return-invalid".to_string()
         {
-            assert!(!client
-                .submit(&service_id_a, vec![batch], Some(Duration::from_secs(10)),)
-                .is_ok());
+            match client.submit(&service_id_a, vec![batch], Some(Duration::from_secs(10))) {
+                Err(e) => assert!(matches!(e, ScabbardClientError { .. })),
+                Ok(_) => panic!("should have returned an error"),
+            }
         } else {
             assert!(client
-                .submit(&service_id_a, vec![batch], Some(Duration::from_secs(10)),)
+                .submit(&service_id_a, vec![batch], Some(Duration::from_secs(10)))
                 .is_ok());
         }
     }
@@ -617,7 +630,7 @@ fn get_command_contract_setup_batches(signer: &dyn Signer) -> Vec<Batch> {
     ]
 }
 
-// Generate a random address that has the command family prefix
+// Generate random addresses that have the command family prefix
 fn generate_rand_addresses(num_addresses: usize) -> Vec<String> {
     let mut addresses = Vec::new();
     for i in 0..num_addresses {
@@ -641,6 +654,7 @@ fn generate_rand_addresses(num_addresses: usize) -> Vec<String> {
 fn create_command_playlist(addresses: Vec<String>, signer: &dyn Signer) -> Vec<(String, Batch)> {
     let mut rng: StdRng = SeedableRng::seed_from_u64(10);
     let mut batches = Vec::new();
+    let num_batches = addresses.len();
 
     for address in addresses {
         let command: &str = match rng.gen_range(0, 6) {
@@ -660,6 +674,10 @@ fn create_command_playlist(addresses: Vec<String>, signer: &dyn Signer) -> Vec<(
         let batch = make_command_batch(command, address, signer)
             .expect("failed to make return-internal-error batch");
         batches.push((command.to_string(), batch));
+
+        if batches.len() >= num_batches {
+            break;
+        }
     }
     batches
 }
