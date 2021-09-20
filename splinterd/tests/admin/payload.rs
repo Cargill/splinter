@@ -16,12 +16,18 @@
 //! integration tests.
 
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
 
 use cylinder::{PublicKey, Signer};
 use openssl::hash::{hash, MessageDigest};
-use protobuf::Message;
-
-use sabre_sdk::protocol::payload::CreateContractRegistryActionBuilder;
+use protobuf::{Message, RepeatedField};
+use sabre_sdk::protocol::payload::{
+    CreateContractActionBuilder, CreateContractRegistryActionBuilder,
+    CreateNamespaceRegistryActionBuilder, CreateNamespaceRegistryPermissionActionBuilder,
+    ExecuteContractActionBuilder,
+};
 use splinter::admin::client::ProposalSlice;
 use splinter::admin::messages::{
     AuthorizationType, CircuitProposalVote, CreateCircuitBuilder, DurabilityType, PersistenceType,
@@ -33,6 +39,10 @@ use splinter::protos::admin::{
     CircuitManagementPayload_Action, CircuitManagementPayload_Header,
 };
 use transact::protocol::batch::Batch;
+use transact::protos::command::{
+    AddEvent, BytesEntry, Command, CommandPayload, Command_CommandType, DeleteState, GetState,
+    ReturnInternalError, ReturnInvalid, SetState,
+};
 
 /// Makes the `CircuitManagementPayload` to create a circuit and returns the bytes of this
 /// payload
@@ -351,4 +361,176 @@ pub(in crate::admin) fn make_create_contract_registry_batch(
         .map_err(|err| InternalError::from_source(Box::new(err)))?
         .build(signer)
         .map_err(|err| InternalError::from_source(Box::new(err)))
+}
+
+pub(in crate::admin) fn make_upload_contract_batch(
+    name: &str,
+    version: &str,
+    prefix: &str,
+    path: &str,
+    signer: &dyn Signer,
+) -> Result<Batch, InternalError> {
+    let contract_path = Path::new(path);
+    let contract_file =
+        File::open(contract_path).map_err(|err| InternalError::from_source(Box::new(err)))?;
+    let mut buf_reader = std::io::BufReader::new(contract_file);
+    let mut contract = Vec::new();
+    buf_reader
+        .read_to_end(&mut contract)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+    CreateContractActionBuilder::new()
+        .with_name(name.into())
+        .with_version(version.into())
+        .with_inputs(vec![prefix.into()])
+        .with_outputs(vec![prefix.into()])
+        .with_contract(contract)
+        .into_payload_builder()
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .into_transaction_builder(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .into_batch_builder(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .build(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))
+}
+
+pub(in crate::admin) fn make_namespace_create_batch(
+    prefix: &str,
+    signer: &dyn Signer,
+) -> Result<Batch, InternalError> {
+    let owners = vec![signer
+        .public_key()
+        .expect("Unable to get signer's public key")
+        .as_hex()];
+    CreateNamespaceRegistryActionBuilder::new()
+        .with_namespace(prefix.into())
+        .with_owners(owners)
+        .into_payload_builder()
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .into_transaction_builder(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .into_batch_builder(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .build(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))
+}
+
+pub(in crate::admin) fn make_namespace_permissions_batch(
+    name: &str,
+    prefix: &str,
+    signer: &dyn Signer,
+) -> Result<Batch, InternalError> {
+    CreateNamespaceRegistryPermissionActionBuilder::new()
+        .with_namespace(prefix.into())
+        .with_contract_name(name.into())
+        .with_read(true)
+        .with_write(true)
+        .into_payload_builder()
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .into_transaction_builder(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .into_batch_builder(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .build(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))
+}
+
+pub(in crate::admin) fn make_command_batch(
+    command_type: &str,
+    address: String,
+    signer: &dyn Signer,
+) -> Result<Batch, InternalError> {
+    let mut command = Command::new();
+
+    match command_type {
+        "set-state" => {
+            let mut bytes_entry = BytesEntry::new();
+            bytes_entry.set_key(address.clone());
+            bytes_entry.set_value("state_value".to_string().as_bytes().to_vec());
+
+            let state_writes = vec![bytes_entry];
+
+            let mut set_state = SetState::new();
+            set_state.set_state_writes(RepeatedField::from_vec(state_writes));
+
+            command.set_command_type(Command_CommandType::SET_STATE);
+            command.set_set_state(set_state);
+        }
+        "get-state" => {
+            let mut get_state = GetState::new();
+            get_state.set_state_keys(RepeatedField::from_vec(vec![address.clone()]));
+
+            command.set_command_type(Command_CommandType::GET_STATE);
+            command.set_get_state(get_state);
+        }
+        "delete-state" => {
+            let mut delete_state = DeleteState::new();
+            delete_state.set_state_keys(RepeatedField::from_vec(vec![address.clone()]));
+
+            command.set_command_type(Command_CommandType::DELETE_STATE);
+            command.set_delete_state(delete_state);
+        }
+        "add-event" => {
+            let mut bytes_entry = BytesEntry::new();
+            bytes_entry.set_key("event_key".to_string());
+            bytes_entry.set_value("event_value".to_string().as_bytes().to_vec());
+
+            let mut add_event = AddEvent::new();
+
+            add_event.set_event_type("event_type".to_string());
+            add_event.set_attributes(RepeatedField::from_vec(vec![bytes_entry]));
+            add_event.set_data(format!("data{}", address.clone()).as_bytes().to_vec());
+
+            command.set_command_type(Command_CommandType::ADD_EVENT);
+            command.set_add_event(add_event);
+        }
+        "return-invalid" => {
+            let mut return_invalid = ReturnInvalid::new();
+            return_invalid
+                .set_error_message("'return_invalid' command mock error message".to_string());
+
+            let mut command = Command::new();
+            command.set_command_type(Command_CommandType::RETURN_INVALID);
+            command.set_return_invalid(return_invalid);
+        }
+        "return-internal-error" => {
+            let mut return_internal_error = ReturnInternalError::new();
+            return_internal_error.set_error_message(
+                "'return_internal_error' command mock error message".to_string(),
+            );
+
+            let mut command = Command::new();
+            command.set_command_type(Command_CommandType::RETURN_INTERNAL_ERROR);
+            command.set_return_internal_error(return_internal_error);
+        }
+        command => {
+            return Err(InternalError::with_message(format!(
+                "command type '{}' does not exist",
+                command
+            )))
+        }
+    }
+
+    let mut command_payload = CommandPayload::new();
+    command_payload.set_commands(RepeatedField::from_vec(vec![command]));
+
+    let payload_bytes = command_payload
+        .write_to_bytes()
+        .expect("Unable to get bytes from Command Payload");
+
+    Ok(ExecuteContractActionBuilder::new()
+        .with_name(String::from("command"))
+        .with_version(String::from("1.0"))
+        .with_inputs(vec![address.clone()])
+        .with_outputs(vec![address.clone()])
+        .with_payload(payload_bytes)
+        .into_payload_builder()
+        .expect("Unable to create payload builder")
+        .into_transaction_builder(signer)
+        .expect("Unable to create transaction builder")
+        .into_batch_builder(signer)
+        .expect("Unable to create batch builder")
+        .build(signer)
+        .expect("Unable to build txn"))
 }
