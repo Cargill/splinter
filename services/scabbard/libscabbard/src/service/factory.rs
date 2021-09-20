@@ -635,11 +635,12 @@ mod tests {
     use super::*;
 
     use cylinder::secp256k1::Secp256k1Context;
+    use tempdir::TempDir;
 
     /// Verify that the scabbard factory produces a valid `Scabbard` instance.
     #[test]
     fn create_successful() {
-        let factory = get_factory();
+        let (_tempdir, factory) = get_factory();
 
         let service = factory
             .create("0".into(), "", "1", get_mock_args())
@@ -658,7 +659,7 @@ mod tests {
     /// arguments are commo seperated instead of json fmt.
     #[test]
     fn create_successful_no_json() {
-        let factory = get_factory();
+        let (_tempdir, factory) = get_factory();
 
         let service = factory
             .create("2".into(), "", "1", get_mock_args_no_json())
@@ -677,7 +678,7 @@ mod tests {
     /// instance.
     #[test]
     fn create_with_coordinator_timeout() {
-        let factory = get_factory();
+        let (_tempdir, factory) = get_factory();
         let mut args = get_mock_args();
         args.insert("coordinator_timeout".into(), "123".into());
 
@@ -695,7 +696,7 @@ mod tests {
     /// Verify that `Scabbard` creation fails when the `peer_services` argument isn't specified.
     #[test]
     fn create_without_peer_services() {
-        let factory = get_factory();
+        let (_tempdir, factory) = get_factory();
         let mut args = get_mock_args();
         args.remove("peer_services");
 
@@ -708,7 +709,7 @@ mod tests {
     /// Verify that `Scabbard` creation fails when the `admin_keys` argument isn't specified.
     #[test]
     fn create_without_admin_keys() {
-        let factory = get_factory();
+        let (_tempdir, factory) = get_factory();
         let mut args = get_mock_args();
         args.remove("admin_keys");
 
@@ -718,10 +719,11 @@ mod tests {
         );
     }
 
-    fn get_factory() -> ScabbardFactory {
+    fn get_factory() -> (TempDir, ScabbardFactory) {
+        let tempdir = TempDir::new("scabbard_factory").expect("Unable to create new tempdir");
         #[cfg(not(all(feature = "diesel-receipt-store", feature = "sqlite")))]
         let receipt_store_factory_config = ScabbardFactoryStorageConfig::Lmdb {
-            db_dir: "/tmp".into(),
+            db_dir: tempdir.path().to_string_lossy().into(),
             db_size: 1024 * 1024,
         };
         #[cfg(all(feature = "diesel-receipt-store", feature = "sqlite"))]
@@ -741,13 +743,17 @@ mod tests {
                 pool
             },
         };
-        ScabbardFactory {
-            service_types: vec![SERVICE_TYPE.into()],
-            state_db_dir: "/tmp".into(),
-            state_db_size: 1024 * 1024,
-            receipt_store_factory_config,
-            signature_verifier_factory: Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
-        }
+        let state_db_dir = tempdir.path().to_string_lossy().into();
+        (
+            tempdir,
+            ScabbardFactory {
+                service_types: vec![SERVICE_TYPE.into()],
+                state_db_dir,
+                state_db_size: 1024 * 1024,
+                receipt_store_factory_config,
+                signature_verifier_factory: Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
+            },
+        )
     }
 
     fn get_mock_args() -> HashMap<String, String> {
