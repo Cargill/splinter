@@ -15,8 +15,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 #[cfg(feature = "diesel-receipt-store")]
 use std::str::FromStr;
 use std::sync::{
@@ -25,13 +24,11 @@ use std::sync::{
 };
 use std::time::{Duration, Instant, SystemTime};
 
-#[cfg(feature = "diesel-receipt-store")]
-use diesel::r2d2::{ConnectionManager, Pool};
 use protobuf::Message;
 #[cfg(feature = "diesel-receipt-store")]
-use sawtooth::receipt::store::{diesel::DieselReceiptStore, ReceiptStore};
+use sawtooth::receipt::store::ReceiptStore;
 #[cfg(not(feature = "diesel-receipt-store"))]
-use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
+use sawtooth::store::receipt_store::TransactionReceiptStore;
 use sawtooth_sabre::{
     handler::SabreTransactionHandler, ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
 };
@@ -69,6 +66,12 @@ const ITER_CACHE_SIZE: usize = 64;
 const COMPLETED_BATCH_INFO_ITER_RETRY_MILLIS: u64 = 100;
 const DEFAULT_BATCH_HISTORY_SIZE: usize = 100;
 
+#[cfg(not(feature = "diesel-receipt-store"))]
+type ScabbardReceiptStore = Arc<RwLock<TransactionReceiptStore>>;
+
+#[cfg(feature = "diesel-receipt-store")]
+type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
+
 /// Iterator over entries in a Scabbard service's state
 pub type StateIter = Box<dyn Iterator<Item = Result<(String, Vec<u8>), ScabbardStateError>>>;
 
@@ -77,35 +80,23 @@ pub struct ScabbardState {
     context_manager: ContextManager,
     executor: Executor,
     current_state_root: String,
-    #[cfg(not(feature = "diesel-receipt-store"))]
-    transaction_receipt_store: Arc<RwLock<TransactionReceiptStore>>,
-    #[cfg(feature = "diesel-receipt-store")]
-    receipt_store: Arc<RwLock<dyn ReceiptStore>>,
+    receipt_store: ScabbardReceiptStore,
     pending_changes: Option<(String, Vec<TransactionReceipt>)>,
     event_subscribers: Vec<Box<dyn StateSubscriber>>,
     batch_history: BatchHistory,
-    state_db_file: PathBuf,
-    receipt_db_file: PathBuf,
 }
 
 impl ScabbardState {
     pub fn new(
         state_db_path: &Path,
         state_db_size: usize,
-        receipt_db_path: &Path,
-        // allow unused-variables, receipt_db_size is not used if diesel-receipt-store is enabled
-        #[allow(unused_variables)] receipt_db_size: usize,
-        #[cfg(feature = "diesel-receipt-store")] receipt_db_url: String,
+        receipt_store: ScabbardReceiptStore,
         admin_keys: Vec<String>,
     ) -> Result<Self, ScabbardStateError> {
         // Initialize the database
         let mut indexes = INDEXES.to_vec();
         indexes.push(CURRENT_STATE_ROOT_INDEX);
-        let state_db_file = state_db_path.to_path_buf();
-        let receipt_db_file = receipt_db_path.to_path_buf();
         let state_db_path = state_db_path.with_extension("lmdb");
-        #[cfg(not(feature = "diesel-receipt-store"))]
-        let receipt_db_path = receipt_db_path.with_extension("lmdb");
         let db = Box::new(LmdbDatabase::new(
             LmdbContext::new(&state_db_path, indexes.len(), Some(state_db_size))?,
             &indexes,
@@ -160,64 +151,15 @@ impl ScabbardState {
         // initialize committed_batches metric
         counter!("splinter.scabbard.committed_batches", 0);
 
-        #[cfg(feature = "diesel-receipt-store")]
-        let receipt_store: Arc<RwLock<dyn ReceiptStore>> =
-            match ConnectionUri::from_str(&receipt_db_url).map_err(|_| {
-                ScabbardStateError(format!(
-                    "Failed to convert database url {} to ConnectionUri",
-                    receipt_db_url
-                ))
-            })? {
-                ConnectionUri::Postgres(url) => {
-                    let connection_manager =
-                        ConnectionManager::<diesel::pg::PgConnection>::new(url);
-                    let pool = Pool::builder().build(connection_manager).map_err(|err| {
-                        ScabbardStateError(format!("Failed to build connection pool: {}", err))
-                    })?;
-                    Arc::new(RwLock::new(DieselReceiptStore::new(pool)))
-                }
-                ConnectionUri::Sqlite(conn_str) => {
-                    if (conn_str != ":memory:") && !std::path::Path::new(&conn_str).exists() {
-                        return Err(ScabbardStateError(format!(
-                            "Database file '{}' does not exist",
-                            conn_str
-                        )));
-                    }
-                    let connection_manager =
-                        ConnectionManager::<diesel::sqlite::SqliteConnection>::new(&conn_str);
-                    let mut pool_builder = Pool::builder();
-                    // A new database is created for each connection to the in-memory SQLite
-                    // implementation; to ensure that the resulting stores will operate on the same
-                    // database, only one connection is allowed.
-                    if conn_str == ":memory:" {
-                        pool_builder = pool_builder.max_size(1);
-                    }
-                    let pool = pool_builder.build(connection_manager).map_err(|err| {
-                        ScabbardStateError(format!("Failed to build connection pool: {}", err))
-                    })?;
-                    Arc::new(RwLock::new(DieselReceiptStore::new(pool)))
-                }
-            };
-
         Ok(ScabbardState {
             db,
             context_manager,
             executor,
             current_state_root,
-            #[cfg(not(feature = "diesel-receipt-store"))]
-            transaction_receipt_store: Arc::new(RwLock::new(TransactionReceiptStore::new(
-                Box::new(
-                    LmdbOrderedStore::new(&receipt_db_path, Some(receipt_db_size))
-                        .map_err(|err| ScabbardStateError(err.to_string()))?,
-                ),
-            ))),
-            #[cfg(feature = "diesel-receipt-store")]
             receipt_store,
             pending_changes: None,
             event_subscribers: vec![],
             batch_history: BatchHistory::new(),
-            state_db_file,
-            receipt_db_file,
         })
     }
 
@@ -374,7 +316,7 @@ impl ScabbardState {
                     .collect::<Result<Vec<_>, _>>()?;
 
                 #[cfg(not(feature = "diesel-receipt-store"))]
-                self.transaction_receipt_store
+                self.receipt_store
                     .write()
                     .map_err(|err| {
                         ScabbardStateError(format!(
@@ -446,7 +388,7 @@ impl ScabbardState {
 
     pub fn get_events_since(&self, event_id: Option<String>) -> Result<Events, ScabbardStateError> {
         #[cfg(not(feature = "diesel-receipt-store"))]
-        let events = Events::new(self.transaction_receipt_store.clone(), event_id);
+        let events = Events::new(self.receipt_store.clone(), event_id);
         #[cfg(feature = "diesel-receipt-store")]
         let events = Events::new(self.receipt_store.clone(), event_id);
         events
@@ -458,29 +400,6 @@ impl ScabbardState {
 
     pub fn clear_subscribers(&mut self) {
         self.event_subscribers.clear();
-    }
-
-    /// Computes the files associated with the LMDB state, including lock files.
-    pub fn remove_db_files(&self) -> Result<(), ScabbardStateError> {
-        let state_db_path = self.state_db_file.with_extension("lmdb");
-        let state_db_lock_file_path = self.state_db_file.with_extension("lmdb-lock");
-        let receipt_db_path = self.receipt_db_file.with_extension("lmdb");
-        let receipt_db_lock_file_path = self.receipt_db_file.with_extension("lmdb-lock");
-
-        fs::remove_file(receipt_db_path.as_path()).map_err(|err| {
-            ScabbardStateError(format!("Unable to remove state LMDB file: {}", err))
-        })?;
-        fs::remove_file(receipt_db_lock_file_path.as_path()).map_err(|err| {
-            ScabbardStateError(format!("Unable to remove state LMDB file: {}", err))
-        })?;
-        fs::remove_file(state_db_path.as_path()).map_err(|err| {
-            ScabbardStateError(format!("Unable to remove receipt store LMDB file: {}", err))
-        })?;
-        fs::remove_file(state_db_lock_file_path.as_path()).map_err(|err| {
-            ScabbardStateError(format!("Unable to remove state LMDB file: {}", err))
-        })?;
-
-        Ok(())
     }
 }
 
@@ -1064,6 +983,10 @@ mod tests {
     };
     #[cfg(feature = "diesel-receipt-store")]
     use sawtooth::migrations::run_sqlite_migrations;
+    #[cfg(feature = "diesel-receipt-store")]
+    use sawtooth::receipt::store::diesel::DieselReceiptStore;
+    #[cfg(not(feature = "diesel-receipt-store"))]
+    use sawtooth::store::lmdb::LmdbOrderedStore;
     use tempdir::TempDir;
     use transact::{
         families::command::make_command_transaction,
@@ -1206,21 +1129,22 @@ mod tests {
         // Initialize state
         let paths = StatePaths::new("get_state_at_address");
 
+        #[cfg(not(feature = "diesel-receipt-store"))]
+        let receipt_store = Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+            LmdbOrderedStore::new(
+                &StatePaths::new("state_at_address").receipt_db_path,
+                Some(TEMP_DB_SIZE),
+            )
+            .expect("Failed to create LMDB store"),
+        ))));
         #[cfg(feature = "diesel-receipt-store")]
-        let receipt_db_uri = paths._temp_dir_handle.path().join("sqlite_receipts.db");
-        #[cfg(feature = "diesel-receipt-store")]
-        create_connection_pool_and_migrate(receipt_db_uri.to_str().unwrap().to_string());
+        let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
+            create_connection_pool_and_migrate(":memory:".to_string()),
+        )));
 
-        let mut state = ScabbardState::new(
-            &paths.state_db_path,
-            TEMP_DB_SIZE,
-            &paths.receipt_db_path,
-            TEMP_DB_SIZE,
-            #[cfg(feature = "diesel-receipt-store")]
-            receipt_db_uri.to_str().unwrap().to_string(),
-            vec![],
-        )
-        .expect("Failed to initialize state");
+        let mut state =
+            ScabbardState::new(&paths.state_db_path, TEMP_DB_SIZE, receipt_store, vec![])
+                .expect("Failed to initialize state");
 
         // Set a value in state
         let address = "abcdef".to_string();
@@ -1279,22 +1203,22 @@ mod tests {
     fn get_state_with_prefix() {
         let paths = StatePaths::new("get_state_at_address");
 
+        #[cfg(not(feature = "diesel-receipt-store"))]
+        let receipt_store = Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+            LmdbOrderedStore::new(
+                &StatePaths::new("state_with_prefix").receipt_db_path,
+                Some(TEMP_DB_SIZE),
+            )
+            .expect("Failed to create LMDB store"),
+        ))));
         #[cfg(feature = "diesel-receipt-store")]
-        let receipt_db_uri = paths._temp_dir_handle.path().join("sqlite_receipts.db");
-        #[cfg(feature = "diesel-receipt-store")]
-        create_connection_pool_and_migrate(receipt_db_uri.to_str().unwrap().to_string());
+        let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
+            create_connection_pool_and_migrate(":memory:".to_string()),
+        )));
 
-        // Initialize state
-        let mut state = ScabbardState::new(
-            &paths.state_db_path,
-            TEMP_DB_SIZE,
-            &paths.receipt_db_path,
-            TEMP_DB_SIZE,
-            #[cfg(feature = "diesel-receipt-store")]
-            receipt_db_uri.to_str().unwrap().to_string(),
-            vec![],
-        )
-        .expect("Failed to initialize state");
+        let mut state =
+            ScabbardState::new(&paths.state_db_path, TEMP_DB_SIZE, receipt_store, vec![])
+                .expect("Failed to initialize state");
 
         // Set some values in state
         let prefix = "abcdef".to_string();
@@ -1361,6 +1285,7 @@ mod tests {
     struct StatePaths {
         _temp_dir_handle: TempDir,
         pub state_db_path: PathBuf,
+        #[cfg(not(feature = "diesel-receipt-store"))]
         pub receipt_db_path: PathBuf,
     }
 
@@ -1368,10 +1293,12 @@ mod tests {
         fn new(prefix: &str) -> Self {
             let temp_dir = TempDir::new(prefix).expect("Failed to create temp dir");
             let state_db_path = temp_dir.path().join("state.lmdb");
+            #[cfg(not(feature = "diesel-receipt-store"))]
             let receipt_db_path = temp_dir.path().join("receipts.lmdb");
             Self {
                 _temp_dir_handle: temp_dir,
                 state_db_path,
+                #[cfg(not(feature = "diesel-receipt-store"))]
                 receipt_db_path,
             }
         }

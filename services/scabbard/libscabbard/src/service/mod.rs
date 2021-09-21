@@ -18,7 +18,7 @@
 
 mod consensus;
 mod error;
-mod factory;
+pub(crate) mod factory;
 #[cfg(feature = "rest-api")]
 mod rest_api;
 mod shared;
@@ -27,13 +27,16 @@ mod state;
 use std::any::Any;
 use std::collections::{HashSet, VecDeque};
 use std::convert::TryFrom;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::path::Path;
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use cylinder::Verifier as SignatureVerifier;
-use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
+#[cfg(feature = "diesel-receipt-store")]
+use sawtooth::receipt::store::ReceiptStore;
+#[cfg(not(feature = "diesel-receipt-store"))]
+use sawtooth::store::receipt_store::TransactionReceiptStore;
 use splinter::{
     consensus::{Proposal, ProposalUpdate},
     service::{
@@ -46,16 +49,13 @@ use transact::{
     protos::{FromBytes, IntoBytes},
 };
 
-use super::hex::to_hex;
 use super::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
 
 use consensus::ScabbardConsensusManager;
 use error::ScabbardError;
 #[cfg(feature = "service-arg-validation")]
 pub use factory::ScabbardArgValidator;
-pub use factory::ScabbardFactory;
-#[cfg(feature = "factory-builder")]
-pub use factory::ScabbardFactoryBuilder;
+pub use factory::{ScabbardFactory, ScabbardFactoryBuilder, ScabbardStorageConfiguration};
 use shared::ScabbardShared;
 pub use state::{
     BatchInfo, BatchInfoIter, BatchStatus, Events, StateChange, StateChangeEvent, StateIter,
@@ -86,6 +86,12 @@ impl TryFrom<Option<&str>> for ScabbardVersion {
     }
 }
 
+#[cfg(not(feature = "diesel-receipt-store"))]
+type ScabbardReceiptStore = Arc<RwLock<TransactionReceiptStore>>;
+
+#[cfg(feature = "diesel-receipt-store")]
+type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
+
 /// A service for running Sawtooth Sabre smart contracts with two-phase commit consensus.
 #[derive(Clone)]
 pub struct Scabbard {
@@ -94,6 +100,7 @@ pub struct Scabbard {
     version: ScabbardVersion,
     shared: Arc<Mutex<ScabbardShared>>,
     state: Arc<Mutex<ScabbardState>>,
+    purge_fn: Arc<dyn Fn() -> Result<(), splinter::error::InternalError> + Send + Sync>,
     /// The coordinator timeout for the two-phase commit consensus engine
     coordinator_timeout: Duration,
     consensus: Arc<Mutex<Option<ScabbardConsensusManager>>>,
@@ -110,15 +117,11 @@ impl Scabbard {
         // List of other scabbard services on the same circuit that this service shares state with
         peer_services: HashSet<String>,
         // The directory in which to create sabre's LMDB database
-        state_db_dir: &Path,
+        state_db_path: &Path,
         // The size of sabre's LMDB database
         state_db_size: usize,
-        // The directory in which to create the transaction receipt store's LMDB database
-        receipt_db_dir: &Path,
-        // The size of the transaction receipt store's LMDB database
-        receipt_db_size: usize,
-        // The database connection url to use for the receipt store
-        #[cfg(feature = "diesel-receipt-store")] receipt_db_url: String,
+        receipt_store: ScabbardReceiptStore,
+        purge_fn: Box<dyn Fn() -> Result<(), splinter::error::InternalError> + Send + Sync>,
         signature_verifier: Box<dyn SignatureVerifier>,
         // The public keys that are authorized to create and manage sabre contracts
         admin_keys: Vec<String>,
@@ -137,18 +140,8 @@ impl Scabbard {
             version,
         );
 
-        let (state_db_path, receipt_db_path) =
-            compute_db_paths(&service_id, circuit_id, state_db_dir, receipt_db_dir)?;
-        let state = ScabbardState::new(
-            &state_db_path,
-            state_db_size,
-            &receipt_db_path,
-            receipt_db_size,
-            #[cfg(feature = "diesel-receipt-store")]
-            receipt_db_url,
-            admin_keys,
-        )
-        .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
+        let state = ScabbardState::new(state_db_path, state_db_size, receipt_store, admin_keys)
+            .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
 
         let coordinator_timeout =
             coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
@@ -159,6 +152,7 @@ impl Scabbard {
             version,
             shared: Arc::new(Mutex::new(shared)),
             state: Arc::new(Mutex::new(state)),
+            purge_fn: purge_fn.into(),
             coordinator_timeout,
             consensus: Arc::new(Mutex::new(None)),
         })
@@ -395,13 +389,7 @@ impl Service for Scabbard {
     }
 
     fn purge(&mut self) -> Result<(), splinter::error::InternalError> {
-        self.state
-            .lock()
-            .map_err(|_| {
-                splinter::error::InternalError::with_message("consensus lock poisoned".into())
-            })?
-            .remove_db_files()
-            .map_err(|err| splinter::error::InternalError::from_source(Box::new(err)))
+        (*self.purge_fn)()
     }
 
     fn handle_message(
@@ -516,49 +504,52 @@ impl Service for Scabbard {
     }
 }
 
-fn compute_db_paths(
-    service_id: &str,
-    circuit_id: &str,
-    state_db_dir: &Path,
-    receipt_db_dir: &Path,
-) -> Result<(PathBuf, PathBuf), ScabbardError> {
-    let hash = hash(
-        MessageDigest::sha256(),
-        format!("{}::{}", service_id, circuit_id).as_bytes(),
-    )
-    .map(|digest| to_hex(&*digest))
-    .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
-    let state_db_path = state_db_dir.join(format!("{}-state", hash));
-    let receipt_db_path = receipt_db_dir.join(format!("{}-receipts", hash));
-    Ok((state_db_path, receipt_db_path))
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
 
     use std::error::Error;
+    use std::path::PathBuf;
 
     use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
+    #[cfg(feature = "diesel-receipt-store")]
+    use sawtooth::receipt::store::{ReceiptIter, ReceiptStoreError};
+    #[cfg(not(feature = "diesel-receipt-store"))]
+    use sawtooth::store::lmdb::LmdbOrderedStore;
     use splinter::service::{
         ServiceConnectionError, ServiceDisconnectionError, ServiceMessageContext,
         ServiceNetworkSender, ServiceSendError,
     };
+    use tempdir::TempDir;
+    #[cfg(feature = "diesel-receipt-store")]
+    use transact::protocol::receipt::TransactionReceipt;
+
+    use crate::service::factory::compute_db_path;
+
+    const MOCK_CIRCUIT_ID: &str = "abcde-01234";
+    const MOCK_SERVICE_ID: &str = "ABCD";
+    const TEMP_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
     /// Tests that a new scabbard service is properly instantiated.
     #[test]
     fn new_scabbard() {
+        let paths = StatePaths::new("new_scabbard");
+
         let service = Scabbard::new(
             "new_scabbard".into(),
             "test_circuit",
             ScabbardVersion::V1,
             HashSet::new(),
-            Path::new("/tmp"),
-            1024 * 1024,
-            Path::new("/tmp"),
-            1024 * 1024,
+            paths.state_db_path.as_path(),
+            TEMP_DB_SIZE,
+            #[cfg(not(feature = "diesel-receipt-store"))]
+            Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+                LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
+                    .expect("Unable to make lmdb store"),
+            )))),
             #[cfg(feature = "diesel-receipt-store")]
-            ":memory:".to_string(),
+            Arc::new(RwLock::new(MockReceiptStore)),
+            Box::new(|| Ok(())),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
@@ -572,17 +563,23 @@ pub mod tests {
     /// will hang if the thread does not get shutdown correctly.
     #[test]
     fn thread_cleanup() {
+        let paths = StatePaths::new("new_scabbard");
+
         let mut service = Scabbard::new(
             "thread_cleanup".into(),
             "test_circuit",
             ScabbardVersion::V1,
             HashSet::new(),
-            Path::new("/tmp"),
-            1024 * 1024,
-            Path::new("/tmp"),
-            1024 * 1024,
+            paths.state_db_path.as_path(),
+            TEMP_DB_SIZE,
+            #[cfg(not(feature = "diesel-receipt-store"))]
+            Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+                LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
+                    .expect("Unable to make lmdb store"),
+            )))),
             #[cfg(feature = "diesel-receipt-store")]
-            ":memory:".to_string(),
+            Arc::new(RwLock::new(MockReceiptStore)),
+            Box::new(|| Ok(())),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
@@ -596,23 +593,62 @@ pub mod tests {
     /// Tests that the service properly connects and disconnects using the network registry.
     #[test]
     fn connect_and_disconnect() {
+        let paths = StatePaths::new("new_scabbard");
+
         let mut service = Scabbard::new(
             "connect_and_disconnect".into(),
             "test_circuit",
             ScabbardVersion::V1,
             HashSet::new(),
-            Path::new("/tmp"),
-            1024 * 1024,
-            Path::new("/tmp"),
-            1024 * 1024,
+            paths.state_db_path.as_path(),
+            TEMP_DB_SIZE,
+            #[cfg(not(feature = "diesel-receipt-store"))]
+            Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+                LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
+                    .expect("Unable to make lmdb store"),
+            )))),
             #[cfg(feature = "diesel-receipt-store")]
-            ":memory:".to_string(),
+            Arc::new(RwLock::new(MockReceiptStore)),
+            Box::new(|| Ok(())),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
         )
         .expect("failed to create service");
         test_connect_and_disconnect(&mut service);
+    }
+
+    struct StatePaths {
+        // this is deleted when dropped
+        _temp_dir: TempDir,
+        pub state_db_path: PathBuf,
+        #[cfg(not(feature = "diesel-receipt-store"))]
+        pub receipt_db_path: PathBuf,
+    }
+
+    impl StatePaths {
+        fn new(prefix: &str) -> Self {
+            let temp_dir = TempDir::new(prefix).expect("Failed to create temp dir");
+            // This computes the paths such that they're the same ones that will be used by
+            // scabbard when it's initialized
+            let state_db_path =
+                compute_db_path(MOCK_SERVICE_ID, MOCK_CIRCUIT_ID, temp_dir.path(), "-state")
+                    .expect("Failed to compute DB paths");
+            #[cfg(not(feature = "diesel-receipt-store"))]
+            let receipt_db_path = compute_db_path(
+                MOCK_SERVICE_ID,
+                MOCK_CIRCUIT_ID,
+                temp_dir.path(),
+                "-receipts",
+            )
+            .expect("Failed to compute DB paths");
+            Self {
+                _temp_dir: temp_dir,
+                state_db_path,
+                #[cfg(not(feature = "diesel-receipt-store"))]
+                receipt_db_path,
+            }
+        }
     }
 
     #[derive(Debug)]
@@ -747,6 +783,58 @@ pub mod tests {
             _sender: &str,
         ) -> Result<(), ServiceSendError> {
             Ok(())
+        }
+    }
+
+    #[cfg(feature = "diesel-receipt-store")]
+    struct MockReceiptStore;
+
+    #[cfg(feature = "diesel-receipt-store")]
+    impl ReceiptStore for MockReceiptStore {
+        fn get_txn_receipt_by_id(
+            &self,
+            _id: String,
+        ) -> Result<Option<TransactionReceipt>, ReceiptStoreError> {
+            unimplemented!()
+        }
+
+        fn get_txn_receipt_by_index(
+            &self,
+            _index: u64,
+        ) -> Result<Option<TransactionReceipt>, ReceiptStoreError> {
+            unimplemented!()
+        }
+
+        fn add_txn_receipts(
+            &self,
+            _receipts: Vec<TransactionReceipt>,
+        ) -> Result<(), ReceiptStoreError> {
+            unimplemented!()
+        }
+
+        fn remove_txn_receipt_by_id(
+            &self,
+            _id: String,
+        ) -> Result<Option<TransactionReceipt>, ReceiptStoreError> {
+            unimplemented!()
+        }
+
+        fn remove_txn_receipt_by_index(
+            &self,
+            _index: u64,
+        ) -> Result<Option<TransactionReceipt>, ReceiptStoreError> {
+            unimplemented!()
+        }
+
+        fn count_txn_receipts(&self) -> Result<u64, ReceiptStoreError> {
+            unimplemented!()
+        }
+
+        fn list_receipts_since(
+            &self,
+            _id: Option<String>,
+        ) -> Result<ReceiptIter, ReceiptStoreError> {
+            unimplemented!()
         }
     }
 

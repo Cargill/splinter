@@ -45,7 +45,7 @@ transact = { version = "0.3", features = ["sawtooth-compat"] }
 [dependencies.sawtooth]
 version = "0.6.6"
 default-features = false
-features = ["diesel", "lmdb-store", "postgres", "receipt-store", "sqlite", "transaction-receipt-store"]
+features = ["lmdb-store", "receipt-store", "transaction-receipt-store"]
 
 [dev-dependencies]
 tempdir = "0.3"
@@ -76,7 +76,6 @@ experimental = [
   # The following features are experimental:
   "commit-store",
   "diesel-receipt-store",
-  "factory-builder",
   "https",
   "postgres",
   "sqlite",
@@ -86,13 +85,12 @@ authorization = ["splinter/authorization"]
 client = []
 client-reqwest = ["client", "reqwest"]
 commit-store = []
-diesel-receipt-store = ["diesel"]
+diesel-receipt-store = ["diesel", "sawtooth/transaction-receipt-store-lmdb"]
 events = ["splinter/events"]
-factory-builder = []
 https = []
 lmdb = []
-postgres = ["diesel/postgres", "diesel_migrations"]
+postgres = ["diesel/postgres", "diesel_migrations", "sawtooth/postgres"]
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
 service-arg-validation = ["splinter/service-arg-validation"]
-sqlite = ["diesel/sqlite", "diesel_migrations"]
+sqlite = ["diesel/sqlite", "diesel_migrations", "sawtooth/sqlite"]
