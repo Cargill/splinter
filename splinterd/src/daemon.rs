@@ -100,7 +100,9 @@ use splinter::transport::{
     Incoming, ListenError, Listener, Transport,
 };
 
+use crate::node_id::get_node_id;
 use crate::routes;
+use crate::UserError;
 
 const ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
@@ -123,7 +125,7 @@ pub struct SplinterDaemon {
     advertised_endpoints: Vec<String>,
     initial_peers: Vec<String>,
     mesh: Mesh,
-    node_id: String,
+    node_id: Option<String>,
     display_name: String,
     rest_api_endpoint: String,
     #[cfg(feature = "https-bind")]
@@ -245,10 +247,17 @@ impl SplinterDaemon {
         let admin_service_verifier = secp256k1_context.new_verifier();
         let auth_config_verifier = secp256k1_context.new_verifier();
         let signing_context = Arc::new(Mutex::new(secp256k1_context));
+        let node_id: String = get_node_id(
+            self.node_id.as_ref().map(|s| s.to_string()),
+            #[cfg(feature = "node-file-block")]
+            {
+                store_factory.get_node_id_store()
+            },
+        )?;
 
-        info!("Starting SpinterNode with ID {}", self.node_id);
+        info!("Starting SpinterNode with ID {}", &node_id);
         let authorization_manager = AuthorizationManager::new(
-            self.node_id.clone(),
+            node_id.to_string(),
             #[cfg(feature = "challenge-authorization")]
             self.signers.clone(),
             #[cfg(feature = "challenge-authorization")]
@@ -263,21 +272,21 @@ impl SplinterDaemon {
         let mut inproc_ids = vec![
             (
                 "inproc://orchestator".to_string(),
-                format!("orchestator::{}", &self.node_id),
+                format!("orchestator::{}", &node_id),
             ),
             (
                 "inproc://admin-service".to_string(),
-                admin_service_id(&self.node_id),
+                admin_service_id(&node_id),
             ),
         ];
 
         #[cfg(feature = "health-service")]
         inproc_ids.push((
             "inproc://health-service".to_string(),
-            format!("health::{}", &self.node_id),
+            format!("health::{}", &node_id),
         ));
 
-        let inproc_authorizer = InprocAuthorizer::new(inproc_ids, self.node_id.clone());
+        let inproc_authorizer = InprocAuthorizer::new(inproc_ids, node_id.clone());
 
         let mut authorizers = Authorizers::new();
         authorizers.add_authorizer("inproc", inproc_authorizer);
@@ -297,7 +306,7 @@ impl SplinterDaemon {
 
         let mut peer_manager = PeerManager::builder()
             .with_connector(connection_connector.clone())
-            .with_identity(self.node_id.to_string())
+            .with_identity(node_id.to_string())
             .with_strict_ref_counts(self.strict_ref_counts)
             .start()
             .map_err(|err| {
@@ -360,7 +369,7 @@ impl SplinterDaemon {
         // Set up the Circuit dispatcher
         let circuit_dispatcher = set_up_circuit_dispatcher(
             network_sender.clone(),
-            &self.node_id,
+            &node_id,
             routing_reader.clone(),
             routing_writer.clone(),
             #[cfg(feature = "challenge-authorization")]
@@ -389,7 +398,7 @@ impl SplinterDaemon {
 
         // Set up the Network dispatcher
         let network_dispatcher =
-            set_up_network_dispatcher(network_sender, &self.node_id, circuit_dispatch_sender);
+            set_up_network_dispatcher(network_sender, &node_id, circuit_dispatch_sender);
 
         let mut network_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(network_dispatcher)
@@ -440,12 +449,11 @@ impl SplinterDaemon {
         let mut peer_refs = vec![];
         for endpoint in self.initial_peers.iter() {
             #[cfg(feature = "challenge-authorization")]
-            let (endpoint, token) =
-                parse_peer_endpoint(endpoint, &self.peering_token, &self.node_id);
+            let (endpoint, token) = parse_peer_endpoint(endpoint, &self.peering_token, &node_id);
             #[cfg(not(feature = "challenge-authorization"))]
             let endpoint = endpoint.to_string();
             #[cfg(not(feature = "challenge-authorization"))]
-            let token = PeerAuthorizationToken::from_peer_id(&self.node_id);
+            let token = PeerAuthorizationToken::from_peer_id(&node_id);
             match peer_connector.add_unidentified_peer(endpoint, token) {
                 Ok(peer_ref) => peer_refs.push(peer_ref),
                 Err(err) => error!("Connect Error: {}", err),
@@ -502,7 +510,7 @@ impl SplinterDaemon {
         let mut admin_service_builder = AdminServiceBuilder::new();
 
         admin_service_builder = admin_service_builder
-            .with_node_id(self.node_id.clone())
+            .with_node_id(node_id.clone())
             .with_service_orchestrator(orchestrator)
             .with_peer_manager_connector(peer_connector)
             .with_admin_service_store(store_factory.get_admin_service_store())
@@ -543,7 +551,8 @@ impl SplinterDaemon {
             StartError::AdminServiceError(format!("unable to create admin service: {}", err))
         })?;
 
-        let node_id = self.node_id.clone();
+        #[cfg(feature = "authorization")]
+        let node_id_clone = node_id.clone();
         let display_name = self.display_name.clone();
         #[cfg(feature = "service-endpoint")]
         let service_endpoint = self.service_endpoint.clone();
@@ -551,7 +560,8 @@ impl SplinterDaemon {
         let advertised_endpoints = self.advertised_endpoints.clone();
 
         let circuit_resource_provider = CircuitResourceProvider::new(
-            self.node_id.to_string(),
+            #[allow(clippy::redundant_clone)]
+            node_id.to_owned(),
             store_factory.get_admin_service_store(),
         );
 
@@ -633,7 +643,7 @@ impl SplinterDaemon {
                     routes::STATUS_READ_PERMISSION,
                     move |_, _| {
                         routes::get_status(
-                            node_id.clone(),
+                            node_id_clone.clone(),
                             display_name.clone(),
                             #[cfg(feature = "service-endpoint")]
                             service_endpoint.clone(),
@@ -807,7 +817,7 @@ impl SplinterDaemon {
 
         #[cfg(feature = "health-service")]
         let mut health_service_shutdown_handle = {
-            let health_service = HealthService::new(&self.node_id);
+            let health_service = HealthService::new(&node_id);
             rest_api_builder = rest_api_builder.add_resources(health_service.resources());
 
             start_health_service(health_connection, health_service)?
@@ -1139,13 +1149,13 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_node_id(mut self, value: String) -> Self {
-        self.node_id = Some(value);
+    pub fn with_node_id(mut self, value: Option<String>) -> Self {
+        self.node_id = value;
         self
     }
 
-    pub fn with_display_name(mut self, value: String) -> Self {
-        self.display_name = Some(value);
+    pub fn with_display_name(mut self, value: Option<String>) -> Self {
+        self.display_name = value;
         self
     }
 
@@ -1272,10 +1282,6 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
         })?;
 
-        let node_id = self.node_id.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: node_id".to_string())
-        })?;
-
         let mesh = Mesh::new(512, 128);
 
         #[cfg(feature = "authorization-handler-allow-keys")]
@@ -1364,8 +1370,8 @@ impl SplinterDaemonBuilder {
             advertised_endpoints,
             initial_peers,
             mesh,
-            node_id,
             display_name,
+            node_id: self.node_id,
             rest_api_endpoint,
             #[cfg(feature = "https-bind")]
             rest_api_ssl_settings,
@@ -1736,6 +1742,7 @@ pub enum StartError {
     #[cfg(feature = "health-service")]
     HealthServiceError(String),
     OrchestratorError(String),
+    UserError(String),
 }
 
 impl Error for StartError {}
@@ -1758,7 +1765,16 @@ impl fmt::Display for StartError {
             StartError::OrchestratorError(msg) => {
                 write!(f, "the orchestrator encountered an error: {}", msg)
             }
+            StartError::UserError(msg) => {
+                write!(f, "there has been a user error: {}", msg)
+            }
         }
+    }
+}
+
+impl From<UserError> for StartError {
+    fn from(user_error: UserError) -> Self {
+        StartError::UserError(user_error.to_string())
     }
 }
 

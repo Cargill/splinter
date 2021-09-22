@@ -24,6 +24,7 @@ mod daemon;
 mod error;
 #[cfg(feature = "log-config")]
 mod logging;
+pub mod node_id;
 mod routes;
 mod transport;
 
