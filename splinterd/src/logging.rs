@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "log-config")]
 use log::Level;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::console::Target;
@@ -87,7 +86,6 @@ impl From<RootConfig> for Root {
     }
 }
 
-#[cfg(feature = "log-config")]
 impl RootConfig {
     fn set_level(self, level: Level) -> Self {
         Self { level, ..self }
@@ -109,7 +107,6 @@ impl TryInto<Config> for LogConfig {
     }
 }
 
-#[cfg(feature = "log-config")]
 impl LogConfig {
     pub fn set_root_level(self, level: Level) -> Self {
         Self {
