@@ -54,7 +54,6 @@ impl CreateCircuit {
     pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, MarshallingError> {
         let authorization_type = match proto.get_authorization_type() {
             admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
-            #[cfg(feature = "challenge-authorization")]
             admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION => {
                 AuthorizationType::Challenge
             }
@@ -180,7 +179,6 @@ impl CreateCircuit {
                 circuit
                     .set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
             }
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Challenge => {
                 circuit.set_authorization_type(
                     admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION,
@@ -264,7 +262,6 @@ impl TryInto<admin::Circuit> for CreateCircuit {
                 circuit
                     .set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
             }
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Challenge => {
                 circuit.set_authorization_type(
                     admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION,
@@ -319,7 +316,6 @@ pub fn is_valid_circuit_id(circuit_id: &str) -> bool {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum AuthorizationType {
     Trust,
-    #[cfg(feature = "challenge-authorization")]
     Challenge,
 }
 
@@ -327,7 +323,6 @@ impl From<&store::AuthorizationType> for AuthorizationType {
     fn from(store_enum: &store::AuthorizationType) -> Self {
         match *store_enum {
             store::AuthorizationType::Trust => AuthorizationType::Trust,
-            #[cfg(feature = "challenge-authorization")]
             store::AuthorizationType::Challenge => AuthorizationType::Challenge,
         }
     }
@@ -421,7 +416,6 @@ impl std::fmt::Display for CircuitStatus {
 pub struct SplinterNode {
     pub node_id: String,
     pub endpoints: Vec<String>,
-    #[cfg(feature = "challenge-authorization")]
     pub public_key: Option<Vec<u8>>,
 }
 
@@ -432,7 +426,6 @@ impl SplinterNode {
         proto.set_node_id(self.node_id);
         proto.set_endpoints(self.endpoints.into());
 
-        #[cfg(feature = "challenge-authorization")]
         if let Some(public_key) = self.public_key {
             proto.set_public_key(public_key);
         }
@@ -441,7 +434,6 @@ impl SplinterNode {
     }
 
     pub fn from_proto(mut proto: admin::SplinterNode) -> Result<Self, MarshallingError> {
-        #[cfg(feature = "challenge-authorization")]
         let public_key = {
             let public_key = proto.take_public_key();
             if public_key.is_empty() {
@@ -454,7 +446,6 @@ impl SplinterNode {
         Ok(Self {
             node_id: proto.take_node_id(),
             endpoints: proto.take_endpoints().into(),
-            #[cfg(feature = "challenge-authorization")]
             public_key,
         })
     }
@@ -624,7 +615,6 @@ impl From<store::CircuitProposal> for CircuitProposal {
                 .map(|node| SplinterNode {
                     node_id: node.node_id().to_string(),
                     endpoints: node.endpoints().to_vec(),
-                    #[cfg(feature = "challenge-authorization")]
                     public_key: node.public_key().clone(),
                 })
                 .collect::<Vec<SplinterNode>>(),

@@ -22,7 +22,6 @@ use super::ProposedNode;
 pub struct CircuitNode {
     id: String,
     endpoints: Vec<String>,
-    #[cfg(feature = "challenge-authorization")]
     public_key: Option<Vec<u8>>,
 }
 
@@ -38,7 +37,6 @@ impl CircuitNode {
     }
 
     /// Returns the public key that belongs to the node
-    #[cfg(feature = "challenge-authorization")]
     pub fn public_key(&self) -> &Option<Vec<u8>> {
         &self.public_key
     }
@@ -49,7 +47,6 @@ impl From<&ProposedNode> for CircuitNode {
         CircuitNode {
             id: proposed_node.node_id().into(),
             endpoints: proposed_node.endpoints().to_vec(),
-            #[cfg(feature = "challenge-authorization")]
             public_key: proposed_node.public_key().clone(),
         }
     }
@@ -60,7 +57,6 @@ impl From<ProposedNode> for CircuitNode {
         CircuitNode {
             id: node.node_id().into(),
             endpoints: node.endpoints().to_vec(),
-            #[cfg(feature = "challenge-authorization")]
             public_key: node.public_key().clone(),
         }
     }
@@ -71,7 +67,6 @@ impl From<ProposedNode> for CircuitNode {
 pub struct CircuitNodeBuilder {
     node_id: Option<String>,
     endpoints: Option<Vec<String>>,
-    #[cfg(feature = "challenge-authorization")]
     public_key: Option<Vec<u8>>,
 }
 
@@ -92,7 +87,6 @@ impl CircuitNodeBuilder {
     }
 
     /// Returns the public key for the node
-    #[cfg(feature = "challenge-authorization")]
     pub fn public_key(&self) -> Option<Vec<u8>> {
         self.public_key.clone()
     }
@@ -122,7 +116,6 @@ impl CircuitNodeBuilder {
     /// # Arguments
     ///
     ///  * `public_key` - The bytes of the node's public key
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_public_key(mut self, public_key: &[u8]) -> CircuitNodeBuilder {
         self.public_key = Some(public_key.into());
         self
@@ -147,7 +140,6 @@ impl CircuitNodeBuilder {
         let node = CircuitNode {
             id: node_id,
             endpoints,
-            #[cfg(feature = "challenge-authorization")]
             public_key: self.public_key,
         };
 

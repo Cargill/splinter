@@ -23,7 +23,6 @@ use crate::protos::admin;
 pub struct ProposedNode {
     node_id: String,
     endpoints: Vec<String>,
-    #[cfg(feature = "challenge-authorization")]
     public_key: Option<Vec<u8>>,
 }
 
@@ -39,7 +38,6 @@ impl ProposedNode {
     }
 
     /// Returns the public key that belongs to the proposed node
-    #[cfg(feature = "challenge-authorization")]
     pub fn public_key(&self) -> &Option<Vec<u8>> {
         &self.public_key
     }
@@ -50,7 +48,6 @@ impl ProposedNode {
         proto.set_node_id(self.node_id);
         proto.set_endpoints(self.endpoints.into());
 
-        #[cfg(feature = "challenge-authorization")]
         if let Some(public_key) = self.public_key {
             proto.set_public_key(public_key);
         }
@@ -59,7 +56,6 @@ impl ProposedNode {
     }
 
     pub fn from_proto(mut proto: admin::SplinterNode) -> Self {
-        #[cfg(feature = "challenge-authorization")]
         let public_key = {
             let public_key = proto.take_public_key();
             if public_key.is_empty() {
@@ -72,7 +68,6 @@ impl ProposedNode {
         Self {
             node_id: proto.take_node_id(),
             endpoints: proto.take_endpoints().into(),
-            #[cfg(feature = "challenge-authorization")]
             public_key,
         }
     }
@@ -83,7 +78,6 @@ impl ProposedNode {
 pub struct ProposedNodeBuilder {
     node_id: Option<String>,
     endpoints: Option<Vec<String>>,
-    #[cfg(feature = "challenge-authorization")]
     public_key: Option<Vec<u8>>,
 }
 
@@ -104,7 +98,6 @@ impl ProposedNodeBuilder {
     }
 
     /// Returns the publice key for the node
-    #[cfg(feature = "challenge-authorization")]
     pub fn public_key(&self) -> Option<Vec<u8>> {
         self.public_key.clone()
     }
@@ -134,7 +127,6 @@ impl ProposedNodeBuilder {
     /// # Arguments
     ///
     ///  * `public_key` - The bytes of the node's public key
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_public_key(mut self, public_key: &[u8]) -> ProposedNodeBuilder {
         self.public_key = Some(public_key.into());
         self
@@ -157,7 +149,6 @@ impl ProposedNodeBuilder {
         let node = ProposedNode {
             node_id,
             endpoints,
-            #[cfg(feature = "challenge-authorization")]
             public_key: self.public_key,
         };
 
@@ -170,7 +161,6 @@ impl From<&messages::SplinterNode> for ProposedNode {
         ProposedNode {
             node_id: admin_node.node_id.to_string(),
             endpoints: admin_node.endpoints.to_vec(),
-            #[cfg(feature = "challenge-authorization")]
             public_key: admin_node.public_key.clone(),
         }
     }

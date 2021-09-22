@@ -32,10 +32,7 @@ pub struct PeerNode {
 }
 
 pub trait PeerAuthorizationTokenReader {
-    fn list_tokens(
-        &self,
-        #[cfg(feature = "challenge-authorization")] local_node: &str,
-    ) -> Result<Vec<PeerTokenPair>, InvalidStateError>;
+    fn list_tokens(&self, local_node: &str) -> Result<Vec<PeerTokenPair>, InvalidStateError>;
 
     fn list_nodes(&self) -> Result<Vec<PeerNode>, InvalidStateError>;
 

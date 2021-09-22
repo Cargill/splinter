@@ -155,7 +155,6 @@ impl TryFrom<&admin::Circuit> for Circuit {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AuthorizationType {
     Trust,
-    #[cfg(feature = "challenge-authorization")]
     Challenge,
 }
 
@@ -163,7 +162,6 @@ impl From<&messages::AuthorizationType> for AuthorizationType {
     fn from(message_enum: &messages::AuthorizationType) -> Self {
         match *message_enum {
             messages::AuthorizationType::Trust => AuthorizationType::Trust,
-            #[cfg(feature = "challenge-authorization")]
             messages::AuthorizationType::Challenge => AuthorizationType::Challenge,
         }
     }
@@ -175,7 +173,6 @@ impl TryFrom<&admin::Circuit_AuthorizationType> for AuthorizationType {
     fn try_from(proto: &admin::Circuit_AuthorizationType) -> Result<Self, Self::Error> {
         match *proto {
             admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => Ok(AuthorizationType::Trust),
-            #[cfg(feature = "challenge-authorization")]
             admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION => {
                 Ok(AuthorizationType::Challenge)
             }
@@ -190,7 +187,6 @@ impl From<&AuthorizationType> for admin::Circuit_AuthorizationType {
     fn from(auth: &AuthorizationType) -> Self {
         match *auth {
             AuthorizationType::Trust => admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION,
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Challenge => {
                 admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION
             }
@@ -646,7 +642,6 @@ impl From<&AuthorizationType> for routing::AuthorizationType {
     fn from(auth_type: &AuthorizationType) -> Self {
         match auth_type {
             AuthorizationType::Trust => routing::AuthorizationType::Trust,
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Challenge => routing::AuthorizationType::Challenge,
         }
     }

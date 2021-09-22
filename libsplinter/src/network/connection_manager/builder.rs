@@ -222,17 +222,13 @@ fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             endpoint,
             sender,
             connection_id,
-            #[cfg(feature = "challenge-authorization")]
             expected_authorization,
-            #[cfg(feature = "challenge-authorization")]
             local_authorization,
         } => state.add_outbound_connection(
             OutboundConnection {
                 endpoint,
                 connection_id,
-                #[cfg(feature = "challenge-authorization")]
                 expected_authorization,
-                #[cfg(feature = "challenge-authorization")]
                 local_authorization,
             },
             sender,

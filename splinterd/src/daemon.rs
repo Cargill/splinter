@@ -60,7 +60,6 @@ use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
 use splinter::orchestrator::ServiceOrchestratorBuilder;
 use splinter::peer::interconnect::NetworkMessageSender;
 use splinter::peer::interconnect::PeerInterconnectBuilder;
-#[cfg(feature = "challenge-authorization")]
 use splinter::peer::PeerAuthorizationToken;
 use splinter::peer::PeerManager;
 use splinter::protos::circuit::CircuitMessageType;
@@ -278,11 +277,7 @@ impl SplinterDaemon {
             format!("health::{}", &self.node_id),
         ));
 
-        let inproc_authorizer = InprocAuthorizer::new(
-            inproc_ids,
-            #[cfg(feature = "challenge-authorization")]
-            self.node_id.clone(),
-        );
+        let inproc_authorizer = InprocAuthorizer::new(inproc_ids, self.node_id.clone());
 
         let mut authorizers = Authorizers::new();
         authorizers.add_authorizer("inproc", inproc_authorizer);
@@ -380,6 +375,8 @@ impl SplinterDaemon {
                         err
                     ))
                 })?,
+            #[cfg(not(feature = "challenge-authorization"))]
+            vec![],
         );
         let mut circuit_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(circuit_dispatcher)
@@ -447,11 +444,9 @@ impl SplinterDaemon {
                 parse_peer_endpoint(endpoint, &self.peering_token, &self.node_id);
             #[cfg(not(feature = "challenge-authorization"))]
             let endpoint = endpoint.to_string();
-            match peer_connector.add_unidentified_peer(
-                endpoint,
-                #[cfg(feature = "challenge-authorization")]
-                token,
-            ) {
+            #[cfg(not(feature = "challenge-authorization"))]
+            let token = PeerAuthorizationToken::from_peer_id(&self.node_id);
+            match peer_connector.add_unidentified_peer(endpoint, token) {
                 Ok(peer_ref) => peer_refs.push(peer_ref),
                 Err(err) => error!("Connect Error: {}", err),
             }
@@ -1432,7 +1427,7 @@ fn set_up_circuit_dispatcher(
     node_id: &str,
     routing_reader: Box<dyn RoutingTableReader>,
     routing_writer: Box<dyn RoutingTableWriter>,
-    #[cfg(feature = "challenge-authorization")] public_keys: Vec<String>,
+    public_keys: Vec<String>,
 ) -> Dispatcher<CircuitMessageType> {
     let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(network_sender));
 
@@ -1456,12 +1451,8 @@ fn set_up_circuit_dispatcher(
     dispatcher.set_handler(Box::new(circuit_error_handler));
 
     // Circuit Admin handlers
-    let admin_direct_message_handler = AdminDirectMessageHandler::new(
-        node_id.to_string(),
-        routing_reader,
-        #[cfg(feature = "challenge-authorization")]
-        public_keys,
-    );
+    let admin_direct_message_handler =
+        AdminDirectMessageHandler::new(node_id.to_string(), routing_reader, public_keys);
     dispatcher.set_handler(Box::new(admin_direct_message_handler));
 
     dispatcher

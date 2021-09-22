@@ -16,7 +16,6 @@ use protobuf::Message;
 
 use crate::circuit::handlers::create_message;
 use crate::circuit::routing::RoutingTableReader;
-#[cfg(feature = "challenge-authorization")]
 use crate::hex::parse_hex;
 use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
 use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
@@ -25,14 +24,12 @@ use crate::protos::circuit::{
 };
 
 const ADMIN_SERVICE_ID_PREFIX: &str = "admin::";
-#[cfg(feature = "challenge-authorization")]
 const ADMIN_SERVICE_PUBLIC_KEY_PREFIX: &str = "public_key";
 
 // Implements a handler that handles AdminDirectMessage
 pub struct AdminDirectMessageHandler {
     node_id: String,
     routing_table: Box<dyn RoutingTableReader>,
-    #[cfg(feature = "challenge-authorization")]
     public_keys: Vec<String>,
 }
 
@@ -87,12 +84,11 @@ impl AdminDirectMessageHandler {
     pub fn new(
         node_id: String,
         routing_table: Box<dyn RoutingTableReader>,
-        #[cfg(feature = "challenge-authorization")] public_keys: Vec<String>,
+        public_keys: Vec<String>,
     ) -> Self {
         Self {
             node_id,
             routing_table,
-            #[cfg(feature = "challenge-authorization")]
             public_keys,
         }
     }
@@ -170,7 +166,6 @@ impl AdminDirectMessageHandler {
                 return Err(DispatchError::HandleError("Empty node id provided".into()));
             }
 
-            #[cfg(feature = "challenge-authorization")]
             // If challenge authorization the admin id will be in the format
             // admin::public_key::<public key string>. this is required because currently the
             // authorization type is determined by the proposal but that information is not
@@ -259,16 +254,6 @@ impl AdminDirectMessageHandler {
                 }
             };
 
-            // If the service is on this node send message to the service, otherwise
-            // send the message to the node the service is connected to
-            #[cfg(not(feature = "challenge-authorization"))]
-            let target_node = if node_id != self.node_id {
-                PeerTokenPair::new(PeerAuthorizationToken::from_peer_id(node_id)).into()
-            } else {
-                // The internal admin service is at the node id with an identical name
-                PeerTokenPair::new(PeerAuthorizationToken::from_peer_id(recipient)).into()
-            };
-
             let network_msg_bytes =
                 create_message(msg_bytes, CircuitMessageType::ADMIN_DIRECT_MESSAGE)?;
             (network_msg_bytes, target_node)
@@ -307,7 +292,6 @@ fn is_admin_service_id(service_id: &str) -> bool {
     service_id.starts_with(ADMIN_SERVICE_ID_PREFIX)
 }
 
-#[cfg(feature = "challenge-authorization")]
 fn admin_service_id(node_id: &str) -> String {
     format!("{}{}", ADMIN_SERVICE_ID_PREFIX, node_id)
 }
@@ -319,7 +303,6 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
-    #[cfg(feature = "challenge-authorization")]
     use crate::circuit::routing::AuthorizationType;
     use crate::circuit::routing::{
         memory::RoutingTable, Circuit, CircuitNode, RoutingTableWriter, Service,
@@ -341,18 +324,8 @@ mod tests {
         let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
         let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let node_1234 = CircuitNode::new(
-            "1234".to_string(),
-            vec!["123.0.0.1:0".to_string()],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-        );
-        let node_5678 = CircuitNode::new(
-            "5678".to_string(),
-            vec!["123.0.0.1:1".to_string()],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-        );
+        let node_1234 = CircuitNode::new("1234".to_string(), vec!["123.0.0.1:0".to_string()], None);
+        let node_5678 = CircuitNode::new("5678".to_string(), vec!["123.0.0.1:1".to_string()], None);
 
         let service_abc = Service::new(
             "abc".to_string(),
@@ -372,7 +345,6 @@ mod tests {
             "alpha".into(),
             vec![service_abc.clone(), service_def.clone()],
             vec!["123".into(), "345".into()],
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Trust,
         );
 
@@ -384,12 +356,7 @@ mod tests {
             )
             .expect("Unable to add circuit");
 
-        let handler = AdminDirectMessageHandler::new(
-            "1234".into(),
-            reader,
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-        );
+        let handler = AdminDirectMessageHandler::new("1234".into(), reader, vec![]);
         dispatcher.set_handler(Box::new(handler));
 
         let mut direct_message = AdminDirectMessage::new();
@@ -404,7 +371,6 @@ mod tests {
             .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("5678"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("1234"),
                 )
                 .into(),
@@ -419,7 +385,6 @@ mod tests {
             id.into(),
             PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("5678"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("1234"),
             ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
@@ -446,18 +411,8 @@ mod tests {
         let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
         let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let node_1234 = CircuitNode::new(
-            "1234".to_string(),
-            vec!["123.0.0.1:0".to_string()],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-        );
-        let node_5678 = CircuitNode::new(
-            "5678".to_string(),
-            vec!["123.0.0.1:1".to_string()],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-        );
+        let node_1234 = CircuitNode::new("1234".to_string(), vec!["123.0.0.1:0".to_string()], None);
+        let node_5678 = CircuitNode::new("5678".to_string(), vec!["123.0.0.1:1".to_string()], None);
 
         let service_abc = Service::new(
             "abc".to_string(),
@@ -477,7 +432,6 @@ mod tests {
             "alpha".into(),
             vec![service_abc.clone(), service_def.clone()],
             vec!["123".into(), "345".into()],
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Trust,
         );
 
@@ -489,12 +443,7 @@ mod tests {
             )
             .expect("Unable to add circuit");
 
-        let handler = AdminDirectMessageHandler::new(
-            "1234".into(),
-            reader,
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-        );
+        let handler = AdminDirectMessageHandler::new("1234".into(), reader, vec![]);
         dispatcher.set_handler(Box::new(handler));
 
         let mut direct_message = AdminDirectMessage::new();
@@ -509,7 +458,6 @@ mod tests {
             .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("5678"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("1234"),
                 )
                 .into(),
@@ -524,7 +472,6 @@ mod tests {
             id.into(),
             PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("5678"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("1234"),
             ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
@@ -551,18 +498,8 @@ mod tests {
         let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
         let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let node_1234 = CircuitNode::new(
-            "1234".to_string(),
-            vec!["123.0.0.1:0".to_string()],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-        );
-        let node_5678 = CircuitNode::new(
-            "5678".to_string(),
-            vec!["123.0.0.1:1".to_string()],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-        );
+        let node_1234 = CircuitNode::new("1234".to_string(), vec!["123.0.0.1:0".to_string()], None);
+        let node_5678 = CircuitNode::new("5678".to_string(), vec!["123.0.0.1:1".to_string()], None);
 
         let service_abc = Service::new(
             "abc".to_string(),
@@ -582,7 +519,6 @@ mod tests {
             "alpha".into(),
             vec![service_abc.clone(), service_def.clone()],
             vec!["123".into(), "345".into()],
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Trust,
         );
 
@@ -594,12 +530,7 @@ mod tests {
             )
             .expect("Unable to add circuit");
 
-        let handler = AdminDirectMessageHandler::new(
-            "1234".into(),
-            reader,
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-        );
+        let handler = AdminDirectMessageHandler::new("1234".into(), reader, vec![]);
         dispatcher.set_handler(Box::new(handler));
 
         let mut direct_message = AdminDirectMessage::new();
@@ -614,7 +545,6 @@ mod tests {
             .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("1234"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("5678"),
                 )
                 .into(),
@@ -628,7 +558,6 @@ mod tests {
             id.into(),
             PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("5678"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("1234"),
             ),
             CircuitMessageType::ADMIN_DIRECT_MESSAGE,
@@ -653,12 +582,7 @@ mod tests {
         let table = RoutingTable::default();
         let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
 
-        let handler = AdminDirectMessageHandler::new(
-            "1234".into(),
-            reader,
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-        );
+        let handler = AdminDirectMessageHandler::new("1234".into(), reader, vec![]);
         dispatcher.set_handler(Box::new(handler));
 
         let mut direct_message = AdminDirectMessage::new();
@@ -673,7 +597,6 @@ mod tests {
             .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("1234"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("5678"),
                 )
                 .into(),
@@ -688,7 +611,6 @@ mod tests {
             id.into(),
             PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("5678"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("1234"),
             ),
             CircuitMessageType::ADMIN_DIRECT_MESSAGE,
@@ -704,7 +626,6 @@ mod tests {
 
     /// Send a message to an admin service via the admin circuit using a public key. Expect that
     /// the message is sent to the appropriate node that hosts the target admin service.
-    #[cfg(feature = "challenge-authorization")]
     #[test]
     fn test_send_admin_direct_message_via_admin_circuit_challenge() {
         // Set up dispatcher and mock sender
@@ -714,12 +635,7 @@ mod tests {
         let table = RoutingTable::default();
         let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
 
-        let handler = AdminDirectMessageHandler::new(
-            "1234".into(),
-            reader,
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-        );
+        let handler = AdminDirectMessageHandler::new("1234".into(), reader, vec![]);
         dispatcher.set_handler(Box::new(handler));
 
         let mut direct_message = AdminDirectMessage::new();
@@ -736,7 +652,6 @@ mod tests {
                     PeerAuthorizationToken::from_public_key(
                         &parse_hex("5678").expect("Unable to parse hex"),
                     ),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_public_key(
                         &parse_hex("1234").expect("Unable to parse hex"),
                     ),
@@ -755,7 +670,6 @@ mod tests {
                 PeerAuthorizationToken::from_public_key(
                     &parse_hex("5678").expect("Unable to parse hex"),
                 ),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_public_key(
                     &parse_hex("1234").expect("Unable to parse hex"),
                 ),
@@ -785,12 +699,7 @@ mod tests {
         let table = RoutingTable::default();
         let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
 
-        let handler = AdminDirectMessageHandler::new(
-            "1234".into(),
-            reader,
-            #[cfg(feature = "challenge-authorization")]
-            vec![],
-        );
+        let handler = AdminDirectMessageHandler::new("1234".into(), reader, vec![]);
         dispatcher.set_handler(Box::new(handler));
 
         let mut direct_message = AdminDirectMessage::new();
@@ -805,7 +714,6 @@ mod tests {
             .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("1234"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("5678"),
                 )
                 .into(),
@@ -819,7 +727,6 @@ mod tests {
             id.into(),
             PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("admin::1234"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("1234"),
             ),
             CircuitMessageType::ADMIN_DIRECT_MESSAGE,

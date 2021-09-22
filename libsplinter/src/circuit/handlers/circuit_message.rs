@@ -116,7 +116,6 @@ mod tests {
             .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("PEER"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("123"),
                 )
                 .into(),

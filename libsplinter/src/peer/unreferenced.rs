@@ -17,7 +17,6 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
-#[cfg(feature = "challenge-authorization")]
 use super::PeerAuthorizationToken;
 use super::PeerTokenPair;
 
@@ -27,7 +26,6 @@ use super::PeerTokenPair;
 pub struct UnreferencedPeer {
     pub endpoint: String,
     pub connection_id: String,
-    #[cfg(feature = "challenge-authorization")]
     pub local_authorization: PeerAuthorizationToken,
 }
 
@@ -35,7 +33,6 @@ pub struct UnreferencedPeer {
 #[derive(Debug)]
 pub struct RequestedEndpoint {
     pub endpoint: String,
-    #[cfg(feature = "challenge-authorization")]
     pub local_authorization: PeerAuthorizationToken,
 }
 

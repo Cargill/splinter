@@ -30,7 +30,6 @@ use crate::admin::token::{PeerAuthorizationTokenReader, PeerNode};
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
 use crate::error::InternalError;
-#[cfg(feature = "challenge-authorization")]
 use crate::hex::parse_hex;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
@@ -47,7 +46,6 @@ use crate::protos::admin::{
     Circuit_PersistenceType, Circuit_RouteType, MemberReady, RemovedProposal,
     ServiceProtocolVersionRequest, SplinterNode, SplinterService,
 };
-#[cfg(feature = "challenge-authorization")]
 use crate::public_key;
 use crate::service::error::ServiceError;
 #[cfg(feature = "service-arg-validation")]
@@ -62,7 +60,6 @@ use super::{admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscri
 
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";
-#[cfg(feature = "challenge-authorization")]
 const ADMIN_SERVICE_PUBLIC_KEY_PREFIX: &str = "public_key";
 
 pub enum PayloadType {
@@ -156,7 +153,6 @@ pub struct AdminServiceShared {
     routing_table_writer: Box<dyn RoutingTableWriter>,
     // Mailbox of AdminServiceEvent values
     event_store: Box<dyn AdminServiceStore>,
-    #[cfg(feature = "challenge-authorization")]
     public_keys: Vec<public_key::PublicKey>,
     token_to_peer: HashMap<PeerTokenPair, PeerNodePair>,
 }
@@ -177,7 +173,7 @@ impl AdminServiceShared {
         key_permission_manager: Box<dyn KeyPermissionManager>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
         admin_service_event_store: Box<dyn AdminServiceStore>,
-        #[cfg(feature = "challenge-authorization")] public_keys: Vec<public_key::PublicKey>,
+        public_keys: Vec<public_key::PublicKey>,
     ) -> Self {
         AdminServiceShared {
             node_id,
@@ -204,7 +200,6 @@ impl AdminServiceShared {
             admin_service_status: AdminServiceStatus::NotRunning,
             routing_table_writer,
             event_store: admin_service_event_store,
-            #[cfg(feature = "challenge-authorization")]
             public_keys,
             token_to_peer: HashMap::new(),
         }
@@ -217,7 +212,6 @@ impl AdminServiceShared {
     pub fn is_local_node(&self, peer_id: &PeerAuthorizationToken) -> bool {
         match peer_id {
             PeerAuthorizationToken::Trust { peer_id } => peer_id == self.node_id(),
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { public_key } => {
                 self.public_keys.contains(public_key)
             }
@@ -230,7 +224,6 @@ impl AdminServiceShared {
             PeerAuthorizationToken::Trust { .. } => peer_id
                 .peer_id()
                 .has_peer_id(&admin_service_id(self.node_id())),
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { .. } => false,
         }
     }
@@ -411,10 +404,7 @@ impl AdminServiceShared {
                                 let envelope_bytes =
                                     msg.write_to_bytes().map_err(MarshallingError::from)?;
                                 for token in store_circuit
-                                    .list_tokens(
-                                        #[cfg(feature = "challenge-authorization")]
-                                        &self.node_id,
-                                    )
+                                    .list_tokens(&self.node_id)
                                     .map_err(|_| {
                                         AdminSharedError::SplinterStateError(format!(
                                             "Unable to get member peer tokens from {}",
@@ -464,7 +454,6 @@ impl AdminServiceShared {
                                     .iter()
                                     .map(|node| node.node_id().to_string())
                                     .collect(),
-                                #[cfg(feature = "challenge-authorization")]
                                 circuit.authorization_type().into(),
                             );
 
@@ -476,7 +465,6 @@ impl AdminServiceShared {
                                     routing::CircuitNode::new(
                                         node.get_node_id().to_string(),
                                         node.get_endpoints().to_vec(),
-                                        #[cfg(feature = "challenge-authorization")]
                                         if node.get_public_key().is_empty() {
                                             None
                                         } else {
@@ -522,10 +510,7 @@ impl AdminServiceShared {
                                     msg.write_to_bytes().map_err(MarshallingError::from)?;
 
                                 for token in circuit
-                                    .list_tokens(
-                                        #[cfg(feature = "challenge-authorization")]
-                                        &self.node_id,
-                                    )
+                                    .list_tokens(&self.node_id)
                                     .map_err(|_| {
                                         AdminSharedError::SplinterStateError(format!(
                                             "Unable to get member peer tokens from {}",
@@ -618,10 +603,7 @@ impl AdminServiceShared {
                             self.remove_peer_refs(
                                 proposal
                                     .circuit()
-                                    .list_tokens(
-                                        #[cfg(feature = "challenge-authorization")]
-                                        &self.node_id,
-                                    )
+                                    .list_tokens(&self.node_id)
                                     .map_err(|err| {
                                         AdminSharedError::SplinterStateError(format!(
                                             "Unable to remove peer refs for proposal {}: {}",
@@ -678,7 +660,6 @@ impl AdminServiceShared {
                 let mut verifiers = vec![];
                 let mut protocol = ADMIN_SERVICE_PROTOCOL_VERSION;
 
-                #[cfg(feature = "challenge-authorization")]
                 let local_required_auth = proposed_circuit
                     .get_node_token(&self.node_id)
                     .map_err(|err| {
@@ -703,7 +684,6 @@ impl AdminServiceShared {
                     // Figure out what protocol version should be used for this proposal
                     if let Some(protocol_version) = self.service_protocols.get(&PeerTokenPair::new(
                         member.token.clone(),
-                        #[cfg(feature = "challenge-authorization")]
                         local_required_auth.clone(),
                     )) {
                         if protocol_version < &protocol {
@@ -722,10 +702,7 @@ impl AdminServiceShared {
                     protocol,
                 )
                 .map_err(|err| {
-                    match proposed_circuit.list_tokens(
-                        #[cfg(feature = "challenge-authorization")]
-                        &self.node_id,
-                    ) {
+                    match proposed_circuit.list_tokens(&self.node_id) {
                         Ok(tokens) => self.remove_peer_refs(tokens),
                         Err(err) => {
                             error!(
@@ -754,12 +731,8 @@ impl AdminServiceShared {
                     signer_public_key: header.get_requester().to_vec(),
                     action: CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST,
                 });
-                self.current_consensus_verifiers = proposed_circuit
-                    .list_tokens(
-                        #[cfg(feature = "challenge-authorization")]
-                        &self.node_id,
-                    )
-                    .map_err(|_| {
+                self.current_consensus_verifiers =
+                    proposed_circuit.list_tokens(&self.node_id).map_err(|_| {
                         AdminSharedError::SplinterStateError(format!(
                             "Unable to get tokens for proposal: {}",
                             proposed_circuit.get_circuit_id()
@@ -801,10 +774,7 @@ impl AdminServiceShared {
                 )
                 .map_err(|err| {
                     if circuit_proposal.proposal_type() == &ProposalType::Create {
-                        match circuit_proposal.circuit().list_tokens(
-                            #[cfg(feature = "challenge-authorization")]
-                            &self.node_id,
-                        ) {
+                        match circuit_proposal.circuit().list_tokens(&self.node_id) {
                             Ok(tokens) => self.remove_peer_refs(tokens),
                             Err(err) => {
                                 error!(
@@ -856,10 +826,7 @@ impl AdminServiceShared {
 
                 self.current_consensus_verifiers = circuit_proposal
                     .circuit()
-                    .list_tokens(
-                        #[cfg(feature = "challenge-authorization")]
-                        &self.node_id,
-                    )
+                    .list_tokens(&self.node_id)
                     .map_err(|_| {
                         AdminSharedError::SplinterStateError(format!(
                             "Unable to get tokens for proposal: {}",
@@ -906,7 +873,6 @@ impl AdminServiceShared {
                     header.get_requester_node_id(),
                 )?;
 
-                #[cfg(feature = "challenge-authorization")]
                 let local_required_auth = circuit_proposal
                     .get_circuit_proposal()
                     .get_node_token(&self.node_id)
@@ -938,7 +904,6 @@ impl AdminServiceShared {
                     // Figure out what protocol version should be used for this proposal
                     if let Some(protocol_version) = self.service_protocols.get(&PeerTokenPair::new(
                         member.token.clone(),
-                        #[cfg(feature = "challenge-authorization")]
                         local_required_auth.clone(),
                     )) {
                         if protocol_version < &protocol {
@@ -964,10 +929,7 @@ impl AdminServiceShared {
                 });
                 self.current_consensus_verifiers = circuit_proposal
                     .get_circuit_proposal()
-                    .list_tokens(
-                        #[cfg(feature = "challenge-authorization")]
-                        &self.node_id,
-                    )
+                    .list_tokens(&self.node_id)
                     .map_err(|_| {
                         AdminSharedError::SplinterStateError(format!(
                             "Unable to get tokens for proposal: {}",
@@ -1073,7 +1035,6 @@ impl AdminServiceShared {
                 )))
             })?;
 
-        #[cfg(feature = "challenge-authorization")]
         let local_required_auth = proposal
             .circuit()
             .get_node_token(&self.node_id)
@@ -1096,7 +1057,6 @@ impl AdminServiceShared {
 
         self.check_connected_peers_payload_vote(
             &members,
-            #[cfg(feature = "challenge-authorization")]
             local_required_auth,
             payload,
             message_sender,
@@ -1121,7 +1081,6 @@ impl AdminServiceShared {
             .make_disband_request_circuit_proposal(circuit_id, requester, requester_node_id)
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
-        #[cfg(feature = "challenge-authorization")]
         let local_required_auth = circuit_proposal
             .get_circuit_proposal()
             .get_node_token(&self.node_id)
@@ -1147,7 +1106,6 @@ impl AdminServiceShared {
 
         self.check_connected_peers_payload_disband(
             &members,
-            #[cfg(feature = "challenge-authorization")]
             local_required_auth,
             payload,
             message_sender,
@@ -1245,10 +1203,7 @@ impl AdminServiceShared {
             })?;
 
             for token in stored_circuit
-                .list_tokens(
-                    #[cfg(feature = "challenge-authorization")]
-                    &self.node_id,
-                )
+                .list_tokens(&self.node_id)
                 .map_err(|_| {
                     ServiceError::UnableToHandleMessage(Box::new(
                         AdminSharedError::SplinterStateError(format!(
@@ -1307,21 +1262,14 @@ impl AdminServiceShared {
                 )))
             })?;
         // Removing the circuit's peer refs
-        self.remove_peer_refs(
-            stored_circuit
-                .list_tokens(
-                    #[cfg(feature = "challenge-authorization")]
-                    &self.node_id,
-                )
-                .map_err(|err| {
-                    ServiceError::UnableToHandleMessage(Box::new(
-                        AdminSharedError::SplinterStateError(format!(
-                            "Unable to remove peer refs for circuit: {}: {}",
-                            circuit_id, err
-                        )),
-                    ))
-                })?,
-        );
+        self.remove_peer_refs(stored_circuit.list_tokens(&self.node_id).map_err(|err| {
+            ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                format!(
+                    "Unable to remove peer refs for circuit: {}: {}",
+                    circuit_id, err
+                ),
+            )))
+        })?);
 
         Ok(())
     }
@@ -1351,10 +1299,7 @@ impl AdminServiceShared {
 
                 for token in proposal
                     .circuit()
-                    .list_tokens(
-                        #[cfg(feature = "challenge-authorization")]
-                        &self.node_id,
-                    )
+                    .list_tokens(&self.node_id)
                     .map_err(|_| {
                         ServiceError::UnableToHandleMessage(Box::new(
                             AdminSharedError::SplinterStateError(format!(
@@ -1387,22 +1332,16 @@ impl AdminServiceShared {
             self.update_metrics()
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
-            self.remove_peer_refs(
-                proposal
-                    .circuit()
-                    .list_tokens(
-                        #[cfg(feature = "challenge-authorization")]
-                        &self.node_id,
-                    )
-                    .map_err(|err| {
-                        ServiceError::UnableToHandleMessage(Box::new(
-                            AdminSharedError::SplinterStateError(format!(
-                                "Unable to remove peer refs for proposal: {}: {}",
-                                circuit_id, err
-                            )),
-                        ))
-                    })?,
-            );
+            self.remove_peer_refs(proposal.circuit().list_tokens(&self.node_id).map_err(
+                |err| {
+                    ServiceError::UnableToHandleMessage(Box::new(
+                        AdminSharedError::SplinterStateError(format!(
+                            "Unable to remove peer refs for proposal: {}: {}",
+                            circuit_id, err
+                        )),
+                    ))
+                },
+            )?);
             Ok(())
         } else {
             Err(ServiceError::UnableToHandleMessage(Box::new(
@@ -1431,21 +1370,13 @@ impl AdminServiceShared {
                 msg.set_protocol_request(request);
 
                 let envelope_bytes = msg.write_to_bytes()?;
-                #[cfg(not(feature = "challenge-authorization"))]
-                network_sender.send(&admin_service_id(&token.id_as_string()), &envelope_bytes)?;
-
                 // need to set the sender to our local auth that is being used
-                #[cfg(feature = "challenge-authorization")]
                 network_sender.send_with_sender(
                     &admin_service_id(&token.id_as_string()),
                     &envelope_bytes,
                     &admin_service_id(
-                        &PeerTokenPair::new(
-                            token.local_id().clone(),
-                            #[cfg(feature = "challenge-authorization")]
-                            token.peer_id().clone(),
-                        )
-                        .id_as_string(),
+                        &PeerTokenPair::new(token.local_id().clone(), token.peer_id().clone())
+                            .id_as_string(),
                     ),
                 )?
             }
@@ -1458,18 +1389,15 @@ impl AdminServiceShared {
     fn check_connected_peers_payload_vote(
         &mut self,
         members: &[PeerNode],
-        #[cfg(feature = "challenge-authorization")] local_required_auth: PeerAuthorizationToken,
+        local_required_auth: PeerAuthorizationToken,
         payload: CircuitManagementPayload,
         message_sender: String,
     ) -> Result<(), ServiceError> {
         let mut missing_protocol_ids = vec![];
         let mut pending_members = vec![];
         for node in members {
-            let peer_token_pair = PeerTokenPair::new(
-                node.token.clone(),
-                #[cfg(feature = "challenge-authorization")]
-                local_required_auth.clone(),
-            );
+            let peer_token_pair =
+                PeerTokenPair::new(node.token.clone(), local_required_auth.clone());
             if !self.is_local_node(&node.token)
                 && self.service_protocols.get(&peer_token_pair).is_none()
             {
@@ -1510,11 +1438,8 @@ impl AdminServiceShared {
         let mut pending_members = vec![];
         let mut added_peers: Vec<PeerTokenPair> = vec![];
         for node in members {
-            let peer_token_pair = PeerTokenPair::new(
-                node.token.clone(),
-                #[cfg(feature = "challenge-authorization")]
-                local_required_auth.clone(),
-            );
+            let peer_token_pair =
+                PeerTokenPair::new(node.token.clone(), local_required_auth.clone());
             if !self.is_local_node(&node.token) {
                 debug!("Referencing node {:?}", &node.token);
                 let peer_ref = self
@@ -1522,7 +1447,6 @@ impl AdminServiceShared {
                     .add_peer_ref(
                         node.token.clone(),
                         node.endpoints.to_vec(),
-                        #[cfg(feature = "challenge-authorization")]
                         local_required_auth.clone(),
                     )
                     .map_err(|err| {
@@ -1578,18 +1502,15 @@ impl AdminServiceShared {
     fn check_connected_peers_payload_disband(
         &mut self,
         members: &[PeerNode],
-        #[cfg(feature = "challenge-authorization")] local_required_auth: PeerAuthorizationToken,
+        local_required_auth: PeerAuthorizationToken,
         payload: CircuitManagementPayload,
         message_sender: String,
     ) -> Result<(), ServiceError> {
         let mut missing_protocol_ids = vec![];
         let mut pending_members = vec![];
         for node in members {
-            let peer_token_pair = PeerTokenPair::new(
-                node.token.clone(),
-                #[cfg(feature = "challenge-authorization")]
-                local_required_auth.clone(),
-            );
+            let peer_token_pair =
+                PeerTokenPair::new(node.token.clone(), local_required_auth.clone());
             if !self.is_local_node(&node.token)
                 && self.service_protocols.get(&peer_token_pair).is_none()
             {
@@ -1807,11 +1728,8 @@ impl AdminServiceShared {
             })?;
 
             for node in &peer_members {
-                let peer_token_pair = PeerTokenPair::new(
-                    node.token.clone(),
-                    #[cfg(feature = "challenge-authorization")]
-                    local_required_auth.clone(),
-                );
+                let peer_token_pair =
+                    PeerTokenPair::new(node.token.clone(), local_required_auth.clone());
                 if !self.is_local_node(peer_token_pair.peer_id()) {
                     debug!("Referencing node {:?}", &peer_token_pair);
                     let peer_ref = self
@@ -1819,7 +1737,6 @@ impl AdminServiceShared {
                         .add_peer_ref(
                             node.token.clone(),
                             node.endpoints.to_vec(),
-                            #[cfg(feature = "challenge-authorization")]
                             local_required_auth.clone(),
                         )
                         .map_err(|err| {
@@ -1885,7 +1802,6 @@ impl AdminServiceShared {
                     ))
                 })?;
 
-            #[cfg(feature = "challenge-authorization")]
             let local_required_auth = circuit
                 .get_node_token(&self.node_id)
                 .map_err(|err| {
@@ -1911,11 +1827,8 @@ impl AdminServiceShared {
             })?;
 
             for node in tokens {
-                let peer_token_pair = PeerTokenPair::new(
-                    node.token.clone(),
-                    #[cfg(feature = "challenge-authorization")]
-                    local_required_auth.clone(),
-                );
+                let peer_token_pair =
+                    PeerTokenPair::new(node.token.clone(), local_required_auth.clone());
                 // Verify each disband member has an agreed upon protocol version with this node
                 // Otherwise, re-establish a peer connection
                 if !self.is_local_node(peer_token_pair.peer_id())
@@ -2124,7 +2037,6 @@ impl AdminServiceShared {
             })?;
 
             // need to set the sender to our local auth that is being used
-            #[cfg(feature = "challenge-authorization")]
             network_sender
                 .send_with_sender(
                     &admin_service_id(&peer_id.id_as_string()),
@@ -2132,22 +2044,11 @@ impl AdminServiceShared {
                     &admin_service_id(
                         &PeerTokenPair::new(
                             peer_node_pair.local_peer_token.clone(),
-                            #[cfg(feature = "challenge-authorization")]
                             peer_id.peer_id().clone(),
                         )
                         .id_as_string(),
                     ),
                 )
-                .map_err(|err| {
-                    AdminSharedError::ServiceProtocolError(format!(
-                        "Unable to send service protocol request: {}",
-                        err
-                    ))
-                })?;
-
-            #[cfg(not(feature = "challenge-authorization"))]
-            network_sender
-                .send(&admin_service_id(&peer_id.id_as_string()), &envelope_bytes)
                 .map_err(|err| {
                     AdminSharedError::ServiceProtocolError(format!(
                         "Unable to send service protocol request: {}",
@@ -2170,23 +2071,18 @@ impl AdminServiceShared {
         protocol: u32,
     ) -> Result<(), AdminSharedError> {
         // parse the admin service to know if the peer token is trust or challenge
-        let peer_token = get_peer_token_from_service_id(
-            service_id,
-            #[cfg(feature = "challenge-authorization")]
-            &self.node_id,
-        )
-        .map_err(|err| {
-            AdminSharedError::ServiceProtocolError(format!(
-                "Unable to verify peer token for service id: {}",
-                err
-            ))
-        })?;
+        let peer_token =
+            get_peer_token_from_service_id(service_id, &self.node_id).map_err(|err| {
+                AdminSharedError::ServiceProtocolError(format!(
+                    "Unable to verify peer token for service id: {}",
+                    err
+                ))
+            })?;
 
         // if trust the service ID remains the same, if challenge need to get the actual service
         // ID from the known peer
         let service_id = match peer_token.peer_id() {
             PeerAuthorizationToken::Trust { .. } => service_id.to_string(),
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { .. } => {
                 if let Some(peer_node_pair) = self.token_to_peer.get(&peer_token) {
                     peer_node_pair.peer_node.admin_service.to_string()
@@ -2640,7 +2536,6 @@ impl AdminServiceShared {
             ));
         }
 
-        #[cfg(feature = "challenge-authorization")]
         if circuit.get_circuit_version() < CIRCUIT_PROTOCOL_VERSION
             && circuit.get_authorization_type()
                 == Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION
@@ -2724,7 +2619,6 @@ impl AdminServiceShared {
                 all_endpoints.append(&mut endpoints);
             }
 
-            #[cfg(feature = "challenge-authorization")]
             if circuit.get_authorization_type()
                 == Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION
                 && member.get_public_key().is_empty()
@@ -3294,7 +3188,6 @@ impl AdminServiceShared {
             .map(|circuit_node| messages::SplinterNode {
                 node_id: circuit_node.node_id().to_string(),
                 endpoints: circuit_node.endpoints().to_vec(),
-                #[cfg(feature = "challenge-authorization")]
                 public_key: circuit_node.public_key().clone(),
             })
             .collect::<Vec<messages::SplinterNode>>();
@@ -3375,7 +3268,6 @@ impl AdminServiceShared {
                 let mut node = SplinterNode::new();
                 node.set_node_id(circuit_node.node_id().to_string());
                 node.set_endpoints(RepeatedField::from_vec(circuit_node.endpoints().to_vec()));
-                #[cfg(feature = "challenge-authorization")]
                 {
                     if let Some(public_key) = circuit_node.public_key() {
                         node.set_public_key(public_key.clone());
@@ -3663,20 +3555,13 @@ impl AdminServiceShared {
                 ))
             })?;
             // Removing the circuit's peer refs
-            self.remove_peer_refs(
-                proposed_circuit
-                    .list_tokens(
-                        #[cfg(feature = "challenge-authorization")]
-                        &self.node_id,
-                    )
-                    .map_err(|err| {
-                        AdminSharedError::SplinterStateError(format!(
-                            "Unable to remove peer refs for proposal {}: {}",
-                            proposed_circuit.circuit_id(),
-                            err
-                        ))
-                    })?,
-            );
+            self.remove_peer_refs(proposed_circuit.list_tokens(&self.node_id).map_err(|err| {
+                AdminSharedError::SplinterStateError(format!(
+                    "Unable to remove peer refs for proposal {}: {}",
+                    proposed_circuit.circuit_id(),
+                    err
+                ))
+            })?);
         }
 
         Ok(())
@@ -3716,7 +3601,7 @@ impl AdminServiceShared {
 // This should never return an error since we recieved a message from this service id
 fn get_peer_token_from_service_id(
     service_id: &str,
-    #[cfg(feature = "challenge-authorization")] local_node_id: &str,
+    local_node_id: &str,
 ) -> Result<PeerTokenPair, InternalError> {
     let mut iter = service_id.split("::");
 
@@ -3739,7 +3624,6 @@ fn get_peer_token_from_service_id(
         return Err(InternalError::with_message("Empty node id provided".into()));
     }
 
-    #[cfg(feature = "challenge-authorization")]
     // If challenge authorization the admin id will be in the format
     // admin::public_key::<public key string>.
     if node_id == ADMIN_SERVICE_PUBLIC_KEY_PREFIX {
@@ -3792,13 +3676,6 @@ fn get_peer_token_from_service_id(
             PeerAuthorizationToken::from_peer_id(node_id),
             PeerAuthorizationToken::from_peer_id(local_node_id),
         ))
-    }
-
-    #[cfg(not(feature = "challenge-authorization"))]
-    {
-        Ok(PeerTokenPair::new(PeerAuthorizationToken::from_peer_id(
-            node_id,
-        )))
     }
 }
 
@@ -3900,7 +3777,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -3964,7 +3840,6 @@ mod tests {
         shared
             .on_peer_connected(&PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("other-node"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_peer_id"),
             ))
             .expect("Unable to set peer to peered");
@@ -3977,7 +3852,6 @@ mod tests {
         shared
             .on_peer_connected(&PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test-node"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_peer_id"),
             ))
             .expect("Unable to set peer to peered");
@@ -4048,7 +3922,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -4099,7 +3972,6 @@ mod tests {
         shared
             .on_peer_connected(&PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("other-node"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("test-node"),
             ))
             .expect("Unable to set peer to peered");
@@ -4153,7 +4025,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let circuit = setup_test_circuit();
@@ -4198,7 +4069,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let circuit = setup_test_circuit();
@@ -4237,7 +4107,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let circuit = setup_test_circuit();
@@ -4280,7 +4149,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let circuit = setup_test_circuit();
@@ -4334,7 +4202,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4383,7 +4250,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4435,7 +4301,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4484,7 +4349,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4533,7 +4397,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4587,7 +4450,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4630,7 +4492,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4675,7 +4536,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4724,7 +4584,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4780,7 +4639,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4836,7 +4694,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4880,7 +4737,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4924,7 +4780,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -4976,7 +4831,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -5028,7 +4882,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -5080,7 +4933,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -5124,7 +4976,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -5168,7 +5019,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -5212,7 +5062,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -5256,7 +5105,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -5274,7 +5122,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "challenge-authorization")]
     #[test]
     // test that if a circuit has challenge auth set while circuit version 1 an error is returned
     fn test_validate_circuit_challenge_auth_not_supported() {
@@ -5301,7 +5148,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_v1_test_circuit();
@@ -5319,7 +5165,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "challenge-authorization")]
     #[test]
     // test that if a circuit has challenge auth set and nodes do not have public keys, the circuit
     // is invalid
@@ -5347,7 +5192,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let mut circuit = setup_test_circuit();
@@ -5389,7 +5233,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let circuit = setup_test_circuit();
@@ -5434,7 +5277,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let circuit = setup_test_circuit();
@@ -5478,7 +5320,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let circuit = setup_test_circuit();
@@ -5522,7 +5363,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let circuit = setup_test_circuit();
@@ -5574,7 +5414,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let circuit = setup_test_circuit();
@@ -5624,7 +5463,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -5685,7 +5523,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -5747,7 +5584,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -5811,7 +5647,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -5879,7 +5714,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -5941,7 +5775,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6001,7 +5834,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6062,7 +5894,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6113,7 +5944,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6174,7 +6004,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6262,7 +6091,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6284,7 +6112,6 @@ mod tests {
             shared.token_to_peer.insert(
                 PeerTokenPair::new(
                     node.token.clone(),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("node_a"),
                 ),
                 PeerNodePair {
@@ -6322,7 +6149,6 @@ mod tests {
         shared
             .on_peer_connected(&PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("node_b"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("node_a"),
             ))
             .expect("Unable to set peer to peered");
@@ -6390,7 +6216,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6444,7 +6269,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6489,7 +6313,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6545,7 +6368,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6602,7 +6424,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6662,7 +6483,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6736,7 +6556,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6785,7 +6604,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6826,7 +6644,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6878,7 +6695,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6929,7 +6745,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -6988,7 +6803,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -7065,7 +6879,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
         let store_proposal = StoreProposal::from_proto(setup_test_proposal(&setup_test_circuit()))
@@ -7113,7 +6926,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -7156,7 +6968,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -7206,7 +7017,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -7264,7 +7074,6 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             event_store,
-            #[cfg(feature = "challenge-authorization")]
             vec![],
         );
 
@@ -7446,7 +7255,6 @@ mod tests {
                     "test-node".to_string(),
                 ),
             ],
-            #[cfg(feature = "challenge-authorization")]
             "node_id".to_string(),
         );
 
@@ -7736,7 +7544,6 @@ mod tests {
             Box::new(self.clone())
         }
 
-        #[cfg(feature = "challenge-authorization")]
         fn send_with_sender(
             &mut self,
             recipient: &str,

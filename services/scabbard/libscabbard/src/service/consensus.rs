@@ -559,7 +559,6 @@ mod tests {
             Box::new(self.clone())
         }
 
-        #[cfg(feature = "challenge-authorization")]
         fn send_with_sender(
             &mut self,
             _recipient: &str,

@@ -184,7 +184,6 @@ pub mod tests {
                         PeerAuthorizationToken::Trust {
                             peer_id: format!("test_peer{}", i),
                         },
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::Trust {
                             peer_id: "local".into(),
                         },
@@ -203,7 +202,6 @@ pub mod tests {
                         PeerAuthorizationToken::Trust {
                             peer_id: format!("test_peer{}", notifications_sent),
                         },
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::Trust {
                             peer_id: "local".into(),
                         },
@@ -240,7 +238,6 @@ pub mod tests {
                     PeerAuthorizationToken::Trust {
                         peer_id: format!("test_peer_{}", i),
                     },
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::Trust {
                         peer_id: "local".into(),
                     },
@@ -260,7 +257,6 @@ pub mod tests {
                     PeerAuthorizationToken::Trust {
                         peer_id: "test_peer_0".into()
                     },
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::Trust {
                         peer_id: "local".into()
                     },
@@ -274,7 +270,6 @@ pub mod tests {
                     PeerAuthorizationToken::Trust {
                         peer_id: "test_peer_1".into()
                     },
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::Trust {
                         peer_id: "local".into()
                     },
@@ -288,7 +283,6 @@ pub mod tests {
                     PeerAuthorizationToken::Trust {
                         peer_id: "test_peer_2".into()
                     },
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::Trust {
                         peer_id: "local".into()
                     },
@@ -311,7 +305,6 @@ pub mod tests {
                 PeerAuthorizationToken::Trust {
                     peer_id: "test_peer_3".into(),
                 },
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::Trust {
                     peer_id: "local".into(),
                 },
@@ -325,7 +318,6 @@ pub mod tests {
                     PeerAuthorizationToken::Trust {
                         peer_id: "test_peer_3".into()
                     },
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::Trust {
                         peer_id: "local".into()
                     },
@@ -339,7 +331,6 @@ pub mod tests {
                     PeerAuthorizationToken::Trust {
                         peer_id: "test_peer_3".into()
                     },
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::Trust {
                         peer_id: "local".into()
                     },
@@ -369,7 +360,6 @@ pub mod tests {
                     PeerAuthorizationToken::Trust {
                         peer_id: format!("test_peer_{}", i),
                     },
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::Trust {
                         peer_id: "local".into(),
                     },
@@ -389,7 +379,6 @@ pub mod tests {
                     PeerAuthorizationToken::Trust {
                         peer_id: "test_peer_2".into()
                     },
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::Trust {
                         peer_id: "local".into()
                     },
@@ -406,7 +395,6 @@ pub mod tests {
                 PeerAuthorizationToken::Trust {
                     peer_id: "test_peer_3".into(),
                 },
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::Trust {
                     peer_id: "local".into(),
                 },
@@ -417,7 +405,6 @@ pub mod tests {
                 PeerAuthorizationToken::Trust {
                     peer_id: "test_peer_4".into(),
                 },
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::Trust {
                     peer_id: "local".into(),
                 },
@@ -431,7 +418,6 @@ pub mod tests {
                     PeerAuthorizationToken::Trust {
                         peer_id: "test_peer_3".into()
                     },
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::Trust {
                         peer_id: "local".into()
                     },
@@ -445,7 +431,6 @@ pub mod tests {
                     PeerAuthorizationToken::Trust {
                         peer_id: "test_peer_4".into()
                     },
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::Trust {
                         peer_id: "local".into()
                     },

@@ -793,7 +793,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec!["test".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -802,7 +801,6 @@ pub mod tests {
             peer_ref.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -817,7 +815,6 @@ pub mod tests {
             PeerManagerNotification::Connected {
                 peer: PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("test_peer"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("my_id"),
                 )
             }
@@ -940,7 +937,6 @@ pub mod tests {
                     message_context.source_peer_id(),
                     &PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                     .into()
@@ -992,12 +988,8 @@ pub mod tests {
             callback: Box<
                 dyn Fn(AuthorizationResult) -> Result<(), Box<dyn std::error::Error>> + Send,
             >,
-            #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
-                ConnectionAuthorizationType,
-            >,
-            #[cfg(feature = "challenge-authorization")] local_authorization: Option<
-                ConnectionAuthorizationType,
-            >,
+            expected_authorization: Option<ConnectionAuthorizationType>,
+            local_authorization: Option<ConnectionAuthorizationType>,
         ) -> Result<(), AuthorizerError> {
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
@@ -1005,9 +997,7 @@ pub mod tests {
                 identity: ConnectionAuthorizationType::Trust {
                     identity: self.authorized_id.clone(),
                 },
-                #[cfg(feature = "challenge-authorization")]
                 expected_authorization: expected_authorization.unwrap(),
-                #[cfg(feature = "challenge-authorization")]
                 local_authorization: local_authorization.unwrap(),
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))

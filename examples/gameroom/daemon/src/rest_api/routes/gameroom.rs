@@ -131,12 +131,14 @@ pub async fn propose_gameroom(
         .map(|node| SplinterNode {
             node_id: node.identity.to_string(),
             endpoints: node.endpoints.to_vec(),
+            public_key: None,
         })
         .collect::<Vec<SplinterNode>>();
 
     members.push(SplinterNode {
         node_id: node_info.identity.to_string(),
         endpoints: node_info.endpoints.to_vec(),
+        public_key: None,
     });
 
     let node_ids = nodes

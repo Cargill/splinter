@@ -516,7 +516,10 @@ mod tests {
     use cylinder::{PublicKey, Signature, VerificationError, Verifier};
     use protobuf::Message;
 
-    use crate::network::auth::{AuthorizationDispatchBuilder, Identity, ManagedAuthorizationState};
+    use crate::network::auth::AuthorizationDispatchBuilder;
+    #[cfg(feature = "challenge-authorization")]
+    use crate::network::auth::Identity;
+    use crate::network::auth::ManagedAuthorizationState;
     use crate::protocol::authorization::AuthComplete;
     use crate::protos::network::NetworkMessageType;
     use crate::protos::{authorization, network};

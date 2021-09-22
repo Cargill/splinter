@@ -111,7 +111,6 @@ impl ProposedCircuit {
     pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, InvalidStateError> {
         let authorization_type = match proto.get_authorization_type() {
             admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
-            #[cfg(feature = "challenge-authorization")]
             admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION => {
                 AuthorizationType::Challenge
             }
@@ -249,7 +248,6 @@ impl ProposedCircuit {
                 circuit
                     .set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
             }
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Challenge => {
                 circuit.set_authorization_type(
                     admin::Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION,

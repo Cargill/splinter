@@ -19,22 +19,15 @@
 use std::cmp::Ordering;
 use std::fmt;
 
-#[cfg(feature = "challenge-authorization")]
 use crate::hex::to_hex;
 use crate::network::auth::ConnectionAuthorizationType;
-#[cfg(feature = "challenge-authorization")]
 use crate::public_key::PublicKey;
 
 /// The authorization type specific peer ID
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PeerAuthorizationToken {
-    Trust {
-        peer_id: String,
-    },
-    #[cfg(feature = "challenge-authorization")]
-    Challenge {
-        public_key: PublicKey,
-    },
+    Trust { peer_id: String },
+    Challenge { public_key: PublicKey },
 }
 
 impl PeerAuthorizationToken {
@@ -45,7 +38,6 @@ impl PeerAuthorizationToken {
         }
     }
 
-    #[cfg(feature = "challenge-authorization")]
     /// Get a challenge token from a provided public_key
     pub fn from_public_key(public_key: &[u8]) -> Self {
         PeerAuthorizationToken::Challenge {
@@ -57,7 +49,6 @@ impl PeerAuthorizationToken {
     pub fn has_peer_id(&self, peer_id: &str) -> bool {
         match self {
             PeerAuthorizationToken::Trust { peer_id: id } => peer_id == id,
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { .. } => false,
         }
     }
@@ -66,12 +57,10 @@ impl PeerAuthorizationToken {
     pub fn peer_id(&self) -> Option<&str> {
         match self {
             PeerAuthorizationToken::Trust { peer_id } => Some(peer_id),
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { .. } => None,
         }
     }
 
-    #[cfg(feature = "challenge-authorization")]
     /// Get the public key if the token is challenge, else None
     pub fn public_key(&self) -> Option<&PublicKey> {
         match self {
@@ -84,7 +73,6 @@ impl PeerAuthorizationToken {
     pub fn id_as_string(&self) -> String {
         match self {
             PeerAuthorizationToken::Trust { peer_id } => peer_id.to_string(),
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { public_key } => {
                 format!("public_key::{}", to_hex(public_key.as_slice()))
             }
@@ -98,7 +86,6 @@ impl fmt::Display for PeerAuthorizationToken {
             PeerAuthorizationToken::Trust { peer_id } => {
                 write!(f, "Trust ( peer_id: {} )", peer_id)
             }
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { public_key } => {
                 write!(
                     f,
@@ -116,7 +103,6 @@ impl From<ConnectionAuthorizationType> for PeerAuthorizationToken {
             ConnectionAuthorizationType::Trust { identity } => {
                 PeerAuthorizationToken::Trust { peer_id: identity }
             }
-            #[cfg(feature = "challenge-authorization")]
             ConnectionAuthorizationType::Challenge { public_key } => {
                 PeerAuthorizationToken::Challenge { public_key }
             }
@@ -130,7 +116,6 @@ impl From<PeerAuthorizationToken> for ConnectionAuthorizationType {
             PeerAuthorizationToken::Trust { peer_id } => {
                 ConnectionAuthorizationType::Trust { identity: peer_id }
             }
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { public_key } => {
                 ConnectionAuthorizationType::Challenge { public_key }
             }
@@ -155,27 +140,18 @@ impl PartialOrd for PeerAuthorizationToken {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PeerTokenPair {
     peer_id: PeerAuthorizationToken,
-    #[cfg(feature = "challenge-authorization")]
     local_id: PeerAuthorizationToken,
 }
 
 impl PeerTokenPair {
-    pub fn new(
-        peer_id: PeerAuthorizationToken,
-        #[cfg(feature = "challenge-authorization")] local_id: PeerAuthorizationToken,
-    ) -> Self {
-        Self {
-            peer_id,
-            #[cfg(feature = "challenge-authorization")]
-            local_id,
-        }
+    pub fn new(peer_id: PeerAuthorizationToken, local_id: PeerAuthorizationToken) -> Self {
+        Self { peer_id, local_id }
     }
 
     pub fn peer_id(&self) -> &PeerAuthorizationToken {
         &self.peer_id
     }
 
-    #[cfg(feature = "challenge-authorization")]
     pub fn local_id(&self) -> &PeerAuthorizationToken {
         &self.local_id
     }
@@ -184,7 +160,6 @@ impl PeerTokenPair {
     pub fn id_as_string(&self) -> String {
         match self.peer_id {
             PeerAuthorizationToken::Trust { .. } => self.peer_id.id_as_string(),
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::Challenge { .. } => {
                 format!(
                     "{}::{}",
@@ -198,14 +173,6 @@ impl PeerTokenPair {
 
 impl fmt::Display for PeerTokenPair {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        #[cfg(feature = "challenge-authorization")]
-        {
-            write!(f, "Peer: {}, Local: {}", self.peer_id, self.local_id)
-        }
-
-        #[cfg(not(feature = "challenge-authorization"))]
-        {
-            write!(f, "{}", self.peer_id)
-        }
+        write!(f, "Peer: {}, Local: {}", self.peer_id, self.local_id)
     }
 }

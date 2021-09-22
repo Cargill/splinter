@@ -1287,6 +1287,7 @@ mod test {
             members: vec![SplinterNode {
                 node_id: "Node-123".to_string(),
                 endpoints: vec!["127.0.0.1:8282".to_string()],
+                public_key: None,
             }],
             authorization_type: AuthorizationType::Trust,
             persistence: PersistenceType::Any,

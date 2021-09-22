@@ -87,13 +87,11 @@ pub(crate) enum PeerManagerRequest {
     AddPeer {
         peer_id: PeerAuthorizationToken,
         endpoints: Vec<String>,
-        #[cfg(feature = "challenge-authorization")]
         required_local_auth: PeerAuthorizationToken,
         sender: Sender<Result<PeerRef, PeerRefAddError>>,
     },
     AddUnidentified {
         endpoint: String,
-        #[cfg(feature = "challenge-authorization")]
         local_authorization: PeerAuthorizationToken,
         sender: Sender<Result<EndpointPeerRef, PeerUnknownAddError>>,
     },
@@ -265,11 +263,7 @@ impl PeerManager {
         let join_handle = thread::Builder::new()
             .name("Peer Manager".into())
             .spawn(move || {
-                let mut peers = PeerMap::new(
-                    retry_frequency,
-                    #[cfg(not(feature = "challenge-authorization"))]
-                    PeerAuthorizationToken::from_peer_id(&identity),
-                );
+                let mut peers = PeerMap::new(retry_frequency);
                 // a map of identities to unreferenced peers.
                 // and a list of endpoints that should be turned into peers
                 let mut unreferenced_peers = UnreferencedPeerState::new(endpoint_retry_frequency);
@@ -385,7 +379,6 @@ fn handle_request(
         PeerManagerRequest::AddPeer {
             peer_id,
             endpoints,
-            #[cfg(feature = "challenge-authorization")]
             required_local_auth,
             sender,
         } => {
@@ -399,7 +392,6 @@ fn handle_request(
                     peer_remover,
                     ref_map,
                     subscribers,
-                    #[cfg(feature = "challenge-authorization")]
                     required_local_auth,
                 ))
                 .is_err()
@@ -409,7 +401,6 @@ fn handle_request(
         }
         PeerManagerRequest::AddUnidentified {
             endpoint,
-            #[cfg(feature = "challenge-authorization")]
             local_authorization,
             sender,
         } => {
@@ -421,7 +412,6 @@ fn handle_request(
                     peer_remover,
                     peers,
                     ref_map,
-                    #[cfg(feature = "challenge-authorization")]
                     local_authorization,
                 )))
                 .is_err()
@@ -505,13 +495,7 @@ fn handle_request(
         } => {
             let peer_id = peers
                 .get_by_connection_id(&connection_id)
-                .map(|meta| {
-                    PeerTokenPair::new(
-                        meta.id.clone(),
-                        #[cfg(feature = "challenge-authorization")]
-                        meta.required_local_auth.clone(),
-                    )
-                })
+                .map(|meta| PeerTokenPair::new(meta.id.clone(), meta.required_local_auth.clone()))
                 .or_else(|| {
                     unreferenced_peers
                         .peers
@@ -554,13 +538,9 @@ fn add_peer(
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap<PeerTokenPair>,
     subscribers: &mut SubscriberMap,
-    #[cfg(feature = "challenge-authorization")] required_local_auth: PeerAuthorizationToken,
+    required_local_auth: PeerAuthorizationToken,
 ) -> Result<PeerRef, PeerRefAddError> {
-    let peer_token_pair = PeerTokenPair::new(
-        peer_id.clone(),
-        #[cfg(feature = "challenge-authorization")]
-        required_local_auth.clone(),
-    );
+    let peer_token_pair = PeerTokenPair::new(peer_id.clone(), required_local_auth.clone());
 
     if check_for_duplicate_endpoint(&peer_id, &endpoints, peers) {
         return Err(PeerRefAddError::AddError(format!(
@@ -650,7 +630,6 @@ fn add_peer(
             endpoints,
             endpoint,
             PeerStatus::Connected,
-            #[cfg(feature = "challenge-authorization")]
             required_local_auth,
         );
 
@@ -682,9 +661,7 @@ fn add_peer(
         match connector.request_connection(
             endpoint,
             &connection_id,
-            #[cfg(feature = "challenge-authorization")]
             Some(peer_id.clone().into()),
-            #[cfg(feature = "challenge-authorization")]
             Some(required_local_auth.clone().into()),
         ) {
             Ok(()) => {
@@ -704,7 +681,6 @@ fn add_peer(
         endpoints.to_vec(),
         active_endpoint,
         PeerStatus::Pending,
-        #[cfg(feature = "challenge-authorization")]
         required_local_auth,
     );
     let peer_ref = PeerRef::new(peer_token_pair, peer_remover.clone());
@@ -719,41 +695,24 @@ fn add_unidentified(
     peer_remover: &PeerRemover,
     peers: &PeerMap,
     ref_map: &mut RefMap<PeerTokenPair>,
-    #[cfg(feature = "challenge-authorization")] local_authorization: PeerAuthorizationToken,
+    local_authorization: PeerAuthorizationToken,
 ) -> EndpointPeerRef {
     info!("Attempting to peer with peer by endpoint {}", endpoint);
     if let Some(peer_metadatas) = peers.get_peer_from_endpoint(&endpoint) {
-        // if challenge authorization is not enabled, only one peer will be in the list
-        #[cfg(not(feature = "challenge-authorization"))]
-        {
-            if let Some(peer_metadata) = peer_metadatas.get(0) {
+        for peer_metadata in peer_metadatas {
+            // need to verify that the existing peer has the correct local authorization
+            if peer_metadata.required_local_auth == local_authorization {
+                let peer_token_pair = PeerTokenPair::new(
+                    peer_metadata.id.clone(),
+                    peer_metadata.required_local_auth.clone(),
+                );
                 // if there is peer in the peer_map, there is reference in the ref map
-                ref_map.add_ref(PeerTokenPair::new(peer_metadata.id.clone()));
+                ref_map.add_ref(peer_token_pair);
                 return EndpointPeerRef::new(
                     endpoint,
-                    peer_metadata.connection_id.clone(),
+                    peer_metadata.connection_id,
                     peer_remover.clone(),
                 );
-            }
-        }
-
-        #[cfg(feature = "challenge-authorization")]
-        {
-            for peer_metadata in peer_metadatas {
-                // need to verify that the existing peer has the correct local authorization
-                if peer_metadata.required_local_auth == local_authorization {
-                    let peer_token_pair = PeerTokenPair::new(
-                        peer_metadata.id.clone(),
-                        peer_metadata.required_local_auth.clone(),
-                    );
-                    // if there is peer in the peer_map, there is reference in the ref map
-                    ref_map.add_ref(peer_token_pair);
-                    return EndpointPeerRef::new(
-                        endpoint,
-                        peer_metadata.connection_id,
-                        peer_remover.clone(),
-                    );
-                }
             }
         }
     }
@@ -762,9 +721,7 @@ fn add_unidentified(
     match connector.request_connection(
         &endpoint,
         &connection_id,
-        #[cfg(feature = "challenge-authorization")]
         None,
-        #[cfg(feature = "challenge-authorization")]
         Some(local_authorization.clone().into()),
     ) {
         Ok(()) => (),
@@ -776,7 +733,6 @@ fn add_unidentified(
         endpoint.to_string(),
         RequestedEndpoint {
             endpoint: endpoint.to_string(),
-            #[cfg(feature = "challenge-authorization")]
             local_authorization,
         },
     );
@@ -868,7 +824,6 @@ fn remove_peer_by_endpoint(
 
     let peer_token_pair = PeerTokenPair::new(
         peer_metadata.id.clone(),
-        #[cfg(feature = "challenge-authorization")]
         peer_metadata.required_local_auth.clone(),
     );
 
@@ -990,9 +945,7 @@ fn handle_notifications(
                         match connector.request_connection(
                             endpoint,
                             &peer_metadata.connection_id,
-                            #[cfg(feature = "challenge-authorization")]
                             Some(peer_metadata.id.clone().into()),
-                            #[cfg(feature = "challenge-authorization")]
                             Some(peer_metadata.required_local_auth.clone().into()),
                         ) {
                             Ok(()) => break,
@@ -1016,13 +969,11 @@ fn handle_notifications(
             endpoint,
             connection_id,
             identity,
-            #[cfg(feature = "challenge-authorization")]
             local_identity,
         } => handle_inbound_connection(
             endpoint,
             PeerAuthorizationToken::from(identity),
             connection_id,
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::from(local_identity),
             unreferenced_peers,
             peers,
@@ -1033,14 +984,12 @@ fn handle_notifications(
         ConnectionManagerNotification::Connected {
             endpoint,
             identity,
-            #[cfg(feature = "challenge-authorization")]
             local_identity,
             connection_id,
         } => handle_connected(
             endpoint,
             PeerAuthorizationToken::from(identity),
             connection_id,
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::from(local_identity),
             unreferenced_peers,
             peers,
@@ -1085,7 +1034,6 @@ fn handle_disconnection(
         let notification = PeerManagerNotification::Disconnected {
             peer: PeerTokenPair::new(
                 peer_metadata.id.clone(),
-                #[cfg(feature = "challenge-authorization")]
                 peer_metadata.required_local_auth.clone(),
             ),
         };
@@ -1114,9 +1062,7 @@ fn handle_disconnection(
                 match connector.request_connection(
                     endpoint,
                     &peer_metadata.connection_id,
-                    #[cfg(feature = "challenge-authorization")]
                     Some(identity.clone().into()),
-                    #[cfg(feature = "challenge-authorization")]
                     Some(peer_metadata.required_local_auth.clone().into()),
                 ) {
                     Ok(()) => break,
@@ -1154,7 +1100,7 @@ fn handle_inbound_connection(
     endpoint: String,
     identity: PeerAuthorizationToken,
     connection_id: String,
-    #[cfg(feature = "challenge-authorization")] local_authorization: PeerAuthorizationToken,
+    local_authorization: PeerAuthorizationToken,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
@@ -1166,11 +1112,7 @@ fn handle_inbound_connection(
         identity, endpoint
     );
 
-    let peer_token_pair = PeerTokenPair::new(
-        identity.clone(),
-        #[cfg(feature = "challenge-authorization")]
-        local_authorization.clone(),
-    );
+    let peer_token_pair = PeerTokenPair::new(identity.clone(), local_authorization.clone());
     // If we got an inbound counnection for an existing peer, replace old connection with
     // this new one unless we are already connected.
     if let Some(mut peer_metadata) = peers.get_by_peer_id(&peer_token_pair).cloned() {
@@ -1239,7 +1181,6 @@ fn handle_inbound_connection(
             UnreferencedPeer {
                 connection_id,
                 endpoint: endpoint.to_string(),
-                #[cfg(feature = "challenge-authorization")]
                 local_authorization,
             },
         ) {
@@ -1262,7 +1203,7 @@ fn handle_connected(
     endpoint: String,
     identity: PeerAuthorizationToken,
     connection_id: String,
-    #[cfg(feature = "challenge-authorization")] local_authorization: PeerAuthorizationToken,
+    local_authorization: PeerAuthorizationToken,
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
@@ -1270,11 +1211,7 @@ fn handle_connected(
     ref_map: &mut RefMap<PeerTokenPair>,
     retry_frequency: u64,
 ) {
-    let peer_token_pair = PeerTokenPair::new(
-        identity.clone(),
-        #[cfg(feature = "challenge-authorization")]
-        local_authorization.clone(),
-    );
+    let peer_token_pair = PeerTokenPair::new(identity.clone(), local_authorization.clone());
     if let Some(mut peer_metadata) = peers.get_by_peer_id(&peer_token_pair).cloned() {
         match peer_metadata.status {
             PeerStatus::Pending => {
@@ -1356,7 +1293,6 @@ fn handle_connected(
                 vec![endpoint.to_string()],
                 endpoint,
                 PeerStatus::Connected,
-                #[cfg(feature = "challenge-authorization")]
                 requested_endpoint.local_authorization.clone(),
             );
 
@@ -1373,7 +1309,6 @@ fn handle_connected(
             UnreferencedPeer {
                 connection_id,
                 endpoint: endpoint.to_string(),
-                #[cfg(feature = "challenge-authorization")]
                 local_authorization,
             },
         ) {
@@ -1406,7 +1341,6 @@ fn handle_fatal_connection(
         let notification = PeerManagerNotification::Disconnected {
             peer: PeerTokenPair::new(
                 peer_metadata.id.clone(),
-                #[cfg(feature = "challenge-authorization")]
                 peer_metadata.required_local_auth.clone(),
             ),
         };
@@ -1447,9 +1381,7 @@ fn retry_pending(
             match connector.request_connection(
                 endpoint,
                 &peer_metadata.connection_id,
-                #[cfg(feature = "challenge-authorization")]
                 Some(peer_metadata.id.clone().into()),
-                #[cfg(feature = "challenge-authorization")]
                 Some(peer_metadata.required_local_auth.clone().into()),
             ) {
                 Ok(()) => peer_metadata.active_endpoint = endpoint.to_string(),
@@ -1482,9 +1414,7 @@ fn retry_pending(
             match connector.request_connection(
                 endpoint,
                 &connection_id,
-                #[cfg(feature = "challenge-authorization")]
                 None,
-                #[cfg(feature = "challenge-authorization")]
                 Some(requested_endpoint.local_authorization.clone().into()),
             ) {
                 Ok(()) => (),
@@ -1571,7 +1501,6 @@ fn check_for_duplicate_endpoint(
     endpoints: &[String],
     peer_map: &PeerMap,
 ) -> bool {
-    #[cfg(feature = "challenge-authorization")]
     if matches!(peer_id, PeerAuthorizationToken::Challenge { .. }) {
         return false;
     }
@@ -1655,7 +1584,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec!["inproc://test".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -1664,7 +1592,6 @@ pub mod tests {
             peer_ref.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -1679,7 +1606,6 @@ pub mod tests {
                 == PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -1742,7 +1668,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec!["inproc://test".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -1751,7 +1676,6 @@ pub mod tests {
             peer_ref.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -1766,7 +1690,6 @@ pub mod tests {
                 == PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -1776,7 +1699,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("different_peer"),
                 vec!["inproc://test".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .is_ok()
@@ -1846,7 +1768,6 @@ pub mod tests {
                     "inproc://bad_endpoint".to_string(),
                     "inproc://test".to_string(),
                 ],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -1855,7 +1776,6 @@ pub mod tests {
             peer_ref.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -1870,7 +1790,6 @@ pub mod tests {
                 == PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -1930,7 +1849,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec!["inproc://test".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -1939,7 +1857,6 @@ pub mod tests {
             peer_ref.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -1954,7 +1871,6 @@ pub mod tests {
                 == PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -1964,7 +1880,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec!["inproc://test".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -1973,7 +1888,6 @@ pub mod tests {
             peer_ref.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -2043,7 +1957,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec!["inproc://test".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -2052,7 +1965,6 @@ pub mod tests {
             peer_ref_1.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -2067,7 +1979,6 @@ pub mod tests {
                 == PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -2077,7 +1988,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("next_peer"),
                 vec!["inproc://test_2".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -2086,7 +1996,6 @@ pub mod tests {
             peer_ref_2.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("next_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -2099,7 +2008,6 @@ pub mod tests {
                 == PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("next_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -2182,7 +2090,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec!["inproc://test".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -2191,7 +2098,6 @@ pub mod tests {
             peer_ref_1.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -2206,7 +2112,6 @@ pub mod tests {
                 == PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -2216,7 +2121,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("next_peer"),
                 vec!["inproc://test_2".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -2225,7 +2129,6 @@ pub mod tests {
             peer_ref_2.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("next_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -2238,7 +2141,6 @@ pub mod tests {
                 == PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("next_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -2251,7 +2153,6 @@ pub mod tests {
         assert!(peers
             .get_by_key(&PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("next_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             ))
             .is_some());
@@ -2259,7 +2160,6 @@ pub mod tests {
         assert!(peers
             .get_by_key(&PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             ))
             .is_some());
@@ -2324,7 +2224,6 @@ pub mod tests {
                 .add_peer_ref(
                     PeerAuthorizationToken::from_peer_id("test_peer"),
                     vec!["inproc://test".to_string()],
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("my_id"),
                 )
                 .expect("Unable to add peer");
@@ -2333,7 +2232,6 @@ pub mod tests {
                 peer_ref.peer_id(),
                 &PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("test_peer"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("my_id"),
                 )
             );
@@ -2348,7 +2246,6 @@ pub mod tests {
                     == PeerManagerNotification::Connected {
                         peer: PeerTokenPair::new(
                             PeerAuthorizationToken::from_peer_id("test_peer"),
-                            #[cfg(feature = "challenge-authorization")]
                             PeerAuthorizationToken::from_peer_id("my_id"),
                         )
                     }
@@ -2435,7 +2332,6 @@ pub mod tests {
             let endpoint_peer_ref = peer_connector
                 .add_unidentified_peer(
                     "inproc://test".to_string(),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("my_id"),
                 )
                 .expect("Unable to add peer by endpoint");
@@ -2450,7 +2346,6 @@ pub mod tests {
                     == PeerManagerNotification::Connected {
                         peer: PeerTokenPair::new(
                             PeerAuthorizationToken::from_peer_id("test_peer"),
-                            #[cfg(feature = "challenge-authorization")]
                             PeerAuthorizationToken::from_peer_id("my_id"),
                         )
                     }
@@ -2460,7 +2355,6 @@ pub mod tests {
                 .add_peer_ref(
                     PeerAuthorizationToken::from_peer_id("test_peer"),
                     vec!["inproc://test".to_string()],
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("my_id"),
                 )
                 .expect("Unable to add peer");
@@ -2469,7 +2363,6 @@ pub mod tests {
                 peer_ref.peer_id(),
                 &PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("test_peer"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("my_id"),
                 )
             );
@@ -2608,7 +2501,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec![endpoint, endpoint2],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -2617,7 +2509,6 @@ pub mod tests {
             peer_ref.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -2632,7 +2523,6 @@ pub mod tests {
                 == PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -2647,7 +2537,6 @@ pub mod tests {
                 == PeerManagerNotification::Disconnected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -2663,7 +2552,6 @@ pub mod tests {
                 == PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 }
@@ -2770,7 +2658,6 @@ pub mod tests {
         assert_eq!(
             vec![PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )],
             peer_connector.list_unreferenced_peers().unwrap()
@@ -2780,7 +2667,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec!["inproc://test".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -2789,7 +2675,6 @@ pub mod tests {
             peer_ref.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -2890,7 +2775,6 @@ pub mod tests {
             .add_peer_ref(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
                 vec!["inproc://test".to_string()],
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
             .expect("Unable to add peer");
@@ -2899,7 +2783,6 @@ pub mod tests {
             peer_ref.peer_id(),
             &PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("test_peer"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("my_id"),
             )
         );
@@ -2914,7 +2797,6 @@ pub mod tests {
                 == TestEnum::Notification(PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::from_peer_id("test_peer"),
-                        #[cfg(feature = "challenge-authorization")]
                         PeerAuthorizationToken::from_peer_id("my_id"),
                     )
                 })
@@ -2972,12 +2854,8 @@ pub mod tests {
             callback: Box<
                 dyn Fn(AuthorizationResult) -> Result<(), Box<dyn std::error::Error>> + Send,
             >,
-            #[cfg(feature = "challenge-authorization")] _expected_authorization: Option<
-                ConnectionAuthorizationType,
-            >,
-            #[cfg(feature = "challenge-authorization")] local_authorization: Option<
-                ConnectionAuthorizationType,
-            >,
+            _expected_authorization: Option<ConnectionAuthorizationType>,
+            local_authorization: Option<ConnectionAuthorizationType>,
         ) -> Result<(), AuthorizerError> {
             let identity = self
                 .ids
@@ -2990,9 +2868,7 @@ pub mod tests {
                 identity: ConnectionAuthorizationType::Trust {
                     identity: identity.clone(),
                 },
-                #[cfg(feature = "challenge-authorization")]
                 expected_authorization: ConnectionAuthorizationType::Trust { identity },
-                #[cfg(feature = "challenge-authorization")]
                 local_authorization: local_authorization.unwrap_or(
                     ConnectionAuthorizationType::Trust {
                         identity: "my_id".into(),
