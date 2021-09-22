@@ -14,7 +14,7 @@
 
 //! Provides sqlite migration support to the database action
 
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::path::PathBuf;
 
 use diesel::{
@@ -30,13 +30,26 @@ use super::SplinterEnvironment;
 use crate::error::CliError;
 
 const DEFAULT_SQLITE: &str = "splinter_state.db";
+const MEMORY: &str = ":memory:";
 
 /// Run the sqlite migrations against the provided connection string
 pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
+    if connection_string != MEMORY {
+        if let Err(err) = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&connection_string)
+        {
+            return Err(CliError::ActionError(format!(
+                "While opening: {} received {}",
+                &connection_string, err
+            )));
+        }
+    }
     let connection_manager = ConnectionManager::<SqliteConnection>::new(&connection_string);
     let mut pool_builder = Pool::builder();
 
-    if connection_string == ":memory:" {
+    if connection_string == MEMORY {
         pool_builder = pool_builder.max_size(1)
     }
 
@@ -44,7 +57,7 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
         .build(connection_manager)
         .map_err(|_| CliError::ActionError("Failed to build connection pool".to_string()))?;
 
-    if connection_string != ":memory:" {
+    if connection_string != MEMORY {
         let path = PathBuf::from(&connection_string);
         let full_path = fs::canonicalize(&path).map_err(|err| {
             CliError::ActionError(format!(
