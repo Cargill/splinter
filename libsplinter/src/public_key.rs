@@ -16,7 +16,7 @@
 
 use std::cmp::Ordering;
 
-/// Local representation of a public ket
+/// Local representation of a public key
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PublicKey {
     bytes: Vec<u8>,
