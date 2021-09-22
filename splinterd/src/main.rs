@@ -27,8 +27,6 @@ mod logging;
 mod routes;
 mod transport;
 
-#[cfg(feature = "log-config")]
-use crate::logging::LogConfig;
 #[cfg(feature = "challenge-authorization")]
 use cylinder::{load_key_from_path, secp256k1::Secp256k1Context, Context, Signer};
 #[cfg(not(feature = "log-config"))]
@@ -49,6 +47,8 @@ use splinter::store::create_store_factory;
 #[cfg(feature = "tap")]
 use splinter::tap::influx::InfluxRecorder;
 
+#[cfg(feature = "log-config")]
+use crate::config::LogConfig;
 use crate::config::{
     ClapPartialConfigBuilder, Config, ConfigBuilder, ConfigError, DefaultPartialConfigBuilder,
     EnvPartialConfigBuilder, PartialConfigBuilder, TomlPartialConfigBuilder,
@@ -618,7 +618,7 @@ fn main() {
     let log_handle = {
         #[cfg(feature = "log-config")]
         {
-            use crate::logging::{AppenderConfig, LogTarget, RootConfig, DEFAULT_PATTERN};
+            use crate::config::{AppenderConfig, LogTarget, RootConfig, DEFAULT_LOGGING_PATTERN};
             let default_config: LogConfig = LogConfig {
                 root: RootConfig {
                     appenders: vec![String::from("default")],
@@ -626,7 +626,7 @@ fn main() {
                 },
                 appenders: vec![AppenderConfig {
                     name: String::from("default"),
-                    encoder: String::from(DEFAULT_PATTERN),
+                    encoder: String::from(DEFAULT_LOGGING_PATTERN),
                     kind: LogTarget::Stdout,
                 }],
                 loggers: vec![],

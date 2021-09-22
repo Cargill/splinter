@@ -32,12 +32,12 @@ use log4rs::encode::Encode;
 use log4rs::Config;
 use std::convert::{From, Into, TryInto};
 
-use super::{AppenderConfig, LogConfig, LoggerConfig, RootConfig};
+use crate::config::{AppenderConfig, LogConfig, LoggerConfig, RootConfig};
 
 impl TryInto<Appender> for AppenderConfig {
     type Error = std::io::Error;
     fn try_into(self) -> Result<Appender, Self::Error> {
-        use super::LogTarget::*;
+        use crate::config::LogTarget::*;
         let encoder: Box<dyn Encode> = Box::new(PatternEncoder::new(&self.encoder));
         let boxed: Box<dyn Append> = match &self.kind {
             Stdout => Box::new(

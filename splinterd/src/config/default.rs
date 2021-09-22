@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
 #[cfg(feature = "log-config")]
-use crate::logging::{RootConfig, UnnamedAppenderConfig, DEFAULT_PATTERN};
+use super::logging::{RootConfig, UnnamedAppenderConfig, DEFAULT_LOGGING_PATTERN};
 
 const CONFIG_DIR: &str = "/etc/splinter";
 const TLS_CERT_DIR: &str = "/etc/splinter/certs";
@@ -115,8 +115,8 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 level: log::Level::Info,
             });
             let stdout = UnnamedAppenderConfig {
-                encoder: String::from(DEFAULT_PATTERN),
-                kind: crate::logging::RawLogTarget::Stdout,
+                encoder: String::from(DEFAULT_LOGGING_PATTERN),
+                kind: super::logging::RawLogTarget::Stdout,
                 size: None,
                 filename: None,
             };

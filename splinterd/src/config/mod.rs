@@ -19,10 +19,14 @@
 //! sources to be combined into a final `Config` object.
 
 mod builder;
+#[cfg(feature = "log-config")]
+mod bytes;
 mod clap;
 mod default;
 mod env;
 mod error;
+#[cfg(feature = "log-config")]
+mod logging;
 mod partial;
 mod toml;
 
@@ -32,11 +36,15 @@ pub use crate::config::clap::ClapPartialConfigBuilder;
 pub use crate::config::default::DefaultPartialConfigBuilder;
 pub use crate::config::env::EnvPartialConfigBuilder;
 pub use crate::config::toml::TomlPartialConfigBuilder;
-#[cfg(feature = "log-config")]
-use crate::logging::{AppenderConfig, LoggerConfig, RootConfig};
 pub use builder::{ConfigBuilder, PartialConfigBuilder};
 pub use error::ConfigError;
 pub use partial::{ConfigSource, PartialConfig};
+
+#[cfg(feature = "log-config")]
+pub use logging::{
+    AppenderConfig, LogConfig, LogTarget, LoggerConfig, RawLogTarget, RootConfig,
+    DEFAULT_LOGGING_PATTERN,
+};
 
 /// `Config` is the final representation of configuration values. This final config object assembles
 /// values from `PartialConfig` builder objects generated from various sources.

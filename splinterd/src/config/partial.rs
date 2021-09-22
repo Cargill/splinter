@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 #[cfg(feature = "log-config")]
-use crate::logging::{RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig};
+use super::logging::{RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig};
 
 /// `ConfigSource` displays the source of configuration values, used to identify which of the various
 /// config modules were used to create a particular `PartialConfig` object.
