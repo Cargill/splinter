@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::Level;
-use serde::Deserialize;
 use std::convert::From;
 use std::convert::TryFrom;
+
+use log::Level;
+use serde::Deserialize;
 
 use super::bytes::ByteSize;
 use super::error::ConfigError;
@@ -93,18 +94,17 @@ pub enum RawLogTarget {
 impl TryFrom<(String, UnnamedAppenderConfig)> for AppenderConfig {
     type Error = ConfigError;
     fn try_from(value: (String, UnnamedAppenderConfig)) -> Result<Self, Self::Error> {
-        use crate::config::RawLogTarget::*;
         let kind = match value.1.kind {
-            Stdout => Ok(LogTarget::Stdout),
-            Stderr => Ok(LogTarget::Stderr),
-            File => {
+            RawLogTarget::Stdout => Ok(LogTarget::Stdout),
+            RawLogTarget::Stderr => Ok(LogTarget::Stderr),
+            RawLogTarget::File => {
                 if let Some(filename) = value.1.filename {
                     Ok(LogTarget::File(filename))
                 } else {
                     Err(ConfigError::MissingValue("filename".to_string()))
                 }
             }
-            RollingFile => {
+            RawLogTarget::RollingFile => {
                 if let (Some(filename), Some(size)) = (value.1.filename, value.1.size) {
                     let size = size.get_mem_size();
                     Ok(LogTarget::RollingFile { filename, size })
