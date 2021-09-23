@@ -247,6 +247,7 @@ impl ProposalManager for AdminProposalManager {
         } else {
             self.proposal_update_sender
                 .send(ProposalUpdate::ProposalCreated(None))?;
+            shared.cleanup_held_peer_refs();
         }
 
         Ok(())

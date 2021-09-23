@@ -17,6 +17,7 @@ use std::convert::{TryFrom, TryInto};
 use std::iter::ExactSizeIterator;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::{Message, RepeatedField};
@@ -60,6 +61,7 @@ use super::{admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscri
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";
 const ADMIN_SERVICE_PUBLIC_KEY_PREFIX: &str = "public_key";
+const DEFAULT_HOLD_PEER_SECS: u64 = 10;
 
 pub enum PayloadType {
     Circuit(CircuitManagementPayload),
@@ -153,6 +155,9 @@ pub struct AdminServiceShared {
     event_store: Box<dyn AdminServiceStore>,
     public_keys: Vec<public_key::PublicKey>,
     token_to_peer: HashMap<PeerTokenPair, PeerNodePair>,
+    // Temporarily hold on to peers that should be removed. This helps avoid dropping messages
+    // when removing a proposal.
+    peers_to_be_removed: Vec<(Instant, Vec<PeerTokenPair>)>,
 }
 
 impl AdminServiceShared {
@@ -196,6 +201,7 @@ impl AdminServiceShared {
             event_store: admin_service_event_store,
             public_keys,
             token_to_peer: HashMap::new(),
+            peers_to_be_removed: Vec::new(),
         }
     }
 
@@ -303,6 +309,23 @@ impl AdminServiceShared {
                     self.service_protocols.remove(&peer_id);
                 }
             }
+        }
+    }
+
+    /// Remove the peers who have been held onto for the default holding time. In some cases
+    /// peers should not be removed when a proposal is removed because it can cause messages to be
+    /// dropped. Instead, the will be dropped after 10 seconds or when the cleanup_held_peer_refs
+    /// function is called.
+    pub fn cleanup_held_peer_refs(&mut self) {
+        let peers_to_be_removed = std::mem::take(&mut self.peers_to_be_removed);
+        let (to_clean, pending) = peers_to_be_removed
+            .into_iter()
+            .partition(|(instant, _)| instant.elapsed().as_secs() > DEFAULT_HOLD_PEER_SECS);
+
+        self.peers_to_be_removed = pending;
+
+        for (_, peers) in to_clean {
+            self.remove_peer_refs(peers);
         }
     }
 
@@ -596,7 +619,8 @@ impl AdminServiceShared {
                         let proposal = self.remove_proposal(circuit_id)?;
                         self.update_metrics()?;
                         if let Some(proposal) = proposal {
-                            self.remove_peer_refs(
+                            self.peers_to_be_removed.push((
+                                Instant::now(),
                                 proposal
                                     .circuit()
                                     .list_tokens(&self.node_id)
@@ -607,7 +631,7 @@ impl AdminServiceShared {
                                             err
                                         ))
                                     })?,
-                            );
+                            ));
                         }
                         let circuit_proposal_proto =
                             messages::CircuitProposal::from_proto(circuit_proposal.clone())
@@ -643,6 +667,7 @@ impl AdminServiceShared {
         &mut self,
         mut circuit_payload: CircuitManagementPayload,
     ) -> Result<(String, CircuitProposal), AdminSharedError> {
+        self.cleanup_held_peer_refs();
         let header = Message::parse_from_bytes(circuit_payload.get_header())
             .map_err(MarshallingError::from)?;
         self.validate_circuit_management_payload(&circuit_payload, &header)?;
