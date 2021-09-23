@@ -788,9 +788,43 @@ impl AdminServiceShared {
                     })?;
 
                 let mut verifiers = vec![];
-                for member in circuit_proposal.circuit().members() {
-                    verifiers.push(admin_service_id(member.node_id()));
+                let mut protocol = ADMIN_SERVICE_PROTOCOL_VERSION;
+
+                #[cfg(feature = "challenge-authorization")]
+                let local_required_auth = circuit_proposal
+                    .circuit()
+                    .get_node_token(&self.node_id)
+                    .map_err(|err| {
+                        AdminSharedError::ValidationFailed(format!(
+                            "Unable to get local nodes token: {}",
+                            err
+                        ))
+                    })?
+                    .ok_or_else(|| {
+                        AdminSharedError::ValidationFailed(
+                            "Circuit does not have the local node".to_string(),
+                        )
+                    })?;
+
+                for member in circuit_proposal.circuit().list_nodes().map_err(|_| {
+                    AdminSharedError::SplinterStateError(format!(
+                        "Unable to get tokens for proposal: {}",
+                        circuit_proposal.circuit_id()
+                    ))
+                })? {
+                    verifiers.push(member.admin_service.clone());
+                    // Figure out what protocol version should be used for this proposal
+                    if let Some(protocol_version) = self.service_protocols.get(&PeerTokenPair::new(
+                        member.token.clone(),
+                        #[cfg(feature = "challenge-authorization")]
+                        local_required_auth.clone(),
+                    )) {
+                        if protocol_version < &protocol {
+                            protocol = *protocol_version
+                        }
+                    }
                 }
+
                 let signer_public_key = header.get_requester();
 
                 self.validate_circuit_vote(
@@ -798,6 +832,7 @@ impl AdminServiceShared {
                     signer_public_key,
                     &circuit_proposal,
                     header.get_requester_node_id(),
+                    protocol,
                 )
                 .map_err(|err| {
                     if circuit_proposal.proposal_type() == &ProposalType::Create {
@@ -1670,6 +1705,7 @@ impl AdminServiceShared {
                     signer_public_key,
                     &circuit_proposal,
                     header.get_requester_node_id(),
+                    ADMIN_SERVICE_PROTOCOL_VERSION,
                 )
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
@@ -2836,7 +2872,10 @@ impl AdminServiceShared {
         signer_public_key: &[u8],
         circuit_proposal: &StoreProposal,
         node_id: &str,
+        protocol: u32,
     ) -> Result<(), AdminSharedError> {
+        self.validate_protocol_vote(circuit_proposal, protocol)?;
+
         let circuit_hash = proposal_vote.get_circuit_hash();
 
         self.validate_key(signer_public_key)?;
@@ -2888,6 +2927,75 @@ impl AdminServiceShared {
         }
 
         Ok(())
+    }
+
+    /// When handling a vote, the proposal being validated still matches the agreed upon protocol
+    /// version. It is possible that the agreed upon protocol version may have changed after
+    /// the proposal was stored in state. If that is the case the vote should be rejected.
+    fn validate_protocol_vote(
+        &self,
+        circuit_proposal: &StoreProposal,
+        protocol: u32,
+    ) -> Result<(), AdminSharedError> {
+        match circuit_proposal.proposal_type() {
+            ProposalType::Create => {
+                let circuit = circuit_proposal.circuit();
+                match protocol {
+                    ADMIN_SERVICE_PROTOCOL_VERSION => {
+                        // verify that the circuit version is supported
+                        if circuit.circuit_version() > CIRCUIT_PROTOCOL_VERSION {
+                            return Err(AdminSharedError::ValidationFailed(format!(
+                                "Proposed circuit's schema version is unsupported: {}",
+                                circuit.circuit_version()
+                            )));
+                        }
+                        Ok(())
+                    }
+                    1 => {
+                        // if using the previous version, display name cannot be set
+                        if circuit.display_name().is_some() {
+                            return Err(AdminSharedError::ValidationFailed(
+                                "Proposed circuit cannot have a display name on protocol 1"
+                                    .to_string(),
+                            ));
+                        } else if circuit.circuit_status() != &StoreCircuitStatus::Active {
+                            return Err(AdminSharedError::ValidationFailed(
+                                "Proposed circuit cannot have a circuit status other then active \
+                                    on protocol 1"
+                                    .to_string(),
+                            ));
+                        }
+                        // check that the circuit includes supported versions
+                        match circuit.circuit_version() {
+                            0 => Ok(()),
+                            _ => Err(AdminSharedError::ValidationFailed(
+                                "Proposed circuit schema version is not supported by protocol 1"
+                                    .to_string(),
+                            )),
+                        }
+                    }
+                    // Unsupported version, this should never happen
+                    _ => {
+                        return Err(AdminSharedError::ServiceProtocolError(format!(
+                            "Agreed upon unsupported protocol version: {}",
+                            protocol
+                        )))
+                    }
+                }
+            }
+            ProposalType::Disband => {
+                if protocol != ADMIN_SERVICE_PROTOCOL_VERSION {
+                    return Err(AdminSharedError::ValidationFailed(format!(
+                        "Circuit-Disband is not available for protocol version {}",
+                        protocol
+                    )));
+                }
+                Ok(())
+            }
+            _ => Err(AdminSharedError::ValidationFailed(
+                "Unsupported proposal type for vote".to_string(),
+            )),
+        }
     }
 
     /// Validates a `CircuitDisbandRequest` using the following:
@@ -5401,8 +5509,54 @@ mod tests {
             PUB_KEY,
             &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
             "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
         ) {
             panic!("Should have been valid: {}", err);
+        }
+        shutdown(mesh, cm, pm);
+    }
+
+    #[test]
+    // test that if a proposal that was previously added to state, but the the agreed upon
+    // protocol version has changed, the vote and proposal should now be rejected.
+    fn test_validate_proposal_vote_invalid_protocol() {
+        let store = setup_admin_service_store();
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            event_store,
+            #[cfg(feature = "challenge-authorization")]
+            vec![],
+        );
+        let circuit = setup_test_circuit();
+        let vote = setup_test_vote(&circuit);
+        let proposal = setup_test_proposal(&circuit);
+
+        if let Ok(()) = admin_shared.validate_circuit_vote(
+            &vote,
+            PUB_KEY,
+            &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
+            "node_a",
+            1,
+        ) {
+            panic!("Should have been invalid because protocol does not support proposal");
         }
         shutdown(mesh, cm, pm);
     }
@@ -5446,6 +5600,7 @@ mod tests {
             PUB_KEY,
             &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
             "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
         ) {
             panic!("Should have been invalid because voting node is not registered");
         }
@@ -5490,6 +5645,7 @@ mod tests {
             PUB_KEY,
             &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
             "node_b",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
         ) {
             panic!("Should have been invalid because voter is the requester");
         }
@@ -5541,6 +5697,7 @@ mod tests {
             PUB_KEY,
             &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
             "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
         ) {
             panic!("Should have been invalid because node as already submitted a vote");
         }
@@ -5588,6 +5745,7 @@ mod tests {
             PUB_KEY,
             &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
             "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
         ) {
             panic!("Should have been invalid because the circuit hash does not match");
         }
