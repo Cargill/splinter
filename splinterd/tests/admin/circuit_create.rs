@@ -623,7 +623,6 @@ pub fn test_3_party_circuit_creation_challenge_authorization() {
 /// 5. Wait until the proposal is not available on the nodes, using `list_proposals`
 /// 6. Verify the proposal does not exist on each node
 #[test]
-#[ignore]
 pub fn test_2_party_circuit_creation_proposal_rejected() {
     // Start a 2-node network
     let mut network = Network::new()
@@ -766,7 +765,6 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
 ///    `list_proposals`
 /// 9. Validate the proposal is no longer available for the node that voted to reject the proposal
 #[test]
-#[ignore]
 pub fn test_3_party_circuit_creation_proposal_rejected() {
     // Start a 3-node network
     let mut network = Network::new()
@@ -827,7 +825,7 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     let node_b_event_client = node_b
         .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
-    let node_c_event_client = node_b
+    let node_c_event_client = node_c
         .admin_service_event_client(&format!("test_circuit_{}", &circuit_id), None)
         .expect("Unable to get event client");
 
@@ -913,6 +911,19 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     assert_eq!(vote_a_event.proposal(), vote_b_event.proposal());
     assert_eq!(vote_a_event.proposal(), vote_c_event.proposal());
 
+    // Create the `CircuitProposalVote` to be sent to a node
+    // Uses `false` for the `accept` argument to create a vote to reject the proposal
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_a_event.proposal().clone(),
+        node_c.node_id(),
+        &*node_c.admin_signer().clone_box(),
+        false,
+    );
+    let res = node_c
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
+    assert!(res.is_ok());
+
     // Wait for proposal rejected
     let rejected_a_event = node_a_event_client
         .next_event()
@@ -943,19 +954,6 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     );
     assert_eq!(rejected_a_event.proposal(), rejected_b_event.proposal());
     assert_eq!(rejected_a_event.proposal(), rejected_c_event.proposal());
-
-    // Create the `CircuitProposalVote` to be sent to a node
-    // Uses `false` for the `accept` argument to create a vote to reject the proposal
-    let vote_payload_bytes = make_circuit_proposal_vote_payload(
-        proposal_a_event.proposal().clone(),
-        node_c.node_id(),
-        &*node_c.admin_signer().clone_box(),
-        false,
-    );
-    let res = node_c
-        .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
 
     let proposals_a = node_a
         .admin_service_client()
