@@ -83,6 +83,10 @@ pub struct ScabbardState {
     receipt_store: ScabbardReceiptStore,
     pending_changes: Option<(String, Vec<TransactionReceipt>)>,
     event_subscribers: Vec<Box<dyn StateSubscriber>>,
+    #[cfg(feature = "metrics")]
+    service_id: String,
+    #[cfg(feature = "metrics")]
+    circuit_id: String,
     batch_history: BatchHistory,
 }
 
@@ -90,6 +94,8 @@ impl ScabbardState {
     pub fn new(
         state_db_path: &Path,
         state_db_size: usize,
+        #[cfg(feature = "metrics")] service_id: String,
+        #[cfg(feature = "metrics")] circuit_id: String,
         receipt_store: ScabbardReceiptStore,
         admin_keys: Vec<String>,
     ) -> Result<Self, ScabbardStateError> {
@@ -149,7 +155,7 @@ impl ScabbardState {
             .map_err(|err| ScabbardStateError(format!("failed to start executor: {}", err)))?;
 
         // initialize committed_batches metric
-        counter!("splinter.scabbard.committed_batches", 0);
+        counter!("splinter.scabbard.committed_batches", 0, "service" => format!("{}::{}", &circuit_id, &service_id));
 
         Ok(ScabbardState {
             db,
@@ -159,6 +165,10 @@ impl ScabbardState {
             receipt_store,
             pending_changes: None,
             event_subscribers: vec![],
+            #[cfg(feature = "metrics")]
+            service_id,
+            #[cfg(feature = "metrics")]
+            circuit_id,
             batch_history: BatchHistory::new(),
         })
     }
@@ -363,7 +373,7 @@ impl ScabbardState {
                 }
 
                 self.batch_history.commit(&signature);
-                counter!("splinter.scabbard.committed_batches", 1);
+                counter!("splinter.scabbard.committed_batches", 1, "service" => format!("{}::{}", self.circuit_id, self.service_id));
                 Ok(())
             }
             None => Err(ScabbardStateError("no pending changes to commit".into())),
@@ -1142,9 +1152,17 @@ mod tests {
             create_connection_pool_and_migrate(":memory:".to_string()),
         )));
 
-        let mut state =
-            ScabbardState::new(&paths.state_db_path, TEMP_DB_SIZE, receipt_store, vec![])
-                .expect("Failed to initialize state");
+        let mut state = ScabbardState::new(
+            &paths.state_db_path,
+            TEMP_DB_SIZE,
+            #[cfg(feature = "metrics")]
+            "svc0".to_string(),
+            #[cfg(feature = "metrics")]
+            "vzrQS-rvwf4".to_string(),
+            receipt_store,
+            vec![],
+        )
+        .expect("Failed to initialize state");
 
         // Set a value in state
         let address = "abcdef".to_string();
@@ -1216,9 +1234,17 @@ mod tests {
             create_connection_pool_and_migrate(":memory:".to_string()),
         )));
 
-        let mut state =
-            ScabbardState::new(&paths.state_db_path, TEMP_DB_SIZE, receipt_store, vec![])
-                .expect("Failed to initialize state");
+        let mut state = ScabbardState::new(
+            &paths.state_db_path,
+            TEMP_DB_SIZE,
+            #[cfg(feature = "metrics")]
+            "svc0".to_string(),
+            #[cfg(feature = "metrics")]
+            "vzrQS-rvwf4".to_string(),
+            receipt_store,
+            vec![],
+        )
+        .expect("Failed to initialize state");
 
         // Set some values in state
         let prefix = "abcdef".to_string();
