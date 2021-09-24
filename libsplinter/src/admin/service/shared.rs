@@ -2892,14 +2892,40 @@ impl AdminServiceShared {
     }
 
     fn validate_circuit_vote(
-        &self,
+        &mut self,
         proposal_vote: &CircuitProposalVote,
         signer_public_key: &[u8],
         circuit_proposal: &StoreProposal,
         node_id: &str,
         protocol: u32,
     ) -> Result<(), AdminSharedError> {
-        self.validate_protocol_vote(circuit_proposal, protocol)?;
+        if let Err(err) = self.validate_protocol_vote(circuit_proposal, protocol) {
+            warn!(
+                "Removing proposal for {}, no longer valid for agreed protocol version: {}",
+                circuit_proposal.circuit_id(),
+                protocol
+            );
+
+            self.remove_proposal(circuit_proposal.circuit_id())?;
+            self.peers_to_be_removed.push((
+                Instant::now(),
+                circuit_proposal
+                    .circuit()
+                    .list_tokens(
+                        #[cfg(feature = "challenge-authorization")]
+                        &self.node_id,
+                    )
+                    .map_err(|err| {
+                        AdminSharedError::SplinterStateError(format!(
+                            "Unable to remove peer refs for proposal {}: {}",
+                            circuit_proposal.circuit_id(),
+                            err
+                        ))
+                    })?,
+            ));
+
+            return Err(err);
+        };
 
         let circuit_hash = proposal_vote.get_circuit_hash();
 
@@ -5510,7 +5536,7 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let admin_shared = AdminServiceShared::new(
+        let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
             #[cfg(feature = "service-arg-validation")]
@@ -5555,7 +5581,7 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let admin_shared = AdminServiceShared::new(
+        let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
             #[cfg(feature = "service-arg-validation")]
@@ -5601,7 +5627,7 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let admin_shared = AdminServiceShared::new(
+        let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
             #[cfg(feature = "service-arg-validation")]
@@ -5646,7 +5672,7 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let admin_shared = AdminServiceShared::new(
+        let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
             #[cfg(feature = "service-arg-validation")]
@@ -5691,7 +5717,7 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let admin_shared = AdminServiceShared::new(
+        let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
             #[cfg(feature = "service-arg-validation")]
@@ -5744,7 +5770,7 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let admin_shared = AdminServiceShared::new(
+        let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
             #[cfg(feature = "service-arg-validation")]
