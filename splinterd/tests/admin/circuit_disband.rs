@@ -195,7 +195,6 @@ pub fn test_2_party_circuit_lifecycle() {
 /// 8. Validate the active circuit is still available to each node, using `list_circuits` which
 ///    only returns active circuits
 #[test]
-#[ignore]
 pub fn test_2_party_circuit_disband_proposal_rejected() {
     // Start a 2-node network
     let mut network = Network::new()
@@ -539,7 +538,6 @@ pub fn test_3_party_circuit_lifecycle() {
 /// 11. Validate the circuit is still active for each node, using `list_circuits` which only returns
 ///     active circuits
 #[test]
-#[ignore]
 pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
     // Start a 3-node network
     let mut network = Network::new()
@@ -553,7 +551,7 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
     let node_b_admin_pubkey = admin_pubkey(node_b);
     // Get the third node in the network
     let node_c = network.node(2).expect("Unable to get third node");
-    let node_c_admin_pubkey = admin_pubkey(node_b);
+    let node_c_admin_pubkey = admin_pubkey(node_c);
 
     let circuit_id = "ABCDE-01234";
     commit_3_party_circuit(circuit_id, node_a, node_b, node_c, AuthorizationType::Trust);
@@ -596,7 +594,7 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
     // Wait for the proposal event from each node.
     let proposal_a_event = node_a_events.next().expect("Unable to get next event");
     let proposal_b_event = node_b_events.next().expect("Unable to get next event");
-    let proposal_c_event = node_b_events.next().expect("Unable to get next event");
+    let proposal_c_event = node_c_events.next().expect("Unable to get next event");
 
     assert_eq!(&EventType::ProposalSubmitted, proposal_a_event.event_type());
     assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
