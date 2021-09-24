@@ -1,5 +1,142 @@
 # Release Notes
 
+## Changes in Splinter 0.5.19
+
+### Highlights
+
+* The experimental `metrics` feature has been renamed to `tap` and stabilized.
+
+* The use of PeerAuthorizationToken as the Peer ID has been replaced by
+  `PeerTokenPair` which is made up of both the other nodes authorization type
+  and the local authorization type used for the local node.
+
+* Simple back-pressure has been added to the scabbard `/batches` route. If
+  there are more than 30 pending batches, the scabbard route will start
+  rejecting the batch and returning TOO_MANY_REQUESTS, until the batch queue
+  reduces by half.
+
+### libsplinter
+
+* Update `metrics` feature to use v0.17 of metrics in libsplinter. Due to
+  change in v0.17 the `metrics` feature was renamed to `tap` to avoid
+  conflicts.
+
+* Make `InfluxRecorder::new` private, `InfluxRecorder::init` should be used
+  instead.  The `InfluxRecorder` is available behind the `tap` feature.
+
+* Remove clones from `InfluxRecorder`. This change removes clones from the
+  influx recorder, reducing the clones of entire strings. While small, metrics
+  will happen frequently as more metrics are added, so its performance impact
+  should be as minimal as possible.  The `InfluxRecorder` is available behind
+  the `tap` feature.
+
+* Add connection_id to `ConnectionManagerNotification::Disconnected` and
+  `ConnectionManagerNotification::NonFatalConnectionError`. This will help with
+  switching peers to be uniquely identified by the identity and the local
+  identity used.
+
+* Add picked public key to `AuthChallengeSubmitResponse`. This will allow the
+  node to know which public key is being used as their identity on the other
+  node in the case multiple submit requests were used.
+
+* Add local authorization type to` InboundConnection` notification. Because
+  peer connections need to be identified by both the peer's authorization as
+  well as how the local node was authorized, inbound connections need to return
+  this information in the notification.
+
+* Update the `InprocAuthorizer` constructor to require the node ID so it can be
+  added as the local authorization.
+
+* Add local identity to `ConnectionManagerNotification::Connected`
+  notification. Because peer connections need to be identified by both the
+  peer's authorization as well as how the local node was authorized, outbound
+  connections need to return this information in the notification.
+
+* Add `PeerTokenPair` for unique peer identification. Since with
+  `challenge-authorization` a peer can have several connections based on the
+  combinations of different local and remote authorization types, a peer must
+  be uniquely identified by both the authorization type of the peer and how the
+  local peer identified.
+
+* Replace `PeerAuthorizationToken` with `PeerTokenPair` which contains both the
+  peer's authorization along with the local nodes authorization type. This is
+  required because a node should be able to connect to another node over
+  different connections using different public keys.
+
+* Update the `PeerManager`, `PeerMap`, `PeerConnector` and `PeerInterconnect`
+  to use `PeerTokenPair` as the Peer ID for the peers.
+
+* Update Dispatcher `PeerID` to use `PeerTokenPair` along with all of the
+  message handlers.
+
+* Update Admin service to use `PeerTokenPai`r. This required an update to the
+  admin service hack so the admin service id has been updated to include both
+  the peers public key and the local nodes id
+  "admin::public_key::PUBLIC_KEY::public_key::PUBLIC_KEY"
+
+* Replace panics in Authorization handlers to return an `InternalError` instead
+  of panic.
+
+* Add InternalError to `DispatchError`. This required removing `PartialEq` from
+  the error.
+
+* Move creation of accepted authorization list to the
+  `AuthProtocolRequestHandlerBuilder`. Before this was done in the handler
+  itself.
+
+* Rename Local/Remote state machine structs to Initiating/Accepting. This will
+   hopefully make it more clear which state is for which node in the
+   authorization processes.
+
+* Add experimental commit-store feature for database backed commit hash stores.
+
+### splinterd
+
+* Update `metrics-*` arguments to `influx-*`. The arguments in splinterd are
+  now:
+
+```
+--influx-db <db_name> The name of the InfluxDB database for metrics collection
+
+--influx-password <password> The password used for authorization with the
+InfluxDB
+
+--influx-url <url> The URL to connect the InfluxDB database for metrics
+collection
+
+--influx-username <username> The username used for authorization with the
+InfluxDB
+
+```
+
+* Stabilize `tap` features. This enables sending metrics to an InfluxDB
+  instance.
+
+### libscabbard
+
+* Remove `"factory-builder"` feature.  This feature was unnecessary and is
+  required to allow for different storage configurations.
+
+* Remove `"ScabbardFactory::new"`. The `ScabbardFactory` must now be
+  constructed via the `ScabbardFactoryBuilder`.
+
+* Stabilize `back-pressure` feature by removing it.
+
+* Stabilize `metrics` in scabbard.
+
+### splinter CLI
+
+* Fix looping database error message for insufficient file permissions to
+  sqlite databases.
+
+* Breakout list of endpoints in `splinter circuit show`. The endpoints will now
+  be listed separately:
+  ```
+      Endpoints:
+          tcp://127.0.0.1:18044
+          tcp://127.0.0.1:18044
+  ```
+
 ## Changes in Splinter 0.5.18
 
 ### Highlights
