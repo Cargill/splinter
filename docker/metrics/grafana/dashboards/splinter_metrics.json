@@ -448,12 +448,19 @@
       "steppedLine": false,
       "targets": [
         {
+          "alias": "committed batches [[tag_service]]",
           "groupBy": [
             {
               "params": [
                 "$__interval"
               ],
               "type": "time"
+            },
+            {
+              "params": [
+                "service"
+              ],
+              "type": "tag"
             },
             {
               "params": [
