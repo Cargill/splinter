@@ -95,6 +95,10 @@ impl CommitHashStore for LmdbCommitHashStore {
 
         Ok(())
     }
+
+    fn clone_boxed(&self) -> Box<dyn CommitHashStore> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(test)]
