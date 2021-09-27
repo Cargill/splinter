@@ -12,48 +12,52 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "log-config")]
-use log::Level;
-use log4rs::append::console::ConsoleAppender;
-use log4rs::append::console::Target;
-use log4rs::append::file::FileAppender;
-use log4rs::append::rolling_file::policy::compound::roll::delete::DeleteRoller;
-use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
-use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
-use log4rs::append::rolling_file::policy::Policy;
-use log4rs::append::rolling_file::RollingFileAppender;
-use log4rs::append::Append;
-use log4rs::config::runtime::ConfigErrors;
-use log4rs::config::Appender;
-use log4rs::config::Logger;
-use log4rs::config::Root;
-use log4rs::encode::pattern::PatternEncoder;
-use log4rs::encode::Encode;
-use log4rs::Config;
 use std::convert::{From, Into, TryInto};
 
-use super::{AppenderConfig, LogConfig, LoggerConfig, RootConfig};
+use log::Level;
+use log4rs::{
+    append::{
+        console::{ConsoleAppender, Target},
+        file::FileAppender,
+        rolling_file::{
+            policy::{
+                compound::{
+                    roll::delete::DeleteRoller, trigger::size::SizeTrigger, CompoundPolicy,
+                },
+                Policy,
+            },
+            RollingFileAppender,
+        },
+        Append,
+    },
+    config::{runtime::ConfigErrors, Appender, Logger, Root},
+    encode::{pattern::PatternEncoder, Encode},
+    Config,
+};
+
+use crate::config::{AppenderConfig, LogConfig, LogTarget, LoggerConfig, RootConfig};
 
 impl TryInto<Appender> for AppenderConfig {
     type Error = std::io::Error;
     fn try_into(self) -> Result<Appender, Self::Error> {
-        use super::LogTarget::*;
         let encoder: Box<dyn Encode> = Box::new(PatternEncoder::new(&self.encoder));
         let boxed: Box<dyn Append> = match &self.kind {
-            Stdout => Box::new(
+            LogTarget::Stdout => Box::new(
                 ConsoleAppender::builder()
                     .encoder(encoder)
                     .target(Target::Stdout)
                     .build(),
             ),
-            Stderr => Box::new(
+            LogTarget::Stderr => Box::new(
                 ConsoleAppender::builder()
                     .encoder(encoder)
                     .target(Target::Stderr)
                     .build(),
             ),
-            File(path) => Box::new(FileAppender::builder().encoder(encoder).build(path)?),
-            RollingFile { filename, size } => {
+            LogTarget::File(path) => {
+                Box::new(FileAppender::builder().encoder(encoder).build(path)?)
+            }
+            LogTarget::RollingFile { filename, size } => {
                 let trigger = Box::new(SizeTrigger::new(*size));
                 let roll = Box::new(DeleteRoller::new());
                 let policy: Box<dyn Policy> = Box::new(CompoundPolicy::new(trigger, roll));
@@ -87,7 +91,6 @@ impl From<RootConfig> for Root {
     }
 }
 
-#[cfg(feature = "log-config")]
 impl RootConfig {
     fn set_level(self, level: Level) -> Self {
         Self { level, ..self }
@@ -109,7 +112,6 @@ impl TryInto<Config> for LogConfig {
     }
 }
 
-#[cfg(feature = "log-config")]
 impl LogConfig {
     pub fn set_root_level(self, level: Level) -> Self {
         Self {

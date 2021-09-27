@@ -17,11 +17,12 @@
 use crate::config::PartialConfigBuilder;
 use crate::config::{ConfigError, ConfigSource, PartialConfig};
 #[cfg(feature = "log-config")]
-use crate::logging::{UnnamedAppenderConfig, UnnamedLoggerConfig};
-#[cfg(feature = "log-config")]
 use serde_derive::Deserialize;
 #[cfg(feature = "log-config")]
 use std::collections::HashMap;
+
+#[cfg(feature = "log-config")]
+use super::logging::{UnnamedAppenderConfig, UnnamedLoggerConfig};
 
 /// `TOML_VERSION` represents the version of the toml config file.
 /// The version determines the most current valid toml config entries.

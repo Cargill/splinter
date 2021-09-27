@@ -12,18 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::Level;
-use serde::Deserialize;
 use std::convert::From;
 use std::convert::TryFrom;
 
-use crate::config::ConfigError;
+use log::Level;
+use serde::Deserialize;
 
-mod bytes;
-mod log4rs;
+use super::bytes::ByteSize;
+use super::error::ConfigError;
 
-use self::bytes::ByteSize;
-pub const DEFAULT_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
+pub const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
+
+fn default_pattern() -> String {
+    String::from(DEFAULT_LOGGING_PATTERN)
+}
 
 #[derive(Clone, Debug)]
 pub struct LogConfig {
@@ -34,9 +36,9 @@ pub struct LogConfig {
 
 #[derive(Clone, Debug)]
 pub struct LoggerConfig {
-    name: String,
-    appenders: Vec<String>,
-    level: Level,
+    pub name: String,
+    pub appenders: Vec<String>,
+    pub level: Level,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -89,25 +91,20 @@ pub enum RawLogTarget {
     RollingFile,
 }
 
-fn default_pattern() -> String {
-    String::from(DEFAULT_PATTERN)
-}
-
 impl TryFrom<(String, UnnamedAppenderConfig)> for AppenderConfig {
     type Error = ConfigError;
     fn try_from(value: (String, UnnamedAppenderConfig)) -> Result<Self, Self::Error> {
-        use RawLogTarget::*;
         let kind = match value.1.kind {
-            Stdout => Ok(LogTarget::Stdout),
-            Stderr => Ok(LogTarget::Stderr),
-            File => {
+            RawLogTarget::Stdout => Ok(LogTarget::Stdout),
+            RawLogTarget::Stderr => Ok(LogTarget::Stderr),
+            RawLogTarget::File => {
                 if let Some(filename) = value.1.filename {
                     Ok(LogTarget::File(filename))
                 } else {
                     Err(ConfigError::MissingValue("filename".to_string()))
                 }
             }
-            RollingFile => {
+            RawLogTarget::RollingFile => {
                 if let (Some(filename), Some(size)) = (value.1.filename, value.1.size) {
                     let size = size.get_mem_size();
                     Ok(LogTarget::RollingFile { filename, size })

@@ -25,8 +25,9 @@ use std::path::Path;
 
 use crate::config::error::ConfigError;
 use crate::config::{Config, ConfigSource, PartialConfig};
+
 #[cfg(feature = "log-config")]
-use crate::logging::AppenderConfig;
+use super::logging::AppenderConfig;
 
 pub trait PartialConfigBuilder {
     /// Takes all values set in a config object to create a `PartialConfig` object.
