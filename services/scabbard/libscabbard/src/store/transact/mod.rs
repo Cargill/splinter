@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! LMDB-backed CommitHashStore implementations.
+//! Transact-backed CommitHashStore implementations.
 
 use splinter::error::{InternalError, InvalidArgumentError, InvalidStateError};
 use transact::database::{lmdb::LmdbDatabase, Database, DatabaseError};
@@ -23,23 +23,30 @@ use super::{CommitHashStore, CommitHashStoreError};
 
 const CURRENT_STATE_ROOT_INDEX: &str = "current_state_root";
 
-/// Provides commit log storage using an LMDB database in a legacy configuration.
+/// Provides an LMDB-backed CommitHashStore.
+pub type LmdbCommitHashStore = TransactCommitHashStore<LmdbDatabase>;
+
+/// Provides commit log storage using an Transact database in a legacy configuration.
 ///
-/// The legacy database configuration requires a index "current_state_root" configured on the
-/// database instance.  This is expected externally. It also doesn't support multiple services per
-/// store, as it expects a unique DB instance per store.
-pub struct LmdbCommitHashStore {
-    db: LmdbDatabase,
+/// The database configuration requires a index "current_state_root" configured on the database
+/// instance.  This is expected externally. It also doesn't support multiple services per store, as
+/// it expects a unique DB instance per store.
+#[derive(Clone)]
+pub struct TransactCommitHashStore<D>
+where
+    D: Database + Clone + 'static,
+{
+    db: D,
 }
 
-impl LmdbCommitHashStore {
-    /// Constructs a new commit log store around an LMDB database instance.
-    pub fn new(db: LmdbDatabase) -> Self {
+impl<D: Database + Clone> TransactCommitHashStore<D> {
+    /// Constructs a new commit log store around an Transact database instance.
+    pub fn new(db: D) -> Self {
         Self { db }
     }
 }
 
-impl CommitHashStore for LmdbCommitHashStore {
+impl<D: Database + Clone> CommitHashStore for TransactCommitHashStore<D> {
     fn get_current_commit_hash(&self) -> Result<Option<String>, CommitHashStoreError> {
         let reader = self
             .db
@@ -113,7 +120,10 @@ mod tests {
     use std::thread;
 
     use transact::{
-        database::{lmdb::LmdbContext, DatabaseError},
+        database::{
+            lmdb::{LmdbContext, LmdbDatabase},
+            DatabaseError,
+        },
         state::merkle::INDEXES,
     };
 
