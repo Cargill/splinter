@@ -26,7 +26,7 @@ pub use error::CommitHashStoreError;
 ///
 /// The commit hash, for Scabbard's purposes is the current state root hash of the Merkle-Radix
 /// tree after transactions have been applied.
-pub trait CommitHashStore {
+pub trait CommitHashStore: Sync + Send {
     /// Returns the current commit hash for the instance
     fn get_current_commit_hash(&self) -> Result<Option<String>, CommitHashStoreError>;
 
