@@ -29,7 +29,6 @@ pub fn to_hex(bytes: &[u8]) -> String {
     buf
 }
 
-#[cfg(any(feature = "admin-service", feature = "challenge-authorization"))]
 pub fn parse_hex(hex: &str) -> Result<Vec<u8>, HexError> {
     if hex.len() % 2 != 0 {
         return Err(HexError {

@@ -29,7 +29,6 @@ use crate::consensus::{
     ProposalUpdate,
 };
 use crate::consensus::{ConsensusEngine, StartupState};
-#[cfg(feature = "challenge-authorization")]
 use crate::error::InvalidStateError;
 use crate::hex::to_hex;
 use crate::peer::PeerTokenPair;
@@ -216,7 +215,6 @@ impl ProposalManager for AdminProposalManager {
                 .list_nodes()
                 .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?;
 
-            #[cfg(feature = "challenge-authorization")]
             let local_node = circuit_proposal
                 .get_circuit_proposal()
                 .get_node_token(shared.node_id())
@@ -235,12 +233,8 @@ impl ProposalManager for AdminProposalManager {
                     network_sender
                         .send(
                             &admin_service_id(
-                                &PeerTokenPair::new(
-                                    node.token.clone(),
-                                    #[cfg(feature = "challenge-authorization")]
-                                    local_node.clone(),
-                                )
-                                .id_as_string(),
+                                &PeerTokenPair::new(node.token.clone(), local_node.clone())
+                                    .id_as_string(),
                             ),
                             &envelope_bytes,
                         )

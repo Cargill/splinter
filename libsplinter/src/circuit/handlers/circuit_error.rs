@@ -90,7 +90,6 @@ impl Handler for CircuitErrorHandler {
                         .get_peer_auth_token(circuit.authorization_type())
                         .map_err(|err| DispatchError::HandleError(err.to_string()))?;
 
-                    #[cfg(feature = "challenge-authorization")]
                     let local_peer_id = self
                         .routing_table
                         .get_node(&self.node_id)
@@ -104,11 +103,7 @@ impl Handler for CircuitErrorHandler {
                         .get_peer_auth_token(circuit.authorization_type())
                         .map_err(|err| DispatchError::HandleError(err.to_string()))?;
 
-                    PeerTokenPair::new(
-                        peer_id,
-                        #[cfg(feature = "challenge-authorization")]
-                        local_peer_id,
-                    )
+                    PeerTokenPair::new(peer_id, local_peer_id)
                 }
             }
             None => {
@@ -155,7 +150,6 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
-    #[cfg(feature = "challenge-authorization")]
     use crate::circuit::routing::AuthorizationType;
     use crate::circuit::routing::{
         memory::RoutingTable, Circuit, CircuitNode, RoutingTableWriter, Service,
@@ -177,18 +171,8 @@ mod tests {
         let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
         let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let node_123 = CircuitNode::new(
-            "123".to_string(),
-            vec!["123.0.0.1:0".to_string()],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-        );
-        let node_345 = CircuitNode::new(
-            "345".to_string(),
-            vec!["123.0.0.1:1".to_string()],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-        );
+        let node_123 = CircuitNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()], None);
+        let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()], None);
 
         let mut service_abc = Service::new(
             "abc".to_string(),
@@ -208,7 +192,6 @@ mod tests {
             "alpha".into(),
             vec![service_abc.clone(), service_def.clone()],
             vec!["123".into(), "345".into()],
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Trust,
         );
 
@@ -224,12 +207,10 @@ mod tests {
         let def_id = ServiceId::new("alpha".into(), "def".into());
         service_abc.set_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("abc_network"),
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::from_peer_id("123"),
         ));
         service_def.set_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("def_network"),
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::from_peer_id("345"),
         ));
         writer.add_service(abc_id, service_abc).unwrap();
@@ -253,7 +234,6 @@ mod tests {
             .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("345"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("123"),
                 )
                 .into(),
@@ -268,7 +248,6 @@ mod tests {
             id.into(),
             PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("abc_network"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("123"),
             ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
@@ -297,18 +276,8 @@ mod tests {
         let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
         let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let node_123 = CircuitNode::new(
-            "123".to_string(),
-            vec!["123.0.0.1:0".to_string()],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-        );
-        let node_345 = CircuitNode::new(
-            "345".to_string(),
-            vec!["123.0.0.1:1".to_string()],
-            #[cfg(feature = "challenge-authorization")]
-            None,
-        );
+        let node_123 = CircuitNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()], None);
+        let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()], None);
 
         let mut service_abc = Service::new(
             "abc".to_string(),
@@ -328,7 +297,6 @@ mod tests {
             "alpha".into(),
             vec![service_abc.clone(), service_def.clone()],
             vec!["123".into(), "345".into()],
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Trust,
         );
 
@@ -344,12 +312,10 @@ mod tests {
         let def_id = ServiceId::new("alpha".into(), "def".into());
         service_abc.set_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("abc_network"),
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::from_peer_id("123"),
         ));
         service_def.set_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("def_network"),
-            #[cfg(feature = "challenge-authorization")]
             PeerAuthorizationToken::from_peer_id("345"),
         ));
 
@@ -374,7 +340,6 @@ mod tests {
             .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("568"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("345"),
                 )
                 .into(),
@@ -389,7 +354,6 @@ mod tests {
             id.into(),
             PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("345"),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_peer_id("123"),
             ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
@@ -434,7 +398,6 @@ mod tests {
             .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("def"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("345"),
                 )
                 .into(),
@@ -452,7 +415,6 @@ mod tests {
             .send(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("def"),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("345"),
                 )
                 .into(),

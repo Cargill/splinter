@@ -35,7 +35,6 @@ use crate::protocol::network::NetworkMessage;
 use crate::protocol::{PEER_AUTHORIZATION_PROTOCOL_MIN, PEER_AUTHORIZATION_PROTOCOL_VERSION};
 use crate::protos::network;
 use crate::protos::prelude::*;
-#[cfg(feature = "challenge-authorization")]
 use crate::public_key::PublicKey;
 use crate::transport::{Connection, RecvError};
 
@@ -168,12 +167,8 @@ impl AuthorizationConnector {
         &self,
         connection_id: String,
         connection: Box<dyn Connection>,
-        #[cfg(feature = "challenge-authorization")] expected_authorization: Option<
-            ConnectionAuthorizationType,
-        >,
-        #[cfg(feature = "challenge-authorization")] local_authorization: Option<
-            ConnectionAuthorizationType,
-        >,
+        expected_authorization: Option<ConnectionAuthorizationType>,
+        local_authorization: Option<ConnectionAuthorizationType>,
         on_complete_callback: Callback,
     ) -> Result<(), AuthorizationManagerError> {
         let mut connection = connection;
@@ -196,16 +191,16 @@ impl AuthorizationConnector {
 
         // mut is required if chalenge authorization is enabled
         #[allow(unused_mut)]
-        let mut dispatcher_builder =
-            AuthorizationDispatchBuilder::new().with_identity(&self.local_identity);
+        let mut dispatcher_builder = AuthorizationDispatchBuilder::new()
+            .with_identity(&self.local_identity)
+            .with_expected_authorization(expected_authorization)
+            .with_local_authorization(local_authorization);
 
         #[cfg(feature = "challenge-authorization")]
         {
             dispatcher_builder = dispatcher_builder
                 .with_signers(&self.signers)
                 .with_nonce(&nonce)
-                .with_expected_authorization(expected_authorization)
-                .with_local_authorization(local_authorization)
                 .with_verifier(verifier)
         }
 
@@ -351,11 +346,9 @@ impl AuthorizationConnector {
                     Identity::Trust { identity } => ConnectionAuthorizationState::Authorized {
                         connection_id,
                         connection,
-                        #[cfg(feature = "challenge-authorization")]
                         expected_authorization:  ConnectionAuthorizationType::Trust {
                             identity: identity.clone()
                         },
-                        #[cfg(feature = "challenge-authorization")]
                         local_authorization: local_authorization.into(),
                         identity: ConnectionAuthorizationType::Trust { identity },
                     },
@@ -470,13 +463,8 @@ impl ManagedAuthorizations {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConnectionAuthorizationType {
-    Trust {
-        identity: String,
-    },
-    #[cfg(feature = "challenge-authorization")]
-    Challenge {
-        public_key: PublicKey,
-    },
+    Trust { identity: String },
+    Challenge { public_key: PublicKey },
 }
 
 pub enum ConnectionAuthorizationState {
@@ -485,9 +473,7 @@ pub enum ConnectionAuthorizationState {
         identity: ConnectionAuthorizationType,
         connection: Box<dyn Connection>,
         // information required if reconnect needs to be attempted
-        #[cfg(feature = "challenge-authorization")]
         expected_authorization: ConnectionAuthorizationType,
-        #[cfg(feature = "challenge-authorization")]
         local_authorization: ConnectionAuthorizationType,
     },
     Unauthorized {

@@ -19,7 +19,6 @@ use cylinder::{Signer, Verifier};
 
 use crate::error::InvalidStateError;
 use crate::network::auth::AuthorizationManagerStateMachine;
-#[cfg(feature = "challenge-authorization")]
 use crate::network::auth::ConnectionAuthorizationType;
 use crate::network::dispatch::{ConnectionId, Dispatcher, MessageSender};
 use crate::protos::network::NetworkMessageType;
@@ -55,9 +54,7 @@ pub struct AuthorizationDispatchBuilder {
     signers: Option<Vec<Box<dyn Signer>>>,
     #[cfg(feature = "challenge-authorization")]
     nonce: Option<Vec<u8>>,
-    #[cfg(feature = "challenge-authorization")]
     expected_authorization: Option<ConnectionAuthorizationType>,
-    #[cfg(feature = "challenge-authorization")]
     local_authorization: Option<ConnectionAuthorizationType>,
     #[cfg(feature = "challenge-authorization")]
     verifier: Option<Box<dyn Verifier>>,
@@ -105,7 +102,6 @@ impl AuthorizationDispatchBuilder {
     /// # Arguments
     ///
     ///  * `expected_authorization` - The expected authorization type of the connecting connection
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_expected_authorization(
         mut self,
         expected_authorization: Option<ConnectionAuthorizationType>,
@@ -119,7 +115,6 @@ impl AuthorizationDispatchBuilder {
     /// # Arguments
     ///
     ///  * `local_authorization` - The authorization type the local node must use to connect
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_local_authorization(
         mut self,
         local_authorization: Option<ConnectionAuthorizationType>,
@@ -199,12 +194,9 @@ impl AuthorizationDispatchBuilder {
             let mut auth_protocol_request_builder = AuthProtocolRequestHandlerBuilder::default()
                 .with_auth_manager(auth_manager.clone());
 
-            #[cfg(feature = "challenge-authorization")]
-            {
-                auth_protocol_request_builder = auth_protocol_request_builder
-                    .with_expected_authorization(self.expected_authorization.clone())
-                    .with_local_authorization(self.local_authorization.clone())
-            }
+            auth_protocol_request_builder = auth_protocol_request_builder
+                .with_expected_authorization(self.expected_authorization.clone())
+                .with_local_authorization(self.local_authorization.clone());
 
             auth_dispatcher.set_handler(Box::new(auth_protocol_request_builder.build()?));
 
@@ -216,10 +208,12 @@ impl AuthorizationDispatchBuilder {
                 auth_protocol_response_builder =
                     auth_protocol_response_builder.with_identity(&identity);
             }
-            #[cfg(feature = "challenge-authorization")]
+
+            // allow redundant clone, required if challenge-authorization is enabled
+            #[allow(clippy::redundant_clone)]
             {
                 auth_protocol_response_builder = auth_protocol_response_builder
-                    .with_required_local_auth(self.local_authorization.clone())
+                    .with_required_local_auth(self.local_authorization.clone());
             }
 
             auth_dispatcher.set_handler(Box::new(auth_protocol_response_builder.build()?));

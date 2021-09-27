@@ -24,9 +24,7 @@ use super::{AuthProtocolRequestHandler, AuthProtocolResponseHandler};
 #[derive(Default)]
 pub struct AuthProtocolRequestHandlerBuilder {
     auth_manager: Option<AuthorizationManagerStateMachine>,
-    #[cfg(feature = "challenge-authorization")]
     expected_authorization: Option<ConnectionAuthorizationType>,
-    #[cfg(feature = "challenge-authorization")]
     local_authorization: Option<ConnectionAuthorizationType>,
 }
 
@@ -36,7 +34,6 @@ impl AuthProtocolRequestHandlerBuilder {
         self
     }
 
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_expected_authorization(
         mut self,
         expected_authorization: Option<ConnectionAuthorizationType>,
@@ -45,7 +42,6 @@ impl AuthProtocolRequestHandlerBuilder {
         self
     }
 
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_local_authorization(
         mut self,
         local_authorization: Option<ConnectionAuthorizationType>,
@@ -72,28 +68,40 @@ impl AuthProtocolRequestHandlerBuilder {
         // we do not have an expected authorization type we want to include all of the
         // supported authorization types so the other side can make the decision on what
         // type of authorization to do.
-        #[cfg(feature = "challenge-authorization")]
         match self.expected_authorization {
             #[cfg(feature = "trust-authorization")]
             Some(ConnectionAuthorizationType::Trust { .. }) => (),
+            #[cfg(feature = "challenge-authorization")]
             Some(ConnectionAuthorizationType::Challenge { .. }) => {
                 accepted_authorizations = vec![PeerAuthorizationType::Challenge]
             }
             // if None, check required local authorization type as well
             _ => {
+                // allow single match, not a single match if challenge-authorization is enabled
+                #[allow(clippy::single_match)]
                 match self.local_authorization {
                     #[cfg(feature = "trust-authorization")]
                     Some(ConnectionAuthorizationType::Trust { .. }) => (),
+                    #[cfg(feature = "challenge-authorization")]
                     Some(ConnectionAuthorizationType::Challenge { .. }) => {
                         accepted_authorizations = vec![PeerAuthorizationType::Challenge]
                     }
+                    #[cfg(feature = "challenge-authorization")]
                     _ => {
                         // if trust is enabled it was already added
                         accepted_authorizations.push(PeerAuthorizationType::Challenge)
                     }
+                    #[cfg(not(feature = "challenge-authorization"))]
+                    _ => (),
                 }
             }
         };
+
+        if accepted_authorizations.is_empty() {
+            return Err(InvalidStateError::with_message(
+                "No accepted authorization types could be added".to_string(),
+            ));
+        }
 
         Ok(AuthProtocolRequestHandler {
             auth_manager,
@@ -123,7 +131,6 @@ impl AuthProtocolResponseHandlerBuilder {
         self
     }
 
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_required_local_auth(
         mut self,
         required_local_auth: Option<ConnectionAuthorizationType>,

@@ -102,7 +102,6 @@ pub trait ServiceNetworkSender: Send {
 
     /// Send the message bytes to the given recipient (another service) with a configurable
     /// message sender
-    #[cfg(feature = "challenge-authorization")]
     fn send_with_sender(
         &mut self,
         recipient: &str,

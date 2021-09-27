@@ -187,10 +187,7 @@ impl TryFrom<&ProposedCircuit> for Vec<ProposedNodeModel> {
                             "Unable to convert index into i32".to_string(),
                         ))
                     })?,
-                    #[cfg(feature = "challenge-authorization")]
                     public_key: node.public_key().clone(),
-                    #[cfg(not(feature = "challenge-authorization"))]
-                    public_key: None,
                 })
             })
             .collect::<Result<Vec<ProposedNodeModel>, AdminServiceStoreError>>()
@@ -464,10 +461,7 @@ impl TryFrom<&Circuit> for Vec<CircuitMemberModel> {
                             "Unable to convert index into i32".to_string(),
                         ))
                     })?,
-                    #[cfg(feature = "challenge-authorization")]
                     public_key: node.public_key().clone(),
-                    #[cfg(not(feature = "challenge-authorization"))]
-                    public_key: None,
                 })
             })
             .collect::<Result<Vec<CircuitMemberModel>, AdminServiceStoreError>>()
@@ -980,7 +974,6 @@ impl TryFrom<String> for AuthorizationType {
     fn try_from(variant: String) -> Result<Self, Self::Error> {
         match variant.as_ref() {
             "Trust" => Ok(AuthorizationType::Trust),
-            #[cfg(feature = "challenge-authorization")]
             "Challenge" => Ok(AuthorizationType::Challenge),
             _ => Err(AdminServiceStoreError::InvalidStateError(
                 InvalidStateError::with_message(
@@ -995,7 +988,6 @@ impl From<&AuthorizationType> for String {
     fn from(variant: &AuthorizationType) -> Self {
         match variant {
             AuthorizationType::Trust => String::from("Trust"),
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Challenge => String::from("Challenge"),
         }
     }
@@ -1005,7 +997,6 @@ impl From<&messages::AuthorizationType> for String {
     fn from(variant: &messages::AuthorizationType) -> Self {
         match variant {
             messages::AuthorizationType::Trust => String::from("Trust"),
-            #[cfg(feature = "challenge-authorization")]
             messages::AuthorizationType::Challenge => String::from("Challenge"),
         }
     }

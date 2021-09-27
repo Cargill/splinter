@@ -15,7 +15,6 @@
 use std::collections::BTreeMap;
 
 use crate::admin::store::{Circuit, CircuitNode, CircuitStatus, Service};
-#[cfg(feature = "challenge-authorization")]
 use crate::hex::to_hex;
 use crate::rest_api::paging::Paging;
 
@@ -91,7 +90,6 @@ impl From<String> for CircuitStatus {
 pub(crate) struct CircuitNodeResponse<'a> {
     pub node_id: &'a str,
     pub endpoints: &'a [String],
-    #[cfg(feature = "challenge-authorization")]
     pub public_key: Option<String>,
 }
 
@@ -100,7 +98,6 @@ impl<'a> From<&'a CircuitNode> for CircuitNodeResponse<'a> {
         Self {
             node_id: node_def.node_id(),
             endpoints: node_def.endpoints(),
-            #[cfg(feature = "challenge-authorization")]
             public_key: node_def
                 .public_key()
                 .as_ref()

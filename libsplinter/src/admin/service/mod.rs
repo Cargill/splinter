@@ -300,7 +300,6 @@ impl AdminService {
                     let peer_ref = self.peer_connector.add_peer_ref(
                         member.token.clone(),
                         member.endpoints.to_vec(),
-                        #[cfg(feature = "challenge-authorization")]
                         local_required_auth.clone(),
                     );
                     if let Ok(peer_ref) = peer_ref {
@@ -310,11 +309,7 @@ impl AdminService {
                     }
 
                     token_to_peer.insert(
-                        PeerTokenPair::new(
-                            member.token.clone(),
-                            #[cfg(feature = "challenge-authorization")]
-                            local_required_auth.clone(),
-                        ),
+                        PeerTokenPair::new(member.token.clone(), local_required_auth.clone()),
                         PeerNodePair {
                             peer_node: member.clone(),
                             local_peer_token: local_required_auth.clone(),
@@ -356,7 +351,6 @@ impl AdminService {
                     routing::CircuitNode::new(
                         node.node_id().to_string(),
                         node.endpoints().to_vec(),
-                        #[cfg(feature = "challenge-authorization")]
                         node.public_key().clone(),
                     )
                 })
@@ -373,7 +367,6 @@ impl AdminService {
                             .iter()
                             .map(|node| node.node_id().to_string())
                             .collect(),
-                        #[cfg(feature = "challenge-authorization")]
                         circuit.authorization_type().into(),
                     ),
                     routing_members,
@@ -498,7 +491,6 @@ impl AdminService {
                     let peer_ref = self.peer_connector.add_peer_ref(
                         member.token.clone(),
                         member.endpoints.to_vec(),
-                        #[cfg(feature = "challenge-authorization")]
                         local_required_auth.clone(),
                     );
 
@@ -509,11 +501,7 @@ impl AdminService {
                     }
 
                     token_to_peer.insert(
-                        PeerTokenPair::new(
-                            member.token.clone(),
-                            #[cfg(feature = "challenge-authorization")]
-                            local_required_auth.clone(),
-                        ),
+                        PeerTokenPair::new(member.token.clone(), local_required_auth.clone()),
                         PeerNodePair {
                             peer_node: member.clone(),
                             local_peer_token: local_required_auth.clone(),
@@ -1039,7 +1027,6 @@ mod tests {
                     "other-node".to_string(),
                 ),
             ],
-            #[cfg(feature = "challenge-authorization")]
             "test-node".to_string(),
         );
 
@@ -1325,7 +1312,6 @@ mod tests {
             Box::new(self.clone())
         }
 
-        #[cfg(feature = "challenge-authorization")]
         fn send_with_sender(
             &mut self,
             recipient: &str,

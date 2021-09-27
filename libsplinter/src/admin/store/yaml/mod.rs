@@ -1644,7 +1644,6 @@ impl From<ProposedNode> for YamlProposedNode {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum YamlAuthorizationType {
     Trust,
-    #[cfg(feature = "challenge-authorization")]
     Challenge,
 }
 
@@ -1652,7 +1651,6 @@ impl From<AuthorizationType> for YamlAuthorizationType {
     fn from(authorization_type: AuthorizationType) -> Self {
         match authorization_type {
             AuthorizationType::Trust => YamlAuthorizationType::Trust,
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Challenge => YamlAuthorizationType::Challenge,
         }
     }
@@ -1662,7 +1660,6 @@ impl From<YamlAuthorizationType> for AuthorizationType {
     fn from(yaml_authorization_type: YamlAuthorizationType) -> Self {
         match yaml_authorization_type {
             YamlAuthorizationType::Trust => AuthorizationType::Trust,
-            #[cfg(feature = "challenge-authorization")]
             YamlAuthorizationType::Challenge => AuthorizationType::Challenge,
         }
     }

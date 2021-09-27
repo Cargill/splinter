@@ -27,7 +27,6 @@ use crate::error::InvalidStateError;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::ServiceOrchestrator;
 use crate::peer::PeerManagerConnector;
-#[cfg(feature = "challenge-authorization")]
 use crate::public_key::PublicKey;
 #[cfg(feature = "service-arg-validation")]
 use crate::service::validation::ServiceArgValidator;
@@ -56,7 +55,6 @@ pub struct AdminServiceBuilder {
     coordinator_timeout: Option<Duration>,
     routing_table_writer: Option<Box<dyn RoutingTableWriter>>,
     event_store: Option<Box<dyn AdminServiceStore>>,
-    #[cfg(feature = "challenge-authorization")]
     public_keys: Option<Vec<PublicKey>>,
 }
 
@@ -155,7 +153,6 @@ impl AdminServiceBuilder {
     }
 
     /// Sets the public keys
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_public_keys(mut self, public_keys: Vec<PublicKey>) -> Self {
         self.public_keys = Some(public_keys);
 
@@ -225,7 +222,6 @@ impl AdminServiceBuilder {
 
         let service_id = admin_service_id(&node_id);
 
-        #[cfg(feature = "challenge-authorization")]
         let public_keys = self.public_keys.unwrap_or_default();
 
         let admin_service_shared = Arc::new(Mutex::new(AdminServiceShared::new(
@@ -240,7 +236,6 @@ impl AdminServiceBuilder {
             key_permission_manager,
             routing_table_writer,
             admin_event_store,
-            #[cfg(feature = "challenge-authorization")]
             public_keys,
         )));
 

@@ -19,11 +19,7 @@ use crate::protos::admin::{Circuit, Circuit_AuthorizationType};
 use super::{admin_service_id, PeerAuthorizationTokenReader, PeerNode};
 
 impl PeerAuthorizationTokenReader for Circuit {
-    fn list_tokens(
-        &self,
-        #[cfg(feature = "challenge-authorization")] local_node: &str,
-    ) -> Result<Vec<PeerTokenPair>, InvalidStateError> {
-        #[cfg(feature = "challenge-authorization")]
+    fn list_tokens(&self, local_node: &str) -> Result<Vec<PeerTokenPair>, InvalidStateError> {
         let local_required_auth = self.get_node_token(local_node)?.ok_or_else(|| {
             InvalidStateError::with_message(format!(
                 "Requested local node {} does not exist in the circuit",
@@ -36,10 +32,8 @@ impl PeerAuthorizationTokenReader for Circuit {
             .map(|member| match self.get_authorization_type() {
                 Circuit_AuthorizationType::TRUST_AUTHORIZATION => Ok(PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id(member.get_node_id()),
-                    #[cfg(feature = "challenge-authorization")]
                     local_required_auth.clone(),
                 )),
-                #[cfg(feature = "challenge-authorization")]
                 Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION => {
                     if !member.get_public_key().is_empty() {
                         Ok(PeerTokenPair::new(
@@ -72,7 +66,6 @@ impl PeerAuthorizationTokenReader for Circuit {
                     endpoints: member.get_endpoints().to_vec(),
                     admin_service: admin_service_id(member.get_node_id()),
                 }),
-                #[cfg(feature = "challenge-authorization")]
                 Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION => {
                     if !member.get_public_key().is_empty() {
                         Ok(PeerNode {
@@ -110,7 +103,6 @@ impl PeerAuthorizationTokenReader for Circuit {
                 Circuit_AuthorizationType::TRUST_AUTHORIZATION => Ok(Some(
                     PeerAuthorizationToken::from_peer_id(member.get_node_id()),
                 )),
-                #[cfg(feature = "challenge-authorization")]
                 Circuit_AuthorizationType::CHALLENGE_AUTHORIZATION => {
                     if !member.get_public_key().is_empty() {
                         Ok(Some(PeerAuthorizationToken::from_public_key(

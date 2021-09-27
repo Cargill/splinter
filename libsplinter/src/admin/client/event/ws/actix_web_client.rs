@@ -415,7 +415,6 @@ impl From<messages::SplinterNode> for CircuitMembers {
         Self {
             node_id: splinter_node.node_id,
             endpoints: splinter_node.endpoints,
-            #[cfg(feature = "challenge-authorization")]
             public_key: splinter_node
                 .public_key
                 .as_ref()

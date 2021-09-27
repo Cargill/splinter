@@ -68,7 +68,6 @@ pub struct CircuitListSlice {
 pub struct CircuitMembers {
     pub node_id: String,
     pub endpoints: Vec<String>,
-    #[cfg(feature = "challenge-authorization")]
     pub public_key: Option<String>,
 }
 

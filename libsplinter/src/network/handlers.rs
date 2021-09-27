@@ -50,7 +50,6 @@ impl Handler for NetworkEchoHandler {
                 // authorization
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id(&echo_message.recipient),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id(&self.node_id),
                 )
                 .into()
@@ -150,7 +149,6 @@ mod tests {
             .dispatch(
                 PeerTokenPair::new(
                     PeerAuthorizationToken::from_peer_id("OTHER_PEER").into(),
-                    #[cfg(feature = "challenge-authorization")]
                     PeerAuthorizationToken::from_peer_id("TestPeer").into(),
                 )
                 .into(),

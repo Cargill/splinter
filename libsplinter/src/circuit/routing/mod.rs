@@ -42,7 +42,6 @@ use std::fmt;
 use self::error::RoutingTableReaderError;
 
 use crate::error::InternalError;
-#[cfg(feature = "challenge-authorization")]
 use crate::error::InvalidStateError;
 use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
 
@@ -204,16 +203,13 @@ impl Circuit {
         circuit_id: String,
         roster: Vec<Service>,
         members: Vec<String>,
-        #[cfg(feature = "challenge-authorization")] authorization_type: AuthorizationType,
+        authorization_type: AuthorizationType,
     ) -> Self {
         Circuit {
             circuit_id,
             roster,
             members,
-            #[cfg(feature = "challenge-authorization")]
             authorization_type,
-            #[cfg(not(feature = "challenge-authorization"))]
-            authorization_type: AuthorizationType::Trust,
         }
     }
 
@@ -241,7 +237,6 @@ impl Circuit {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AuthorizationType {
     Trust,
-    #[cfg(feature = "challenge-authorization")]
     Challenge,
 }
 
@@ -260,18 +255,11 @@ impl CircuitNode {
     ///
     /// * `node_id` -  The unique ID for the circuit
     /// * `endpoints` -  A list of endpoints the node can be reached at
-    pub fn new(
-        node_id: String,
-        endpoints: Vec<String>,
-        #[cfg(feature = "challenge-authorization")] public_key: Option<Vec<u8>>,
-    ) -> Self {
+    pub fn new(node_id: String, endpoints: Vec<String>, public_key: Option<Vec<u8>>) -> Self {
         CircuitNode {
             node_id,
             endpoints,
-            #[cfg(feature = "challenge-authorization")]
             public_key,
-            #[cfg(not(feature = "challenge-authorization"))]
-            public_key: None,
         }
     }
 
@@ -281,7 +269,6 @@ impl CircuitNode {
     ) -> Result<PeerAuthorizationToken, RoutingTableReaderError> {
         match auth_type {
             AuthorizationType::Trust => Ok(PeerAuthorizationToken::from_peer_id(&self.node_id)),
-            #[cfg(feature = "challenge-authorization")]
             AuthorizationType::Challenge => {
                 let public_key = self.public_key.clone().ok_or_else(|| {
                     RoutingTableReaderError::InvalidStateError(InvalidStateError::with_message(
@@ -292,7 +279,6 @@ impl CircuitNode {
                         ),
                     ))
                 })?;
-                #[cfg(feature = "challenge-authorization")]
                 Ok(PeerAuthorizationToken::from_public_key(&public_key))
             }
         }

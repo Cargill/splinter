@@ -758,7 +758,6 @@ mod tests {
                 members: vec![SplinterNode {
                     node_id: "node_id".into(),
                     endpoints: vec!["".into()],
-                    #[cfg(feature = "challenge-authorization")]
                     public_key: None,
                 }],
                 authorization_type: AuthorizationType::Trust,
@@ -815,7 +814,6 @@ mod tests {
                 members: vec![SplinterNode {
                     node_id: "node_id".into(),
                     endpoints: vec!["".into()],
-                    #[cfg(feature = "challenge-authorization")]
                     public_key: None,
                 }],
                 authorization_type: AuthorizationType::Trust,

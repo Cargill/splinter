@@ -270,11 +270,8 @@ where
                                     builder = builder.with_endpoints(endpoints);
                                 }
 
-                                #[cfg(feature = "challenge-authorization")]
-                                {
-                                    if let Some(public_key) = &member.public_key {
-                                        builder = builder.with_public_key(public_key);
-                                    }
+                                if let Some(public_key) = &member.public_key {
+                                    builder = builder.with_public_key(public_key);
                                 }
 
                                 builder.build()

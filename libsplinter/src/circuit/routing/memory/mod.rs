@@ -26,7 +26,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 
 use super::error::RoutingTableReaderError;
-#[cfg(feature = "challenge-authorization")]
 use super::AuthorizationType;
 use super::{
     Circuit, CircuitIter, CircuitNode, CircuitNodeIter, RoutingTableReader, RoutingTableWriter,
@@ -179,7 +178,6 @@ impl RoutingTableReader for RoutingTable {
                 ADMIN_CIRCUIT_ID.to_string(),
                 vec![],
                 vec![],
-                #[cfg(feature = "challenge-authorization")]
                 AuthorizationType::Trust,
             )))
         } else {

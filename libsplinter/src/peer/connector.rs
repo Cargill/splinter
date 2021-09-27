@@ -82,14 +82,13 @@ impl PeerManagerConnector {
         &self,
         peer_id: PeerAuthorizationToken,
         endpoints: Vec<String>,
-        #[cfg(feature = "challenge-authorization")] required_local_auth: PeerAuthorizationToken,
+        required_local_auth: PeerAuthorizationToken,
     ) -> Result<PeerRef, PeerRefAddError> {
         let (sender, recv) = channel();
 
         let message = PeerManagerMessage::Request(PeerManagerRequest::AddPeer {
             peer_id,
             endpoints,
-            #[cfg(feature = "challenge-authorization")]
             required_local_auth,
             sender,
         });
@@ -120,13 +119,12 @@ impl PeerManagerConnector {
     pub fn add_unidentified_peer(
         &self,
         endpoint: String,
-        #[cfg(feature = "challenge-authorization")] local_authorization: PeerAuthorizationToken,
+        local_authorization: PeerAuthorizationToken,
     ) -> Result<EndpointPeerRef, PeerUnknownAddError> {
         let (sender, recv) = channel();
 
         let message = PeerManagerMessage::Request(PeerManagerRequest::AddUnidentified {
             endpoint,
-            #[cfg(feature = "challenge-authorization")]
             local_authorization,
             sender,
         });

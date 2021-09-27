@@ -87,11 +87,8 @@ where
             .map(|node| {
                 let mut builder = CircuitNodeBuilder::new().with_node_id(&node.node_id);
 
-                #[cfg(feature = "challenge-authorization")]
-                {
-                    if let Some(public_key) = &node.public_key {
-                        builder = builder.with_public_key(public_key);
-                    }
+                if let Some(public_key) = &node.public_key {
+                    builder = builder.with_public_key(public_key);
                 }
 
                 if let Some(endpoints) = node_map.get(&node.node_id) {

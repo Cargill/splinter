@@ -19,7 +19,6 @@ use crate::admin::messages::{
     Vote, VoteRecord,
 };
 use crate::hex::as_hex;
-#[cfg(feature = "challenge-authorization")]
 use crate::hex::to_hex;
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
@@ -121,7 +120,6 @@ impl<'a> TryFrom<&'a CreateCircuit> for CircuitResponse<'a> {
 pub(crate) struct NodeResponse<'a> {
     pub node_id: &'a str,
     pub endpoints: &'a [String],
-    #[cfg(feature = "challenge-authorization")]
     pub public_key: Option<String>,
 }
 
@@ -130,7 +128,6 @@ impl<'a> From<&'a SplinterNode> for NodeResponse<'a> {
         Self {
             node_id: &node.node_id,
             endpoints: &node.endpoints,
-            #[cfg(feature = "challenge-authorization")]
             public_key: node
                 .public_key
                 .as_ref()

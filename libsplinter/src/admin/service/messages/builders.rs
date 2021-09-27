@@ -191,16 +191,6 @@ impl CreateCircuitBuilder {
             .members
             .ok_or_else(|| BuilderError::MissingField("members".to_string()))?;
 
-        #[cfg(not(feature = "challenge-authorization"))]
-        let authorization_type = self.authorization_type.unwrap_or_else(|| {
-            debug!(
-                "Building circuit create request with default authorization_type: {:?}",
-                AuthorizationType::Trust
-            );
-            AuthorizationType::Trust
-        });
-
-        #[cfg(feature = "challenge-authorization")]
         let authorization_type = self.authorization_type.unwrap_or_else(|| {
             debug!(
                 "Building circuit create request with default authorization_type: {:?}",
@@ -353,7 +343,6 @@ impl SplinterServiceBuilder {
 pub struct SplinterNodeBuilder {
     node_id: Option<String>,
     endpoints: Option<Vec<String>>,
-    #[cfg(feature = "challenge-authorization")]
     public_key: Option<Vec<u8>>,
 }
 
@@ -370,7 +359,6 @@ impl SplinterNodeBuilder {
         self.endpoints.clone()
     }
 
-    #[cfg(feature = "challenge-authorization")]
     pub fn public_key(&self) -> Option<Vec<u8>> {
         self.public_key.clone()
     }
@@ -385,7 +373,6 @@ impl SplinterNodeBuilder {
         self
     }
 
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_public_key(mut self, public_key: &[u8]) -> SplinterNodeBuilder {
         self.public_key = Some(public_key.into());
         self
@@ -403,7 +390,6 @@ impl SplinterNodeBuilder {
         let node = SplinterNode {
             node_id,
             endpoints,
-            #[cfg(feature = "challenge-authorization")]
             public_key: self.public_key,
         };
 
@@ -525,9 +511,6 @@ mod tests {
             .all(|c| c.is_ascii_alphanumeric()));
         assert_eq!(circuit.roster, vec![service]);
         assert_eq!(circuit.members, vec![node]);
-        #[cfg(not(feature = "challenge-authorization"))]
-        assert_eq!(circuit.authorization_type, AuthorizationType::Trust);
-        #[cfg(feature = "challenge-authorization")]
         assert_eq!(circuit.authorization_type, AuthorizationType::Challenge);
         assert_eq!(circuit.persistence, PersistenceType::Any);
         assert_eq!(circuit.durability, DurabilityType::NoDurability);
