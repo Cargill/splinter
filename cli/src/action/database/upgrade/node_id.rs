@@ -87,3 +87,52 @@ enum WarningEmited {
     Yes,
     No,
 }
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+
+    use splinter::error::InternalError;
+    use splinter::node_id::store::{error::NodeIdStoreError, NodeIdStore};
+
+    struct MockNodeIdStore {
+        pub value: RefCell<Option<String>>,
+    }
+
+    impl NodeIdStore for MockNodeIdStore {
+        fn get_node_id(&self) -> Result<Option<String>, NodeIdStoreError> {
+            Ok(self.value.borrow().to_owned())
+        }
+        fn set_node_id(&self, node_id: String) -> Result<(), NodeIdStoreError> {
+            self.value.replace(Some(node_id));
+            Ok(())
+        }
+    }
+
+    impl MockNodeIdStore {
+        fn new(value: Option<String>) -> Self {
+            Self {
+                value: RefCell::new(value),
+            }
+        }
+    }
+
+    struct MockErrorNodeIdStore {}
+
+    impl NodeIdStore for MockErrorNodeIdStore {
+        fn get_node_id(&self) -> Result<Option<String>, NodeIdStoreError> {
+            Err(NodeIdStoreError::InternalError(
+                InternalError::with_message(String::from(
+                    "This is an intentional error, please disregard",
+                )),
+            ))
+        }
+        fn set_node_id(&self, _node_id: String) -> Result<(), NodeIdStoreError> {
+            Err(NodeIdStoreError::InternalError(
+                InternalError::with_message(String::from(
+                    "This is an intentional error, please disregard",
+                )),
+            ))
+        }
+    }
+}
