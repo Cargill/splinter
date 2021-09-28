@@ -71,8 +71,6 @@ impl PeerMap {
     /// # Arguments
     ///
     /// * `initial_retry_frequency` - The value to set as the retry frequency for a new peer
-    /// * `local_identity` - The default required local authorization if the
-    ///  `challenge-authorization` features is not enabled
     pub fn new(initial_retry_frequency: u64) -> Self {
         // initialize peers metric
         gauge!("splinter.peer_manager.peers", 0.0);
