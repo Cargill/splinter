@@ -47,7 +47,7 @@ impl Action for UpgradeAction {
         #[cfg(feature = "node-id-upgrade")]
         {
             let db_store = store_factory.get_node_id_store();
-            node_id::migrate_node_id_to_db(state_dir.clone(), db_store)?;
+            node_id::migrate_node_id_to_db(state_dir.clone(), &*db_store)?;
         }
         info!(
             "Source yaml state directory: {}",

@@ -59,7 +59,7 @@ fn import_store(
 
 pub fn migrate_node_id_to_db(
     state_dir: PathBuf,
-    db_store: Box<dyn NodeIdStore>,
+    db_store: &dyn NodeIdStore,
 ) -> Result<(), CliError> {
     let mut filename = state_dir.clone();
     filename.push("node_id");
