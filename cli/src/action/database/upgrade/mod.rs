@@ -26,8 +26,8 @@ use splinter::store::ConnectionUri;
 
 #[cfg(feature = "sqlite")]
 use crate::action::database::sqlite::{get_database_at_state_path, get_default_database};
-use crate::action::database::{PgConnection, SplinterEnvironment};
-use crate::diesel::Connection;
+use crate::action::database::SplinterEnvironment;
+use crate::diesel::{pg::PgConnection, Connection};
 use crate::error::CliError;
 
 use super::Action;
