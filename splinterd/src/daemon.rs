@@ -126,7 +126,7 @@ pub struct SplinterDaemon {
     initial_peers: Vec<String>,
     mesh: Mesh,
     node_id: Option<String>,
-    display_name: String,
+    display_name: Option<String>,
     rest_api_endpoint: String,
     #[cfg(feature = "https-bind")]
     rest_api_ssl_settings: Option<(String, String)>,
@@ -553,7 +553,11 @@ impl SplinterDaemon {
 
         #[cfg(feature = "authorization")]
         let node_id_clone = node_id.clone();
-        let display_name = self.display_name.clone();
+        let display_name: String = self
+            .display_name
+            .to_owned()
+            .or_else(|| Some(format!("Node: {}", node_id)))
+            .unwrap();
         #[cfg(feature = "service-endpoint")]
         let service_endpoint = self.service_endpoint.clone();
         let network_endpoints = self.network_endpoints.clone();
@@ -1310,10 +1314,6 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: initial_peers".to_string())
         })?;
 
-        let display_name = self.display_name.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: display_name".to_string())
-        })?;
-
         let rest_api_endpoint = self.rest_api_endpoint.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: rest_api_endpoint".to_string())
         })?;
@@ -1370,8 +1370,8 @@ impl SplinterDaemonBuilder {
             advertised_endpoints,
             initial_peers,
             mesh,
-            display_name,
             node_id: self.node_id,
+            display_name: self.display_name,
             rest_api_endpoint,
             #[cfg(feature = "https-bind")]
             rest_api_ssl_settings,

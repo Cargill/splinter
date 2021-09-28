@@ -762,10 +762,7 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
     config.log_as_debug();
 
     let node_id = find_node_id(&config)?;
-    let display_name: Option<String> = config
-        .display_name()
-        .map(String::from)
-        .or_else(|| node_id.as_ref().map(|node_id| format!("Node {}", node_id)));
+    let display_name: Option<String> = config.display_name().map(String::from);
 
     let mut daemon_builder = SplinterDaemonBuilder::new();
 
