@@ -319,14 +319,11 @@ impl Handler for TrustRequestHandler {
 mod tests {
     use super::*;
 
+    use protobuf::Message;
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
-    #[cfg(feature = "challenge-authorization")]
-    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
-    use cylinder::{PublicKey, Signature, VerificationError, Verifier};
-    use protobuf::Message;
-
+    use crate::network::auth::authorization::trust_v0::TrustV0Authorization;
     use crate::network::auth::AuthorizationDispatchBuilder;
     use crate::protos::authorization;
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
@@ -343,20 +340,13 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        // mut is required if chalenge authorization is enabled
-        #[allow(unused_mut)]
+
         let mut dispatcher_builder =
             AuthorizationDispatchBuilder::new().with_identity("mock_identity");
 
-        #[cfg(feature = "challenge-authorization")]
-        {
-            dispatcher_builder = dispatcher_builder
-                .with_signers(&vec![new_signer()])
-                .with_nonce(&vec![])
-                .with_expected_authorization(None)
-                .with_local_authorization(None)
-                .with_verifier(Box::new(NoopVerifier))
-        }
+        dispatcher_builder = dispatcher_builder.add_authorization(Box::new(
+            TrustV0Authorization::new("mock_identity".into(), auth_mgr.clone()),
+        ));
 
         let dispatcher = dispatcher_builder
             .build(dispatch_sender, auth_mgr)
@@ -417,20 +407,13 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        // mut is required if chalenge authorization is enabled
-        #[allow(unused_mut)]
+
         let mut dispatcher_builder =
             AuthorizationDispatchBuilder::new().with_identity("mock_identity");
 
-        #[cfg(feature = "challenge-authorization")]
-        {
-            dispatcher_builder = dispatcher_builder
-                .with_signers(&vec![new_signer()])
-                .with_nonce(&vec![])
-                .with_expected_authorization(None)
-                .with_local_authorization(None)
-                .with_verifier(Box::new(NoopVerifier))
-        }
+        dispatcher_builder = dispatcher_builder.add_authorization(Box::new(
+            TrustV0Authorization::new("mock_identity".into(), auth_mgr.clone()),
+        ));
 
         let dispatcher = dispatcher_builder
             .build(dispatch_sender, auth_mgr)
@@ -476,20 +459,13 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        // mut is required if chalenge authorization is enabled
-        #[allow(unused_mut)]
+
         let mut dispatcher_builder =
             AuthorizationDispatchBuilder::new().with_identity("mock_identity");
 
-        #[cfg(feature = "challenge-authorization")]
-        {
-            dispatcher_builder = dispatcher_builder
-                .with_signers(&vec![new_signer()])
-                .with_nonce(&vec![])
-                .with_expected_authorization(None)
-                .with_local_authorization(None)
-                .with_verifier(Box::new(NoopVerifier))
-        }
+        dispatcher_builder = dispatcher_builder.add_authorization(Box::new(
+            TrustV0Authorization::new("mock_identity".into(), auth_mgr.clone()),
+        ));
 
         let dispatcher = dispatcher_builder
             .build(dispatch_sender, auth_mgr)
@@ -593,29 +569,5 @@ mod tests {
 
             Ok(())
         }
-    }
-
-    struct NoopVerifier;
-
-    impl Verifier for NoopVerifier {
-        fn algorithm_name(&self) -> &str {
-            unimplemented!()
-        }
-
-        fn verify(
-            &self,
-            _message: &[u8],
-            _signature: &Signature,
-            _public_key: &PublicKey,
-        ) -> Result<bool, VerificationError> {
-            unimplemented!()
-        }
-    }
-
-    #[cfg(feature = "challenge-authorization")]
-    fn new_signer() -> Box<dyn Signer> {
-        let context = Secp256k1Context::new();
-        let key = context.new_random_private_key();
-        context.new_signer(key)
     }
 }

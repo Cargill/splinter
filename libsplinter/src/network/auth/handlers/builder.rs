@@ -14,22 +14,8 @@
 
 //! Builder for creating the dispatcher for authorization messages
 
-#[cfg(feature = "challenge-authorization")]
-use cylinder::{Signer, Verifier};
-
 use crate::error::InvalidStateError;
-#[cfg(feature = "challenge-authorization")]
-use crate::network::auth::authorization::challenge::handlers::{
-    AuthChallengeNonceRequestHandler, AuthChallengeNonceResponseHandler,
-    AuthChallengeSubmitRequestHandler, AuthChallengeSubmitResponseHandler,
-};
-#[cfg(feature = "trust-authorization")]
-use crate::network::auth::authorization::trust::handlers::{
-    AuthTrustRequestHandler, AuthTrustResponseHandler,
-};
-use crate::network::auth::authorization::trust_v0::handlers::{
-    AuthorizedHandler, ConnectRequestHandler, ConnectResponseHandler, TrustRequestHandler,
-};
+use crate::network::auth::authorization::Authorization;
 use crate::network::auth::AuthorizationManagerStateMachine;
 use crate::network::auth::ConnectionAuthorizationType;
 use crate::network::dispatch::{ConnectionId, Dispatcher, MessageSender};
@@ -52,14 +38,9 @@ use super::{AuthorizationErrorHandler, AuthorizationMessageHandler};
 #[derive(Default)]
 pub struct AuthorizationDispatchBuilder {
     identity: Option<String>,
-    #[cfg(feature = "challenge-authorization")]
-    signers: Option<Vec<Box<dyn Signer>>>,
-    #[cfg(feature = "challenge-authorization")]
-    nonce: Option<Vec<u8>>,
     expected_authorization: Option<ConnectionAuthorizationType>,
     local_authorization: Option<ConnectionAuthorizationType>,
-    #[cfg(feature = "challenge-authorization")]
-    verifier: Option<Box<dyn Verifier>>,
+    authorizations: Vec<Box<dyn Authorization>>,
 }
 
 impl AuthorizationDispatchBuilder {
@@ -74,28 +55,6 @@ impl AuthorizationDispatchBuilder {
     ///  * `identity` - The local node ID
     pub fn with_identity(mut self, identity: &str) -> Self {
         self.identity = Some(identity.to_string());
-        self
-    }
-
-    /// Sets the signers
-    ///
-    /// # Arguments
-    ///
-    ///  * `signers` - The list of supported signing keys to be used in challenge authorization
-    #[cfg(feature = "challenge-authorization")]
-    pub fn with_signers(mut self, signers: &[Box<dyn Signer>]) -> Self {
-        self.signers = Some(signers.to_vec());
-        self
-    }
-
-    /// Sets the nonce
-    ///
-    /// # Arguments
-    ///
-    ///  * `nonce` - The random bytes that must be signed in challenge authorization
-    #[cfg(feature = "challenge-authorization")]
-    pub fn with_nonce(mut self, nonce: &[u8]) -> Self {
-        self.nonce = Some(nonce.to_vec());
         self
     }
 
@@ -125,14 +84,13 @@ impl AuthorizationDispatchBuilder {
         self
     }
 
-    /// Sets the verifier
+    /// Adds an authorization implmentation
     ///
     /// # Arguments
     ///
-    ///  * `verifier` - The authorization type the local node must use to connect
-    #[cfg(feature = "challenge-authorization")]
-    pub fn with_verifier(mut self, verifier: Box<dyn Verifier>) -> Self {
-        self.verifier = Some(verifier);
+    ///  * `authorization` - An implementation of an authorization type
+    pub fn add_authorization(mut self, authorization: Box<dyn Authorization>) -> Self {
+        self.authorizations.push(authorization);
         self
     }
 
@@ -144,49 +102,12 @@ impl AuthorizationDispatchBuilder {
         auth_msg_sender: impl MessageSender<ConnectionId> + Clone + 'static,
         auth_manager: AuthorizationManagerStateMachine,
     ) -> Result<Dispatcher<NetworkMessageType, ConnectionId>, InvalidStateError> {
+        #[cfg(feature = "trust-authorization")]
         let identity = self.identity.ok_or_else(|| {
             InvalidStateError::with_message("Missing required `identity` field".to_string())
         })?;
 
-        #[cfg(feature = "challenge-authorization")]
-        let signers = self.signers.ok_or_else(|| {
-            InvalidStateError::with_message("Missing required `signers` field".to_string())
-        })?;
-
-        #[cfg(feature = "challenge-authorization")]
-        if signers.is_empty() {
-            return Err(InvalidStateError::with_message(
-                "At least one signer must be configured".to_string(),
-            ));
-        };
-
-        #[cfg(feature = "challenge-authorization")]
-        let nonce = self.nonce.ok_or_else(|| {
-            InvalidStateError::with_message("Missing required `nonce` field".to_string())
-        })?;
-
-        #[cfg(feature = "challenge-authorization")]
-        let verifier = self.verifier.ok_or_else(|| {
-            InvalidStateError::with_message("Missing required `verifier` field".to_string())
-        })?;
-
         let mut auth_dispatcher = Dispatcher::new(Box::new(auth_msg_sender.clone()));
-
-        // v0 message handlers
-        auth_dispatcher.set_handler(Box::new(ConnectRequestHandler::new(auth_manager.clone())));
-
-        // allow redundant_clone, must be cloned here if trust-authorization is enabled
-        #[allow(clippy::redundant_clone)]
-        auth_dispatcher.set_handler(Box::new(ConnectResponseHandler::new(
-            identity.to_string(),
-            auth_manager.clone(),
-        )));
-
-        auth_dispatcher.set_handler(Box::new(TrustRequestHandler::new(auth_manager.clone())));
-
-        auth_dispatcher.set_handler(Box::new(AuthorizedHandler::new(auth_manager.clone())));
-
-        auth_dispatcher.set_handler(Box::new(AuthorizedHandler::new(auth_manager.clone())));
 
         // v1 message handlers
         #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
@@ -223,66 +144,12 @@ impl AuthorizationDispatchBuilder {
             auth_dispatcher.set_handler(Box::new(AuthCompleteHandler::new(auth_manager.clone())));
         }
 
-        #[cfg(feature = "trust-authorization")]
-        {
-            auth_dispatcher
-                .set_handler(Box::new(AuthTrustRequestHandler::new(auth_manager.clone())));
+        for mut authorization in self.authorizations.into_iter() {
+            let handlers = authorization.get_handlers()?;
 
-            auth_dispatcher.set_handler(Box::new(AuthTrustResponseHandler::new(
-                auth_manager.clone(),
-            )));
-        }
-
-        #[cfg(feature = "challenge-authorization")]
-        {
-            auth_dispatcher.set_handler(Box::new(AuthChallengeNonceRequestHandler::new(
-                auth_manager.clone(),
-                nonce.clone(),
-            )));
-
-            let signers_to_use = match &self.local_authorization {
-                Some(ConnectionAuthorizationType::Challenge { public_key }) => {
-                    let signer = signers.iter().find(|signer| match signer.public_key() {
-                        Ok(signer_public_key) => {
-                            signer_public_key.as_slice() == public_key.as_slice()
-                        }
-                        Err(_) => false,
-                    });
-
-                    match signer {
-                        Some(signer) => vec![signer.clone()],
-                        None => {
-                            return Err(InvalidStateError::with_message(
-                                "Required local authorization is not supported".to_string(),
-                            ));
-                        }
-                    }
-                }
-
-                // if there is no local_authorization which key is used here does not matter
-                _ => signers.clone(),
-            };
-
-            auth_dispatcher.set_handler(Box::new(AuthChallengeNonceResponseHandler::new(
-                auth_manager.clone(),
-                signers_to_use,
-            )));
-
-            let expected_public_key = match self.expected_authorization {
-                Some(ConnectionAuthorizationType::Challenge { public_key }) => Some(public_key),
-                _ => None,
-            };
-
-            auth_dispatcher.set_handler(Box::new(AuthChallengeSubmitRequestHandler::new(
-                auth_manager.clone(),
-                verifier,
-                nonce,
-                expected_public_key,
-            )));
-
-            auth_dispatcher.set_handler(Box::new(AuthChallengeSubmitResponseHandler::new(
-                auth_manager.clone(),
-            )));
+            for handler in handlers {
+                auth_dispatcher.set_handler(handler);
+            }
         }
 
         auth_dispatcher.set_handler(Box::new(AuthorizationErrorHandler::new(auth_manager)));

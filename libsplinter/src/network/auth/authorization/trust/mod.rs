@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod handlers;
+mod handlers;
 
 use crate::error::InvalidStateError;
 use crate::network::auth::AuthorizationManagerStateMachine;

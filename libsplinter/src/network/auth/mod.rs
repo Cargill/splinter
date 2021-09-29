@@ -39,6 +39,11 @@ use crate::protos::prelude::*;
 use crate::public_key::PublicKey;
 use crate::transport::{Connection, RecvError};
 
+#[cfg(feature = "challenge-authorization")]
+use self::authorization::challenge::ChallengeAuthorization;
+#[cfg(feature = "trust-authorization")]
+use self::authorization::trust::TrustAuthorization;
+use self::authorization::trust_v0::TrustV0Authorization;
 use self::handlers::AuthorizationDispatchBuilder;
 use self::pool::{ThreadPool, ThreadPoolBuilder};
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
@@ -180,30 +185,46 @@ impl AuthorizationConnector {
             shared: Arc::clone(&self.shared),
         };
         let msg_sender = AuthorizationMessageSender { sender: tx };
-        #[cfg(feature = "challenge-authorization")]
-        let verifier = self
-            .verifier_factory
-            .lock()
-            .map_err(|_| AuthorizationManagerError("VerifierFactory lock poisoned".to_string()))?
-            .new_verifier();
-
-        #[cfg(feature = "challenge-authorization")]
-        let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
 
         // mut is required if chalenge authorization is enabled
-        #[allow(unused_mut)]
+        #[allow(unused_mut, clippy::redundant_clone)]
         let mut dispatcher_builder = AuthorizationDispatchBuilder::new()
             .with_identity(&self.local_identity)
-            .with_expected_authorization(expected_authorization)
-            .with_local_authorization(local_authorization);
+            .with_expected_authorization(expected_authorization.clone())
+            .with_local_authorization(local_authorization.clone());
 
         #[cfg(feature = "challenge-authorization")]
         {
-            dispatcher_builder = dispatcher_builder
-                .with_signers(&self.signers)
-                .with_nonce(&nonce)
-                .with_verifier(verifier)
+            let verifier = self
+                .verifier_factory
+                .lock()
+                .map_err(|_| {
+                    AuthorizationManagerError("VerifierFactory lock poisoned".to_string())
+                })?
+                .new_verifier();
+            let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
+            let challenge_authorization = ChallengeAuthorization::new(
+                self.signers.clone(),
+                nonce,
+                verifier,
+                expected_authorization,
+                local_authorization,
+                state_machine.clone(),
+            );
+
+            dispatcher_builder =
+                dispatcher_builder.add_authorization(Box::new(challenge_authorization));
         }
+
+        #[cfg(feature = "trust-authorization")]
+        {
+            dispatcher_builder = dispatcher_builder
+                .add_authorization(Box::new(TrustAuthorization::new(state_machine.clone())));
+        }
+
+        dispatcher_builder = dispatcher_builder.add_authorization(Box::new(
+            TrustV0Authorization::new(self.local_identity.to_string(), state_machine.clone()),
+        ));
 
         let dispatcher = dispatcher_builder
             .build(
