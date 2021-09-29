@@ -26,11 +26,12 @@ use crate::network::auth::{
     AuthorizationInitiatingState, AuthorizationManagerStateMachine, AuthorizationMessage, Identity,
 };
 use crate::network::dispatch::{
-    ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
+    ConnectionId, DispatchError, Handler, MessageContext, MessageSender, RawBytes,
 };
+use crate::protocol::authorization::AuthComplete;
 use crate::protocol::authorization::{
     AuthChallengeNonceResponse, AuthChallengeSubmitRequest, AuthChallengeSubmitResponse,
-    AuthComplete, AuthorizationError, SubmitRequest,
+    AuthorizationError, SubmitRequest,
 };
 use crate::protocol::network::NetworkMessage;
 use crate::protos::authorization;
@@ -57,7 +58,7 @@ impl AuthChallengeNonceRequestHandler {
 impl Handler for AuthChallengeNonceRequestHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthChallengeNonceRequest;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTH_CHALLENGE_NONCE_REQUEST
@@ -157,7 +158,7 @@ impl AuthChallengeNonceResponseHandler {
 impl Handler for AuthChallengeNonceResponseHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthChallengeNonceResponse;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTH_CHALLENGE_NONCE_RESPONSE
@@ -174,7 +175,7 @@ impl Handler for AuthChallengeNonceResponseHandler {
             context.source_connection_id()
         );
 
-        let nonce_request = AuthChallengeNonceResponse::from_proto(msg)?;
+        let nonce_request = AuthChallengeNonceResponse::from_bytes(msg.bytes())?;
 
         let submit_requests = self
             .signers
@@ -296,7 +297,7 @@ impl AuthChallengeSubmitRequestHandler {
 impl Handler for AuthChallengeSubmitRequestHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthChallengeSubmitRequest;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTH_CHALLENGE_SUBMIT_REQUEST
@@ -313,7 +314,7 @@ impl Handler for AuthChallengeSubmitRequestHandler {
             context.source_connection_id()
         );
 
-        let submit_msg = AuthChallengeSubmitRequest::from_proto(msg)?;
+        let submit_msg = AuthChallengeSubmitRequest::from_bytes(msg.bytes())?;
         let mut public_keys = vec![];
 
         for request in submit_msg.submit_requests {
@@ -449,7 +450,7 @@ impl AuthChallengeSubmitResponseHandler {
 impl Handler for AuthChallengeSubmitResponseHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthChallengeSubmitResponse;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTH_CHALLENGE_SUBMIT_RESPONSE
@@ -466,7 +467,7 @@ impl Handler for AuthChallengeSubmitResponseHandler {
             context.source_connection_id()
         );
 
-        let submit_msg = AuthChallengeSubmitResponse::from_proto(msg)?;
+        let submit_msg = AuthChallengeSubmitResponse::from_bytes(msg.bytes())?;
 
         let public_key = submit_msg.public_key;
 
@@ -598,7 +599,6 @@ mod tests {
     /// 1) no error from the dispatcher
     /// 2) the handler should send AuthChallengeNonceRequest
     #[test]
-
     fn protocol_response_challenge() {
         let connection_id = "test_connection".to_string();
         // need to setup expected authorization state
