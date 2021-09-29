@@ -19,7 +19,10 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use cylinder::VerifierFactory;
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
+#[cfg(all(
+    feature = "diesel-receipt-store",
+    any(feature = "postgres", feature = "sqlite")
+))]
 use diesel::r2d2::{ConnectionManager, Pool};
 use openssl::hash::{hash, MessageDigest};
 #[cfg(all(
@@ -311,11 +314,11 @@ enum ScabbardFactoryStorageConfig {
         db_dir: String,
         db_size: usize,
     },
-    #[cfg(feature = "postgres")]
+    #[cfg(all(feature = "diesel-receipt-store", feature = "postgres"))]
     Postgres {
         pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
     },
-    #[cfg(feature = "sqlite")]
+    #[cfg(all(feature = "diesel-receipt-store", feature = "sqlite"))]
     Sqlite {
         pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
     },
