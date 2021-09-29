@@ -13,8 +13,13 @@
 // limitations under the License.
 
 use crate::error::InternalError;
+use crate::network::auth::{
+    state_machine::trust_v0::{TrustV0AuthorizationAction, TrustV0AuthorizationState},
+    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationActionError,
+    AuthorizationManagerStateMachine, Identity,
+};
 use crate::network::dispatch::{
-    ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
+    ConnectionId, DispatchError, Handler, MessageContext, MessageSender, RawBytes,
 };
 use crate::protocol::authorization::{
     AuthorizationMessage, AuthorizationType, Authorized, ConnectRequest, ConnectResponse,
@@ -24,12 +29,6 @@ use crate::protocol::network::NetworkMessage;
 use crate::protos::authorization;
 use crate::protos::network;
 use crate::protos::prelude::*;
-
-use crate::network::auth::{
-    state_machine::trust_v0::{TrustV0AuthorizationAction, TrustV0AuthorizationState},
-    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationActionError,
-    AuthorizationManagerStateMachine, Identity,
-};
 
 pub struct AuthorizedHandler {
     auth_manager: AuthorizationManagerStateMachine,
@@ -44,7 +43,7 @@ impl AuthorizedHandler {
 impl Handler for AuthorizedHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthorizedMessage;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTHORIZE
@@ -96,7 +95,7 @@ impl ConnectRequestHandler {
 impl Handler for ConnectRequestHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::ConnectRequest;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::CONNECT_REQUEST
@@ -108,7 +107,7 @@ impl Handler for ConnectRequestHandler {
         context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
-        let connect_request = ConnectRequest::from_proto(msg)?;
+        let connect_request = ConnectRequest::from_bytes(msg.bytes())?;
         match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
             AuthorizationAcceptingAction::Connecting,
@@ -194,7 +193,7 @@ impl ConnectResponseHandler {
 impl Handler for ConnectResponseHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::ConnectResponse;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::CONNECT_RESPONSE
@@ -206,7 +205,7 @@ impl Handler for ConnectResponseHandler {
         context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
-        let connect_response = ConnectResponse::from_proto(msg)?;
+        let connect_response = ConnectResponse::from_bytes(msg.bytes())?;
         debug!(
             "Receive connect response from connection {}: {:?}",
             context.source_connection_id(),
@@ -259,7 +258,7 @@ impl TrustRequestHandler {
 impl Handler for TrustRequestHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::TrustRequest;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::TRUST_REQUEST
@@ -271,7 +270,7 @@ impl Handler for TrustRequestHandler {
         context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
-        let trust_request = TrustRequest::from_proto(msg)?;
+        let trust_request = TrustRequest::from_bytes(msg.bytes())?;
         match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
             AuthorizationAcceptingAction::TrustV0(TrustV0AuthorizationAction::TrustIdentifyingV0(
