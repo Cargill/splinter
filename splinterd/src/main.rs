@@ -712,10 +712,35 @@ fn setup_metrics_recorder(config: &Config) -> Result<(), UserError> {
     Ok(())
 }
 
-fn get_config_file<'a>(matches: &'a ArgMatches) -> &'a str {
-    matches
-        .value_of("config")
-        .unwrap_or("/etc/splinter/splinterd.toml")
+fn get_config_file(matches: &'_ ArgMatches) -> Result<String, UserError> {
+    if let Some(value) = matches.value_of("config") {
+        return Ok(value.to_string());
+    }
+
+    if let Ok(value) = env::var("SPLINTER_CONFIG_DIR") {
+        return match Path::new(&value).join("splinterd.toml").to_str() {
+            Some(value) => Ok(value.to_string()),
+            None => Err(UserError::InvalidArgument(
+                "SPLINTER_CONFIG_DIR contains non-UTF-8 characters, which is not supported"
+                    .to_string(),
+            )),
+        };
+    }
+
+    if let Ok(value) = env::var("SPLINTER_HOME") {
+        return match Path::new(&value)
+            .join("conf")
+            .join("splinterd.toml")
+            .to_str()
+        {
+            Some(value) => Ok(value.to_string()),
+            None => Err(UserError::InvalidArgument(
+                "SPLINTER_HOME contains non-UTF-8 characters, which is not supported".to_string(),
+            )),
+        };
+    }
+
+    Ok("/etc/splinter/splinterd.toml".to_string())
 }
 
 #[cfg(not(feature = "log-config"))]
@@ -730,10 +755,10 @@ fn get_log_filter_level(matches: &ArgMatches) -> log::LevelFilter {
 
 fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserError> {
     // get provided config file or search default location
-    let config_file = get_config_file(&matches);
+    let config_file = get_config_file(&matches)?;
 
-    let config_file_path = if Path::new(config_file).is_file() {
-        Some(config_file)
+    let config_file_path = if Path::new(&config_file).is_file() {
+        Some(&*config_file)
     } else {
         None
     };
