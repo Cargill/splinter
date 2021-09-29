@@ -31,10 +31,8 @@ This command provides the `-c` and `--config` options to specify an optional
 TOML configuration file containing `splinterd` settings, instead of using
 command-line options. (Any options on the command line will override those in
 the configuration file.) The file name must end with a `.toml` extension, such
-as `splinterd.toml`). For examples, see
+as `splinterd.toml`). For an example, see
 [splinterd/packaging/splinterd.toml.example](https://github.com/Cargill/splinter/blob/master/splinterd/packaging/splinterd.toml.example)
-and
-[splinterd/sample_configs](https://github.com/Cargill/splinter/tree/master/splinterd/sample_configs)
 in the `splinter` repository.
 
 **Connection Types**
@@ -109,10 +107,8 @@ OPTIONS
 `-c`, `--config` `CONFIG-FILE`
 : Specifies the path and file name for a `splinterd` configuration file, which
   is a TOML file that contains `splinterd` settings. (The file name must end
-  with a `.toml` extension.) For examples, see
+  with a `.toml` extension.) For an example, see
   [splinterd/packaging/splinterd.toml.example](https://github.com/Cargill/splinter/blob/master/splinterd/packaging/splinterd.toml.example)
-  and
-  [splinter/splinterd/sample_configs](https://github.com/Cargill/splinter/tree/master/splinterd/sample_configs)
   in the `splinter` repository.
 
   Any options on the command line will override the settings in the
