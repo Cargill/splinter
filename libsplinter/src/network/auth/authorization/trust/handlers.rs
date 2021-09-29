@@ -24,7 +24,7 @@ use crate::network::auth::{
     AuthorizationInitiatingState, AuthorizationManagerStateMachine, AuthorizationMessage, Identity,
 };
 use crate::network::dispatch::{
-    ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
+    ConnectionId, DispatchError, Handler, MessageContext, MessageSender, RawBytes,
 };
 use crate::protocol::authorization::AuthComplete;
 use crate::protocol::authorization::{AuthTrustRequest, AuthTrustResponse, AuthorizationError};
@@ -47,7 +47,7 @@ impl AuthTrustRequestHandler {
 impl Handler for AuthTrustRequestHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthTrustRequest;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTH_TRUST_REQUEST
@@ -63,7 +63,7 @@ impl Handler for AuthTrustRequestHandler {
             "Received authorization trust request from {}",
             context.source_connection_id()
         );
-        let trust_request = AuthTrustRequest::from_proto(msg)?;
+        let trust_request = AuthTrustRequest::from_bytes(msg.bytes())?;
         match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
             AuthorizationAcceptingAction::Trust(
@@ -138,7 +138,7 @@ impl AuthTrustResponseHandler {
 impl Handler for AuthTrustResponseHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthTrustResponse;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTH_TRUST_RESPONSE

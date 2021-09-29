@@ -13,3 +13,35 @@
 // limitations under the License.
 
 pub mod handlers;
+
+use crate::error::InvalidStateError;
+use crate::network::auth::AuthorizationManagerStateMachine;
+
+use self::handlers::{AuthTrustRequestHandler, AuthTrustResponseHandler};
+
+use super::{AuthDispatchHandler, Authorization};
+
+pub struct TrustAuthorization {
+    auth_manager: AuthorizationManagerStateMachine,
+}
+
+impl TrustAuthorization {
+    pub fn new(auth_manager: AuthorizationManagerStateMachine) -> Self {
+        Self { auth_manager }
+    }
+}
+
+impl Authorization for TrustAuthorization {
+    /// get message handlers for authorization type
+    fn get_handlers(&mut self) -> Result<Vec<AuthDispatchHandler>, InvalidStateError> {
+        let mut handlers: Vec<AuthDispatchHandler> = vec![Box::new(AuthTrustRequestHandler::new(
+            self.auth_manager.clone(),
+        ))];
+
+        handlers.push(Box::new(AuthTrustResponseHandler::new(
+            self.auth_manager.clone(),
+        )));
+
+        Ok(handlers)
+    }
+}
