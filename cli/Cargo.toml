@@ -49,6 +49,17 @@ whoami = "0.7.0"
 path = "../libsplinter"
 features = ["admin-service", "registry"]
 
+[dependencies.scabbard]
+path = "../services/scabbard/libscabbard"
+features = ["commit-store", "postgres", "sqlite"]
+optional = true
+
+[dependencies.transact]
+version = "0.3.10"
+default-features = false
+features = ["postgres", "state-merkle-sql", "sqlite"]
+optional = true
+
 [dev-dependencies]
 gag = "0.1"
 serial_test = "0.3"
@@ -80,6 +91,7 @@ experimental = [
     "node-id-upgrade",
     "registry",
     "scabbard-receipt-store",
+    "scabbard-migrations",
 ]
 
 authorization-handler-maintenance = []
@@ -96,6 +108,7 @@ postgres = [
 ]
 registry = []
 scabbard-receipt-store = ["sawtooth/diesel"]
+scabbard-migrations = ["scabbard", "transact"]
 sqlite = [
     "diesel/sqlite",
     "splinter/sqlite",
