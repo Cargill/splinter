@@ -70,6 +70,14 @@ impl CommitHashStore for DieselCommitHashStore<diesel::pg::PgConnection> {
         )
         .set_current_commit_hash(&*self.circuit_id, &*self.service_id, commit_hash)
     }
+
+    fn clone_boxed(&self) -> Box<dyn CommitHashStore> {
+        Box::new(Self {
+            pool: self.pool.clone(),
+            circuit_id: self.circuit_id.clone(),
+            service_id: self.service_id.clone(),
+        })
+    }
 }
 
 #[cfg(feature = "sqlite")]
@@ -91,6 +99,14 @@ impl CommitHashStore for DieselCommitHashStore<diesel::sqlite::SqliteConnection>
                 .map_err(|e| InternalError::from_source(Box::new(e)))?,
         )
         .set_current_commit_hash(&*self.circuit_id, &*self.service_id, commit_hash)
+    }
+
+    fn clone_boxed(&self) -> Box<dyn CommitHashStore> {
+        Box::new(Self {
+            pool: self.pool.clone(),
+            circuit_id: self.circuit_id.clone(),
+            service_id: self.service_id.clone(),
+        })
     }
 }
 
