@@ -40,10 +40,15 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
             .write(true)
             .open(&connection_string)
         {
-            return Err(CliError::ActionError(format!(
-                "While opening: {} received {}",
-                &connection_string, err
-            )));
+            match err.kind() {
+                std::io::ErrorKind::NotFound => (),
+                _ => {
+                    return Err(CliError::ActionError(format!(
+                        "While opening: {} received {}",
+                        &connection_string, err
+                    )))
+                }
+            }
         }
     }
     let connection_manager = ConnectionManager::<SqliteConnection>::new(&connection_string);
