@@ -57,7 +57,7 @@ impl Action for UpgradeAction {
         info!("Destination database uri: {}", database_uri);
         info!("Loading YAML datastore... ");
         let db_store = store_factory.get_admin_service_store();
-        yaml::import_yaml_state_to_database(state_dir, &*db_store)?;
+        yaml::import_yaml_state_to_database(state_dir.as_path(), &*db_store)?;
         Ok(())
     }
 }

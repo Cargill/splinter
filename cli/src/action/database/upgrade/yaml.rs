@@ -16,7 +16,7 @@
 
 use std::collections::HashMap;
 use std::error::Error;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fmt, fs};
 
 use splinter::admin::store::error::AdminServiceStoreError;
@@ -88,8 +88,8 @@ fn import_store(
 }
 
 /// Import yaml state from the specified directory to a database
-pub fn import_yaml_state_to_database<P: Into<PathBuf>>(
-    state_dir: P,
+pub fn import_yaml_state_to_database(
+    state_dir: &Path,
     db_store: &'_ dyn AdminServiceStore,
 ) -> Result<(), CliError> {
     fn invalid_utf8() -> CliError {
