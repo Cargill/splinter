@@ -28,18 +28,15 @@ use crate::network::auth::{
 use crate::network::dispatch::{
     ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
 };
-use crate::protocol::authorization::AuthComplete;
 use crate::protocol::authorization::{
     AuthChallengeNonceResponse, AuthChallengeSubmitRequest, AuthChallengeSubmitResponse,
-    SubmitRequest,
+    AuthComplete, AuthorizationError, SubmitRequest,
 };
 use crate::protocol::network::NetworkMessage;
 use crate::protos::authorization;
 use crate::protos::network;
 use crate::protos::prelude::*;
 use crate::public_key;
-
-use super::send_authorization_error;
 
 /// Handler for the Authorization Challenge Nonce Request Message Type
 
@@ -535,6 +532,39 @@ impl Handler for AuthChallengeSubmitResponseHandler {
         };
         Ok(())
     }
+}
+
+fn send_authorization_error(
+    auth_manager: &AuthorizationManagerStateMachine,
+    source_id: &str,
+    connection_id: &str,
+    sender: &dyn MessageSender<ConnectionId>,
+    error_string: &str,
+) -> Result<(), DispatchError> {
+    let response = AuthorizationMessage::AuthorizationError(
+        AuthorizationError::AuthorizationRejected(error_string.into()),
+    );
+
+    let msg_bytes =
+        IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(response))?;
+
+    sender
+        .send(source_id.into(), msg_bytes)
+        .map_err(|(recipient, payload)| {
+            DispatchError::NetworkSendError((recipient.into(), payload))
+        })?;
+
+    if auth_manager
+        .next_accepting_state(connection_id, AuthorizationAcceptingAction::Unauthorizing)
+        .is_err()
+    {
+        warn!(
+            "Unable to update state to Unauthorizing for {}",
+            connection_id,
+        )
+    };
+
+    Ok(())
 }
 
 #[cfg(test)]

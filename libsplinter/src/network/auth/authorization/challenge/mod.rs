@@ -11,19 +11,5 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#[cfg(feature = "challenge-authorization")]
-pub mod challenge;
 
-use crate::error::InvalidStateError;
-use crate::network::dispatch::{ConnectionId, Handler, RawBytes};
-use crate::protos::authorization::AuthorizationMessageType;
-
-pub type AuthDispatchHandler = Box<
-    dyn Handler<Message = RawBytes, MessageType = AuthorizationMessageType, Source = ConnectionId>,
->;
-
-/// Trait for defining an authorization type
-pub trait Authorization {
-    /// get message handlers for authorization type
-    fn get_handlers(&mut self) -> Result<Vec<AuthDispatchHandler>, InvalidStateError>;
-}
+pub mod handlers;
