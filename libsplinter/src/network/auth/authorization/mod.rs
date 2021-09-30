@@ -15,6 +15,7 @@
 pub mod challenge;
 #[cfg(feature = "trust-authorization")]
 pub mod trust;
+pub mod trust_v0;
 
 use crate::error::InvalidStateError;
 use crate::network::dispatch::{ConnectionId, Handler, RawBytes};

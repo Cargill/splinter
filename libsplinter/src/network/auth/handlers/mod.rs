@@ -15,7 +15,6 @@
 //! Message handlers for authorization messages
 
 pub mod builder;
-mod v0_handlers;
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 mod v1_handlers;
 
