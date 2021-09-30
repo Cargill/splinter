@@ -63,6 +63,8 @@ pub struct PeerMap {
     // Endpoint to peer id
     endpoints: HashMap<String, HashSet<PeerTokenPair>>,
     initial_retry_frequency: u64,
+    // If a peer's connection id changes store it off incase it is cached.
+    removed_connection_ids: HashMap<String, PeerTokenPair>,
 }
 
 impl PeerMap {
@@ -79,6 +81,7 @@ impl PeerMap {
             peers: HashMap::new(),
             endpoints: HashMap::new(),
             initial_retry_frequency,
+            removed_connection_ids: HashMap::new(),
         }
     }
 
@@ -109,6 +112,9 @@ impl PeerMap {
     /// * `endpoint` - A list of endpoints the peer is reachable at
     /// * `active_endpoint` - The endpoint of the peer's current connection
     /// * `status` - The peer's current status
+    /// * `required_local_auth` - The local required authorization that must be used for peer
+    /// * `removed_connection_ids` - Old connection IDs associated with this peer
+    #[allow(clippy::too_many_arguments)]
     pub fn insert(
         &mut self,
         peer_id: PeerAuthorizationToken,
@@ -117,6 +123,7 @@ impl PeerMap {
         active_endpoint: String,
         status: PeerStatus,
         required_local_auth: PeerAuthorizationToken,
+        removed_connection_ids: Vec<String>,
     ) {
         let peer_metadata = PeerMetadata {
             id: peer_id.clone(),
@@ -141,6 +148,11 @@ impl PeerMap {
                 peer_tokens.insert(peer_token_pair.clone());
                 self.endpoints.insert(endpoint.clone(), peer_tokens);
             }
+        }
+
+        for old_connection_id in removed_connection_ids.into_iter() {
+            self.removed_connection_ids
+                .insert(old_connection_id.to_string(), peer_token_pair.clone());
         }
 
         gauge!("splinter.peer_manager.peers", self.peers.len() as f64);
@@ -196,6 +208,11 @@ impl PeerMap {
                 }
             }
 
+            if peer_metadata.connection_id != peer_entry.get().connection_id {
+                self.removed_connection_ids
+                    .insert(peer_entry.get().connection_id.to_string(), peer_token_pair);
+            }
+
             peer_entry.insert(peer_metadata);
 
             Ok(())
@@ -238,6 +255,13 @@ impl PeerMap {
         self.peers
             .values()
             .find(|meta| meta.connection_id == connection_id)
+            .or_else(|| {
+                if let Some(peer_id) = self.removed_connection_ids.get(connection_id) {
+                    self.peers.get(peer_id)
+                } else {
+                    None
+                }
+            })
     }
 
     /// Returns the list of peers whose peer status is pending
@@ -277,6 +301,7 @@ pub mod tests {
             "test_endpoint2".to_string(),
             PeerStatus::Connected,
             PeerAuthorizationToken::from_peer_id("my_id"),
+            vec![],
         );
 
         peer_map.insert(
@@ -288,6 +313,7 @@ pub mod tests {
             "next_endpoint1".to_string(),
             PeerStatus::Connected,
             PeerAuthorizationToken::from_peer_id("my_id"),
+            vec![],
         );
 
         let mut peers = peer_map.peer_ids();
@@ -324,6 +350,7 @@ pub mod tests {
             "test_endpoint2".to_string(),
             PeerStatus::Connected,
             PeerAuthorizationToken::from_peer_id("my_id"),
+            vec![],
         );
 
         peer_map.insert(
@@ -335,6 +362,7 @@ pub mod tests {
             "next_endpoint1".to_string(),
             PeerStatus::Connected,
             PeerAuthorizationToken::from_peer_id("my_id"),
+            vec![],
         );
 
         let peers = peer_map.connection_ids();
@@ -384,6 +412,7 @@ pub mod tests {
             "test_endpoint2".to_string(),
             PeerStatus::Pending,
             PeerAuthorizationToken::from_peer_id("my_id"),
+            vec![],
         );
 
         let peer_metadata = peer_map
@@ -431,6 +460,7 @@ pub mod tests {
             "test_endpoint2".to_string(),
             PeerStatus::Pending,
             PeerAuthorizationToken::from_peer_id("my_id"),
+            vec![],
         );
         assert!(peer_map.peers.contains_key(&PeerTokenPair::new(
             PeerAuthorizationToken::Trust {
@@ -494,6 +524,7 @@ pub mod tests {
             "test_endpoint2".to_string(),
             PeerStatus::Pending,
             PeerAuthorizationToken::from_peer_id("my_id"),
+            vec![],
         );
         assert!(peer_map.peers.contains_key(&PeerTokenPair::new(
             PeerAuthorizationToken::Trust {
@@ -567,6 +598,7 @@ pub mod tests {
             "test_endpoint2".to_string(),
             PeerStatus::Connected,
             PeerAuthorizationToken::from_peer_id("my_id"),
+            vec![],
         );
         assert!(peer_map.peers.contains_key(&PeerTokenPair::new(
             PeerAuthorizationToken::Trust {

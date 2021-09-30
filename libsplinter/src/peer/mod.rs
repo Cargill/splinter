@@ -498,10 +498,8 @@ fn handle_request(
                 .map(|meta| PeerTokenPair::new(meta.id.clone(), meta.required_local_auth.clone()))
                 .or_else(|| {
                     unreferenced_peers
-                        .peers
-                        .iter()
-                        .find(|(_, meta)| meta.connection_id == connection_id)
-                        .map(|(peer_id, _)| peer_id.clone())
+                        .get_by_connection_id(&connection_id)
+                        .map(|(peer_id, _)| peer_id)
                 });
 
             if sender.send(Ok(peer_id)).is_err() {
@@ -621,6 +619,7 @@ fn add_peer(
     if let Some(UnreferencedPeer {
         connection_id,
         endpoint,
+        old_connection_ids,
         ..
     }) = unreferenced_peers.peers.remove(&peer_token_pair)
     {
@@ -631,6 +630,7 @@ fn add_peer(
             endpoint,
             PeerStatus::Connected,
             required_local_auth,
+            old_connection_ids,
         );
 
         let peer_ref = PeerRef::new(peer_token_pair.clone(), peer_remover.clone());
@@ -682,6 +682,7 @@ fn add_peer(
         active_endpoint,
         PeerStatus::Pending,
         required_local_auth,
+        vec![],
     );
     let peer_ref = PeerRef::new(peer_token_pair, peer_remover.clone());
     Ok(peer_ref)
@@ -1202,10 +1203,14 @@ fn handle_inbound_connection(
                 error!("Unable to clean up old connection: {}", err);
             }
 
+            let mut old_connection_ids = unreferenced_peer.old_connection_ids.to_vec();
+            old_connection_ids.push(unreferenced_peer.connection_id.to_string());
+
             *unreferenced_peer = UnreferencedPeer {
                 connection_id,
                 endpoint,
                 local_authorization,
+                old_connection_ids,
             };
         }
     } else {
@@ -1215,6 +1220,7 @@ fn handle_inbound_connection(
                 connection_id,
                 endpoint,
                 local_authorization,
+                old_connection_ids: vec![],
             },
         );
     }
@@ -1318,6 +1324,7 @@ fn handle_connected(
                 endpoint,
                 PeerStatus::Connected,
                 requested_endpoint.local_authorization.clone(),
+                vec![],
             );
 
             let notification = PeerManagerNotification::Connected {
@@ -1356,10 +1363,14 @@ fn handle_connected(
                     error!("Unable to clean up old connection: {}", err);
                 }
 
+                let mut old_connection_ids = unreferenced_peer.old_connection_ids.to_vec();
+                old_connection_ids.push(unreferenced_peer.connection_id.to_string());
+
                 *unreferenced_peer = UnreferencedPeer {
                     connection_id,
                     endpoint,
                     local_authorization,
+                    old_connection_ids,
                 };
             }
         } else {
@@ -1369,6 +1380,7 @@ fn handle_connected(
                     connection_id,
                     endpoint,
                     local_authorization,
+                    old_connection_ids: vec![],
                 },
             );
         }
