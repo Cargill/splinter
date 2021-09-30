@@ -13,6 +13,8 @@
 // limitations under the License.
 #[cfg(feature = "challenge-authorization")]
 pub mod challenge;
+#[cfg(feature = "trust-authorization")]
+pub mod trust;
 
 use crate::error::InvalidStateError;
 use crate::network::dispatch::{ConnectionId, Handler, RawBytes};

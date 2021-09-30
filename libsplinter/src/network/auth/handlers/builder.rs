@@ -23,6 +23,10 @@ use crate::network::auth::authorization::challenge::handlers::{
     AuthChallengeNonceRequestHandler, AuthChallengeNonceResponseHandler,
     AuthChallengeSubmitRequestHandler, AuthChallengeSubmitResponseHandler,
 };
+#[cfg(feature = "trust-authorization")]
+use crate::network::auth::authorization::trust::handlers::{
+    AuthTrustRequestHandler, AuthTrustResponseHandler,
+};
 use crate::network::auth::AuthorizationManagerStateMachine;
 use crate::network::auth::ConnectionAuthorizationType;
 use crate::network::dispatch::{ConnectionId, Dispatcher, MessageSender};
@@ -31,8 +35,6 @@ use crate::protos::network::NetworkMessageType;
 use super::v0_handlers::{
     AuthorizedHandler, ConnectRequestHandler, ConnectResponseHandler, TrustRequestHandler,
 };
-#[cfg(feature = "trust-authorization")]
-use super::v1_handlers::trust::{AuthTrustRequestHandler, AuthTrustResponseHandler};
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 use super::v1_handlers::{
     builders::{AuthProtocolRequestHandlerBuilder, AuthProtocolResponseHandlerBuilder},
