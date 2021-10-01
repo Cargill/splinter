@@ -14,6 +14,7 @@
 
 pub mod builder;
 mod error;
+mod registry;
 
 #[cfg(feature = "service-arg-validation")]
 use std::collections::HashMap;
@@ -47,7 +48,6 @@ use splinter::circuit::handlers::{
     CircuitMessageHandler, ServiceConnectRequestHandler, ServiceDisconnectRequestHandler,
 };
 use splinter::circuit::routing::{memory::RoutingTable, RoutingTableReader, RoutingTableWriter};
-use splinter::error::InternalError;
 use splinter::keys::insecure::AllowAllKeyPermissionManager;
 use splinter::mesh::Mesh;
 use splinter::network::auth::AuthorizationManager;
@@ -68,8 +68,7 @@ use splinter::protos::network::NetworkMessageType;
 #[cfg(feature = "challenge-authorization")]
 use splinter::public_key::PublicKey;
 use splinter::registry::{
-    LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RemoteYamlShutdownHandle, RwRegistry,
-    UnifiedRegistry,
+    LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RwRegistry, UnifiedRegistry,
 };
 #[cfg(feature = "authorization-handler-allow-keys")]
 use splinter::rest_api::auth::authorization::allow_keys::AllowKeysAuthorizationHandler;
@@ -103,6 +102,7 @@ use crate::node_id::get_node_id;
 use crate::routes;
 
 pub use error::{CreateError, StartError};
+use registry::RegistryShutdownHandle;
 
 const ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
@@ -1278,51 +1278,6 @@ mod tests {
             create_allow_keys_path("/config/path", "relative/path"),
             Path::new("/config/path/relative/path")
         );
-    }
-}
-
-#[derive(Default)]
-struct RegistryShutdownHandle {
-    remote_yaml_shutdown_handles: Vec<RemoteYamlShutdownHandle>,
-}
-
-impl RegistryShutdownHandle {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn add_remote_yaml_shutdown_handle(&mut self, handle: RemoteYamlShutdownHandle) {
-        self.remote_yaml_shutdown_handles.push(handle);
-    }
-}
-
-impl ShutdownHandle for RegistryShutdownHandle {
-    fn signal_shutdown(&mut self) {
-        self.remote_yaml_shutdown_handles
-            .iter_mut()
-            .for_each(|handle| handle.signal_shutdown());
-    }
-
-    fn wait_for_shutdown(self) -> Result<(), InternalError> {
-        let mut errors = vec![];
-        for handle in self.remote_yaml_shutdown_handles {
-            if let Err(err) = handle.wait_for_shutdown() {
-                errors.push(err);
-            }
-        }
-
-        match errors.len() {
-            0 => Ok(()),
-            1 => Err(errors.remove(0)),
-            _ => Err(InternalError::with_message(format!(
-                "Multiple errors occurred during shutdown: {}",
-                errors
-                    .into_iter()
-                    .map(|e| e.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ))),
-        }
     }
 }
 
