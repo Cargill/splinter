@@ -1,5 +1,49 @@
 # Release Notes
 
+## Changes in Splinter 0.5.20
+
+### Highlights
+
+* Splinterd now correctly loads the TOML configuration file from
+  `SPLINTER_HOME`. Previously, splinterd would not take into consideration the
+  value of `SPLINTER_HOME` or `SPLINTER_CONFIG_DIR` with respect to the
+  configuration file. This change makes it so that splinterd will check both of
+  those values before loading the configuration.
+
+### libsplinter
+
+* Stabilize `challenge-authorization` API by removing guard. This includes
+  adding public keys to the circuit state objects and other API changes required
+  to support challenge authorization. Note this stabilization does not include
+  enabling challenge authorization at the authorization level, that will be
+  stabilized separately.
+
+### libscabbard
+
+* Add generic `TransactCommitHashStore` which uses any
+  `transact::database::Database` implementation with the configured index
+  tables.  This is currently available via the experimental `commit-store` and
+  stable `lmdb` features.
+
+* Add Clone to `CommitHashStore` via a `clone_boxed` trait method and
+  implementing `Clone` on `Box<dyn CommitHashStore>`
+
+* Add `Sync` and `Send` constraints to the `CommitHashStore` trait. This brings
+  the store definition in-line with all other splinter stores.
+
+### splinterd
+
+* Fix splinterd so it correctly loads the TOML configuration file from
+  `SPLINTER_HOME`.
+
+### splinter CLI
+
+* Fix `splinter database migrate` so that an error isn't returned if the
+  splinter_state.db file does not exist yet, as it will be created later on by
+  sqlite when migrating. This fixes a regression that was introduced when a
+  looping error message was removed when a file had insufficient file
+  permissions.
+
 ## Changes in Splinter 0.5.19
 
 ### Highlights
