@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod error;
+
 #[cfg(feature = "service-arg-validation")]
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
 use std::fs;
 use std::path::Path;
 #[cfg(feature = "authorization-handler-allow-keys")]
@@ -88,21 +88,20 @@ use splinter::rest_api::auth::authorization::AuthorizationHandler;
 use splinter::rest_api::auth::authorization::Permission;
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
-use splinter::rest_api::{
-    AuthConfig, Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
-};
+use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
 use splinter::service;
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
-    inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Connection,
-    Incoming, ListenError, Listener, Transport,
+    inproc::InprocTransport, multi::MultiTransport, AcceptError, Connection, Incoming, Listener,
+    Transport,
 };
 
 use crate::node_id::get_node_id;
 use crate::routes;
-use crate::UserError;
+
+pub use error::{CreateError, StartError};
 
 const ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
@@ -1712,98 +1711,5 @@ fn parse_peer_endpoint(
         (endpoint, PeerAuthorizationToken::from_peer_id(node_id))
     } else {
         (endpoint.to_string(), peering_token.clone())
-    }
-}
-
-#[derive(Debug)]
-pub enum CreateError {
-    MissingRequiredField(String),
-}
-
-impl Error for CreateError {}
-
-impl fmt::Display for CreateError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            CreateError::MissingRequiredField(msg) => write!(f, "missing required field: {}", msg),
-        }
-    }
-}
-
-#[allow(clippy::enum_variant_names)]
-#[derive(Debug)]
-pub enum StartError {
-    TransportError(String),
-    NetworkError(String),
-    StorageError(String),
-    ProtocolError(String),
-    RestApiError(String),
-    AdminServiceError(String),
-    #[cfg(feature = "health-service")]
-    HealthServiceError(String),
-    OrchestratorError(String),
-    UserError(String),
-}
-
-impl Error for StartError {}
-
-impl fmt::Display for StartError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            StartError::TransportError(msg) => write!(f, "transport returned an error: {}", msg),
-            StartError::NetworkError(msg) => write!(f, "network returned an error: {}", msg),
-            StartError::StorageError(msg) => write!(f, "unable to set up storage: {}", msg),
-            StartError::ProtocolError(msg) => write!(f, "unable to parse protocol: {}", msg),
-            StartError::RestApiError(msg) => write!(f, "REST API encountered an error: {}", msg),
-            StartError::AdminServiceError(msg) => {
-                write!(f, "the admin service encountered an error: {}", msg)
-            }
-            #[cfg(feature = "health-service")]
-            StartError::HealthServiceError(msg) => {
-                write!(f, "the health service encountered an error: {}", msg)
-            }
-            StartError::OrchestratorError(msg) => {
-                write!(f, "the orchestrator encountered an error: {}", msg)
-            }
-            StartError::UserError(msg) => {
-                write!(f, "there has been a user error: {}", msg)
-            }
-        }
-    }
-}
-
-impl From<UserError> for StartError {
-    fn from(user_error: UserError) -> Self {
-        StartError::UserError(user_error.to_string())
-    }
-}
-
-impl From<RestApiServerError> for StartError {
-    fn from(rest_api_error: RestApiServerError) -> Self {
-        StartError::RestApiError(rest_api_error.to_string())
-    }
-}
-
-impl From<ListenError> for StartError {
-    fn from(listen_error: ListenError) -> Self {
-        StartError::TransportError(format!("Listen Error: {:?}", listen_error))
-    }
-}
-
-impl From<AcceptError> for StartError {
-    fn from(accept_error: AcceptError) -> Self {
-        StartError::TransportError(format!("Accept Error: {:?}", accept_error))
-    }
-}
-
-impl From<ConnectError> for StartError {
-    fn from(connect_error: ConnectError) -> Self {
-        StartError::TransportError(format!("Connect Error: {:?}", connect_error))
-    }
-}
-
-impl From<protobuf::ProtobufError> for StartError {
-    fn from(err: protobuf::ProtobufError) -> Self {
-        StartError::ProtocolError(err.to_string())
     }
 }
