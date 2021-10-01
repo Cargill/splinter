@@ -61,6 +61,7 @@ impl CommitHashStore for DieselCommitHashStore<diesel::pg::PgConnection> {
         )
         .get_current_commit_hash(&*self.circuit_id, &*self.service_id)
     }
+
     fn set_current_commit_hash(&self, commit_hash: &str) -> Result<(), CommitHashStoreError> {
         CommitHashStoreOperations::new(
             &*self
@@ -91,6 +92,7 @@ impl CommitHashStore for DieselCommitHashStore<diesel::sqlite::SqliteConnection>
         )
         .get_current_commit_hash(&*self.circuit_id, &*self.service_id)
     }
+
     fn set_current_commit_hash(&self, commit_hash: &str) -> Result<(), CommitHashStoreError> {
         CommitHashStoreOperations::new(
             &*self
