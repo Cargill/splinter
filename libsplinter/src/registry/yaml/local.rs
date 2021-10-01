@@ -22,7 +22,7 @@
 
 use std::convert::TryFrom;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -244,34 +244,50 @@ impl Internal {
 
     /// Read the backing file, verify that it's valid, and cache its contents.
     fn read_nodes(&mut self) -> Result<(), RegistryError> {
-        let file = File::open(&self.file_path).map_err(|err| {
+        let mut file = File::open(&self.file_path).map_err(|err| {
             RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
                 "Failed to open YAML registry file".into(),
             ))
         })?;
 
-        let yaml_nodes: Vec<YamlNode> = serde_yaml::from_reader(&file).map_err(|err| {
+        let mut buffer = vec![];
+        file.read_to_end(&mut buffer).map_err(|err| {
             RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
-                "Failed to read YAML registry file".into(),
+                format!("Failed to read YAML registry file {}", self.file_path),
             ))
         })?;
 
-        let nodes: Vec<Node> = yaml_nodes
-            .into_iter()
-            .map(Node::try_from)
-            .collect::<Result<Vec<Node>, InvalidNodeError>>()
-            .map_err(|err| {
-                RegistryError::InvalidStateError(InvalidStateError::with_message(format!(
-                    "Unable to get node list: {}",
-                    err
-                )))
+        let nodes = if buffer.is_empty() {
+            vec![]
+        } else {
+            let yaml_nodes: Option<Vec<YamlNode>> =
+                serde_yaml::from_slice(&buffer).map_err(|err| {
+                    RegistryError::InternalError(InternalError::from_source_with_message(
+                        Box::new(err),
+                        "Failed to read YAML registry file".into(),
+                    ))
+                })?;
+
+            let nodes: Vec<Node> = yaml_nodes
+                .unwrap_or_else(Vec::new)
+                .into_iter()
+                .map(Node::try_from)
+                .collect::<Result<Vec<Node>, InvalidNodeError>>()
+                .map_err(|err| {
+                    RegistryError::InvalidStateError(InvalidStateError::with_message(format!(
+                        "Unable to get node list: {}",
+                        err
+                    )))
+                })?;
+
+            validate_nodes(&nodes).map_err(|err| {
+                RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
             })?;
 
-        validate_nodes(&nodes).map_err(|err| {
-            RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
-        })?;
+            nodes
+        };
 
         self.cached_nodes = nodes;
         self.last_read = SystemTime::now();
@@ -334,6 +350,27 @@ mod test {
     use std::fs::{remove_file, File};
 
     use tempdir::TempDir;
+
+    ///
+    /// Verifies that reading from an empty YAML file still successfully returns an empty result
+    #[test]
+    fn test_read_empty_yaml_file() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = TempDir::new("test_read_yaml_duplicate_identity_error")?;
+
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        File::create(&path)?;
+
+        let registry = LocalYamlRegistry::new(&path)?;
+        assert!(registry.get_nodes()?.is_empty());
+
+        Ok(())
+    }
 
     ///
     /// Verifies that reading from a YAML file that contains two nodes with the same identity
