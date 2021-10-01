@@ -189,6 +189,10 @@ mod tests {
             let mut state = ScabbardState::new(
                 &paths.state_db_path,
                 TEMP_DB_SIZE,
+                #[cfg(feature = "metrics")]
+                "svc0".to_string(),
+                #[cfg(feature = "metrics")]
+                "vzrQS-rvwf4".to_string(),
                 receipt_store.clone(),
                 vec![],
             )

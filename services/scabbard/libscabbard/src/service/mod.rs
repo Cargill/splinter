@@ -140,8 +140,17 @@ impl Scabbard {
             version,
         );
 
-        let state = ScabbardState::new(state_db_path, state_db_size, receipt_store, admin_keys)
-            .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
+        let state = ScabbardState::new(
+            state_db_path,
+            state_db_size,
+            #[cfg(feature = "metrics")]
+            service_id.clone(),
+            #[cfg(feature = "metrics")]
+            circuit_id.to_string(),
+            receipt_store,
+            admin_keys,
+        )
+        .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
 
         let coordinator_timeout =
             coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
