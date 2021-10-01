@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "postgres")]
+mod postgres;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
@@ -23,12 +25,9 @@ use std::str::FromStr;
 use std::{env, fs};
 
 use clap::ArgMatches;
-use diesel::{connection::Connection as _, pg::PgConnection};
 
-#[cfg(feature = "scabbard-receipt-store")]
-use sawtooth::migrations::run_postgres_migrations as run_receipt_store_postgres_migrations;
-use splinter::migrations::run_postgres_migrations;
-
+#[cfg(not(feature = "sqlite"))]
+use self::postgres::get_default_database;
 #[cfg(feature = "sqlite")]
 use self::sqlite::{get_default_database, sqlite_migrations};
 #[cfg(feature = "upgrade")]
@@ -55,42 +54,14 @@ impl Action for MigrateAction {
         };
 
         match ConnectionUri::from_str(&url)? {
-            ConnectionUri::Postgres(url) => {
-                let connection = PgConnection::establish(&url).map_err(|err| {
-                    CliError::ActionError(format!(
-                        "Failed to establish database connection to '{}': {}",
-                        url, err
-                    ))
-                })?;
-                info!("Running migrations against PostgreSQL database: {}", url);
-                run_postgres_migrations(&connection).map_err(|err| {
-                    CliError::ActionError(format!("Unable to run Postgres migrations: {}", err))
-                })?;
-                #[cfg(feature = "scabbard-receipt-store")]
-                {
-                    info!(
-                        "Running migrations against PostgreSQL database for receipt store: {}",
-                        url
-                    );
-                    run_receipt_store_postgres_migrations(&connection).map_err(|err| {
-                        CliError::ActionError(format!(
-                            "Unable to run Postgres migrations for receipt store: {}",
-                            err
-                        ))
-                    })?;
-                }
-            }
+            #[cfg(feature = "postgres")]
+            ConnectionUri::Postgres(url) => postgres::postgres_migrations(&url)?,
             #[cfg(feature = "sqlite")]
             ConnectionUri::Sqlite(connection_string) => sqlite_migrations(connection_string)?,
         }
 
         Ok(())
     }
-}
-
-#[cfg(not(feature = "sqlite"))]
-fn get_default_database() -> Result<String, CliError> {
-    Ok("postgres://admin:admin@localhost:5432/splinterd".to_string())
 }
 
 /// The possible connection types and identifiers passed to the migrate command
