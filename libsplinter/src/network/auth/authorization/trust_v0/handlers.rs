@@ -13,8 +13,13 @@
 // limitations under the License.
 
 use crate::error::InternalError;
+use crate::network::auth::{
+    state_machine::trust_v0::{TrustV0AuthorizationAction, TrustV0AuthorizationState},
+    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationActionError,
+    AuthorizationManagerStateMachine, Identity,
+};
 use crate::network::dispatch::{
-    ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
+    ConnectionId, DispatchError, Handler, MessageContext, MessageSender, RawBytes,
 };
 use crate::protocol::authorization::{
     AuthorizationMessage, AuthorizationType, Authorized, ConnectRequest, ConnectResponse,
@@ -24,12 +29,6 @@ use crate::protocol::network::NetworkMessage;
 use crate::protos::authorization;
 use crate::protos::network;
 use crate::protos::prelude::*;
-
-use crate::network::auth::{
-    state_machine::trust_v0::{TrustV0AuthorizationAction, TrustV0AuthorizationState},
-    AuthorizationAcceptingAction, AuthorizationAcceptingState, AuthorizationActionError,
-    AuthorizationManagerStateMachine, Identity,
-};
 
 pub struct AuthorizedHandler {
     auth_manager: AuthorizationManagerStateMachine,
@@ -44,7 +43,7 @@ impl AuthorizedHandler {
 impl Handler for AuthorizedHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthorizedMessage;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTHORIZE
@@ -96,7 +95,7 @@ impl ConnectRequestHandler {
 impl Handler for ConnectRequestHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::ConnectRequest;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::CONNECT_REQUEST
@@ -108,7 +107,7 @@ impl Handler for ConnectRequestHandler {
         context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
-        let connect_request = ConnectRequest::from_proto(msg)?;
+        let connect_request = ConnectRequest::from_bytes(msg.bytes())?;
         match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
             AuthorizationAcceptingAction::Connecting,
@@ -194,7 +193,7 @@ impl ConnectResponseHandler {
 impl Handler for ConnectResponseHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::ConnectResponse;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::CONNECT_RESPONSE
@@ -206,7 +205,7 @@ impl Handler for ConnectResponseHandler {
         context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
-        let connect_response = ConnectResponse::from_proto(msg)?;
+        let connect_response = ConnectResponse::from_bytes(msg.bytes())?;
         debug!(
             "Receive connect response from connection {}: {:?}",
             context.source_connection_id(),
@@ -259,7 +258,7 @@ impl TrustRequestHandler {
 impl Handler for TrustRequestHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::TrustRequest;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::TRUST_REQUEST
@@ -271,7 +270,7 @@ impl Handler for TrustRequestHandler {
         context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
-        let trust_request = TrustRequest::from_proto(msg)?;
+        let trust_request = TrustRequest::from_bytes(msg.bytes())?;
         match self.auth_manager.next_accepting_state(
             context.source_connection_id(),
             AuthorizationAcceptingAction::TrustV0(TrustV0AuthorizationAction::TrustIdentifyingV0(
@@ -320,14 +319,11 @@ impl Handler for TrustRequestHandler {
 mod tests {
     use super::*;
 
+    use protobuf::Message;
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
-    #[cfg(feature = "challenge-authorization")]
-    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
-    use cylinder::{PublicKey, Signature, VerificationError, Verifier};
-    use protobuf::Message;
-
+    use crate::network::auth::authorization::trust_v0::TrustV0Authorization;
     use crate::network::auth::AuthorizationDispatchBuilder;
     use crate::protos::authorization;
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
@@ -344,20 +340,13 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        // mut is required if chalenge authorization is enabled
-        #[allow(unused_mut)]
+
         let mut dispatcher_builder =
             AuthorizationDispatchBuilder::new().with_identity("mock_identity");
 
-        #[cfg(feature = "challenge-authorization")]
-        {
-            dispatcher_builder = dispatcher_builder
-                .with_signers(&vec![new_signer()])
-                .with_nonce(&vec![])
-                .with_expected_authorization(None)
-                .with_local_authorization(None)
-                .with_verifier(Box::new(NoopVerifier))
-        }
+        dispatcher_builder = dispatcher_builder.add_authorization(Box::new(
+            TrustV0Authorization::new("mock_identity".into(), auth_mgr.clone()),
+        ));
 
         let dispatcher = dispatcher_builder
             .build(dispatch_sender, auth_mgr)
@@ -418,20 +407,13 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        // mut is required if chalenge authorization is enabled
-        #[allow(unused_mut)]
+
         let mut dispatcher_builder =
             AuthorizationDispatchBuilder::new().with_identity("mock_identity");
 
-        #[cfg(feature = "challenge-authorization")]
-        {
-            dispatcher_builder = dispatcher_builder
-                .with_signers(&vec![new_signer()])
-                .with_nonce(&vec![])
-                .with_expected_authorization(None)
-                .with_local_authorization(None)
-                .with_verifier(Box::new(NoopVerifier))
-        }
+        dispatcher_builder = dispatcher_builder.add_authorization(Box::new(
+            TrustV0Authorization::new("mock_identity".into(), auth_mgr.clone()),
+        ));
 
         let dispatcher = dispatcher_builder
             .build(dispatch_sender, auth_mgr)
@@ -477,20 +459,13 @@ mod tests {
         let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
-        // mut is required if chalenge authorization is enabled
-        #[allow(unused_mut)]
+
         let mut dispatcher_builder =
             AuthorizationDispatchBuilder::new().with_identity("mock_identity");
 
-        #[cfg(feature = "challenge-authorization")]
-        {
-            dispatcher_builder = dispatcher_builder
-                .with_signers(&vec![new_signer()])
-                .with_nonce(&vec![])
-                .with_expected_authorization(None)
-                .with_local_authorization(None)
-                .with_verifier(Box::new(NoopVerifier))
-        }
+        dispatcher_builder = dispatcher_builder.add_authorization(Box::new(
+            TrustV0Authorization::new("mock_identity".into(), auth_mgr.clone()),
+        ));
 
         let dispatcher = dispatcher_builder
             .build(dispatch_sender, auth_mgr)
@@ -594,29 +569,5 @@ mod tests {
 
             Ok(())
         }
-    }
-
-    struct NoopVerifier;
-
-    impl Verifier for NoopVerifier {
-        fn algorithm_name(&self) -> &str {
-            unimplemented!()
-        }
-
-        fn verify(
-            &self,
-            _message: &[u8],
-            _signature: &Signature,
-            _public_key: &PublicKey,
-        ) -> Result<bool, VerificationError> {
-            unimplemented!()
-        }
-    }
-
-    #[cfg(feature = "challenge-authorization")]
-    fn new_signer() -> Box<dyn Signer> {
-        let context = Secp256k1Context::new();
-        let key = context.new_random_private_key();
-        context.new_signer(key)
     }
 }

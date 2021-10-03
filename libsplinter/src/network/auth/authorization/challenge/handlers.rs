@@ -26,20 +26,18 @@ use crate::network::auth::{
     AuthorizationInitiatingState, AuthorizationManagerStateMachine, AuthorizationMessage, Identity,
 };
 use crate::network::dispatch::{
-    ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
+    ConnectionId, DispatchError, Handler, MessageContext, MessageSender, RawBytes,
 };
 use crate::protocol::authorization::AuthComplete;
 use crate::protocol::authorization::{
     AuthChallengeNonceResponse, AuthChallengeSubmitRequest, AuthChallengeSubmitResponse,
-    SubmitRequest,
+    AuthorizationError, SubmitRequest,
 };
 use crate::protocol::network::NetworkMessage;
 use crate::protos::authorization;
 use crate::protos::network;
 use crate::protos::prelude::*;
 use crate::public_key;
-
-use super::send_authorization_error;
 
 /// Handler for the Authorization Challenge Nonce Request Message Type
 
@@ -60,7 +58,7 @@ impl AuthChallengeNonceRequestHandler {
 impl Handler for AuthChallengeNonceRequestHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthChallengeNonceRequest;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTH_CHALLENGE_NONCE_REQUEST
@@ -160,7 +158,7 @@ impl AuthChallengeNonceResponseHandler {
 impl Handler for AuthChallengeNonceResponseHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthChallengeNonceResponse;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTH_CHALLENGE_NONCE_RESPONSE
@@ -177,7 +175,7 @@ impl Handler for AuthChallengeNonceResponseHandler {
             context.source_connection_id()
         );
 
-        let nonce_request = AuthChallengeNonceResponse::from_proto(msg)?;
+        let nonce_request = AuthChallengeNonceResponse::from_bytes(msg.bytes())?;
 
         let submit_requests = self
             .signers
@@ -299,7 +297,7 @@ impl AuthChallengeSubmitRequestHandler {
 impl Handler for AuthChallengeSubmitRequestHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthChallengeSubmitRequest;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTH_CHALLENGE_SUBMIT_REQUEST
@@ -316,7 +314,7 @@ impl Handler for AuthChallengeSubmitRequestHandler {
             context.source_connection_id()
         );
 
-        let submit_msg = AuthChallengeSubmitRequest::from_proto(msg)?;
+        let submit_msg = AuthChallengeSubmitRequest::from_bytes(msg.bytes())?;
         let mut public_keys = vec![];
 
         for request in submit_msg.submit_requests {
@@ -452,7 +450,7 @@ impl AuthChallengeSubmitResponseHandler {
 impl Handler for AuthChallengeSubmitResponseHandler {
     type Source = ConnectionId;
     type MessageType = authorization::AuthorizationMessageType;
-    type Message = authorization::AuthChallengeSubmitResponse;
+    type Message = RawBytes;
 
     fn match_type(&self) -> Self::MessageType {
         authorization::AuthorizationMessageType::AUTH_CHALLENGE_SUBMIT_RESPONSE
@@ -469,7 +467,7 @@ impl Handler for AuthChallengeSubmitResponseHandler {
             context.source_connection_id()
         );
 
-        let submit_msg = AuthChallengeSubmitResponse::from_proto(msg)?;
+        let submit_msg = AuthChallengeSubmitResponse::from_bytes(msg.bytes())?;
 
         let public_key = submit_msg.public_key;
 
@@ -537,6 +535,39 @@ impl Handler for AuthChallengeSubmitResponseHandler {
     }
 }
 
+fn send_authorization_error(
+    auth_manager: &AuthorizationManagerStateMachine,
+    source_id: &str,
+    connection_id: &str,
+    sender: &dyn MessageSender<ConnectionId>,
+    error_string: &str,
+) -> Result<(), DispatchError> {
+    let response = AuthorizationMessage::AuthorizationError(
+        AuthorizationError::AuthorizationRejected(error_string.into()),
+    );
+
+    let msg_bytes =
+        IntoBytes::<network::NetworkMessage>::into_bytes(NetworkMessage::from(response))?;
+
+    sender
+        .send(source_id.into(), msg_bytes)
+        .map_err(|(recipient, payload)| {
+            DispatchError::NetworkSendError((recipient.into(), payload))
+        })?;
+
+    if auth_manager
+        .next_accepting_state(connection_id, AuthorizationAcceptingAction::Unauthorizing)
+        .is_err()
+    {
+        warn!(
+            "Unable to update state to Unauthorizing for {}",
+            connection_id,
+        )
+    };
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -550,6 +581,7 @@ mod tests {
     };
     use protobuf::Message;
 
+    use crate::network::auth::authorization::challenge::ChallengeAuthorization;
     use crate::network::auth::state_machine::challenge_v1::ChallengeAuthorizationInitiatingState;
     use crate::network::auth::{
         AuthorizationDispatchBuilder, ConnectionAuthorizationType, ManagedAuthorizationState,
@@ -568,7 +600,6 @@ mod tests {
     /// 1) no error from the dispatcher
     /// 2) the handler should send AuthChallengeNonceRequest
     #[test]
-
     fn protocol_response_challenge() {
         let connection_id = "test_connection".to_string();
         // need to setup expected authorization state
@@ -592,27 +623,34 @@ mod tests {
         let local_signer = new_signer();
         let other_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
+        let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                other_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
+        let local_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                local_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
-            .with_signers(&[local_signer.clone()])
-            .with_nonce(&nonce)
-            .with_expected_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    other_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_local_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    local_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_verifier(Box::new(NoopVerifier))
+            .add_authorization(Box::new(ChallengeAuthorization::new(
+                vec![local_signer.clone()],
+                nonce.clone(),
+                Box::new(NoopVerifier),
+                expected_authorization.clone(),
+                local_authorization.clone(),
+                auth_mgr.clone(),
+            )))
+            .with_expected_authorization(expected_authorization)
+            .with_local_authorization(local_authorization)
             .build(dispatch_sender, auth_mgr.clone())
             .expect("Unable to build authorization dispatcher");
 
@@ -698,27 +736,34 @@ mod tests {
         let local_signer = new_signer();
         let other_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
+        let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                other_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
+        let local_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                local_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
-            .with_signers(&[local_signer.clone()])
-            .with_nonce(&nonce)
-            .with_expected_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    other_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_local_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    local_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_verifier(Box::new(NoopVerifier))
+            .add_authorization(Box::new(ChallengeAuthorization::new(
+                vec![local_signer.clone()],
+                nonce.clone(),
+                Box::new(NoopVerifier),
+                expected_authorization.clone(),
+                local_authorization.clone(),
+                auth_mgr.clone(),
+            )))
+            .with_expected_authorization(expected_authorization)
+            .with_local_authorization(local_authorization)
             .build(dispatch_sender, auth_mgr.clone())
             .expect("Unable to build authorization dispatcher");
 
@@ -807,27 +852,34 @@ mod tests {
         let local_signer = new_signer();
         let other_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
+        let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                other_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
+        let local_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                local_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
-            .with_signers(&[local_signer.clone()])
-            .with_nonce(&nonce)
-            .with_expected_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    other_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_local_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    local_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_verifier(Box::new(NoopVerifier))
+            .add_authorization(Box::new(ChallengeAuthorization::new(
+                vec![local_signer.clone()],
+                nonce.clone(),
+                Box::new(NoopVerifier),
+                expected_authorization.clone(),
+                local_authorization.clone(),
+                auth_mgr.clone(),
+            )))
+            .with_expected_authorization(expected_authorization)
+            .with_local_authorization(local_authorization)
             .build(dispatch_sender, auth_mgr.clone())
             .expect("Unable to build authorization dispatcher");
 
@@ -902,7 +954,6 @@ mod tests {
     /// 1) no error from the dispatcher
     /// 2) the handler should send a AuthChallengeSubmitResponse
     #[test]
-
     fn auth_challenge_submit_request() {
         let connection_id = "test_connection".to_string();
         // need to setup expected authorization state
@@ -930,27 +981,34 @@ mod tests {
         let local_signer = new_signer();
         let other_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
+        let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                other_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
+        let local_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                local_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
-            .with_signers(&[local_signer.clone()])
-            .with_nonce(&nonce)
-            .with_expected_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    other_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_local_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    local_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_verifier(Box::new(NoopVerifier))
+            .add_authorization(Box::new(ChallengeAuthorization::new(
+                vec![local_signer.clone()],
+                nonce.clone(),
+                Box::new(NoopVerifier),
+                expected_authorization.clone(),
+                local_authorization.clone(),
+                auth_mgr.clone(),
+            )))
+            .with_expected_authorization(expected_authorization)
+            .with_local_authorization(local_authorization)
             .build(dispatch_sender, auth_mgr.clone())
             .expect("Unable to build authorization dispatcher");
 
@@ -1027,7 +1085,6 @@ mod tests {
     /// 2) the handler should send a AuthComplete
     /// 3) verify state is WaitForComplete and Done(Identity)
     #[test]
-
     fn auth_challenge_submit_response() {
         let connection_id = "test_connection".to_string();
         let other_signer = new_signer();
@@ -1061,27 +1118,34 @@ mod tests {
         let dispatch_sender = mock_sender.clone();
         let local_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
+        let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                other_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
+        let local_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                local_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
-            .with_signers(&[local_signer.clone()])
-            .with_nonce(&nonce)
-            .with_expected_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    other_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_local_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    local_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_verifier(Box::new(NoopVerifier))
+            .add_authorization(Box::new(ChallengeAuthorization::new(
+                vec![local_signer.clone()],
+                nonce,
+                Box::new(NoopVerifier),
+                expected_authorization.clone(),
+                local_authorization.clone(),
+                auth_mgr.clone(),
+            )))
+            .with_expected_authorization(expected_authorization)
+            .with_local_authorization(local_authorization)
             .build(dispatch_sender, auth_mgr.clone())
             .expect("Unable to build authorization dispatcher");
 
@@ -1176,27 +1240,34 @@ mod tests {
         let dispatch_sender = mock_sender.clone();
         let local_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
+        let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                other_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
+        let local_authorization = Some(ConnectionAuthorizationType::Challenge {
+            public_key: public_key::PublicKey::from_bytes(
+                local_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into_bytes(),
+            ),
+        });
         let dispatcher = AuthorizationDispatchBuilder::new()
+            .add_authorization(Box::new(ChallengeAuthorization::new(
+                vec![local_signer.clone()],
+                nonce,
+                Box::new(NoopVerifier),
+                expected_authorization.clone(),
+                local_authorization.clone(),
+                auth_mgr.clone(),
+            )))
             .with_identity("mock_identity")
-            .with_signers(&[local_signer.clone()])
-            .with_nonce(&nonce)
-            .with_expected_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    other_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_local_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    local_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
-            }))
-            .with_verifier(Box::new(NoopVerifier))
+            .with_expected_authorization(expected_authorization)
+            .with_local_authorization(local_authorization)
             .build(dispatch_sender, auth_mgr.clone())
             .expect("Unable to build authorization dispatcher");
 

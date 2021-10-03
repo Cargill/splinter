@@ -15,10 +15,6 @@
 //! Message handlers for v1 authorization messages
 
 pub mod builders;
-#[cfg(feature = "challenge-authorization")]
-pub mod challenge;
-#[cfg(feature = "trust-authorization")]
-pub mod trust;
 
 use crate::error::InternalError;
 #[cfg(feature = "challenge-authorization")]
@@ -545,16 +541,6 @@ mod tests {
         let mut dispatcher_builder =
             AuthorizationDispatchBuilder::new().with_identity("mock_identity");
 
-        #[cfg(feature = "challenge-authorization")]
-        {
-            dispatcher_builder = dispatcher_builder
-                .with_signers(&[new_signer()])
-                .with_nonce(&vec![])
-                .with_expected_authorization(None)
-                .with_local_authorization(None)
-                .with_verifier(Box::new(NoopVerifier))
-        }
-
         let dispatcher = dispatcher_builder
             .build(dispatch_sender, auth_mgr)
             .expect("Unable to build authorization dispatcher");
@@ -614,11 +600,8 @@ mod tests {
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
         let local_signer = new_signer();
-        let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
-            .with_signers(&[local_signer.clone()])
-            .with_nonce(&nonce)
             .with_expected_authorization(Some(ConnectionAuthorizationType::Challenge {
                 public_key: public_key::PublicKey::from_bytes(
                     new_signer()
@@ -635,7 +618,6 @@ mod tests {
                         .into_bytes(),
                 ),
             }))
-            .with_verifier(Box::new(NoopVerifier))
             .build(dispatch_sender, auth_mgr)
             .expect("Unable to build authorization dispatcher");
 
@@ -712,16 +694,6 @@ mod tests {
         #[allow(unused_mut)]
         let mut dispatcher_builder =
             AuthorizationDispatchBuilder::new().with_identity("mock_identity");
-
-        #[cfg(feature = "challenge-authorization")]
-        {
-            dispatcher_builder = dispatcher_builder
-                .with_signers(&[new_signer()])
-                .with_nonce(&vec![])
-                .with_expected_authorization(None)
-                .with_local_authorization(None)
-                .with_verifier(Box::new(NoopVerifier))
-        }
 
         let dispatcher = dispatcher_builder
             .build(dispatch_sender, auth_mgr.clone())
