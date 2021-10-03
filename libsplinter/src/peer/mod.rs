@@ -1173,26 +1173,50 @@ fn handle_inbound_connection(
                 warn!("Unable to clean up old connection: {}", err);
             }
         }
-    } else {
-        debug!("Adding peer with id: {}", peer_token_pair);
+    } else if let Some(unreferenced_peer) = unreferenced_peers.peers.get_mut(&peer_token_pair) {
+        // Compare identities, if local identity is greater, close incoming connection
+        // otherwise, remove outbound connection and replace with inbound.
+        if unreferenced_peer.local_authorization > identity {
+            // if peer is already connected, remove the inbound connection
+            debug!(
+                "Removing inbound connection, already connected to unreferenced peer {}",
+                peer_token_pair
+            );
+            if let Err(err) = connector.remove_connection(&endpoint, &connection_id) {
+                error!("Unable to clean up old connection: {}", err);
+            }
+        } else {
+            info!(
+                "Replacing existing connection with inbound for unreferenced peer {}",
+                peer_token_pair
+            );
 
-        if let Some(old_peer) = unreferenced_peers.peers.insert(
+            debug!(
+                "Removing old peer connection for unreferenced peer {}: {}",
+                peer_token_pair, unreferenced_peer.connection_id
+            );
+            if let Err(err) = connector.remove_connection(
+                &unreferenced_peer.endpoint,
+                &unreferenced_peer.connection_id,
+            ) {
+                error!("Unable to clean up old connection: {}", err);
+            }
+
+            *unreferenced_peer = UnreferencedPeer {
+                connection_id,
+                endpoint,
+                local_authorization,
+            };
+        }
+    } else {
+        unreferenced_peers.peers.insert(
             peer_token_pair,
             UnreferencedPeer {
                 connection_id,
-                endpoint: endpoint.to_string(),
+                endpoint,
                 local_authorization,
             },
-        ) {
-            if old_peer.endpoint != endpoint {
-                debug!("Removing old peer connection for {}", old_peer.endpoint);
-                if let Err(err) =
-                    connector.remove_connection(&old_peer.endpoint, &old_peer.connection_id)
-                {
-                    error!("Unable to clean up old connection: {}", err);
-                }
-            }
-        }
+        );
     }
 }
 
@@ -1303,23 +1327,50 @@ fn handle_connected(
             return;
         }
 
-        // Treat unknown peer as unreferenced
-        if let Some(old_peer) = unreferenced_peers.peers.insert(
-            peer_token_pair,
-            UnreferencedPeer {
-                connection_id,
-                endpoint: endpoint.to_string(),
-                local_authorization,
-            },
-        ) {
-            if old_peer.endpoint != endpoint {
-                debug!("Removing old peer connection for {}", old_peer.endpoint);
-                if let Err(err) =
-                    connector.remove_connection(&old_peer.endpoint, &old_peer.connection_id)
-                {
+        if let Some(unreferenced_peer) = unreferenced_peers.peers.get_mut(&peer_token_pair) {
+            // Compare identities, if remote identity is greater, remove outbound connection
+            // otherwise replace inbound connection with outbound.
+            if unreferenced_peer.local_authorization < identity {
+                // if peer is already connected, remove the outbound connection
+                debug!(
+                    "Removing outbound connection, already connected to unreferenced peer {}",
+                    peer_token_pair
+                );
+                if let Err(err) = connector.remove_connection(&endpoint, &connection_id) {
                     error!("Unable to clean up old connection: {}", err);
                 }
+            } else {
+                info!(
+                    "Replacing existing connection with outbound for unreferenced peer {}",
+                    peer_token_pair
+                );
+
+                debug!(
+                    "Removing old peer connection for unreferenced peer {}: {}",
+                    peer_token_pair, unreferenced_peer.connection_id
+                );
+                if let Err(err) = connector.remove_connection(
+                    &unreferenced_peer.endpoint,
+                    &unreferenced_peer.connection_id,
+                ) {
+                    error!("Unable to clean up old connection: {}", err);
+                }
+
+                *unreferenced_peer = UnreferencedPeer {
+                    connection_id,
+                    endpoint,
+                    local_authorization,
+                };
             }
+        } else {
+            unreferenced_peers.peers.insert(
+                peer_token_pair,
+                UnreferencedPeer {
+                    connection_id,
+                    endpoint,
+                    local_authorization,
+                },
+            );
         }
     }
 }
