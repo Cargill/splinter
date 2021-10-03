@@ -436,7 +436,7 @@ impl ServiceFactory for ScabbardFactory {
         let version = ScabbardVersion::try_from(args.get("version").map(String::as_str))
             .map_err(FactoryCreateError::InvalidArguments)?;
 
-        let state_db_path = compute_db_path(&service_id, circuit_id, state_db_dir, "-state")?;
+        let state_db_path = compute_db_path(&service_id, circuit_id, state_db_dir, "state")?;
 
         let (receipt_store, receipt_purge): (ScabbardReceiptStore, _) = match &self
             .receipt_store_factory_config
@@ -465,7 +465,7 @@ impl ServiceFactory for ScabbardFactory {
                 let receipt_db_dir_path = Path::new(&db_dir);
 
                 let receipt_db_path =
-                    compute_db_path(&service_id, circuit_id, receipt_db_dir_path, "-receipts")?;
+                    compute_db_path(&service_id, circuit_id, receipt_db_dir_path, "receipts")?;
 
                 let file: String = receipt_db_path
                     .with_extension("lmdb")
