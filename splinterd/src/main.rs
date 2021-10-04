@@ -24,6 +24,7 @@ mod daemon;
 mod error;
 #[cfg(feature = "log-config")]
 mod logging;
+pub mod node_id;
 mod routes;
 mod transport;
 
@@ -37,13 +38,12 @@ use log4rs::Handle;
 #[cfg(feature = "log-config")]
 use std::convert::TryInto;
 
+#[cfg(not(feature = "node-file-block"))]
 use rand::{thread_rng, Rng};
 #[cfg(any(feature = "challenge-authorization", feature = "node-file-block"))]
 use splinter::error::InternalError;
 #[cfg(feature = "challenge-authorization")]
 use splinter::peer::PeerAuthorizationToken;
-#[cfg(feature = "node-file-block")]
-use splinter::store::create_store_factory;
 #[cfg(feature = "tap")]
 use splinter::tap::influx::InfluxRecorder;
 
@@ -99,11 +99,13 @@ fn create_config(_toml_path: Option<&str>, _matches: ArgMatches) -> Result<Confi
 
 // Checks whether there is a saved node_id file. If there is, the config node_id must match
 // the node_id in the file, otherwise we will return an error.
-fn find_node_id(config: &Config) -> Result<String, UserError> {
+fn find_node_id(config: &Config) -> Result<Option<String>, UserError> {
     let node_id_path = Path::new(config.state_dir()).join("node_id");
 
     #[cfg(feature = "node-file-block")]
     {
+        // This code handles node_ids passed into clap, and throwing errors if the node_id
+        // file hasn't been migrated yet
         if node_id_path.exists() {
             let context = "node_id file is soft-deprecated, run splinter database migrate and \
                 splinter upgrade to import the value"
@@ -113,42 +115,7 @@ fn find_node_id(config: &Config) -> Result<String, UserError> {
                 source: None,
             })
         } else {
-            let database_uri = config
-                .database()
-                .parse()
-                .map_err(|_| UserError::InvalidArgument("db_connection".to_string()))?;
-            let store = create_store_factory(database_uri)?.get_node_id_store();
-            let db_node_id = store.get_node_id();
-            let config_node_id = config.node_id();
-            let save_new_node_id = |node_id| -> Result<(), UserError> {
-                store
-                    .set_node_id(node_id)
-                    .map_err(|err| UserError::from(InternalError::from_source(Box::new(err))))
-            };
-            match (db_node_id, config_node_id) {
-                (Ok(Some(db)), Some(conf)) => {
-                    if db == conf {
-                        Ok(db)
-                    } else {
-                        Err(UserError::InvalidArgument(format!(
-                            "node_id from database {} does not match node_id from config {}",
-                            db, conf
-                        )))
-                    }
-                }
-                (Ok(Some(db)), None) => Ok(db),
-                (Ok(None), Some(conf)) => {
-                    let conf = conf.to_string();
-                    save_new_node_id(conf.clone())?;
-                    Ok(conf)
-                }
-                (Ok(None), None) => {
-                    let node_id = format!("n{}", thread_rng().gen::<u16>().to_string());
-                    save_new_node_id(node_id.clone())?;
-                    Ok(node_id)
-                }
-                (Err(err), _) => Err(UserError::from(InternalError::from_source(Box::new(err)))),
-            }
+            Ok(config.node_id().map(|s| s.to_string()))
         }
     }
 
@@ -175,13 +142,13 @@ fn find_node_id(config: &Config) -> Result<String, UserError> {
                         )))
                     } else {
                         // If the node_id does match, then we return this node_id and continue.
-                        Ok(config_node_id.to_string())
+                        Ok(Some(config_node_id.to_string()))
                     }
                 }
                 None => {
                     // If the config object does not have a node_id, continue with the node_id read
                     // from the file.
-                    Ok(file_node_id)
+                    Ok(Some(file_node_id))
                 }
             }
         } else {
@@ -212,7 +179,7 @@ fn find_node_id(config: &Config) -> Result<String, UserError> {
             })?;
 
             // Continue with node_id
-            Ok(node_id)
+            Ok(Some(node_id))
         }
     }
 }
@@ -820,10 +787,7 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
     config.log_as_debug();
 
     let node_id = find_node_id(&config)?;
-    let display_name = config
-        .display_name()
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| format!("Node {}", &node_id));
+    let display_name: Option<String> = config.display_name().map(String::from);
 
     let mut daemon_builder = SplinterDaemonBuilder::new();
 
