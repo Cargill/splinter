@@ -527,12 +527,18 @@ impl ServiceFactory for ScabbardFactory {
             }
             #[cfg(all(feature = "diesel-receipt-store", feature = "postgres"))]
             ScabbardFactoryStorageConfig::Postgres { pool } => (
-                Arc::new(RwLock::new(DieselReceiptStore::new(pool.clone()))),
+                Arc::new(RwLock::new(DieselReceiptStore::new(
+                    pool.clone(),
+                    Some(format!("{}::{}", circuit_id, service_id)),
+                ))),
                 Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
             ),
             #[cfg(all(feature = "diesel-receipt-store", feature = "sqlite"))]
             ScabbardFactoryStorageConfig::Sqlite { pool } => (
-                Arc::new(RwLock::new(DieselReceiptStore::new(pool.clone()))),
+                Arc::new(RwLock::new(DieselReceiptStore::new(
+                    pool.clone(),
+                    Some(format!("{}::{}", circuit_id, service_id)),
+                ))),
                 Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
             ),
             #[cfg(all(

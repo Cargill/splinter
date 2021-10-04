@@ -1037,7 +1037,7 @@ mod tests {
         {
             let pool = create_connection_pool_and_migrate(":memory:".to_string());
 
-            let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(pool)));
+            let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(pool, None)));
 
             // Test without a specified start
             let all_events =
@@ -1101,7 +1101,7 @@ mod tests {
         {
             let pool = create_connection_pool_and_migrate(":memory:".to_string());
 
-            let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(pool)));
+            let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(pool, None)));
 
             receipt_store
                 .write()
@@ -1150,6 +1150,7 @@ mod tests {
         #[cfg(feature = "diesel-receipt-store")]
         let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
             create_connection_pool_and_migrate(":memory:".to_string()),
+            None,
         )));
 
         let mut state = ScabbardState::new(
@@ -1232,6 +1233,7 @@ mod tests {
         #[cfg(feature = "diesel-receipt-store")]
         let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
             create_connection_pool_and_migrate(":memory:".to_string()),
+            None,
         )));
 
         let mut state = ScabbardState::new(

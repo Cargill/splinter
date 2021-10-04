@@ -175,6 +175,7 @@ mod tests {
         #[cfg(feature = "diesel-receipt-store")]
         let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
             create_connection_pool_and_migrate(":memory:".to_string()),
+            None,
         )));
 
         // Initialize a temporary scabbard state and set some values; this will pre-populate the DBs
