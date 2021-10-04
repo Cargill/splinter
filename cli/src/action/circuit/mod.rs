@@ -31,6 +31,8 @@ use serde::Deserialize;
 use splinter::admin::messages::{CircuitStatus, CreateCircuit, SplinterNode, SplinterService};
 use splinter::protocol::CIRCUIT_PROTOCOL_VERSION;
 
+#[cfg(feature = "challenge-authorization")]
+use crate::circuit::builder::parse_hex;
 use crate::error::CliError;
 use crate::signing::{create_cylinder_jwt_auth, load_signer};
 #[cfg(feature = "circuit-template")]
@@ -374,6 +376,20 @@ fn parse_node_public_key(node_argument: &str) -> Result<(String, String), CliErr
         return Err(CliError::ActionError(format!(
             "No public key detected for node '{}'",
             node_id
+        )));
+    }
+
+    let key_bytes = parse_hex(&public_key).map_err(|_| {
+        CliError::ActionError(format!(
+            "{:?} is not a valid hex-formatted public key",
+            public_key,
+        ))
+    })?;
+
+    if key_bytes.len() != 33 {
+        return Err(CliError::ActionError(format!(
+            "{} is not a valid public key: invalid length",
+            public_key
         )));
     }
 
