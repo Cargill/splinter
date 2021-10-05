@@ -20,7 +20,7 @@ use diesel::replace_into;
 use splinter::error::InternalError;
 
 use crate::store::{
-    diesel::{models::NewCommitHash, schema::scabbard_commit_log},
+    diesel::{models::NewCommitHash, schema::scabbard_commit_hash},
     CommitHashStoreError,
 };
 
@@ -45,7 +45,7 @@ impl<'a> CommitHashStoreSetCurrentCommitHashOperation
         service_id: &str,
         commit_hash: &str,
     ) -> Result<(), CommitHashStoreError> {
-        replace_into(scabbard_commit_log::table)
+        replace_into(scabbard_commit_hash::table)
             .values(NewCommitHash {
                 circuit_id,
                 service_id,
@@ -74,11 +74,11 @@ impl<'a> CommitHashStoreSetCurrentCommitHashOperation
             commit_hash,
         };
 
-        insert_into(scabbard_commit_log::table)
+        insert_into(scabbard_commit_hash::table)
             .values(&new_commit_hash)
             .on_conflict((
-                scabbard_commit_log::circuit_id,
-                scabbard_commit_log::service_id,
+                scabbard_commit_hash::circuit_id,
+                scabbard_commit_hash::service_id,
             ))
             .do_update()
             .set(&new_commit_hash)

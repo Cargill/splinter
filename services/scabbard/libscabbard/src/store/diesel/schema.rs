@@ -13,7 +13,7 @@
 // limitations under the License.
 
 table! {
-    scabbard_commit_log (circuit_id, service_id) {
+    scabbard_commit_hash (circuit_id, service_id) {
         circuit_id -> Text,
         service_id -> Text,
         commit_hash -> Text,
