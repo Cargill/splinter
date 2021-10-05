@@ -47,7 +47,7 @@ whoami = "0.7.0"
 
 [dependencies.splinter]
 path = "../libsplinter"
-features = ["admin-service", "registry"]
+features = ["admin-service", "registry", "node-id-store"]
 
 [dependencies.scabbard]
 path = "../services/scabbard/libscabbard"
@@ -88,7 +88,6 @@ experimental = [
     "challenge-authorization",
     "health",
     "https-certs",
-    "node-id-upgrade",
     "registry",
     "scabbard-receipt-store",
     "scabbard-migrations",
@@ -101,7 +100,6 @@ circuit-template = ["splinter/circuit-template"]
 database = ["diesel"]
 health = []
 https-certs = []
-node-id-upgrade = ["upgrade","splinter/node-id-store"]
 postgres = [
     "diesel/postgres",
     "splinter/postgres",
