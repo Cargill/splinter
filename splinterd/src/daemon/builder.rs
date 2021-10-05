@@ -14,10 +14,8 @@
 
 use std::time::Duration;
 
-#[cfg(feature = "challenge-authorization")]
 use cylinder::Signer;
 use splinter::mesh::Mesh;
-#[cfg(feature = "challenge-authorization")]
 use splinter::peer::PeerAuthorizationToken;
 
 use crate::daemon::error::CreateError;
@@ -65,9 +63,7 @@ pub struct SplinterDaemonBuilder {
     #[cfg(feature = "oauth")]
     oauth_openid_scopes: Option<Vec<String>>,
     strict_ref_counts: Option<bool>,
-    #[cfg(feature = "challenge-authorization")]
     signers: Option<Vec<Box<dyn Signer>>>,
-    #[cfg(feature = "challenge-authorization")]
     peering_token: Option<PeerAuthorizationToken>,
 }
 
@@ -224,13 +220,11 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_signers(mut self, value: Vec<Box<dyn Signer>>) -> Self {
         self.signers = Some(value);
         self
     }
 
-    #[cfg(feature = "challenge-authorization")]
     pub fn with_peering_token(mut self, value: PeerAuthorizationToken) -> Self {
         self.peering_token = Some(value);
         self
@@ -305,12 +299,10 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: strict_ref_counts".to_string())
         })?;
 
-        #[cfg(feature = "challenge-authorization")]
         let signers = self.signers.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: signers".to_string())
         })?;
 
-        #[cfg(feature = "challenge-authorization")]
         let peering_token = self.peering_token.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: peering_token".to_string())
         })?;
@@ -355,9 +347,7 @@ impl SplinterDaemonBuilder {
             oauth_openid_scopes: self.oauth_openid_scopes,
             heartbeat,
             strict_ref_counts,
-            #[cfg(feature = "challenge-authorization")]
             signers,
-            #[cfg(feature = "challenge-authorization")]
             peering_token,
         })
     }

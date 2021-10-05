@@ -359,7 +359,6 @@ impl ConfigBuilder {
                 .partial_configs
                 .iter()
                 .find_map(|p| p.influx_password().map(|v| (v, p.source()))),
-            #[cfg(feature = "challenge-authorization")]
             peering_key: self
                 .partial_configs
                 .iter()

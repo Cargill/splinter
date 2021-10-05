@@ -37,7 +37,7 @@ bytes = "0.4"
 clap = "2.32"
 crossbeam-channel = "0.3"
 ctrlc = "3.0"
-cylinder = "0.2.2"
+cylinder = { version = "0.2.2", features = ["key-load"] }
 diesel = { version = "1.0", features = ["postgres"], optional = true }
 health = { path = "../services/health", optional = true }
 log = "0.4"
@@ -67,6 +67,7 @@ features = [
 path = "../libsplinter"
 features = [
   "admin-service",
+  "challenge-authorization",
   "cylinder-jwt",
   "memory",
   "registry",
@@ -101,7 +102,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization-handler-maintenance",
-    "challenge-authorization",
     "health-service",
     "https-bind",
     "log-config",
@@ -129,10 +129,6 @@ authorization-handler-rbac = [
 biome-credentials = ["splinter/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management"]
 biome-profile = ["splinter/biome-profile"]
-challenge-authorization = [
-  "cylinder/key-load",
-  "splinter/challenge-authorization"
-]
 config-allow-keys = ["authorization-handler-allow-keys"]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
@@ -149,7 +145,6 @@ tap = [
 node = [
     "authorization",
     "https-bind",
-    "challenge-authorization",
     "diesel",
     "sawtooth",
     "scabbard/client-reqwest",

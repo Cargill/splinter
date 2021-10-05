@@ -90,7 +90,8 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             } else {
                 None
             })
-            .with_state_dir(self.matches.value_of("state_dir").map(String::from));
+            .with_state_dir(self.matches.value_of("state_dir").map(String::from))
+            .with_peering_key(self.matches.value_of("peering_key").map(String::from));
 
         #[cfg(feature = "https-bind")]
         {
@@ -187,12 +188,6 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                     2 => Some(log::Level::Debug),
                     _ => Some(log::Level::Trace),
                 });
-        }
-
-        #[cfg(feature = "challenge-authorization")]
-        {
-            partial_config = partial_config
-                .with_peering_key(self.matches.value_of("peering_key").map(String::from))
         }
 
         Ok(partial_config)

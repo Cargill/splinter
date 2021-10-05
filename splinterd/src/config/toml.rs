@@ -82,7 +82,6 @@ struct TomlConfig {
     influx_username: Option<String>,
     #[cfg(feature = "tap")]
     influx_password: Option<String>,
-    #[cfg(feature = "challenge-authorization")]
     peering_key: Option<String>,
     #[cfg(feature = "log-config")]
     appenders: Option<HashMap<String, UnnamedAppenderConfig>>,
@@ -167,7 +166,8 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_registry_auto_refresh(self.toml_config.registry_auto_refresh)
             .with_registry_forced_refresh(self.toml_config.registry_forced_refresh)
             .with_heartbeat(self.toml_config.heartbeat)
-            .with_admin_timeout(self.toml_config.admin_timeout);
+            .with_admin_timeout(self.toml_config.admin_timeout)
+            .with_peering_key(self.toml_config.peering_key);
 
         #[cfg(feature = "https-bind")]
         {
@@ -220,11 +220,6 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 partial_config = partial_config.with_loggers(self.toml_config.loggers)
             }
             partial_config = partial_config.with_appenders(self.toml_config.appenders);
-        }
-
-        #[cfg(feature = "challenge-authorization")]
-        {
-            partial_config = partial_config.with_peering_key(self.toml_config.peering_key);
         }
 
         // deprecated values, only set if the current value was not set

@@ -141,7 +141,6 @@ pub fn test_2_party_circuit_creation_challenge_authorization_unidentified_peer()
                         .expect("Unable to get first node's public key")
                         .as_slice(),
                 ),
-                #[cfg(feature = "challenge-authorization")]
                 PeerAuthorizationToken::from_public_key(
                     node_a
                         .signers()
