@@ -252,7 +252,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
         .after_help(CIRCUIT_PROPOSE_AFTER_HELP);
 
-    #[cfg(feature = "challenge-authorization")]
     let propose_circuit = propose_circuit.arg(
         Arg::with_name("authorization_type")
             .long("auth-type")
@@ -262,7 +261,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             .help("Authorization type for the circuit"),
     );
 
-    #[cfg(feature = "challenge-authorization")]
     let propose_circuit = propose_circuit.arg(
         Arg::with_name("node_public_key")
             .long("node-public-key")

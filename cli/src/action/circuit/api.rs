@@ -272,7 +272,6 @@ impl fmt::Display for CircuitSlice {
 
         for member in self.members.iter() {
             display_string += &format!("\n    {}\n", member.node_id);
-            #[cfg(feature = "challenge-authorization")]
             if let Some(public_key) = &member.public_key {
                 display_string += &format!("        Public Key: {}\n", public_key);
             }
@@ -365,7 +364,6 @@ impl fmt::Display for ProposalSlice {
 
         for member in self.circuit.members.iter() {
             display_string += &format!("\n    {}\n", member.node_id);
-            #[cfg(feature = "challenge-authorization")]
             if let Some(public_key) = &member.public_key {
                 display_string += &format!("        Public Key: {}\n", public_key);
             }
@@ -440,7 +438,6 @@ pub struct ProposalCircuitSlice {
 pub struct CircuitMembers {
     pub node_id: String,
     pub endpoints: Vec<String>,
-    #[cfg(feature = "challenge-authorization")]
     pub public_key: Option<String>,
 }
 
