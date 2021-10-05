@@ -32,6 +32,7 @@ pub struct Network {
     temp_dirs: HashMap<String, TempDir>,
     external_registries: Option<Vec<String>>,
     num_of_keys: usize,
+    cylinder_auth: bool,
 }
 
 pub enum NetworkNode {
@@ -47,7 +48,18 @@ impl Network {
             temp_dirs: HashMap::new(),
             external_registries: None,
             num_of_keys: 1,
+            cylinder_auth: true,
         }
+    }
+
+    pub fn with_cylinder_auth(mut self) -> Self {
+        self.cylinder_auth = true;
+        self
+    }
+
+    pub fn without_cylinder_auth(mut self) -> Self {
+        self.cylinder_auth = false;
+        self
     }
 
     pub fn add_nodes_with_defaults(mut self, count: i32) -> Result<Network, InternalError> {
@@ -66,12 +78,11 @@ impl Network {
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
             let mut signers = Vec::new();
-
             for _ in 0..self.num_of_keys {
                 signers.push(context.new_signer(context.new_random_private_key()));
             }
 
-            let node = NodeBuilder::new()
+            let mut builder = NodeBuilder::new()
                 .with_rest_api_variant(self.default_rest_api_variant)
                 .with_scabbard(
                     ScabbardConfigBuilder::new()
@@ -91,9 +102,12 @@ impl Network {
                 .with_admin_signer(admin_signer)
                 .with_signers(signers)
                 .with_external_registries(self.external_registries.clone())
-                .with_biome_enabled()
-                .build()?
-                .run()?;
+                .with_biome_enabled();
+            if self.cylinder_auth {
+                builder = builder.with_cylinder_auth(Box::new(Secp256k1Context::new()));
+            }
+
+            let node = builder.build()?.run()?;
 
             registry_info.push((
                 node.node_id().to_string(),

@@ -98,6 +98,15 @@ impl RestApiBuilder {
         self
     }
 
+    pub fn append_auth_configs(mut self, auth_configs: &mut Vec<AuthConfig>) -> Self {
+        self.auth_configs.append(auth_configs);
+        self
+    }
+    pub fn push_auth_config(mut self, auth_config: AuthConfig) -> Self {
+        self.auth_configs.push(auth_config);
+        self
+    }
+
     #[cfg(feature = "authorization")]
     pub fn with_authorization_handlers(
         mut self,

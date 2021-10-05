@@ -20,6 +20,7 @@ pub(super) mod network;
 
 use std::net::{Ipv4Addr, SocketAddr};
 
+use splinter::biome::credentials::rest_api::BiomeCredentialsRestResourceProvider;
 use splinter::error::InternalError;
 use splinter::rest_api::actix_web_1::RestApiBuilder;
 use splinter::rest_api::actix_web_3::RunnableRestApi;
@@ -39,6 +40,30 @@ use self::network::RunnableNetworkSubsystem;
 pub(super) enum RunnableNodeRestApiVariant {
     ActixWeb1(RestApiBuilder),
     ActixWeb3(RunnableRestApi),
+}
+
+impl RunnableNodeRestApiVariant {
+    #[cfg(feature = "biome-credentials")]
+    pub fn with_biome_auth(self, provider: BiomeCredentialsRestResourceProvider) -> Self {
+        match self {
+            RunnableNodeRestApiVariant::ActixWeb1(builder) => {
+                RunnableNodeRestApiVariant::ActixWeb1(builder.push_auth_config(AuthConfig::Biome {
+                    biome_credentials_resource_provider: provider,
+                }))
+            }
+            _ => unimplemented!(),
+        }
+    }
+    pub fn with_cylinder_auth(self, verifier: Box<dyn cylinder::Verifier>) -> Self {
+        match self {
+            RunnableNodeRestApiVariant::ActixWeb1(builder) => {
+                RunnableNodeRestApiVariant::ActixWeb1(
+                    builder.push_auth_config(AuthConfig::Cylinder { verifier }),
+                )
+            }
+            _ => unimplemented!(),
+        }
+    }
 }
 
 /// A fully configured and runnable instance of a node.
@@ -72,13 +97,12 @@ impl RunnableNode {
 
         let rest_api_variant = match self.rest_api_variant {
             RunnableNodeRestApiVariant::ActixWeb1(rest_api) => {
+                let admin_resources = admin_subsystem.take_actix1_resources();
+                let mut biome_resources = vec![];
                 let mut auth_configs = vec![AuthConfig::Custom {
                     resources: vec![],
                     identity_provider: Box::new(MockIdentityProvider),
                 }];
-
-                let admin_resources = admin_subsystem.take_actix1_resources();
-                let mut biome_resources = vec![];
 
                 // Create the `Biome` resources if the node has biome enabled
                 if self.enable_biome {
@@ -90,7 +114,7 @@ impl RunnableNode {
                 };
 
                 let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api
-                    .with_auth_configs(auth_configs)
+                    .append_auth_configs(&mut auth_configs)
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?
                     .add_resources(admin_resources)
