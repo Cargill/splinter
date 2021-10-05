@@ -96,7 +96,7 @@ experimental = [
 
 authorization-handler-maintenance = []
 authorization-handler-rbac = []
-challenge-authorization = ["splinter/challenge-authorization"]
+challenge-authorization = []
 circuit-template = ["splinter/circuit-template"]
 database = ["diesel"]
 health = []

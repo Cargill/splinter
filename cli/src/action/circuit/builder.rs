@@ -236,7 +236,7 @@ impl CreateCircuitMessageBuilder {
             "challenge" => AuthorizationType::Challenge,
             _ => {
                 return Err(CliError::ActionError(format!(
-                    "Invalid authorization type {}",
+                    "Invalid authorization type: {}",
                     authorization_type
                 )))
             }
