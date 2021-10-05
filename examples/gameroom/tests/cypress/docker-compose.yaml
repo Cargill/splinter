@@ -121,6 +121,7 @@ services:
         done && \
         splinter database migrate -C postgres://admin:admin@splinterd-db-node:5432/splinter && \
         splinter cert generate --skip && \
+        splinter keygen --system --skip && \
         splinterd -c ./project/tests/splinterd-node-0-docker.toml -vv \
               --database postgres://admin:admin@splinterd-db-node:5432/splinter \
               --service-endpoint 0.0.0.0:8043 \
