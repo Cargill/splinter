@@ -244,10 +244,7 @@ impl SplinterDaemon {
         let signing_context = Arc::new(Mutex::new(secp256k1_context));
         let node_id: String = get_node_id(
             self.node_id.as_ref().map(|s| s.to_string()),
-            #[cfg(feature = "node-file-block")]
-            {
-                store_factory.get_node_id_store()
-            },
+            store_factory.get_node_id_store(),
         )?;
 
         info!("Starting SpinterNode with ID {}", &node_id);
