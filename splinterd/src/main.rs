@@ -53,7 +53,7 @@ use crate::config::{
     ClapPartialConfigBuilder, Config, ConfigBuilder, ConfigError, DefaultPartialConfigBuilder,
     EnvPartialConfigBuilder, PartialConfigBuilder, TomlPartialConfigBuilder,
 };
-use crate::daemon::SplinterDaemonBuilder;
+use crate::daemon::builder::SplinterDaemonBuilder;
 use clap::{clap_app, crate_version};
 use clap::{Arg, ArgMatches};
 
