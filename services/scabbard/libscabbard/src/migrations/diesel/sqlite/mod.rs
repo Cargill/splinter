@@ -31,7 +31,7 @@ use splinter::error::InternalError;
 pub fn run_migrations(conn: &SqliteConnection) -> Result<(), InternalError> {
     embedded_migrations::run(conn).map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-    info!("Successfully applied SQLite migrations");
+    debug!("Successfully applied Scabbard SQLite migrations");
 
     Ok(())
 }
