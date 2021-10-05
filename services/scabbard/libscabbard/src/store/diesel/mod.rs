@@ -41,6 +41,8 @@ impl<C: diesel::Connection> DieselCommitHashStore<C> {
     /// # Arguments
     ///
     /// * `pool` - Database connection pool
+    /// * `circuit_id` - The circuit associated with the store
+    /// * `service_id` - The service associated with the store
     pub fn new(pool: Pool<ConnectionManager<C>>, circuit_id: &str, service_id: &str) -> Self {
         Self {
             pool,
