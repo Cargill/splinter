@@ -28,7 +28,6 @@ pub mod node_id;
 mod routes;
 mod transport;
 
-#[cfg(feature = "challenge-authorization")]
 use cylinder::{load_key_from_path, secp256k1::Secp256k1Context, Context, Signer};
 #[cfg(not(feature = "log-config"))]
 use log4rs::config::{Appender, Logger, Root};
@@ -40,9 +39,7 @@ use std::convert::TryInto;
 
 #[cfg(not(feature = "node-file-block"))]
 use rand::{thread_rng, Rng};
-#[cfg(any(feature = "challenge-authorization", feature = "node-file-block"))]
 use splinter::error::InternalError;
-#[cfg(feature = "challenge-authorization")]
 use splinter::peer::PeerAuthorizationToken;
 #[cfg(feature = "tap")]
 use splinter::tap::influx::InfluxRecorder;
@@ -58,7 +55,6 @@ use clap::{clap_app, crate_version};
 use clap::{Arg, ArgMatches};
 
 use std::env;
-#[cfg(feature = "challenge-authorization")]
 use std::ffi::OsStr;
 use std::fs;
 #[cfg(not(feature = "node-file-block"))]
@@ -184,11 +180,9 @@ fn find_node_id(config: &Config) -> Result<Option<String>, UserError> {
     }
 }
 
-#[cfg(feature = "challenge-authorization")]
 type ChallengeAuthorizationArgs = (Vec<Box<dyn Signer>>, PeerAuthorizationToken);
 
 // load all signing keys from the configured splinterd key file
-#[cfg(feature = "challenge-authorization")]
 fn load_signer_keys(
     config_dir: &str,
     peering_key: &str,
@@ -857,13 +851,10 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
             .with_oauth_openid_scopes(config.oauth_openid_scopes().map(ToOwned::to_owned));
     }
 
-    #[cfg(feature = "challenge-authorization")]
-    {
-        let (signers, peering_token) = load_signer_keys(config.config_dir(), config.peering_key())?;
-        daemon_builder = daemon_builder
-            .with_signers(signers)
-            .with_peering_token(peering_token);
-    }
+    let (signers, peering_token) = load_signer_keys(config.config_dir(), config.peering_key())?;
+    daemon_builder = daemon_builder
+        .with_signers(signers)
+        .with_peering_token(peering_token);
 
     let mut node = daemon_builder.build().map_err(|err| {
         UserError::daemon_err_with_source("unable to build the Splinter daemon", Box::new(err))

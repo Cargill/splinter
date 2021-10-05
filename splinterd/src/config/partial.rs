@@ -93,7 +93,6 @@ pub struct PartialConfig {
     influx_username: Option<String>,
     #[cfg(feature = "tap")]
     influx_password: Option<String>,
-    #[cfg(feature = "challenge-authorization")]
     peering_key: Option<String>,
     #[cfg(feature = "log-config")]
     root_logger: Option<RootConfig>,
@@ -167,7 +166,6 @@ impl PartialConfig {
             influx_username: None,
             #[cfg(feature = "tap")]
             influx_password: None,
-            #[cfg(feature = "challenge-authorization")]
             peering_key: None,
             #[cfg(feature = "log-config")]
             appenders: None,
@@ -358,7 +356,6 @@ impl PartialConfig {
         self.influx_password.clone()
     }
 
-    #[cfg(feature = "challenge-authorization")]
     pub fn peering_key(&self) -> Option<String> {
         self.peering_key.clone()
     }
@@ -841,7 +838,7 @@ impl PartialConfig {
         self.influx_password = influx_password;
         self
     }
-    #[cfg(feature = "challenge-authorization")]
+
     /// Adds an `peering_key` value to the `PartialConfig` object.
     ///
     /// # Arguments

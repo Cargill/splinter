@@ -50,7 +50,6 @@ const REGISTRY_FORCED_REFRESH: u64 = 10; // 10 seconds
 const HEARTBEAT: u64 = 30; // 30 seconds
 const ADMIN_TIMEOUT: u64 = 30; // 30 seconds
 
-#[cfg(feature = "challenge-authorization")]
 const PEERING_KEY_NAME: &str = "splinterd";
 
 #[cfg(feature = "config-allow-keys")]
@@ -89,7 +88,8 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_state_dir(Some(String::from(STATE_DIR)))
             .with_tls_insecure(Some(false))
             .with_no_tls(Some(false))
-            .with_strict_ref_counts(Some(false));
+            .with_strict_ref_counts(Some(false))
+            .with_peering_key(Some(String::from(PEERING_KEY_NAME)));
 
         #[cfg(feature = "https-bind")]
         {
@@ -126,11 +126,6 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 .with_root_logger(root_logger)
                 .with_appenders(Some(appenders))
                 .with_verbosity(Some(log::Level::Info));
-        }
-
-        #[cfg(feature = "challenge-authorization")]
-        {
-            partial_config = partial_config.with_peering_key(Some(String::from(PEERING_KEY_NAME)))
         }
 
         #[cfg(feature = "config-allow-keys")]

@@ -27,9 +27,7 @@ use std::sync::{mpsc::channel, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
-#[cfg(feature = "challenge-authorization")]
-use cylinder::{Signer, SigningError};
+use cylinder::{secp256k1::Secp256k1Context, Signer, SigningError, VerifierFactory};
 #[cfg(feature = "health-service")]
 use health::HealthService;
 #[cfg(feature = "service-arg-validation")]
@@ -65,7 +63,6 @@ use splinter::peer::PeerAuthorizationToken;
 use splinter::peer::PeerManager;
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::NetworkMessageType;
-#[cfg(feature = "challenge-authorization")]
 use splinter::public_key::PublicKey;
 use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RwRegistry, UnifiedRegistry,
@@ -155,9 +152,7 @@ pub struct SplinterDaemon {
     oauth_openid_scopes: Option<Vec<String>>,
     heartbeat: u64,
     strict_ref_counts: bool,
-    #[cfg(feature = "challenge-authorization")]
     signers: Vec<Box<dyn Signer>>,
-    #[cfg(feature = "challenge-authorization")]
     peering_token: PeerAuthorizationToken,
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: String,
@@ -258,9 +253,7 @@ impl SplinterDaemon {
         info!("Starting SpinterNode with ID {}", &node_id);
         let authorization_manager = AuthorizationManager::new(
             node_id.to_string(),
-            #[cfg(feature = "challenge-authorization")]
             self.signers.clone(),
-            #[cfg(feature = "challenge-authorization")]
             signing_context.clone(),
         )
         .map_err(|err| {
@@ -372,7 +365,6 @@ impl SplinterDaemon {
             &node_id,
             routing_reader.clone(),
             routing_writer.clone(),
-            #[cfg(feature = "challenge-authorization")]
             self.signers
                 .iter()
                 .map(|signer| Ok(signer.public_key()?.as_hex()))
@@ -384,8 +376,6 @@ impl SplinterDaemon {
                         err
                     ))
                 })?,
-            #[cfg(not(feature = "challenge-authorization"))]
-            vec![],
         );
         let mut circuit_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(circuit_dispatcher)
@@ -448,12 +438,7 @@ impl SplinterDaemon {
         // hold on to peer refs for the peers provided to ensure the connections are kept around
         let mut peer_refs = vec![];
         for endpoint in self.initial_peers.iter() {
-            #[cfg(feature = "challenge-authorization")]
             let (endpoint, token) = parse_peer_endpoint(endpoint, &self.peering_token, &node_id);
-            #[cfg(not(feature = "challenge-authorization"))]
-            let endpoint = endpoint.to_string();
-            #[cfg(not(feature = "challenge-authorization"))]
-            let token = PeerAuthorizationToken::from_peer_id(&node_id);
             match peer_connector.add_unidentified_peer(endpoint, token) {
                 Ok(peer_ref) => peer_refs.push(peer_ref),
                 Err(err) => error!("Connect Error: {}", err),
@@ -519,20 +504,8 @@ impl SplinterDaemon {
             .with_key_permission_manager(Box::new(AllowAllKeyPermissionManager))
             .with_coordinator_timeout(self.admin_timeout)
             .with_routing_table_writer(routing_writer.clone())
-            .with_admin_event_store(store_factory.get_admin_service_store());
-
-        #[cfg(feature = "service-arg-validation")]
-        {
-            let mut validators: HashMap<String, Box<dyn ServiceArgValidator + Send>> =
-                HashMap::new();
-            validators.insert("scabbard".into(), Box::new(ScabbardArgValidator));
-
-            admin_service_builder = admin_service_builder.with_service_arg_validators(validators);
-        }
-
-        #[cfg(feature = "challenge-authorization")]
-        {
-            admin_service_builder = admin_service_builder.with_public_keys(
+            .with_admin_event_store(store_factory.get_admin_service_store())
+            .with_public_keys(
                 self.signers
                     .iter()
                     .map(|signer| Ok(PublicKey::from_bytes(signer.public_key()?.into_bytes())))
@@ -544,7 +517,15 @@ impl SplinterDaemon {
                             err
                         ))
                     })?,
-            )
+            );
+
+        #[cfg(feature = "service-arg-validation")]
+        {
+            let mut validators: HashMap<String, Box<dyn ServiceArgValidator + Send>> =
+                HashMap::new();
+            validators.insert("scabbard".into(), Box::new(ScabbardArgValidator));
+
+            admin_service_builder = admin_service_builder.with_service_arg_validators(validators);
         }
 
         let admin_service = admin_service_builder.build().map_err(|err| {
@@ -1314,7 +1295,6 @@ fn create_allow_keys_path(config_path: &str, allow_keys_file: &str) -> PathBuf {
 /// either be in normal form impling it should use the configured peer authorization token for
 /// peering (usally challenge, unless no keys were provided) or includes +trust after the
 /// transport type which means a trust token should be used
-#[cfg(feature = "challenge-authorization")]
 fn parse_peer_endpoint(
     endpoint: &str,
     peering_token: &PeerAuthorizationToken,

@@ -105,7 +105,6 @@ pub struct Config {
     influx_username: Option<(String, ConfigSource)>,
     #[cfg(feature = "tap")]
     influx_password: Option<(String, ConfigSource)>,
-    #[cfg(feature = "challenge-authorization")]
     peering_key: (String, ConfigSource),
     #[cfg(feature = "log-config")]
     root_logger: (RootConfig, ConfigSource),
@@ -348,7 +347,6 @@ impl Config {
         }
     }
 
-    #[cfg(feature = "challenge-authorization")]
     pub fn peering_key(&self) -> &str {
         &self.peering_key.0
     }
@@ -581,7 +579,6 @@ impl Config {
         }
     }
 
-    #[cfg(feature = "challenge-authorization")]
     fn peering_key_source(&self) -> &ConfigSource {
         &self.peering_key.1
     }
@@ -702,7 +699,6 @@ impl Config {
             self.peers(),
             self.peers_source()
         );
-        #[cfg(feature = "challenge-authorization")]
         debug!(
             "Config: peering_key: {:?} (source: {:?})",
             self.peering_key(),
