@@ -18,10 +18,8 @@ mod payload;
 #[cfg(feature = "circuit-template")]
 pub mod template;
 
-#[cfg(feature = "circuit-template")]
 use std::collections::HashMap;
 use std::convert::TryFrom;
-#[cfg(feature = "challenge-authorization")]
 use std::fmt::Write;
 use std::fs::File;
 
@@ -31,7 +29,6 @@ use serde::Deserialize;
 use splinter::admin::messages::{CircuitStatus, CreateCircuit, SplinterNode, SplinterService};
 use splinter::protocol::CIRCUIT_PROTOCOL_VERSION;
 
-#[cfg(feature = "challenge-authorization")]
 use crate::circuit::builder::parse_hex;
 use crate::error::CliError;
 use crate::signing::{create_cylinder_jwt_auth, load_signer};
@@ -56,9 +53,7 @@ impl Action for CircuitProposeAction {
 
         let mut builder = CreateCircuitMessageBuilder::new();
 
-        #[cfg(feature = "challenge-authorization")]
         let mut public_keys = HashMap::new();
-        #[cfg(feature = "challenge-authorization")]
         if let Some(nodes_public_keys) = args.values_of("node_public_key") {
             for node_argument in nodes_public_keys {
                 let (node, public_key) = parse_node_public_key(node_argument)?;
@@ -67,7 +62,6 @@ impl Action for CircuitProposeAction {
         }
 
         if let Some(node_file) = args.value_of("node_file") {
-            #[cfg(feature = "challenge-authorization")]
             for node in load_nodes_from_file(node_file)? {
                 builder.add_node(
                     &node.identity,
@@ -75,27 +69,13 @@ impl Action for CircuitProposeAction {
                     public_keys.get(&node.identity),
                 )?;
             }
-
-            #[cfg(not(feature = "challenge-authorization"))]
-            for node in load_nodes_from_file(node_file)? {
-                builder.add_node(&node.identity, &node.endpoints)?;
-            }
         }
 
         if let Some(nodes) = args.values_of("node") {
-            #[cfg(feature = "challenge-authorization")]
             {
                 for node_argument in nodes {
                     let (node, endpoints) = parse_node_argument(node_argument)?;
                     builder.add_node(&node, &endpoints, public_keys.get(&node))?;
-                }
-            }
-
-            #[cfg(not(feature = "challenge-authorization"))]
-            {
-                for node_argument in nodes {
-                    let (node, endpoints) = parse_node_argument(node_argument)?;
-                    builder.add_node(&node, &endpoints)?;
                 }
             }
         }
@@ -139,8 +119,6 @@ impl Action for CircuitProposeAction {
             }
         }
 
-        #[cfg(feature = "challenge-authorization")]
-        #[allow(clippy::single_match)]
         match args.value_of("authorization_type") {
             Some(auth_type) => {
                 if args.value_of("compat_version") == Some("0.4") && auth_type == "challenge" {
@@ -354,7 +332,6 @@ fn parse_node_argument(node_argument: &str) -> Result<(String, Vec<String>), Cli
     Ok((node_id, endpoints))
 }
 
-#[cfg(feature = "challenge-authorization")]
 fn parse_node_public_key(node_argument: &str) -> Result<(String, String), CliError> {
     let mut iter = node_argument.split("::");
 
@@ -652,7 +629,6 @@ impl TryFrom<&SplinterNode> for CircuitMembers {
         Ok(Self {
             node_id: node.node_id.clone(),
             endpoints: node.endpoints.clone(),
-            #[cfg(feature = "challenge-authorization")]
             public_key: node
                 .public_key
                 .as_ref()
@@ -661,7 +637,6 @@ impl TryFrom<&SplinterNode> for CircuitMembers {
     }
 }
 
-#[cfg(feature = "challenge-authorization")]
 fn to_hex(bytes: &[u8]) -> String {
     let mut buf = String::new();
     for b in bytes {
