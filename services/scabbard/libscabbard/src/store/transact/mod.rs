@@ -14,6 +14,8 @@
 
 //! Transact-backed CommitHashStore implementations.
 
+pub mod factory;
+
 use splinter::error::{InternalError, InvalidArgumentError, InvalidStateError};
 use transact::database::{lmdb::LmdbDatabase, Database, DatabaseError};
 
