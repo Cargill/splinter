@@ -74,7 +74,6 @@ experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
-  "commit-store",
   "diesel-receipt-store",
   "https",
   "postgres",
@@ -85,7 +84,6 @@ experimental = [
 authorization = ["splinter/authorization"]
 client = []
 client-reqwest = ["client", "reqwest"]
-commit-store = []
 diesel-receipt-store = ["diesel", "sawtooth/transaction-receipt-store-lmdb"]
 events = ["splinter/events"]
 https = []

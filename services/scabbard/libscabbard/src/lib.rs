@@ -19,10 +19,10 @@
 #[macro_use]
 extern crate log;
 #[cfg(feature = "diesel")]
-#[cfg_attr(feature = "commit-store", macro_use)]
+#[macro_use]
 extern crate diesel;
 #[cfg(feature = "diesel_migrations")]
-#[cfg_attr(feature = "commit-store", macro_use)]
+#[macro_use]
 extern crate diesel_migrations;
 #[macro_use]
 extern crate serde_derive;
@@ -39,10 +39,9 @@ extern crate splinter;
 #[cfg(feature = "client")]
 pub mod client;
 mod hex;
-#[cfg(feature = "commit-store")]
+#[cfg(feature = "diesel_migrations")]
 pub mod migrations;
 pub mod protocol;
 pub mod protos;
 pub mod service;
-#[cfg(feature = "commit-store")]
 pub mod store;
