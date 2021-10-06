@@ -13,35 +13,22 @@
 // limitations under the License.
 
 use rand::Rng;
-#[cfg(feature = "node-file-block")]
 use splinter::error::InternalError;
-#[cfg(feature = "node-file-block")]
 use splinter::node_id::store::NodeIdStore;
 
 use crate::error::UserError;
 
 pub fn get_node_id(
     passed_in_node_id: Option<String>,
-    #[cfg(feature = "node-file-block")] node_id_store: Box<dyn NodeIdStore>,
+    node_id_store: Box<dyn NodeIdStore>,
 ) -> Result<String, UserError> {
-    #[cfg(feature = "node-file-block")]
-    {
-        get_from_store(passed_in_node_id, node_id_store)
-    }
-    #[cfg(not(feature = "node-file-block"))]
-    {
-        // unwrap is safe here because the or_else always returns as Some
-        Ok(passed_in_node_id
-            .or_else(|| Some(get_random_node_id()))
-            .unwrap())
-    }
+    get_from_store(passed_in_node_id, node_id_store)
 }
 
 fn get_random_node_id() -> String {
     format!("n{}", rand::thread_rng().gen::<u16>().to_string())
 }
 
-#[cfg(feature = "node-file-block")]
 fn get_from_store(
     config_node_id: Option<String>,
     node_id_store: Box<dyn NodeIdStore>,

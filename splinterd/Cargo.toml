@@ -75,6 +75,7 @@ features = [
   "rest-api",
   "rest-api-actix",
   "store-factory",
+  "node-id-store",
 ]
 
 [features]
@@ -106,7 +107,6 @@ experimental = [
     "https-bind",
     "log-config",
     "node",
-    "node-file-block",
     "scabbard-receipt-store",
     "scabbard-receipt-store-postgres",
     "scabbard-receipt-store-sqlite",
@@ -159,7 +159,6 @@ node = [
     "splinter/biome-client",
     "splinter/biome-client-reqwest",
 ]
-node-file-block = ["splinter/node-id-store",]
 oauth = [
     "splinter/oauth"
 ]
