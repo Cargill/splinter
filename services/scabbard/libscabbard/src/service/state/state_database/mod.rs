@@ -17,9 +17,6 @@ pub mod merkle_state;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
-use std::path::Path;
-#[cfg(feature = "receipt-store")]
-use std::str::FromStr;
 use std::sync::{
     mpsc::{channel, Receiver, RecvTimeoutError, Sender},
     Arc, RwLock,
@@ -27,10 +24,7 @@ use std::sync::{
 use std::time::{Duration, Instant, SystemTime};
 
 use protobuf::Message;
-#[cfg(feature = "receipt-store")]
 use sawtooth::receipt::store::ReceiptStore;
-#[cfg(not(feature = "receipt-store"))]
-use sawtooth::store::receipt_store::TransactionReceiptStore;
 use sawtooth_sabre::{
     handler::SabreTransactionHandler, ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
 };
@@ -40,10 +34,6 @@ use splinter::events::{ParseBytes, ParseError};
 use transact::families::command::CommandTransactionHandler;
 use transact::{
     context::manager::sync::ContextManager,
-    database::{
-        lmdb::{LmdbContext, LmdbDatabase},
-        Database,
-    },
     execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor},
     protocol::{
         batch::BatchPair,
@@ -52,32 +42,28 @@ use transact::{
     sawtooth::SawtoothToTransactHandlerAdapter,
     scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler},
     state::{
-        merkle::{MerkleRadixTree, MerkleState, StateDatabaseError, INDEXES},
-        StateChange as TransactStateChange, Write,
+        merkle::{MerkleRadixLeafReadError, MerkleRadixLeafReader},
+        Read, StateChange as TransactStateChange, Write,
     },
 };
 
-use crate::hex;
 use crate::protos::scabbard::{Setting, Setting_Entry};
 use crate::service::error::{ScabbardStateError, StateSubscriberError};
+use crate::store::CommitHashStore;
 
 const EXECUTION_TIMEOUT: u64 = 300; // five minutes
-const CURRENT_STATE_ROOT_INDEX: &str = "current_state_root";
 const ITER_CACHE_SIZE: usize = 64;
 const COMPLETED_BATCH_INFO_ITER_RETRY_MILLIS: u64 = 100;
 const DEFAULT_BATCH_HISTORY_SIZE: usize = 100;
 
-#[cfg(not(feature = "receipt-store"))]
-type ScabbardReceiptStore = Arc<RwLock<TransactionReceiptStore>>;
-
-#[cfg(feature = "receipt-store")]
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
 
 /// Iterator over entries in a Scabbard service's state
 pub type StateIter = Box<dyn Iterator<Item = Result<(String, Vec<u8>), ScabbardStateError>>>;
 
 pub struct ScabbardState {
-    db: Box<dyn Database>,
+    merkle_state: merkle_state::MerkleState,
+    commit_hash_store: Box<dyn CommitHashStore>,
     context_manager: ContextManager,
     executor: Executor,
     current_state_root: String,
@@ -93,24 +79,16 @@ pub struct ScabbardState {
 
 impl ScabbardState {
     pub fn new(
-        state_db_path: &Path,
-        state_db_size: usize,
+        merkle_state: merkle_state::MerkleState,
+        commit_hash_store: Box<dyn CommitHashStore>,
+        receipt_store: ScabbardReceiptStore,
         #[cfg(feature = "metrics")] service_id: String,
         #[cfg(feature = "metrics")] circuit_id: String,
-        receipt_store: ScabbardReceiptStore,
         admin_keys: Vec<String>,
     ) -> Result<Self, ScabbardStateError> {
-        // Initialize the database
-        let mut indexes = INDEXES.to_vec();
-        indexes.push(CURRENT_STATE_ROOT_INDEX);
-        let state_db_path = state_db_path.with_extension("lmdb");
-        let db = Box::new(LmdbDatabase::new(
-            LmdbContext::new(&state_db_path, indexes.len(), Some(state_db_size))?,
-            &indexes,
-        )?);
-
-        let current_state_root = if let Some(current_state_root) =
-            Self::read_current_state_root(&*db)?
+        let current_state_root = if let Some(current_state_root) = commit_hash_store
+            .get_current_commit_hash()
+            .map_err(|err| ScabbardStateError(err.to_string()))?
         {
             debug!("Restoring scabbard state on root {}", current_state_root);
             current_state_root
@@ -132,15 +110,17 @@ impl ScabbardState {
                 value: admin_keys_setting_bytes,
             };
 
-            let initial_state_root = MerkleRadixTree::new(db.clone_box(), None)?.get_merkle_root();
-            MerkleState::new(db.clone()).commit(
+            let initial_state_root = merkle_state
+                .get_initial_state_root()
+                .map_err(|err| ScabbardStateError(err.to_string()))?;
+            merkle_state.commit(
                 &initial_state_root,
                 vec![admin_keys_state_change].as_slice(),
             )?
         };
 
         // Initialize transact
-        let context_manager = ContextManager::new(Box::new(MerkleState::new(db.clone())));
+        let context_manager = ContextManager::new(Box::new(merkle_state.clone()));
         let mut executor = Executor::new(vec![Box::new(StaticExecutionAdapter::new_adapter(
             vec![
                 Box::new(SawtoothToTransactHandlerAdapter::new(
@@ -159,7 +139,8 @@ impl ScabbardState {
         counter!("splinter.scabbard.committed_batches", 0, "service" => format!("{}::{}", &circuit_id, &service_id));
 
         Ok(ScabbardState {
-            db,
+            merkle_state,
+            commit_hash_store,
             context_manager,
             executor,
             current_state_root,
@@ -174,37 +155,10 @@ impl ScabbardState {
         })
     }
 
-    fn read_current_state_root(db: &dyn Database) -> Result<Option<String>, ScabbardStateError> {
-        db.get_reader()
-            .and_then(|reader| reader.index_get(CURRENT_STATE_ROOT_INDEX, b"HEAD"))
-            .map(|head| head.map(|bytes| hex::to_hex(&bytes)))
-            .map_err(|e| ScabbardStateError(format!("Unable to read HEAD entry: {}", e)))
-    }
-
     fn write_current_state_root(&self) -> Result<(), ScabbardStateError> {
-        let current_root_bytes = hex::parse_hex(&self.current_state_root).map_err(|e| {
-            ScabbardStateError(format!(
-                "The in-memory current state root is invalid: {}",
-                e
-            ))
-        })?;
-
-        let mut writer = self.db.get_writer().map_err(|e| {
-            ScabbardStateError(format!(
-                "Unable to start write transaction for HEAD entry: {}",
-                e
-            ))
-        })?;
-
-        writer
-            .index_put(CURRENT_STATE_ROOT_INDEX, b"HEAD", &current_root_bytes)
-            .map_err(|e| ScabbardStateError(format!("Unable to write HEAD entry: {}", e)))?;
-
-        writer
-            .commit()
-            .map_err(|e| ScabbardStateError(format!("Unable to commit HEAD entry: {}", e)))?;
-
-        Ok(())
+        self.commit_hash_store
+            .set_current_commit_hash(&self.current_state_root)
+            .map_err(|err| ScabbardStateError(err.to_string()))
     }
 
     /// Fetch the value at the given `address` in state. Returns `None` if the `address` is not set.
@@ -212,10 +166,10 @@ impl ScabbardState {
         &self,
         address: &str,
     ) -> Result<Option<Vec<u8>>, ScabbardStateError> {
-        Ok(
-            MerkleRadixTree::new(self.db.clone(), Some(&self.current_state_root))?
-                .get_value(address)?,
-        )
+        self.merkle_state
+            .get(&self.current_state_root, &[address.to_string()])
+            .map(|mut values| values.remove(address))
+            .map_err(|err| ScabbardStateError(err.to_string()))
     }
 
     /// Fetch a list of entries in state. If a `prefix` is provided, only return entries whose
@@ -226,13 +180,15 @@ impl ScabbardState {
         prefix: Option<&str>,
     ) -> Result<StateIter, ScabbardStateError> {
         Ok(Box::new(
-            MerkleRadixTree::new(self.db.clone(), Some(&self.current_state_root))?
-                .leaves(prefix)
+            self.merkle_state
+                .leaves(&self.current_state_root, prefix)
                 .or_else(|err| match err {
-                    StateDatabaseError::NotFound(_) => Ok(Box::new(std::iter::empty())),
-                    err => Err(err),
+                    MerkleRadixLeafReadError::InvalidStateError(_) => {
+                        Ok(Box::new(std::iter::empty()))
+                    }
+                    err => Err(ScabbardStateError(err.to_string())),
                 })?
-                .map(|res| res.map_err(ScabbardStateError::from)),
+                .map(|res| res.map_err(|e| ScabbardStateError(e.to_string()))),
         ))
     }
 
@@ -297,7 +253,7 @@ impl ScabbardState {
             .collect::<Result<Vec<_>, _>>()?;
 
         // Save the results and compute the resulting state root
-        let state_root = MerkleState::new(self.db.clone()).compute_state_id(
+        let state_root = self.merkle_state.compute_state_id(
             &self.current_state_root,
             &receipts_into_transact_state_changes(&txn_receipts)?,
         )?;
@@ -309,7 +265,8 @@ impl ScabbardState {
         match self.pending_changes.take() {
             Some((signature, txn_receipts)) => {
                 let state_changes = receipts_into_transact_state_changes(&txn_receipts)?;
-                self.current_state_root = MerkleState::new(self.db.clone())
+                self.current_state_root = self
+                    .merkle_state
                     .commit(&self.current_state_root, &state_changes)?;
 
                 self.write_current_state_root()?;
@@ -326,24 +283,6 @@ impl ScabbardState {
                     .map(StateChangeEvent::try_from)
                     .collect::<Result<Vec<_>, _>>()?;
 
-                #[cfg(not(feature = "receipt-store"))]
-                self.receipt_store
-                    .write()
-                    .map_err(|err| {
-                        ScabbardStateError(format!(
-                            "transaction receipt store lock poisoned: {}",
-                            err
-                        ))
-                    })?
-                    .append(txn_receipts)
-                    .map_err(|err| {
-                        ScabbardStateError(format!(
-                            "failed to add transaction receipts to store: {}",
-                            err
-                        ))
-                    })?;
-
-                #[cfg(feature = "receipt-store")]
                 self.receipt_store
                     .write()
                     .map_err(|err| {
@@ -398,11 +337,7 @@ impl ScabbardState {
     }
 
     pub fn get_events_since(&self, event_id: Option<String>) -> Result<Events, ScabbardStateError> {
-        #[cfg(not(feature = "receipt-store"))]
-        let events = Events::new(self.receipt_store.clone(), event_id);
-        #[cfg(feature = "receipt-store")]
-        let events = Events::new(self.receipt_store.clone(), event_id);
-        events
+        Events::new(self.receipt_store.clone(), event_id)
     }
 
     pub fn add_subscriber(&mut self, subscriber: Box<dyn StateSubscriber>) {
@@ -411,26 +346,6 @@ impl ScabbardState {
 
     pub fn clear_subscribers(&mut self) {
         self.event_subscribers.clear();
-    }
-}
-
-/// The possible connection types and identifiers passed to the migrate command
-#[cfg(feature = "receipt-store")]
-pub enum ConnectionUri {
-    Postgres(String),
-    Sqlite(String),
-}
-
-#[cfg(feature = "receipt-store")]
-impl FromStr for ConnectionUri {
-    type Err = ScabbardStateError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("postgres://") {
-            Ok(ConnectionUri::Postgres(s.into()))
-        } else {
-            Ok(ConnectionUri::Sqlite(s.into()))
-        }
     }
 }
 
@@ -530,70 +445,6 @@ enum EventQuery {
     Exhausted,
 }
 
-#[cfg(not(feature = "receipt-store"))]
-/// An iterator that wraps the `TransactionReceiptStore` and returns `StateChangeEvent`s using an
-/// in-memory cache.
-pub struct Events {
-    transaction_receipt_store: Arc<RwLock<TransactionReceiptStore>>,
-    query: EventQuery,
-    cache: VecDeque<StateChangeEvent>,
-}
-
-#[cfg(not(feature = "receipt-store"))]
-impl Events {
-    fn new(
-        transaction_receipt_store: Arc<RwLock<TransactionReceiptStore>>,
-        start_id: Option<String>,
-    ) -> Result<Self, ScabbardStateError> {
-        let mut iter = Events {
-            transaction_receipt_store,
-            query: EventQuery::Fetch(start_id),
-            cache: VecDeque::default(),
-        };
-        iter.reload_cache()?;
-        Ok(iter)
-    }
-
-    fn reload_cache(&mut self) -> Result<(), ScabbardStateError> {
-        match self.query {
-            EventQuery::Fetch(ref start_id) => {
-                let transaction_receipt_store =
-                    self.transaction_receipt_store.read().map_err(|err| {
-                        ScabbardStateError(format!(
-                            "transaction receipt store lock poisoned: {}",
-                            err
-                        ))
-                    })?;
-
-                self.cache = if let Some(id) = start_id.as_ref() {
-                    transaction_receipt_store.iter_since_id(id.clone())
-                } else {
-                    transaction_receipt_store.iter()
-                }
-                .map_err(|err| {
-                    ScabbardStateError(format!(
-                        "failed to get transaction receipts from store: {}",
-                        err
-                    ))
-                })?
-                .take(ITER_CACHE_SIZE)
-                .map(StateChangeEvent::try_from)
-                .collect::<Result<VecDeque<_>, _>>()?;
-
-                self.query = self
-                    .cache
-                    .back()
-                    .map(|event| EventQuery::Fetch(Some(event.id.clone())))
-                    .unwrap_or(EventQuery::Exhausted);
-
-                Ok(())
-            }
-            EventQuery::Exhausted => Ok(()),
-        }
-    }
-}
-
-#[cfg(feature = "receipt-store")]
 /// An iterator that wraps the `ReceiptStore` and returns `StateChangeEvent`s using an
 /// in-memory cache.
 pub struct Events {
@@ -602,7 +453,6 @@ pub struct Events {
     cache: VecDeque<StateChangeEvent>,
 }
 
-#[cfg(feature = "receipt-store")]
 impl Events {
     fn new(
         receipt_store: Arc<RwLock<dyn ReceiptStore>>,
@@ -984,72 +834,46 @@ impl Iterator for ChannelBatchInfoIter {
 mod tests {
     use super::*;
 
-    use std::path::PathBuf;
-
     use cylinder::{secp256k1::Secp256k1Context, Context};
-    #[cfg(feature = "receipt-store")]
     use diesel::{
         r2d2::{ConnectionManager, Pool},
         sqlite::SqliteConnection,
     };
-    #[cfg(feature = "receipt-store")]
     use sawtooth::migrations::run_sqlite_migrations;
-    #[cfg(feature = "receipt-store")]
     use sawtooth::receipt::store::diesel::DieselReceiptStore;
-    #[cfg(not(feature = "receipt-store"))]
-    use sawtooth::store::lmdb::LmdbOrderedStore;
-    use tempdir::TempDir;
     use transact::{
+        database::{btree::BTreeDatabase, Database},
         families::command::make_command_transaction,
         protocol::{
             batch::BatchBuilder,
             command::{BytesEntry, Command, SetState},
         },
+        state::merkle::INDEXES,
     };
 
-    const TEMP_DB_SIZE: usize = 1 << 30; // 1024 ** 3
+    use crate::store::transact::{TransactCommitHashStore, CURRENT_STATE_ROOT_INDEX};
+
+    use super::merkle_state::{MerkleState, MerkleStateConfig};
 
     /// Verify that an empty receipt store returns an empty iterator
     #[test]
     fn empty_event_iterator() {
-        #[cfg(not(feature = "receipt-store"))]
-        {
-            let paths = StatePaths::new("empty_event_iterator");
+        let pool = create_connection_pool_and_migrate(":memory:".to_string());
 
-            let transaction_receipt_store =
-                Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-                    LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
-                        .expect("Failed to create LMDB store"),
-                ))));
+        let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
+            pool,
+            Some("empty_event_iterator".into()),
+        )));
 
-            #[cfg(not(feature = "receipt-store"))]
-            // Test without a specified start
-            let all_events = Events::new(transaction_receipt_store.clone(), None)
-                .expect("failed to get iterator for all events");
-            let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
+        // Test without a specified start
+        let all_events =
+            Events::new(receipt_store, None).expect("failed to get iterator for all events");
+        let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
 
-            assert!(
-                all_event_ids.is_empty(),
-                "All events should have been empty"
-            );
-        }
-
-        #[cfg(feature = "receipt-store")]
-        {
-            let pool = create_connection_pool_and_migrate(":memory:".to_string());
-
-            let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(pool, None)));
-
-            // Test without a specified start
-            let all_events =
-                Events::new(receipt_store, None).expect("failed to get iterator for all events");
-            let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
-
-            assert!(
-                all_event_ids.is_empty(),
-                "All events should have been empty"
-            );
-        }
+        assert!(
+            all_event_ids.is_empty(),
+            "All events should have been empty"
+        );
     }
 
     /// Verify that the event iterator works as expected.
@@ -1065,67 +889,34 @@ mod tests {
             .map(|receipt| receipt.transaction_id.clone())
             .collect::<Vec<_>>();
 
-        #[cfg(not(feature = "receipt-store"))]
-        {
-            let paths = StatePaths::new("event_iterator");
+        let pool = create_connection_pool_and_migrate(":memory:".to_string());
 
-            let transaction_receipt_store =
-                Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-                    LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
-                        .expect("Failed to create LMDB store"),
-                ))));
+        let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
+            pool,
+            Some("event_iterator".into()),
+        )));
 
-            transaction_receipt_store
-                .write()
-                .expect("failed to get write lock")
-                .append(receipts.clone())
-                .expect("failed to add receipts to store");
+        receipt_store
+            .write()
+            .expect("failed to get write lock")
+            .add_txn_receipts(receipts.clone())
+            .expect("failed to add receipts to store");
 
-            // Test without a specified start
-            let all_events = Events::new(transaction_receipt_store.clone(), None)
-                .expect("failed to get iterator for all events");
+        // Test without a specified start
+        let all_events = Events::new(receipt_store.clone(), None)
+            .expect("failed to get iterator for all events");
 
-            let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
-            assert_eq!(all_event_ids, receipt_ids);
+        let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
+        assert_eq!(all_event_ids, receipt_ids);
 
-            // Test with a specified start
-            let some_events = Events::new(transaction_receipt_store, Some(receipt_ids[0].clone()))
-                .expect("failed to get iterator for some events");
+        // Test with a specified start
+        let some_events = Events::new(receipt_store, Some(receipt_ids[0].clone()))
+            .expect("failed to get iterator for some events");
 
-            let some_event_ids = some_events
-                .map(|event| event.id.clone())
-                .collect::<Vec<_>>();
-            assert_eq!(some_event_ids, receipt_ids[1..].to_vec());
-        }
-
-        #[cfg(feature = "receipt-store")]
-        {
-            let pool = create_connection_pool_and_migrate(":memory:".to_string());
-
-            let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(pool, None)));
-
-            receipt_store
-                .write()
-                .expect("failed to get write lock")
-                .add_txn_receipts(receipts.clone())
-                .expect("failed to add receipts to store");
-
-            // Test without a specified start
-            let all_events = Events::new(receipt_store.clone(), None)
-                .expect("failed to get iterator for all events");
-
-            let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
-            assert_eq!(all_event_ids, receipt_ids);
-
-            // Test with a specified start
-            let some_events = Events::new(receipt_store, Some(receipt_ids[0].clone()))
-                .expect("failed to get iterator for some events");
-
-            let some_event_ids = some_events
-                .map(|event| event.id.clone())
-                .collect::<Vec<_>>();
-            assert_eq!(some_event_ids, receipt_ids[1..].to_vec());
-        }
+        let some_event_ids = some_events
+            .map(|event| event.id.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(some_event_ids, receipt_ids[1..].to_vec());
     }
 
     /// Verify that the `ScabbardState::get_state_at_address` method works properly.
@@ -1138,30 +929,24 @@ mod tests {
     #[test]
     fn get_state_at_address() {
         // Initialize state
-        let paths = StatePaths::new("get_state_at_address");
-
-        #[cfg(not(feature = "receipt-store"))]
-        let receipt_store = Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-            LmdbOrderedStore::new(
-                &StatePaths::new("state_at_address").receipt_db_path,
-                Some(TEMP_DB_SIZE),
-            )
-            .expect("Failed to create LMDB store"),
-        ))));
-        #[cfg(feature = "receipt-store")]
         let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
             create_connection_pool_and_migrate(":memory:".to_string()),
             None,
         )));
 
+        let db = create_btree_db();
+        let merkle_state = MerkleState::new(MerkleStateConfig::key_value(db.clone_box()))
+            .expect("Unable to create merkle state");
+        let commit_hash_store = TransactCommitHashStore::new(db);
+
         let mut state = ScabbardState::new(
-            &paths.state_db_path,
-            TEMP_DB_SIZE,
+            merkle_state,
+            Box::new(commit_hash_store),
+            receipt_store,
             #[cfg(feature = "metrics")]
             "svc0".to_string(),
             #[cfg(feature = "metrics")]
             "vzrQS-rvwf4".to_string(),
-            receipt_store,
             vec![],
         )
         .expect("Failed to initialize state");
@@ -1221,30 +1006,24 @@ mod tests {
     ///    that no entries are returned (the iterator is empty).
     #[test]
     fn get_state_with_prefix() {
-        let paths = StatePaths::new("get_state_at_address");
-
-        #[cfg(not(feature = "receipt-store"))]
-        let receipt_store = Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-            LmdbOrderedStore::new(
-                &StatePaths::new("state_with_prefix").receipt_db_path,
-                Some(TEMP_DB_SIZE),
-            )
-            .expect("Failed to create LMDB store"),
-        ))));
-        #[cfg(feature = "receipt-store")]
         let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
             create_connection_pool_and_migrate(":memory:".to_string()),
             None,
         )));
 
+        let db = create_btree_db();
+        let merkle_state = MerkleState::new(MerkleStateConfig::key_value(db.clone_box()))
+            .expect("Unable to create merkle state");
+        let commit_hash_store = TransactCommitHashStore::new(db);
+
         let mut state = ScabbardState::new(
-            &paths.state_db_path,
-            TEMP_DB_SIZE,
+            merkle_state,
+            Box::new(commit_hash_store),
+            receipt_store,
             #[cfg(feature = "metrics")]
             "svc0".to_string(),
             #[cfg(feature = "metrics")]
             "vzrQS-rvwf4".to_string(),
-            receipt_store,
             vec![],
         )
         .expect("Failed to initialize state");
@@ -1311,28 +1090,6 @@ mod tests {
         assert!(no_entries.is_empty());
     }
 
-    struct StatePaths {
-        _temp_dir_handle: TempDir,
-        pub state_db_path: PathBuf,
-        #[cfg(not(feature = "receipt-store"))]
-        pub receipt_db_path: PathBuf,
-    }
-
-    impl StatePaths {
-        fn new(prefix: &str) -> Self {
-            let temp_dir = TempDir::new(prefix).expect("Failed to create temp dir");
-            let state_db_path = temp_dir.path().join("state.lmdb");
-            #[cfg(not(feature = "receipt-store"))]
-            let receipt_db_path = temp_dir.path().join("receipts.lmdb");
-            Self {
-                _temp_dir_handle: temp_dir,
-                state_db_path,
-                #[cfg(not(feature = "receipt-store"))]
-                receipt_db_path,
-            }
-        }
-    }
-
     fn mock_transaction_receipt(id: &str) -> TransactionReceipt {
         TransactionReceipt {
             transaction_id: id.into(),
@@ -1344,7 +1101,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "receipt-store")]
     fn create_connection_pool_and_migrate(
         connection_string: String,
     ) -> Pool<ConnectionManager<SqliteConnection>> {
@@ -1358,5 +1114,11 @@ mod tests {
             .expect("Failed to run migrations");
 
         pool
+    }
+
+    fn create_btree_db() -> BTreeDatabase {
+        let mut indexes = INDEXES.to_vec();
+        indexes.push(CURRENT_STATE_ROOT_INDEX);
+        BTreeDatabase::new(&indexes)
     }
 }
