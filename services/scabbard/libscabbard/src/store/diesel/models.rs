@@ -16,7 +16,7 @@ use super::schema::*;
 
 #[derive(Insertable, Identifiable, AsChangeset)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[table_name = "scabbard_commit_log"]
+#[table_name = "scabbard_commit_hash"]
 #[primary_key(circuit_id, service_id)]
 pub struct NewCommitHash<'a> {
     pub circuit_id: &'a str,

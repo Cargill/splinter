@@ -16,7 +16,7 @@ use diesel::prelude::*;
 use diesel::sql_types::Text;
 use splinter::error::InternalError;
 
-use crate::store::{diesel::schema::scabbard_commit_log, CommitHashStoreError};
+use crate::store::{diesel::schema::scabbard_commit_hash, CommitHashStoreError};
 
 use super::CommitHashStoreOperations;
 
@@ -38,9 +38,9 @@ where
         circuit_id: &str,
         service_id: &str,
     ) -> Result<Option<String>, CommitHashStoreError> {
-        let current_commit_hash = scabbard_commit_log::table
+        let current_commit_hash = scabbard_commit_hash::table
             .find((circuit_id, service_id))
-            .select(scabbard_commit_log::commit_hash)
+            .select(scabbard_commit_hash::commit_hash)
             .get_result(self.conn)
             .optional()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
