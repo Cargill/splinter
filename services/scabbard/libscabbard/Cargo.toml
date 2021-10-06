@@ -66,8 +66,10 @@ stable = [
   "events",
   "lmdb",
   "metrics",
+  "postgres",
   "rest-api",
   "rest-api-actix",
+  "sqlite",
 ]
 
 experimental = [
@@ -76,9 +78,7 @@ experimental = [
   # The following features are experimental:
   "diesel-receipt-store",
   "https",
-  "postgres",
   "service-arg-validation",
-  "sqlite",
 ]
 
 authorization = ["splinter/authorization"]
