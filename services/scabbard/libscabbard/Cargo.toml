@@ -66,26 +66,24 @@ stable = [
   "events",
   "lmdb",
   "metrics",
+  "postgres",
   "rest-api",
   "rest-api-actix",
+  "sqlite",
 ]
 
 experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
-  "commit-store",
   "diesel-receipt-store",
   "https",
-  "postgres",
   "service-arg-validation",
-  "sqlite",
 ]
 
 authorization = ["splinter/authorization"]
 client = []
 client-reqwest = ["client", "reqwest"]
-commit-store = []
 diesel-receipt-store = ["diesel", "sawtooth/transaction-receipt-store-lmdb"]
 events = ["splinter/events"]
 https = []

@@ -51,7 +51,7 @@ features = ["admin-service", "registry", "node-id-store"]
 
 [dependencies.scabbard]
 path = "../services/scabbard/libscabbard"
-features = ["commit-store", "postgres", "sqlite", "lmdb"]
+features = ["postgres", "sqlite", "lmdb"]
 optional = true
 
 [dependencies.transact]
