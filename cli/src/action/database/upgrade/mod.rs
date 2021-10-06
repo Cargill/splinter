@@ -16,7 +16,6 @@
 
 #[cfg(feature = "scabbard-migrations")]
 mod error;
-#[cfg(feature = "node-id-upgrade")]
 mod node_id;
 #[cfg(feature = "scabbard-migrations")]
 mod scabbard;
@@ -48,11 +47,12 @@ impl Action for UpgradeAction {
         })?;
         info!("Upgrading splinterd state");
 
-        #[cfg(feature = "node-id-upgrade")]
+        #[cfg(any(feature = "sqlite", feature = "postgres"))]
         {
             let db_store = store_factory.get_node_id_store();
             node_id::migrate_node_id_to_db(state_dir.clone(), &*db_store)?;
         }
+
         info!(
             "Source yaml state directory: {}",
             state_dir.to_string_lossy()
