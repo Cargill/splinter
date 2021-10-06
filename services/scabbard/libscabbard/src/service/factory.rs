@@ -661,7 +661,7 @@ fn purge_paths(lmdb_path: &Path) -> Result<(), InternalError> {
 mod tests {
     use super::*;
 
-    use cylinder::secp256k1::Secp256k1Context;
+    use cylinder::{secp256k1::Secp256k1Context, Context};
     use tempdir::TempDir;
 
     /// Verify that the scabbard factory produces a valid `Scabbard` instance.
@@ -746,6 +746,44 @@ mod tests {
         );
     }
 
+    /// Verify arg validation returns ok with valid common seperated Args
+    #[test]
+    #[cfg(feature = "service-arg-validation")]
+    fn test_valid_argument_validation_no_json() {
+        let validator = ScabbardArgValidator;
+        let args = get_mock_args_no_json();
+        assert!(validator.validate(&args).is_ok());
+    }
+
+    /// Verify arg validation returns ok with valid Args using json
+    #[test]
+    #[cfg(feature = "service-arg-validation")]
+    fn test_valid_argument_validation() {
+        let validator = ScabbardArgValidator;
+        let args = get_mock_args();
+        assert!(validator.validate(&args).is_ok());
+    }
+
+    /// Verify arg validation returns an error if the args are empty
+    #[test]
+    #[cfg(feature = "service-arg-validation")]
+    fn test_no_argument_validation() {
+        let validator = ScabbardArgValidator;
+        let args = HashMap::new();
+        assert!(validator.validate(&args).is_err());
+    }
+
+    /// Verify arg validation returns an error if the args are present but the values are empty
+    #[test]
+    #[cfg(feature = "service-arg-validation")]
+    fn test_empty_argument_validation() {
+        let validator = ScabbardArgValidator;
+        let mut args = HashMap::new();
+        args.insert("peer_services".into(), "".into());
+        args.insert("admin_keys".into(), "".into());
+        assert!(validator.validate(&args).is_err());
+    }
+
     fn get_factory() -> (TempDir, ScabbardFactory) {
         let tempdir = TempDir::new("scabbard_factory").expect("Unable to create new tempdir");
         #[cfg(not(all(feature = "diesel-receipt-store", feature = "sqlite")))]
@@ -785,7 +823,7 @@ mod tests {
 
     fn get_mock_args() -> HashMap<String, String> {
         let peer_services = vec!["1".to_string(), "2".to_string(), "3".to_string()];
-        let admin_keys: Vec<String> = vec![];
+        let admin_keys = vec![get_public_key(), get_public_key()];
         let mut args = HashMap::new();
         args.insert(
             "peer_services".into(),
@@ -801,7 +839,17 @@ mod tests {
     fn get_mock_args_no_json() -> HashMap<String, String> {
         let mut args = HashMap::new();
         args.insert("peer_services".into(), "0,1,3".into());
-        args.insert("admin_keys".into(), "".into());
+        args.insert(
+            "admin_keys".into(),
+            format!("{},{}", get_public_key(), get_public_key()),
+        );
         args
+    }
+
+    fn get_public_key() -> String {
+        let context = Secp256k1Context::new();
+        let private_key = context.new_random_private_key();
+        let public_key = context.get_public_key(&private_key).unwrap();
+        public_key.as_hex()
     }
 }
