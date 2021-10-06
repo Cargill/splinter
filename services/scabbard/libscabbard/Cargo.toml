@@ -78,6 +78,7 @@ experimental = [
   "diesel-receipt-store",
   "https",
   "postgres",
+  "service-arg-validation",
   "sqlite",
 ]
 
