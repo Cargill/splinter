@@ -34,9 +34,11 @@ use sawtooth::receipt::store::diesel::DieselReceiptStore;
 use sawtooth::receipt::store::{lmdb::LmdbReceiptStore, ReceiptStore};
 #[cfg(not(feature = "diesel-receipt-store"))]
 use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
+#[cfg(feature = "service-arg-validation")]
+use splinter::error::InvalidArgumentError;
 use splinter::error::{InternalError, InvalidStateError};
 #[cfg(feature = "service-arg-validation")]
-use splinter::service::validation::{ServiceArgValidationError, ServiceArgValidator};
+use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 
 #[cfg(feature = "service-arg-validation")]
@@ -337,36 +339,42 @@ pub struct ScabbardArgValidator;
 
 #[cfg(feature = "service-arg-validation")]
 impl ServiceArgValidator for ScabbardArgValidator {
-    fn validate(&self, args: &HashMap<String, String>) -> Result<(), ServiceArgValidationError> {
+    fn validate(&self, args: &HashMap<String, String>) -> Result<(), InvalidArgumentError> {
         let peer_services_str = args.get("peer_services").ok_or_else(|| {
-            ServiceArgValidationError("peer_services argument not provided".into())
+            InvalidArgumentError::new("peer_services".into(), "argument not provided".into())
         })?;
 
         serde_json::from_str::<Vec<String>>(peer_services_str).map_err(|err| {
-            ServiceArgValidationError(format!("failed to parse peer_services list: {}", err,))
+            InvalidArgumentError::new(
+                "peer_services".into(),
+                format!("failed to parse list: {}", err,),
+            )
         })?;
 
-        let admin_keys_str = args
-            .get("admin_keys")
-            .ok_or_else(|| ServiceArgValidationError("admin_keys argument not provided".into()))?;
+        let admin_keys_str = args.get("admin_keys").ok_or_else(|| {
+            InvalidArgumentError::new("admin_keys".into(), "argument not provided".into())
+        })?;
 
         let admin_keys = parse_list(admin_keys_str).map_err(|err| {
-            ServiceArgValidationError(format!("failed to parse admin_keys list: {}", err,))
+            InvalidArgumentError::new(
+                "admin_keys".into(),
+                format!("failed to parse list: {}", err,),
+            )
         })?;
 
         for key in admin_keys {
             let key_bytes = parse_hex(&key).map_err(|_| {
-                ServiceArgValidationError(format!(
-                    "{:?} is not a valid hex-formatted public key",
-                    key,
-                ))
+                InvalidArgumentError::new(
+                    "admin_keys".into(),
+                    format!("{:?} is not a valid hex-formatted public key", key,),
+                )
             })?;
 
             if key_bytes.len() != 33 {
-                return Err(ServiceArgValidationError(format!(
-                    "{} is not a valid public key: invalid length",
-                    key
-                )));
+                return Err(InvalidArgumentError::new(
+                    "admin_keys".into(),
+                    format!("{} is not a valid public key: invalid length", key),
+                ));
             }
         }
 

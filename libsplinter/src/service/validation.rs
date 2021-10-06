@@ -15,23 +15,11 @@
 //! Service Argument validation
 
 use std::collections::HashMap;
-use std::error;
-use std::fmt;
 
-/// An error message indicating an issue with a set of service arguments.
-#[derive(Debug, PartialEq)]
-pub struct ServiceArgValidationError(pub String);
-
-impl error::Error for ServiceArgValidationError {}
-
-impl fmt::Display for ServiceArgValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Invalid service arguments: {}", self.0)
-    }
-}
+use crate::error::InvalidArgumentError;
 
 type Args = HashMap<String, String>;
-type ValidationResult = Result<(), ServiceArgValidationError>;
+type ValidationResult = Result<(), InvalidArgumentError>;
 
 /// Validates the arguments for a service
 pub trait ServiceArgValidator {
@@ -39,7 +27,7 @@ pub trait ServiceArgValidator {
     ///
     /// # Errors
     ///
-    /// Returns an ServiceArgValidationError if the implementation determines that the arguments
+    /// Returns an InvalidArgumentError if the implementation determines that the arguments
     /// are invalid.
     fn validate(&self, args: &Args) -> ValidationResult;
 }
@@ -60,7 +48,10 @@ mod test {
     impl ServiceArgValidator for ContainsFoo {
         fn validate(&self, args: &Args) -> ValidationResult {
             if !args.contains_key("foo") {
-                return Err(ServiceArgValidationError(r#""foo" is missing"#.into()));
+                return Err(InvalidArgumentError::new(
+                    "foo".into(),
+                    r#""foo" is missing"#.into(),
+                ));
             }
 
             Ok(())
@@ -72,7 +63,8 @@ mod test {
     impl ServiceArgValidator for BarNotEmpty {
         fn validate(&self, args: &Args) -> ValidationResult {
             if args.get("bar").map(|v| v.is_empty()).unwrap_or(true) {
-                return Err(ServiceArgValidationError(
+                return Err(InvalidArgumentError::new(
+                    "bar".into(),
                     r#""bar" is missing or empty"#.into(),
                 ));
             }
@@ -106,13 +98,17 @@ mod test {
         let mut args: Args = HashMap::new();
         args.insert("bar".into(), "yes".into());
 
-        assert_eq!(
-            Some(Err(ServiceArgValidationError(r#""foo" is missing"#.into()))),
+        let _expected_result: Option<Result<(), InvalidArgumentError>> = Some(Err(
+            InvalidArgumentError::new("foo".into(), "argument is missing".into()),
+        ));
+
+        assert!(matches!(
             validators
                 .iter()
                 .map(|v| v.validate(&args))
-                .find(|r| r.is_err())
-        );
+                .find(|r| r.is_err()),
+            _expected_result,
+        ));
     }
 
     /// Test that a set of arguments with an invalid "bar" argument will fail with an error.
@@ -125,14 +121,16 @@ mod test {
         args.insert("foo".into(), "one".into());
         args.insert("bar".into(), "".into());
 
-        assert_eq!(
-            Some(Err(ServiceArgValidationError(
-                r#""bar" is missing or empty"#.into()
-            ))),
+        let _expected_result: Option<Result<(), InvalidArgumentError>> = Some(Err(
+            InvalidArgumentError::new("bar".into(), "missing or empty".into()),
+        ));
+
+        assert!(matches!(
             validators
                 .iter()
                 .map(|v| v.validate(&args))
-                .find(|r| r.is_err())
-        );
+                .find(|r| r.is_err()),
+            _expected_result
+        ));
     }
 }
