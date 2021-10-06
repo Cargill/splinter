@@ -351,6 +351,15 @@ impl ServiceArgValidator for ScabbardArgValidator {
             )
         })?;
 
+        for service in peer_services {
+            if service.is_empty() {
+                return Err(InvalidArgumentError::new(
+                    "peer_services".into(),
+                    "must provide at least one service ID".into(),
+                ));
+            }
+        }
+
         let admin_keys_str = args.get("admin_keys").ok_or_else(|| {
             InvalidArgumentError::new("admin_keys".into(), "argument not provided".into())
         })?;
@@ -363,6 +372,13 @@ impl ServiceArgValidator for ScabbardArgValidator {
         })?;
 
         for key in admin_keys {
+            if key.is_empty() {
+                return Err(InvalidArgumentError::new(
+                    "admin_keys".into(),
+                    "must provide at least one admin key".into(),
+                ));
+            }
+
             let key_bytes = parse_hex(&key).map_err(|_| {
                 InvalidArgumentError::new(
                     "admin_keys".into(),
