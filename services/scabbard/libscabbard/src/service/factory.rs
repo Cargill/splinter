@@ -344,7 +344,7 @@ impl ServiceArgValidator for ScabbardArgValidator {
             InvalidArgumentError::new("peer_services".into(), "argument not provided".into())
         })?;
 
-        serde_json::from_str::<Vec<String>>(peer_services_str).map_err(|err| {
+        let peer_services = parse_list(peer_services_str).map_err(|err| {
             InvalidArgumentError::new(
                 "peer_services".into(),
                 format!("failed to parse list: {}", err,),
