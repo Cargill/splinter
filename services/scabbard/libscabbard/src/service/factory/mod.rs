@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "database-support")]
+mod factory_database;
 #[cfg(not(feature = "database-support"))]
 mod factory_static_configuration;
 
+#[cfg(feature = "database-support")]
+pub use factory_database::*;
 #[cfg(not(feature = "database-support"))]
 pub use factory_static_configuration::*;
