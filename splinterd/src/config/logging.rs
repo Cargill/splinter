@@ -18,7 +18,6 @@ use std::convert::TryFrom;
 use log::Level;
 use serde::Deserialize;
 
-use super::bytes::ByteSize;
 use super::error::ConfigError;
 
 pub const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
@@ -68,7 +67,7 @@ pub struct UnnamedAppenderConfig {
     pub encoder: String,
     pub kind: RawLogTarget,
     pub filename: Option<String>,
-    pub size: Option<ByteSize>,
+    pub size: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
@@ -106,7 +105,6 @@ impl TryFrom<(String, UnnamedAppenderConfig)> for AppenderConfig {
             }
             RawLogTarget::RollingFile => {
                 if let (Some(filename), Some(size)) = (value.1.filename, value.1.size) {
-                    let size = size.get_mem_size();
                     Ok(LogTarget::RollingFile { filename, size })
                 } else {
                     Err(ConfigError::MissingValue("filename|size".to_string()))
