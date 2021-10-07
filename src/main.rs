@@ -114,6 +114,16 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .long("seed")
                         .value_name("SEED")
                         .long_help("An integer to use as a seed to make the workload reproducible"),
+                )
+                .arg(
+                    Arg::with_name("duration")
+                        .long("duration")
+                        .short("d")
+                        .takes_value(true)
+                        .help(
+                            "The amount of time in hours the workload should run for. \
+                         If not set workload will run indefinitely"
+                        )
                 ),
         );
     }
