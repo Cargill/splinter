@@ -142,9 +142,9 @@ struct TomlConfig {
     influx_password: Option<String>,
     peering_key: Option<String>,
     #[cfg(feature = "log-config")]
-    appenders: Option<HashMap<String, UnnamedAppenderConfig>>,
+    appenders: Option<HashMap<String, TomlUnnamedAppenderConfig>>,
     #[cfg(feature = "log-config")]
-    loggers: Option<HashMap<String, UnnamedLoggerConfig>>,
+    loggers: Option<HashMap<String, TomlUnnamedLoggerConfig>>,
     #[cfg(feature = "scabbard-database-support")]
     scabbard_storage: Option<ScabbardStorageToml>,
 
@@ -272,14 +272,31 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 if let Some(unnamed) = loggers.remove("root") {
                     partial_config = partial_config
                         .with_root_logger(Some(unnamed.into()))
-                        .with_loggers(Some(loggers));
+                        .with_loggers(Some(
+                            loggers
+                                .drain()
+                                .map(|pair| (pair.0, pair.1.into()))
+                                .collect::<HashMap<String, UnnamedLoggerConfig>>(),
+                        ));
                 } else {
-                    partial_config = partial_config.with_loggers(Some(loggers));
+                    partial_config = partial_config.with_loggers(Some(
+                        loggers
+                            .drain()
+                            .map(|pair| (pair.0, pair.1.into()))
+                            .collect::<HashMap<String, UnnamedLoggerConfig>>(),
+                    ));
                 }
             } else {
-                partial_config = partial_config.with_loggers(self.toml_config.loggers)
+                partial_config = partial_config.with_loggers(None);
             }
-            partial_config = partial_config.with_appenders(self.toml_config.appenders);
+            if let Some(mut appenders) = self.toml_config.appenders {
+                partial_config = partial_config.with_appenders(Some(
+                    appenders
+                        .drain()
+                        .map(|(name, conf)| (name, conf.into()))
+                        .collect::<HashMap<String, UnnamedAppenderConfig>>(),
+                ));
+            }
         }
 
         #[cfg(feature = "scabbard-database-support")]
