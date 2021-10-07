@@ -233,8 +233,10 @@ fn start_smallbank_workloads(
         };
 
         info!(
-            "Starting Smallbank-Workload-{} with target rate {}",
-            i, rate
+            "Starting Smallbank-Workload-{} with target rate {} and duration {}",
+            i,
+            rate,
+            total_duration.map_or("indefinite".into(), |t| format!("{}", t))
         );
         workload_runner
             .add_workload(
@@ -282,7 +284,12 @@ fn start_command_workloads(
             }
         };
 
-        info!("Starting Command-Workload-{} with target rate {}", i, rate);
+        info!(
+            "Starting Command-Workload-{} with target rate {} and duration {}",
+            i,
+            rate,
+            total_duration.map_or("indefinite".into(), |t| format!("{}", t))
+        );
 
         workload_runner
             .add_workload(
