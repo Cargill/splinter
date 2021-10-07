@@ -23,7 +23,7 @@ use super::error::ConfigError;
 
 pub const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
 
-fn default_pattern() -> String {
+pub(super) fn default_pattern() -> String {
     String::from(DEFAULT_LOGGING_PATTERN)
 }
 
