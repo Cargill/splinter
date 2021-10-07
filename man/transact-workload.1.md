@@ -41,6 +41,11 @@ FLAGS
 
 OPTIONS
 =======
+`-d, --duration DURATION`
+: Lenght of time in hours that the workload should run for. If this option is not
+  used, the workload will run indefinitely. Duration can be provided in seconds,
+  minutes, hours, or days ex: `7s`, `20m`, `24h`, `2d`
+
 `-k, --key PRIVATE-KEY-FILE`
 : Specifies the full path to the private key file. The key will be used to
   sign the batches as well as generate a JWT for authentication.
@@ -84,7 +89,8 @@ transact workload \
   --update 5 \
   --smallbank-seed 10 \
   --smallbank-num-accounts 5 \
-  --targets "http://0.0.0.0:8089/scabbard/jEWSK-jdjSM/a001;http://0.0.0.0:8088/scabbard/jEWSK-jdjSM/
+  --targets "http://0.0.0.0:8089/scabbard/jEWSK-jdjSM/a001;http://0.0.0.0:8088/scabbard/jEWSK-jdjSM/ \
+  --duration 24h
 ```
 
 
