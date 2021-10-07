@@ -14,11 +14,15 @@
 
 use std::convert::From;
 use std::convert::TryFrom;
+use std::convert::TryInto;
 
 use log::Level;
 use serde::Deserialize;
 
 use super::error::ConfigError;
+use super::toml::TomlRawLogTarget;
+use super::toml::TomlUnnamedAppenderConfig;
+use super::toml::TomlUnnamedLoggerConfig;
 
 pub const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
 
@@ -90,6 +94,17 @@ pub enum RawLogTarget {
     RollingFile,
 }
 
+impl From<TomlRawLogTarget> for RawLogTarget {
+    fn from(unnamed: TomlRawLogTarget) -> Self {
+        match unnamed {
+            TomlRawLogTarget::File => RawLogTarget::File,
+            TomlRawLogTarget::Stdout => RawLogTarget::Stdout,
+            TomlRawLogTarget::Stderr => RawLogTarget::Stderr,
+            TomlRawLogTarget::RollingFile => RawLogTarget::RollingFile,
+        }
+    }
+}
+
 impl TryFrom<(String, UnnamedAppenderConfig)> for AppenderConfig {
     type Error = ConfigError;
     fn try_from(value: (String, UnnamedAppenderConfig)) -> Result<Self, Self::Error> {
@@ -119,6 +134,34 @@ impl TryFrom<(String, UnnamedAppenderConfig)> for AppenderConfig {
     }
 }
 
+impl TryFrom<(String, TomlUnnamedAppenderConfig)> for AppenderConfig {
+    type Error = <AppenderConfig as TryFrom<(String, UnnamedAppenderConfig)>>::Error;
+    fn try_from(value: (String, TomlUnnamedAppenderConfig)) -> Result<Self, Self::Error> {
+        let unnamed: UnnamedAppenderConfig = value.1.into();
+        (value.0, unnamed).try_into()
+    }
+}
+
+impl From<TomlUnnamedAppenderConfig> for UnnamedAppenderConfig {
+    fn from(unnamed: TomlUnnamedAppenderConfig) -> Self {
+        Self {
+            encoder: unnamed.encoder,
+            kind: unnamed.kind.into(),
+            filename: unnamed.filename,
+            size: unnamed.size.map(|s| s.into()),
+        }
+    }
+}
+
+impl From<TomlUnnamedLoggerConfig> for UnnamedLoggerConfig {
+    fn from(unnamed: TomlUnnamedLoggerConfig) -> Self {
+        Self {
+            appenders: unnamed.appenders,
+            level: unnamed.level.into(),
+        }
+    }
+}
+
 impl From<(String, UnnamedLoggerConfig)> for LoggerConfig {
     fn from(pair: (String, UnnamedLoggerConfig)) -> Self {
         Self {
@@ -129,11 +172,11 @@ impl From<(String, UnnamedLoggerConfig)> for LoggerConfig {
     }
 }
 
-impl From<UnnamedLoggerConfig> for RootConfig {
-    fn from(un_named: UnnamedLoggerConfig) -> Self {
+impl From<TomlUnnamedLoggerConfig> for RootConfig {
+    fn from(unnamed: TomlUnnamedLoggerConfig) -> Self {
         Self {
-            appenders: un_named.appenders,
-            level: un_named.level.into(),
+            appenders: unnamed.appenders,
+            level: unnamed.level.into(),
         }
     }
 }
