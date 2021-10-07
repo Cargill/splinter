@@ -120,6 +120,7 @@ impl TryFrom<(String, UnnamedAppenderConfig)> for AppenderConfig {
         })
     }
 }
+
 impl From<(String, UnnamedLoggerConfig)> for LoggerConfig {
     fn from(pair: (String, UnnamedLoggerConfig)) -> Self {
         Self {
@@ -134,7 +135,7 @@ impl From<UnnamedLoggerConfig> for RootConfig {
     fn from(un_named: UnnamedLoggerConfig) -> Self {
         Self {
             appenders: un_named.appenders,
-            level: un_named.level,
+            level: un_named.level.into(),
         }
     }
 }

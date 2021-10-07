@@ -17,16 +17,74 @@
 use crate::config::PartialConfigBuilder;
 use crate::config::{ConfigError, ConfigSource, PartialConfig};
 #[cfg(feature = "log-config")]
+use log::Level;
+#[cfg(feature = "log-config")]
 use serde_derive::Deserialize;
 #[cfg(feature = "log-config")]
 use std::collections::HashMap;
 
 #[cfg(feature = "log-config")]
-use super::logging::{UnnamedAppenderConfig, UnnamedLoggerConfig};
+use super::bytes::ByteSize;
+#[cfg(feature = "log-config")]
+use super::logging::{default_pattern, UnnamedAppenderConfig, UnnamedLoggerConfig};
 
 /// `TOML_VERSION` represents the version of the toml config file.
 /// The version determines the most current valid toml config entries.
 const TOML_VERSION: &str = "1";
+
+#[cfg(feature = "log-config")]
+#[derive(Deserialize, Clone, Debug)]
+pub enum TomlRawLogTarget {
+    #[serde(alias = "stdout")]
+    Stdout,
+    #[serde(alias = "stderr")]
+    Stderr,
+    #[serde(alias = "file")]
+    File,
+    #[serde(alias = "rolling_file")]
+    RollingFile,
+}
+
+#[cfg(feature = "log-config")]
+#[derive(Deserialize, Clone, Debug)]
+pub struct TomlUnnamedAppenderConfig {
+    #[serde(default = "default_pattern")]
+    #[serde(alias = "pattern")]
+    pub encoder: String,
+    pub kind: TomlRawLogTarget,
+    pub filename: Option<String>,
+    pub size: Option<ByteSize>,
+}
+
+#[cfg(feature = "log-config")]
+#[derive(Deserialize, Clone, Debug)]
+pub struct TomlUnnamedLoggerConfig {
+    pub appenders: Vec<String>,
+    pub level: TomlLogLevel,
+}
+
+#[cfg(feature = "log-config")]
+#[derive(Deserialize, Clone, Debug)]
+pub enum TomlLogLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+#[cfg(feature = "log-config")]
+impl From<TomlLogLevel> for Level {
+    fn from(toml: TomlLogLevel) -> Self {
+        match toml {
+            TomlLogLevel::Warn => Level::Warn,
+            TomlLogLevel::Info => Level::Info,
+            TomlLogLevel::Error => Level::Error,
+            TomlLogLevel::Debug => Level::Debug,
+            TomlLogLevel::Trace => Level::Trace,
+        }
+    }
+}
 
 /// `TomlConfig` object which holds values defined in a toml file. This struct must be
 /// treated as part of the external API of splinter because changes here
