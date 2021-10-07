@@ -1,5 +1,97 @@
 # Release Notes
 
+## Changes in Splinter 0.5.21
+
+### Highlights
+
+* Challenge authorization has been stabilized and set to default. The splinter
+  daemon now requires that keys are configured that can be used for challenge
+  authorization. Use `splinter keygen --system` to generate these keys. If you
+  still wish to create circuits using trust authorization, when creating the
+  proposal add `--auth-type trust`.
+
+* Scabbard feature `commit-store` has been stabilized and has been removed.
+
+### libsplinter
+
+* Add a trait for implementing Authorization types. The trait provides methods
+  for getting all the associated handlers for the defined authorization type.
+
+* The `AuthorizationDispatchBuilder` has been updated to use these authorization
+  implementations to add the related message handler. This change simplifies the
+  guards around arguments that were only used if 'challenge-authorization' was
+  enabled. Also simplifies the configurations required around handler tests.
+
+* Stabilize `challenge-authorization`.
+
+* Update unreferenced peers to properly switch connections if duplicate.
+  Previously, if there was an unreferenced peer connection when one previously
+  existed, it would always be replaced. This is a bad pattern if one side thinks
+  the connection is a full peer and might remove the incorrect side. This commit
+  updated the logic so unreferenced peers follow the same logic as full peers
+  when removing a duplicate connection.
+
+* Replace `ServiceArgValidationError` with `InvalidArgumentError`. This is
+  behind the experimental feature 'service-arg-validation'.
+
+* Update `node_id` file store to check that the node ID file doesn't only
+  contain whitespace before storing the value.
+
+* Fix the local YAML registry such that it can handle an empty file, as well as
+  an empty YAML array.
+
+### splinterd
+
+* Stabilize `challenge-authorization` by removing the feature.
+
+* Create a node_id module to hold `node_id` access and selection logic.
+
+* Use the `get_node_id` method in the daemon to simplify `node_id` retrieval.
+
+* Refactor the daemon by splitting out structs and associated implementations
+  into multiple submodules under the same daemon module.
+
+* Add authorization support to the testing framework.
+
+* Update sawtooth dependency version to 0.6.7.
+
+### splinter CLI
+
+* Stabilize `challenge-authorization` by removing the feature.
+
+* Move postgres migration behavior to its own module to match the sqlite module.
+
+* Add the required migrations for the scabbard service state and commit hash
+  store to the `splinter database migrate` subcommand.
+
+* Add tests for the node_id store.
+
+* Add the libscabbard sources to the CLI docker file to support the addition of
+  the scabbard migrations to the CLI.
+
+* Update sawtooth dependency version to 0.6.7.
+
+### libscabbard
+
+* Add a tag that specifies a circuit and service in the committed batches metric
+  to fix a bug where committed batches from multiple scabbard circuits would
+  override one another.
+
+* Stabilize `commit-store` by removing the feature
+
+* Stabilize `postgres` and `sqlite` features.
+
+* Update sawtooth dependency version to 0.6.7.
+
+* Rename the `diesel-receipt-store` feature to `receipt-store`.
+
+* Update the diesel backed receipt store in scabbard to include the added
+  `service_id` argument.
+
+### gameroom
+
+* Add missing `splinter keygen --system` for gameroom UI test.
+
 ## Changes in Splinter 0.5.20
 
 ### Highlights
