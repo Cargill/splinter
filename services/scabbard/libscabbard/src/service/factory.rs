@@ -20,19 +20,19 @@ use std::time::Duration;
 
 use cylinder::VerifierFactory;
 #[cfg(all(
-    feature = "diesel-receipt-store",
+    feature = "receipt-store",
     any(feature = "postgres", feature = "sqlite")
 ))]
 use diesel::r2d2::{ConnectionManager, Pool};
 use openssl::hash::{hash, MessageDigest};
 #[cfg(all(
-    feature = "diesel-receipt-store",
+    feature = "receipt-store",
     any(feature = "postgres", feature = "sqlite")
 ))]
 use sawtooth::receipt::store::diesel::DieselReceiptStore;
-#[cfg(feature = "diesel-receipt-store")]
+#[cfg(feature = "receipt-store")]
 use sawtooth::receipt::store::{lmdb::LmdbReceiptStore, ReceiptStore};
-#[cfg(not(feature = "diesel-receipt-store"))]
+#[cfg(not(feature = "receipt-store"))]
 use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
 #[cfg(feature = "service-arg-validation")]
 use splinter::error::InvalidArgumentError;
@@ -53,13 +53,13 @@ const DEFAULT_STATE_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 const DEFAULT_RECEIPT_DB_DIR: &str = "/var/lib/splinter";
 const DEFAULT_RECEIPT_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
-#[cfg(not(feature = "diesel-receipt-store"))]
+#[cfg(not(feature = "receipt-store"))]
 type ScabbardReceiptStore = Arc<RwLock<TransactionReceiptStore>>;
 
-#[cfg(feature = "diesel-receipt-store")]
+#[cfg(feature = "receipt-store")]
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
 
-#[cfg(feature = "diesel-receipt-store")]
+#[cfg(feature = "receipt-store")]
 pub enum ConnectionUri {
     #[cfg(feature = "postgres")]
     Postgres(Box<str>),
@@ -76,7 +76,7 @@ pub enum ScabbardStorageConfiguration {
         db_dir: Option<String>,
         db_size: Option<usize>,
     },
-    #[cfg(feature = "diesel-receipt-store")]
+    #[cfg(feature = "receipt-store")]
     DatabaseConnectionUri { connection_uri: ConnectionUri },
 }
 
@@ -89,7 +89,7 @@ impl ScabbardStorageConfiguration {
     }
 
     #[cfg(all(
-        feature = "diesel-receipt-store",
+        feature = "receipt-store",
         any(feature = "postgres", feature = "sqlite")
     ))]
     fn connection_uri(connection_uri: &str) -> Self {
@@ -110,7 +110,7 @@ impl ScabbardStorageConfiguration {
                 db_dir: Some(db_dir),
                 db_size,
             },
-            #[cfg(feature = "diesel-receipt-store")]
+            #[cfg(feature = "receipt-store")]
             _ => Self::Lmdb {
                 db_dir: Some(db_dir),
                 db_size: None,
@@ -124,7 +124,7 @@ impl ScabbardStorageConfiguration {
                 db_dir,
                 db_size: Some(db_size),
             },
-            #[cfg(feature = "diesel-receipt-store")]
+            #[cfg(feature = "receipt-store")]
             _ => Self::Lmdb {
                 db_dir: None,
                 db_size: Some(db_size),
@@ -184,7 +184,7 @@ impl ScabbardFactoryBuilder {
     }
 
     #[cfg(all(
-        feature = "diesel-receipt-store",
+        feature = "receipt-store",
         any(feature = "postgres", feature = "sqlite")
     ))]
     /// Sets the receipt db connection url to be used by the resulting factory.
@@ -236,7 +236,7 @@ impl ScabbardFactoryBuilder {
                     db_size: db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
                 }
             }
-            #[cfg(feature = "diesel-receipt-store")]
+            #[cfg(feature = "receipt-store")]
             ScabbardStorageConfiguration::DatabaseConnectionUri { connection_uri } => {
                 match connection_uri {
                     #[cfg(feature = "postgres")]
@@ -296,7 +296,7 @@ impl ScabbardFactoryBuilder {
                 db_dir.unwrap_or_else(|| DEFAULT_STATE_DB_DIR.into()),
                 db_size.unwrap_or(DEFAULT_STATE_DB_SIZE),
             ),
-            #[cfg(feature = "diesel-receipt-store")]
+            #[cfg(feature = "receipt-store")]
             _ => unreachable!(),
         };
 
@@ -316,11 +316,11 @@ enum ScabbardFactoryStorageConfig {
         db_dir: String,
         db_size: usize,
     },
-    #[cfg(all(feature = "diesel-receipt-store", feature = "postgres"))]
+    #[cfg(all(feature = "receipt-store", feature = "postgres"))]
     Postgres {
         pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
     },
-    #[cfg(all(feature = "diesel-receipt-store", feature = "sqlite"))]
+    #[cfg(all(feature = "receipt-store", feature = "sqlite"))]
     Sqlite {
         pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
     },
@@ -465,7 +465,7 @@ impl ServiceFactory for ScabbardFactory {
         let (receipt_store, receipt_purge): (ScabbardReceiptStore, _) = match &self
             .receipt_store_factory_config
         {
-            #[cfg(not(feature = "diesel-receipt-store"))]
+            #[cfg(not(feature = "receipt-store"))]
             ScabbardFactoryStorageConfig::Lmdb { db_dir, db_size } => {
                 let receipt_db_path =
                     compute_db_path(&service_id, circuit_id, Path::new(&db_dir), "-receipts")?;
@@ -484,7 +484,7 @@ impl ServiceFactory for ScabbardFactory {
                         as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
                 )
             }
-            #[cfg(feature = "diesel-receipt-store")]
+            #[cfg(feature = "receipt-store")]
             ScabbardFactoryStorageConfig::Lmdb { db_dir, db_size } => {
                 let receipt_db_dir_path = Path::new(&db_dir);
 
@@ -525,7 +525,7 @@ impl ServiceFactory for ScabbardFactory {
                         as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
                 )
             }
-            #[cfg(all(feature = "diesel-receipt-store", feature = "postgres"))]
+            #[cfg(all(feature = "receipt-store", feature = "postgres"))]
             ScabbardFactoryStorageConfig::Postgres { pool } => (
                 Arc::new(RwLock::new(DieselReceiptStore::new(
                     pool.clone(),
@@ -533,7 +533,7 @@ impl ServiceFactory for ScabbardFactory {
                 ))),
                 Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
             ),
-            #[cfg(all(feature = "diesel-receipt-store", feature = "sqlite"))]
+            #[cfg(all(feature = "receipt-store", feature = "sqlite"))]
             ScabbardFactoryStorageConfig::Sqlite { pool } => (
                 Arc::new(RwLock::new(DieselReceiptStore::new(
                     pool.clone(),
@@ -542,12 +542,12 @@ impl ServiceFactory for ScabbardFactory {
                 Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
             ),
             #[cfg(all(
-                feature = "diesel-receipt-store",
+                feature = "receipt-store",
                 not(any(feature = "postgres", feature = "sqlite"))
             ))]
             _ => {
                 return Err(FactoryCreateError::Internal(
-                    "diesel-receipt-store was enabled, but without any databases".into(),
+                    "receipt-store was enabled, but without any databases".into(),
                 ))
             }
         };
@@ -792,12 +792,12 @@ mod tests {
 
     fn get_factory() -> (TempDir, ScabbardFactory) {
         let tempdir = TempDir::new("scabbard_factory").expect("Unable to create new tempdir");
-        #[cfg(not(all(feature = "diesel-receipt-store", feature = "sqlite")))]
+        #[cfg(not(all(feature = "receipt-store", feature = "sqlite")))]
         let receipt_store_factory_config = ScabbardFactoryStorageConfig::Lmdb {
             db_dir: tempdir.path().to_string_lossy().into(),
             db_size: 1024 * 1024,
         };
-        #[cfg(all(feature = "diesel-receipt-store", feature = "sqlite"))]
+        #[cfg(all(feature = "receipt-store", feature = "sqlite"))]
         let receipt_store_factory_config = ScabbardFactoryStorageConfig::Sqlite {
             pool: {
                 let connection_manager =

@@ -76,7 +76,7 @@ experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
-  "diesel-receipt-store",
+  "receipt-store",
   "https",
   "service-arg-validation",
 ]
@@ -84,7 +84,7 @@ experimental = [
 authorization = ["splinter/authorization"]
 client = []
 client-reqwest = ["client", "reqwest"]
-diesel-receipt-store = ["diesel", "sawtooth/lmdb"]
+receipt-store = ["diesel", "sawtooth/lmdb"]
 events = ["splinter/events"]
 https = []
 lmdb = []

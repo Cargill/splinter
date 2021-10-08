@@ -71,17 +71,17 @@ mod tests {
     use std::sync::{Arc, Mutex, RwLock};
 
     use cylinder::{secp256k1::Secp256k1Context, Context};
-    #[cfg(feature = "diesel-receipt-store")]
+    #[cfg(feature = "receipt-store")]
     use diesel::{
         r2d2::{ConnectionManager, Pool},
         sqlite::SqliteConnection,
     };
     use reqwest::{blocking::Client, StatusCode, Url};
-    #[cfg(feature = "diesel-receipt-store")]
+    #[cfg(feature = "receipt-store")]
     use sawtooth::migrations::run_sqlite_migrations;
-    #[cfg(feature = "diesel-receipt-store")]
+    #[cfg(feature = "receipt-store")]
     use sawtooth::receipt::store::diesel::DieselReceiptStore;
-    #[cfg(not(feature = "diesel-receipt-store"))]
+    #[cfg(not(feature = "receipt-store"))]
     use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
     use tempdir::TempDir;
     use transact::{
@@ -129,7 +129,7 @@ mod tests {
     fn state_root() {
         let paths = StatePaths::new("state_root");
 
-        #[cfg(not(feature = "diesel-receipt-store"))]
+        #[cfg(not(feature = "receipt-store"))]
         let receipt_store = Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
             LmdbOrderedStore::new(
                 &StatePaths::new("state_at_address").receipt_db_path,
@@ -137,7 +137,7 @@ mod tests {
             )
             .expect("Failed to create LMDB store"),
         ))));
-        #[cfg(feature = "diesel-receipt-store")]
+        #[cfg(feature = "receipt-store")]
         let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
             create_connection_pool_and_migrate(":memory:".to_string()),
             None,
@@ -230,7 +230,7 @@ mod tests {
         // This is deleted when dropped
         _temp_dir: TempDir,
         pub state_db_path: PathBuf,
-        #[cfg(not(feature = "diesel-receipt-store"))]
+        #[cfg(not(feature = "receipt-store"))]
         pub receipt_db_path: PathBuf,
     }
 
@@ -242,7 +242,7 @@ mod tests {
             let state_db_path =
                 compute_db_path(MOCK_SERVICE_ID, MOCK_CIRCUIT_ID, temp_dir.path(), "-state")
                     .expect("Failed to compute DB paths");
-            #[cfg(not(feature = "diesel-receipt-store"))]
+            #[cfg(not(feature = "receipt-store"))]
             let receipt_db_path = compute_db_path(
                 MOCK_SERVICE_ID,
                 MOCK_CIRCUIT_ID,
@@ -253,7 +253,7 @@ mod tests {
             Self {
                 _temp_dir: temp_dir,
                 state_db_path,
-                #[cfg(not(feature = "diesel-receipt-store"))]
+                #[cfg(not(feature = "receipt-store"))]
                 receipt_db_path,
             }
         }
@@ -362,7 +362,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "diesel-receipt-store")]
+    #[cfg(feature = "receipt-store")]
     fn create_connection_pool_and_migrate(
         connection_string: String,
     ) -> Pool<ConnectionManager<SqliteConnection>> {
