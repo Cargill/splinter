@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-use crate::action::time::{Rate, TimeUnit};
+use crate::action::time::{Time, TimeType, TimeUnit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -56,7 +56,7 @@ impl Action for WorkloadAction {
 
         let rate = args.value_of("target_rate").unwrap_or("1/s").to_string();
 
-        let (min, max): (Rate, Rate) = {
+        let (min, max): (Time, Time) = {
             if rate.contains('-') {
                 let split_rate: Vec<String> = rate.split('-').map(String::from).collect();
                 let min_string = split_rate
@@ -67,15 +67,15 @@ impl Action for WorkloadAction {
                     .ok_or_else(|| CliError::ActionError("Max target rate not provided".into()))?;
 
                 let min = min_string
-                    .parse::<Rate>()
-                    .or_else(|_| min_string.parse::<f64>().map(Rate::from))
+                    .parse::<Time>()
+                    .or_else(|_| min_string.parse::<f64>().map(Time::from))
                     .map_err(|_| {
                         CliError::UnparseableArg("Unable to parse provided min target rate".into())
                     })?;
 
                 let max = max_string
-                    .parse::<Rate>()
-                    .or_else(|_| max_string.parse::<f64>().map(Rate::from))
+                    .parse::<Time>()
+                    .or_else(|_| max_string.parse::<f64>().map(Time::from))
                     .map_err(|_| {
                         CliError::UnparseableArg("Unable to parse provided max target rate".into())
                     })?;
@@ -84,7 +84,7 @@ impl Action for WorkloadAction {
             } else {
                 let min = rate
                     .parse()
-                    .or_else(|_| rate.parse::<f64>().map(Rate::from))
+                    .or_else(|_| rate.parse::<f64>().map(Time::from))
                     .map_err(|_| {
                         CliError::ActionError("Unable to parse provided target rate".into())
                     })?;
@@ -182,8 +182,8 @@ impl Action for WorkloadAction {
 fn start_smallbank_workloads(
     workload_runner: &mut WorkloadRunner,
     targets: Vec<Vec<String>>,
-    target_rate_min: Rate,
-    target_rate_max: Rate,
+    target_rate_min: Time,
+    target_rate_max: Time,
     auth: String,
     signer: Box<dyn Signer>,
     update: u32,
@@ -202,9 +202,10 @@ fn start_smallbank_workloads(
             target_rate_min
         } else {
             let numeric = rng.gen_range(target_rate_min.to_milli()..=target_rate_max.to_milli());
-            Rate {
+            Time {
                 numeric: numeric / 1000.0,
                 unit: TimeUnit::Second,
+                time_type: TimeType::Rate,
             }
         };
 
@@ -231,8 +232,8 @@ fn start_smallbank_workloads(
 fn start_command_workloads(
     workload_runner: &mut WorkloadRunner,
     targets: Vec<Vec<String>>,
-    target_rate_min: Rate,
-    target_rate_max: Rate,
+    target_rate_min: Time,
+    target_rate_max: Time,
     auth: String,
     signer: Box<dyn Signer>,
     update: u32,
@@ -250,9 +251,10 @@ fn start_command_workloads(
             target_rate_min
         } else {
             let numeric = rng.gen_range(target_rate_min.to_milli()..=target_rate_max.to_milli());
-            Rate {
+            Time {
                 numeric: numeric / 1000.0,
                 unit: TimeUnit::Second,
+                time_type: TimeType::Rate,
             }
         };
 

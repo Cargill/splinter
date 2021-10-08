@@ -23,7 +23,7 @@ use transact::families::smallbank::workload::playlist::{
 use transact::workload::batch_gen::generate_signed_batches;
 use transact::workload::{submit_batches_from_source, DEFAULT_LOG_TIME_SECS};
 
-use crate::action::time::Rate;
+use crate::action::time::Time;
 use crate::error::CliError;
 
 use super::{create_cylinder_jwt_auth_signer_key, load_cylinder_signer_key, Action};
@@ -206,7 +206,7 @@ impl Action for SubmitPlaylistAction {
         let (auth, _) = create_cylinder_jwt_auth_signer_key(key_path)?;
 
         let rate_string = args.value_of("rate").unwrap_or(DEFAULT_RATE);
-        let rate: Duration = if let Ok(interval) = rate_string.parse::<Rate>() {
+        let rate: Duration = if let Ok(interval) = rate_string.parse::<Time>() {
             interval.into()
         } else {
             let raw_num = rate_string.parse::<f32>().map_err(|_| {
