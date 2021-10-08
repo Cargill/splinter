@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-use crate::action::rate::{Rate, TimeUnit};
+use crate::action::time::{Rate, TimeUnit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
