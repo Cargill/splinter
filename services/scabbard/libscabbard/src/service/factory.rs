@@ -34,10 +34,8 @@ use sawtooth::receipt::store::diesel::DieselReceiptStore;
 use sawtooth::receipt::store::{lmdb::LmdbReceiptStore, ReceiptStore};
 #[cfg(not(feature = "receipt-store"))]
 use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
-#[cfg(feature = "service-arg-validation")]
 use splinter::error::InvalidArgumentError;
 use splinter::error::{InternalError, InvalidStateError};
-#[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 
@@ -333,10 +331,8 @@ pub struct ScabbardFactory {
     signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
-#[cfg(feature = "service-arg-validation")]
 pub struct ScabbardArgValidator;
 
-#[cfg(feature = "service-arg-validation")]
 impl ServiceArgValidator for ScabbardArgValidator {
     fn validate(&self, args: &HashMap<String, String>) -> Result<(), InvalidArgumentError> {
         let peer_services_str = args.get("peer_services").ok_or_else(|| {
@@ -782,7 +778,6 @@ mod tests {
 
     /// Verify arg validation returns ok with valid common seperated Args
     #[test]
-    #[cfg(feature = "service-arg-validation")]
     fn test_valid_argument_validation_no_json() {
         let validator = ScabbardArgValidator;
         let args = get_mock_args_no_json();
@@ -791,7 +786,6 @@ mod tests {
 
     /// Verify arg validation returns ok with valid Args using json
     #[test]
-    #[cfg(feature = "service-arg-validation")]
     fn test_valid_argument_validation() {
         let validator = ScabbardArgValidator;
         let args = get_mock_args();
@@ -800,7 +794,6 @@ mod tests {
 
     /// Verify arg validation returns an error if the args are empty
     #[test]
-    #[cfg(feature = "service-arg-validation")]
     fn test_no_argument_validation() {
         let validator = ScabbardArgValidator;
         let args = HashMap::new();
@@ -809,7 +802,6 @@ mod tests {
 
     /// Verify arg validation returns an error if the args are present but the values are empty
     #[test]
-    #[cfg(feature = "service-arg-validation")]
     fn test_empty_argument_validation() {
         let validator = ScabbardArgValidator;
         let mut args = HashMap::new();

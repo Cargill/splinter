@@ -78,7 +78,6 @@ experimental = [
   # The following features are experimental:
   "receipt-store",
   "https",
-  "service-arg-validation",
 ]
 
 authorization = ["splinter/authorization"]
@@ -91,5 +90,4 @@ lmdb = []
 postgres = ["diesel/postgres", "diesel_migrations", "sawtooth/postgres"]
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
-service-arg-validation = ["splinter/service-arg-validation"]
 sqlite = ["diesel/sqlite", "diesel_migrations", "sawtooth/sqlite"]
