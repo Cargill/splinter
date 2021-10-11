@@ -15,6 +15,7 @@
 use crate::action::time::{Time, TimeType, TimeUnit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use clap::ArgMatches;
 use cylinder::Signer;
@@ -115,6 +116,14 @@ impl Action for WorkloadAction {
             }
         };
 
+        let duration = args
+            .value_of("duration")
+            .map(|d| {
+                Time::make_duration_type_time(d)
+                    .map_err(|err| CliError::ActionError(format!("{}", err)))
+            })
+            .transpose()?;
+
         let mut workload_runner = WorkloadRunner::default();
 
         match workload {
@@ -137,6 +146,7 @@ impl Action for WorkloadAction {
                     update,
                     seed,
                     num_accounts,
+                    duration,
                 )?;
             }
             "command" => {
@@ -149,6 +159,7 @@ impl Action for WorkloadAction {
                     signer,
                     update,
                     seed,
+                    duration,
                 )?;
             }
             _ => {
@@ -158,6 +169,9 @@ impl Action for WorkloadAction {
                 )))
             }
         }
+
+        // calculate the end time based on the duration given
+        let end_time = duration.map(|d| Instant::now() + Duration::from(d));
 
         // setup control-c handling
         let running = Arc::new(AtomicBool::new(true));
@@ -170,7 +184,15 @@ impl Action for WorkloadAction {
             CliError::ActionError("Unable to set up workload ctrlc handler".to_string())
         })?;
 
-        while running.load(Ordering::SeqCst) {}
+        while running.load(Ordering::SeqCst) {
+            // if a duration was given stop the workload a signal shutdown when the end time
+            // is reached
+            if let Some(end_time) = end_time {
+                if end_time <= Instant::now() {
+                    running.store(false, Ordering::SeqCst);
+                }
+            }
+        }
         // shutdown all workloads
         workload_runner.shutdown();
 
@@ -189,6 +211,7 @@ fn start_smallbank_workloads(
     update: u32,
     seed: u64,
     num_accounts: usize,
+    total_duration: Option<Time>,
 ) -> Result<(), CliError> {
     let mut rng = rand::thread_rng();
 
@@ -238,6 +261,7 @@ fn start_command_workloads(
     signer: Box<dyn Signer>,
     update: u32,
     seed: u64,
+    total_duration: Option<Time>,
 ) -> Result<(), CliError> {
     let mut rng = rand::thread_rng();
 
