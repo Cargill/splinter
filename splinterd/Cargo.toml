@@ -110,7 +110,6 @@ experimental = [
     "scabbard-receipt-store",
     "scabbard-receipt-store-postgres",
     "scabbard-receipt-store-sqlite",
-    "service-arg-validation",
     "service-endpoint",
     "ws-transport",
 ]
@@ -163,10 +162,6 @@ oauth = [
     "splinter/oauth"
 ]
 rest-api-cors = ["splinter/rest-api-cors"]
-service-arg-validation = [
-    "scabbard/service-arg-validation",
-    "splinter/service-arg-validation",
-]
 service-endpoint = []
 trust-authorization = ["splinter/trust-authorization"]
 ws-transport = ["splinter/ws-transport"]
