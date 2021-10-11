@@ -14,7 +14,6 @@
 
 //! Builder for the AdminService
 
-#[cfg(feature = "service-arg-validation")]
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -28,7 +27,6 @@ use crate::keys::KeyPermissionManager;
 use crate::orchestrator::ServiceOrchestrator;
 use crate::peer::PeerManagerConnector;
 use crate::public_key::PublicKey;
-#[cfg(feature = "service-arg-validation")]
 use crate::service::validation::ServiceArgValidator;
 
 use super::shared::AdminServiceShared;
@@ -45,7 +43,6 @@ const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 pub struct AdminServiceBuilder {
     node_id: Option<String>,
     orchestrator: Option<ServiceOrchestrator>,
-    #[cfg(feature = "service-arg-validation")]
     service_arg_validators: HashMap<String, Box<dyn ServiceArgValidator + Send>>,
     peer_connector: Option<PeerManagerConnector>,
     admin_store: Option<Box<dyn AdminServiceStore>>,
@@ -79,7 +76,6 @@ impl AdminServiceBuilder {
     /// Sets the service argument validators.
     ///
     /// The service argument validators are mapped by service type.
-    #[cfg(feature = "service-arg-validation")]
     pub fn with_service_arg_validators(
         mut self,
         service_arg_validators: HashMap<String, Box<dyn ServiceArgValidator + Send>>,
@@ -180,7 +176,6 @@ impl AdminServiceBuilder {
             InvalidStateError::with_message("An admin service requires a node_id".into())
         })?;
 
-        #[cfg(feature = "service-arg-validation")]
         let service_arg_validators = self.service_arg_validators;
 
         let admin_store = self.admin_store.ok_or_else(|| {
@@ -227,7 +222,6 @@ impl AdminServiceBuilder {
         let admin_service_shared = Arc::new(Mutex::new(AdminServiceShared::new(
             node_id.clone(),
             orchestrator.clone(),
-            #[cfg(feature = "service-arg-validation")]
             service_arg_validators,
             peer_connector.clone(),
             admin_store,

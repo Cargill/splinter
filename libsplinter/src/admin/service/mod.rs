@@ -44,7 +44,6 @@ use crate::protos::admin::{
 };
 #[cfg(feature = "registry")]
 use crate::registry::RegistryReader;
-#[cfg(feature = "service-arg-validation")]
 use crate::service::validation::ServiceArgValidator;
 use crate::service::{
     error::{ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError},
@@ -154,10 +153,7 @@ impl AdminService {
     pub fn new(
         node_id: &str,
         orchestrator: ServiceOrchestrator,
-        #[cfg(feature = "service-arg-validation")] service_arg_validators: HashMap<
-            String,
-            Box<dyn ServiceArgValidator + Send>,
-        >,
+        service_arg_validators: HashMap<String, Box<dyn ServiceArgValidator + Send>>,
         peer_connector: PeerManagerConnector,
         admin_store: Box<dyn AdminServiceStore>,
         signature_verifier: Box<dyn SignatureVerifier>,
@@ -178,15 +174,11 @@ impl AdminService {
             .with_admin_key_verifier(key_verifier)
             .with_key_permission_manager(key_permission_manager)
             .with_routing_table_writer(routing_table_writer)
-            .with_admin_event_store(event_store);
+            .with_admin_event_store(event_store)
+            .with_service_arg_validators(service_arg_validators);
 
         if let Some(coordinator_timeout) = coordinator_timeout {
             builder = builder.with_coordinator_timeout(coordinator_timeout);
-        }
-
-        #[cfg(feature = "service-arg-validation")]
-        {
-            builder = builder.with_service_arg_validators(service_arg_validators);
         }
 
         builder

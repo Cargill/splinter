@@ -53,7 +53,6 @@ use super::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
 
 use consensus::ScabbardConsensusManager;
 use error::ScabbardError;
-#[cfg(feature = "service-arg-validation")]
 pub use factory::ScabbardArgValidator;
 pub use factory::{ScabbardFactory, ScabbardFactoryBuilder, ScabbardStorageConfiguration};
 use shared::ScabbardShared;

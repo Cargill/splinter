@@ -16,7 +16,6 @@ pub mod builder;
 mod error;
 mod registry;
 
-#[cfg(feature = "service-arg-validation")]
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -30,7 +29,6 @@ use std::time::Duration;
 use cylinder::{secp256k1::Secp256k1Context, Signer, SigningError, VerifierFactory};
 #[cfg(feature = "health-service")]
 use health::HealthService;
-#[cfg(feature = "service-arg-validation")]
 use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactoryBuilder;
 use splinter::admin::rest_api::CircuitResourceProvider;
@@ -87,7 +85,6 @@ use splinter::rest_api::auth::authorization::Permission;
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
 use splinter::service;
-#[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
@@ -516,14 +513,10 @@ impl SplinterDaemon {
                     })?,
             );
 
-        #[cfg(feature = "service-arg-validation")]
-        {
-            let mut validators: HashMap<String, Box<dyn ServiceArgValidator + Send>> =
-                HashMap::new();
-            validators.insert("scabbard".into(), Box::new(ScabbardArgValidator));
+        let mut validators: HashMap<String, Box<dyn ServiceArgValidator + Send>> = HashMap::new();
+        validators.insert("scabbard".into(), Box::new(ScabbardArgValidator));
 
-            admin_service_builder = admin_service_builder.with_service_arg_validators(validators);
-        }
+        admin_service_builder = admin_service_builder.with_service_arg_validators(validators);
 
         let admin_service = admin_service_builder.build().map_err(|err| {
             StartError::AdminServiceError(format!("unable to create admin service: {}", err))
