@@ -157,3 +157,35 @@ version = "1"
 # A username with write access to the database specified above.
 #influx_username = ""
 #influx_password = ""
+
+#
+# Logging Options
+#
+
+# The stdout appender is the only default appender.
+#[appenders.stdout]
+
+# "kind" options are stdout,stderr,file,rolling_file
+#kind = "stdout"
+# Pattern controls the formatting of each log message.
+#pattern = "[ {d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n"
+
+#[appenders.rolling_file]
+
+#kind = "rolling_file"
+# Filename is specific to rolling_file and file appenders and is simply a path to a file.
+# Must be specified.
+#filename = "/var/log/splinter/splinterd.log"
+# Size is specific to rolling_file and specifies when the file should be rolled/overwritten.
+# Must be specified.
+#size = "16.0M"
+
+# Loggers form the connection between code and the appenders.
+# By default there is a single "root" logger that logs to the "stdout" appender,
+#[loggers.splinter]
+
+# The appenders field is a list of defined appender names.
+#appenders = [ "stdout", "rolling_file"]
+# Filter defines the level of log the logger writes to appenders.
+# Valid filter options are, Trace, Debug, Info, Warn, and Error in decreasing order of verbosity.
+#filter = "Warn"
