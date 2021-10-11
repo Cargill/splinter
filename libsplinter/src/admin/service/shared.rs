@@ -48,7 +48,6 @@ use crate::protos::admin::{
 };
 use crate::public_key;
 use crate::service::error::ServiceError;
-#[cfg(feature = "service-arg-validation")]
 use crate::service::validation::ServiceArgValidator;
 
 use crate::service::ServiceNetworkSender;
@@ -114,7 +113,6 @@ pub struct AdminServiceShared {
     uninitialized_circuits: HashMap<String, UninitializedCircuit>,
     orchestrator: Arc<Mutex<ServiceOrchestrator>>,
     // map of service arg validators, by service type
-    #[cfg(feature = "service-arg-validation")]
     service_arg_validators: HashMap<String, Box<dyn ServiceArgValidator + Send>>,
     // peer connector used to connect to new members listed in a circuit
     peer_connector: PeerManagerConnector,
@@ -162,10 +160,7 @@ impl AdminServiceShared {
     pub fn new(
         node_id: String,
         orchestrator: Arc<Mutex<ServiceOrchestrator>>,
-        #[cfg(feature = "service-arg-validation")] service_arg_validators: HashMap<
-            String,
-            Box<dyn ServiceArgValidator + Send>,
-        >,
+        service_arg_validators: HashMap<String, Box<dyn ServiceArgValidator + Send>>,
         peer_connector: PeerManagerConnector,
         admin_store: Box<dyn AdminServiceStore>,
         signature_verifier: Box<dyn SignatureVerifier>,
@@ -180,7 +175,6 @@ impl AdminServiceShared {
             network_sender: None,
             uninitialized_circuits: Default::default(),
             orchestrator,
-            #[cfg(feature = "service-arg-validation")]
             service_arg_validators,
             peer_connector,
             peer_refs: HashMap::new(),
@@ -2692,10 +2686,7 @@ impl AdminServiceShared {
                 services.push(service_id)
             }
 
-            #[cfg(feature = "service-arg-validation")]
-            {
-                self.validate_service_args(service)?;
-            }
+            self.validate_service_args(service)?;
         }
 
         if circuit.get_circuit_management_type().is_empty() {
@@ -2707,7 +2698,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "service-arg-validation")]
     fn validate_service_args(&self, service: &SplinterService) -> Result<(), AdminSharedError> {
         if let Some(validator) = self.service_arg_validators.get(service.get_service_type()) {
             let args: HashMap<String, String> = service
@@ -3768,7 +3758,6 @@ mod tests {
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -3913,7 +3902,6 @@ mod tests {
         let mut shared = AdminServiceShared::new(
             "test-node".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4016,7 +4004,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4060,7 +4047,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4098,7 +4084,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4140,7 +4125,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4193,7 +4177,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4241,7 +4224,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4292,7 +4274,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4340,7 +4321,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4388,7 +4368,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4441,7 +4420,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4483,7 +4461,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4527,7 +4504,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4575,7 +4551,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4630,7 +4605,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4685,7 +4659,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4728,7 +4701,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4771,7 +4743,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4822,7 +4793,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4873,7 +4843,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4924,7 +4893,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -4967,7 +4935,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5010,7 +4977,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5053,7 +5019,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5096,7 +5061,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5139,7 +5103,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5183,7 +5146,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5224,7 +5186,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5268,7 +5229,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5311,7 +5271,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5354,7 +5313,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5405,7 +5363,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5454,7 +5411,6 @@ mod tests {
         let shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5514,7 +5470,6 @@ mod tests {
         let shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5575,7 +5530,6 @@ mod tests {
         let shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5638,7 +5592,6 @@ mod tests {
         let shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5705,7 +5658,6 @@ mod tests {
         let shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5766,7 +5718,6 @@ mod tests {
         let shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5825,7 +5776,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5885,7 +5835,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5935,7 +5884,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -5995,7 +5943,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6082,7 +6029,6 @@ mod tests {
         let mut shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6207,7 +6153,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6260,7 +6205,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6304,7 +6248,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6359,7 +6302,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6415,7 +6357,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6474,7 +6415,6 @@ mod tests {
         let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6547,7 +6487,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6595,7 +6534,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6635,7 +6573,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6686,7 +6623,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6736,7 +6672,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6794,7 +6729,6 @@ mod tests {
         let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6870,7 +6804,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6917,7 +6850,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -6959,7 +6891,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -7008,7 +6939,6 @@ mod tests {
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,
@@ -7065,7 +6995,6 @@ mod tests {
         let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
-            #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
             store,

@@ -42,7 +42,6 @@ pub mod network;
 mod processor;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
-#[cfg(feature = "service-arg-validation")]
 pub mod validation;
 
 use std::any::Any;
