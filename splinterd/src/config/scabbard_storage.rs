@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::fmt::Display;
+use std::str::FromStr;
 
 #[derive(Debug, Copy, Clone)]
 pub enum ScabbardStorage {
@@ -30,6 +31,17 @@ impl Display for ScabbardStorageError {
             ScabbardStorageError::ParseError(msg) => {
                 write!(f, "got {}, expected 'lmdb' or 'database'", msg)
             }
+        }
+    }
+}
+
+impl FromStr for ScabbardStorage {
+    type Err = ScabbardStorageError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "database" => Ok(Self::Database),
+            "lmdb" => Ok(Self::Lmdb),
+            _ => Err(ScabbardStorageError::ParseError(s.to_string())),
         }
     }
 }
