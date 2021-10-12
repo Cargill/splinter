@@ -107,6 +107,7 @@ experimental = [
     "https-bind",
     "log-config",
     "node",
+    "scabbard-database-support",
     "scabbard-receipt-store",
     "scabbard-receipt-store-postgres",
     "scabbard-receipt-store-sqlite",
@@ -131,6 +132,7 @@ biome-profile = ["splinter/biome-profile"]
 config-allow-keys = ["authorization-handler-allow-keys"]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
+scabbard-database-support = []
 scabbard-receipt-store = ["scabbard/receipt-store"]
 scabbard-receipt-store-postgres = ["scabbard/postgres"]
 scabbard-receipt-store-sqlite = ["scabbard/sqlite"]
