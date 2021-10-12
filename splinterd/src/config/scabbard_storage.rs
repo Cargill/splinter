@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::convert::From;
 use std::fmt::Display;
 use std::str::FromStr;
+
+use super::toml::ScabbardStorageToml;
 
 #[derive(Debug, Copy, Clone)]
 pub enum ScabbardStorage {
@@ -42,6 +45,15 @@ impl FromStr for ScabbardStorage {
             "database" => Ok(Self::Database),
             "lmdb" => Ok(Self::Lmdb),
             _ => Err(ScabbardStorageError::ParseError(s.to_string())),
+        }
+    }
+}
+
+impl From<ScabbardStorageToml> for ScabbardStorage {
+    fn from(other: ScabbardStorageToml) -> Self {
+        match other {
+            ScabbardStorageToml::Lmdb => ScabbardStorage::Lmdb,
+            ScabbardStorageToml::Database => ScabbardStorage::Database,
         }
     }
 }

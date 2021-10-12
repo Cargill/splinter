@@ -264,6 +264,15 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
     }
 }
 
+#[cfg(feature = "scabbard-database-support")]
+#[derive(Deserialize, Debug)]
+pub enum ScabbardStorageToml {
+    #[serde(rename = "database")]
+    Database,
+    #[serde(rename = "lmdb")]
+    Lmdb,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
