@@ -15,7 +15,7 @@
 //! Provides a factory to produce LMDB database instances.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use openssl::hash::{hash, MessageDigest};
@@ -70,13 +70,7 @@ impl LmdbDatabaseFactory {
             return Ok(db.clone());
         }
 
-        let hash = hash(MessageDigest::sha256(), key.as_bytes())
-            .map(|digest| to_hex(&*digest))
-            .map_err(|e| InternalError::from_source(Box::new(e)))?;
-        let db_path = Path::new(&*self.db_dir)
-            .to_path_buf()
-            .join(format!("{}-{}", hash, self.db_suffix))
-            .with_extension("lmdb");
+        let db_path = self.path_from_key(&key)?;
 
         let db = LmdbDatabase::new(
             LmdbContext::new(&db_path, self.indexes.len(), Some(self.db_size))
@@ -88,5 +82,60 @@ impl LmdbDatabaseFactory {
         databases.insert(key.into(), db.clone());
 
         Ok(db)
+    }
+
+    pub fn get_database_purge_handle(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> Result<LmdbDatabasePurgeHandle, InternalError> {
+        let db_path = self.compute_path(circuit_id, service_id)?;
+
+        Ok(LmdbDatabasePurgeHandle {
+            lmdb_path: db_path.into(),
+        })
+    }
+
+    pub fn get_database_size(&self) -> usize {
+        self.db_size
+    }
+
+    /// Compute the file path, excluding the extension
+    pub fn compute_path(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> Result<PathBuf, InternalError> {
+        let key = format!("{}::{}", service_id, circuit_id);
+        self.path_from_key(&key)
+    }
+
+    fn path_from_key(&self, key: &str) -> Result<PathBuf, InternalError> {
+        let hash = hash(MessageDigest::sha256(), key.as_bytes())
+            .map(|digest| to_hex(&*digest))
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+        let db_path = Path::new(&*self.db_dir)
+            .to_path_buf()
+            .join(format!("{}-{}", hash, self.db_suffix));
+
+        Ok(db_path)
+    }
+}
+
+pub struct LmdbDatabasePurgeHandle {
+    lmdb_path: Box<Path>,
+}
+
+impl LmdbDatabasePurgeHandle {
+    pub fn purge(&self) -> Result<(), InternalError> {
+        let db_path = self.lmdb_path.with_extension("lmdb");
+        let db_lock_file_path = self.lmdb_path.with_extension("lmdb-lock");
+
+        std::fs::remove_file(db_path.as_path())
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        std::fs::remove_file(db_lock_file_path.as_path())
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        Ok(())
     }
 }
