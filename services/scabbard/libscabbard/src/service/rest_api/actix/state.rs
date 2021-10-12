@@ -99,7 +99,6 @@ pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
 mod tests {
     use super::*;
 
-    use std::path::PathBuf;
     use std::sync::{Arc, Mutex, RwLock};
 
     use cylinder::{secp256k1::Secp256k1Context, Context};
@@ -113,7 +112,13 @@ mod tests {
     #[cfg(not(feature = "receipt-store"))]
     use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
     use serde_json::{to_value, Value as JsonValue};
+    #[cfg(not(feature = "database-support"))]
     use tempdir::TempDir;
+    #[cfg(feature = "database-support")]
+    use transact::{
+        database::{btree::BTreeDatabase, Database},
+        state::merkle::INDEXES,
+    };
     use transact::{
         families::command::make_command_transaction,
         protocol::{
@@ -138,12 +143,20 @@ mod tests {
         service::Service,
     };
 
-    use crate::service::{
-        factory::compute_db_path, state::ScabbardState, Scabbard, ScabbardVersion,
+    #[cfg(not(feature = "database-support"))]
+    use crate::service::factory::compute_db_path;
+    #[cfg(feature = "database-support")]
+    use crate::service::state::merkle_state::{MerkleState, MerkleStateConfig};
+    use crate::service::{state::ScabbardState, Scabbard, ScabbardVersion};
+    #[cfg(feature = "database-support")]
+    use crate::store::{
+        transact::{TransactCommitHashStore, CURRENT_STATE_ROOT_INDEX},
+        CommitHashStore,
     };
 
     const MOCK_CIRCUIT_ID: &str = "abcde-01234";
     const MOCK_SERVICE_ID: &str = "ABCD";
+    #[cfg(not(feature = "database-support"))]
     const TEMP_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
     /// Verify that the `GET /state` endpoint works properly.
@@ -162,15 +175,16 @@ mod tests {
     ///    that the response code is 200, and check that there are no entries in the response.
     #[test]
     fn state_with_prefix() {
+        #[cfg(not(feature = "database-support"))]
         let paths = StatePaths::new("state_with_prefix");
+
+        #[cfg(feature = "database-support")]
+        let (merkle_state, commit_hash_store) = create_merkle_state_and_commit_hash_store();
 
         #[cfg(not(feature = "receipt-store"))]
         let receipt_store = Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-            LmdbOrderedStore::new(
-                &StatePaths::new("state_at_address").receipt_db_path,
-                Some(TEMP_DB_SIZE),
-            )
-            .expect("Failed to create LMDB store"),
+            LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
+                .expect("Failed to create LMDB store"),
         ))));
         #[cfg(feature = "receipt-store")]
         let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
@@ -187,6 +201,7 @@ mod tests {
         let address3 = "0123456789".to_string();
         let value3 = b"value3".to_vec();
         {
+            #[cfg(not(feature = "database-support"))]
             let mut state = ScabbardState::new(
                 &paths.state_db_path,
                 TEMP_DB_SIZE,
@@ -195,6 +210,19 @@ mod tests {
                 #[cfg(feature = "metrics")]
                 "vzrQS-rvwf4".to_string(),
                 receipt_store.clone(),
+                vec![],
+            )
+            .expect("Failed to initialize state");
+
+            #[cfg(feature = "database-support")]
+            let mut state = ScabbardState::new(
+                merkle_state.clone(),
+                commit_hash_store.clone(),
+                receipt_store.clone(),
+                #[cfg(feature = "metrics")]
+                "svc0".to_string(),
+                #[cfg(feature = "metrics")]
+                "vzrQS-rvwf4".to_string(),
                 vec![],
             )
             .expect("Failed to initialize state");
@@ -228,8 +256,14 @@ mod tests {
             MOCK_CIRCUIT_ID,
             ScabbardVersion::V1,
             Default::default(),
+            #[cfg(not(feature = "database-support"))]
             paths.state_db_path.as_path(),
+            #[cfg(not(feature = "database-support"))]
             TEMP_DB_SIZE,
+            #[cfg(feature = "database-support")]
+            merkle_state,
+            #[cfg(feature = "database-support")]
+            commit_hash_store,
             receipt_store,
             Box::new(|| Ok(())),
             Secp256k1Context::new().new_verifier(),
@@ -355,14 +389,16 @@ mod tests {
         join_handle.join().expect("Unable to join rest api thread");
     }
 
+    #[cfg(not(feature = "database-support"))]
     struct StatePaths {
         // This is deleted when dropped
         _temp_dir: TempDir,
-        pub state_db_path: PathBuf,
+        pub state_db_path: std::path::PathBuf,
         #[cfg(not(feature = "receipt-store"))]
-        pub receipt_db_path: PathBuf,
+        pub receipt_db_path: std::path::PathBuf,
     }
 
+    #[cfg(not(feature = "database-support"))]
     impl StatePaths {
         fn new(prefix: &str) -> Self {
             let temp_dir = TempDir::new(prefix).expect("Failed to create temp dir");
@@ -506,5 +542,16 @@ mod tests {
             .expect("Failed to run migrations");
 
         pool
+    }
+
+    #[cfg(feature = "database-support")]
+    fn create_merkle_state_and_commit_hash_store() -> (MerkleState, Box<dyn CommitHashStore>) {
+        let mut indexes = INDEXES.to_vec();
+        indexes.push(CURRENT_STATE_ROOT_INDEX);
+        let db = BTreeDatabase::new(&indexes);
+        let merkle_state = MerkleState::new(MerkleStateConfig::key_value(db.clone_box()))
+            .expect("Unable to create merkle state");
+        let commit_hash_store = TransactCommitHashStore::new(db);
+        (merkle_state, Box::new(commit_hash_store))
     }
 }
