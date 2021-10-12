@@ -12,8 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fmt::Display;
+
 #[derive(Debug, Copy, Clone)]
 pub enum ScabbardStorage {
     Database,
     Lmdb,
+}
+
+pub enum ScabbardStorageError {
+    ParseError(String),
+}
+
+impl Display for ScabbardStorageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScabbardStorageError::ParseError(msg) => {
+                write!(f, "got {}, expected 'lmdb' or 'database'", msg)
+            }
+        }
+    }
 }
