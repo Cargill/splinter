@@ -21,6 +21,8 @@ use std::time::Duration;
 
 #[cfg(feature = "log-config")]
 use super::logging::{RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig};
+#[cfg(feature = "scabbard-database-support")]
+use super::ScabbardStorage;
 
 /// `ConfigSource` displays the source of configuration values, used to identify which of the various
 /// config modules were used to create a particular `PartialConfig` object.
@@ -104,6 +106,8 @@ pub struct PartialConfig {
     verbosity: Option<log::Level>,
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: Option<String>,
+    #[cfg(feature = "scabbard-database-support")]
+    scabbard_storage: Option<ScabbardStorage>,
 }
 
 impl PartialConfig {
@@ -177,6 +181,8 @@ impl PartialConfig {
             verbosity: None,
             #[cfg(feature = "config-allow-keys")]
             allow_keys_file: None,
+            #[cfg(feature = "scabbard-database-support")]
+            scabbard_storage: None,
         }
     }
 
@@ -380,6 +386,11 @@ impl PartialConfig {
     #[cfg(feature = "config-allow-keys")]
     pub fn allow_keys_file(&self) -> Option<String> {
         self.allow_keys_file.clone()
+    }
+
+    #[cfg(feature = "scabbard-database-support")]
+    pub fn scabbard_storage(&self) -> Option<ScabbardStorage> {
+        self.scabbard_storage
     }
 
     /// Adds a `config_dir` value to the `PartialConfig` object.
@@ -907,6 +918,18 @@ impl PartialConfig {
     ///
     pub fn with_allow_keys_file(mut self, allow_keys_file: Option<String>) -> Self {
         self.allow_keys_file = allow_keys_file;
+        self
+    }
+
+    #[cfg(feature = "scabbard-database-support")]
+    /// Adds a `scabbard_storage` value to the  `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `scabbard_storage` - Option of ScabbardStorage value for where to store state
+    ///
+    pub fn with_scabbard_storage(mut self, scabbard_storage: Option<ScabbardStorage>) -> Self {
+        self.scabbard_storage = scabbard_storage;
         self
     }
 }

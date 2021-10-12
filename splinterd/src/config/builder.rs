@@ -425,6 +425,12 @@ impl ConfigBuilder {
                 .iter()
                 .find_map(|p| p.verbosity().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("verbosity".to_string()))?,
+            #[cfg(feature = "scabbard-database-support")]
+            scabbard_storage: self
+                .partial_configs
+                .iter()
+                .find_map(|p| p.scabbard_storage().map(|v| (v, p.source())))
+                .ok_or_else(|| ConfigError::MissingValue("scabbard_storage".to_string()))?,
         })
     }
 }

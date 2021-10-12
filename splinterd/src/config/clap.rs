@@ -14,8 +14,14 @@
 
 //! `PartialConfig` builder using values from splinterd command line arguments.
 
+#[cfg(feature = "scabbard-database-support")]
+use std::str::FromStr;
+
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 use clap::{ArgMatches, ErrorKind};
+
+#[cfg(feature = "scabbard-database-support")]
+use crate::config::scabbard_storage::ScabbardStorage;
 
 /// `PartialConfig` builder which holds command line arguments, represented as clap `ArgMatches`.
 pub struct ClapPartialConfigBuilder<'a> {
@@ -188,6 +194,16 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                     2 => Some(log::Level::Debug),
                     _ => Some(log::Level::Trace),
                 });
+        }
+
+        #[cfg(feature = "scabbard-database-support")]
+        {
+            partial_config = partial_config.with_scabbard_storage(
+                self.matches
+                    .value_of("scabbard-state")
+                    .map(ScabbardStorage::from_str)
+                    .transpose()?,
+            )
         }
 
         Ok(partial_config)
