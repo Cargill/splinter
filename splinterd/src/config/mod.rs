@@ -28,6 +28,8 @@ mod error;
 #[cfg(feature = "log-config")]
 mod logging;
 mod partial;
+#[cfg(feature = "scabbard-database-support")]
+mod scabbard_storage;
 mod toml;
 
 use std::time::Duration;
