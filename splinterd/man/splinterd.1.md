@@ -221,6 +221,10 @@ OPTIONS
 `--rest-api-endpoint REST-API-ENDPOINT`
 : Specifies the connection endpoint for the REST API. (Default: 127.0.0.1:8443.)
 
+`--scabbard-state SCABBARD-STATE`
+: Specifies where scabbard stores its internal state. Accepted values: `lmdb`,
+  `database`
+
 `--state-dir STATE-DIR`
 : Specifies the storage directory.
   (Default: `/var/lib/splinter`.)
