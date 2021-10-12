@@ -24,7 +24,7 @@ use super::logging::{RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig};
 
 /// `ConfigSource` displays the source of configuration values, used to identify which of the various
 /// config modules were used to create a particular `PartialConfig` object.
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ConfigSource {
     Toml { file: String },
     Default,
@@ -35,7 +35,7 @@ pub enum ConfigSource {
 /// `PartialConfig` is an intermediate representation of configuration values, used when combining
 /// several sources. As such, all values of the `PartialConfig` are options as it is not necessary
 /// to provide all values from a single source.
-#[derive(Deserialize, Debug)]
+#[derive(Debug)]
 pub struct PartialConfig {
     source: ConfigSource,
     config_dir: Option<String>,
