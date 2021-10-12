@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::convert::From;
 use std::str::FromStr;
 
 use serde::de::Visitor;
@@ -21,12 +22,6 @@ use serde::Deserialize;
 pub struct ByteSize {
     size: f32,
     unit: MemoryUnitSize,
-}
-
-impl ByteSize {
-    pub fn get_mem_size(&self) -> u64 {
-        (self.size * self.unit.byte_count() as f32).trunc() as u64
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -55,6 +50,12 @@ impl MemoryUnitSize {
             Self::Megabyte => 1_000_000,
             Self::Gigabyte => 1_000_000_000,
         }
+    }
+}
+
+impl From<ByteSize> for u64 {
+    fn from(bytes: ByteSize) -> Self {
+        (bytes.size * bytes.unit.byte_count() as f32).trunc() as u64
     }
 }
 
