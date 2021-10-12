@@ -23,7 +23,7 @@ use crate::hex;
 
 use super::{CommitHashStore, CommitHashStoreError};
 
-const CURRENT_STATE_ROOT_INDEX: &str = "current_state_root";
+pub(crate) const CURRENT_STATE_ROOT_INDEX: &str = "current_state_root";
 
 /// Provides an LMDB-backed CommitHashStore.
 pub type LmdbCommitHashStore = TransactCommitHashStore<LmdbDatabase>;
