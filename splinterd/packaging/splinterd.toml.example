@@ -189,3 +189,6 @@ version = "1"
 # Filter defines the level of log the logger writes to appenders.
 # Valid filter options are, Trace, Debug, Info, Warn, and Error in decreasing order of verbosity.
 #filter = "Warn"
+
+# Where scabbard will store its internal state, valid options are "database" or "lmdb"
+#scabbard_storage = "database"
