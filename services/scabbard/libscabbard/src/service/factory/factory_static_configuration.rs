@@ -41,9 +41,9 @@ use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 
 use crate::hex::parse_hex;
 use crate::hex::to_hex;
-
-use super::error::ScabbardError;
-use super::{Scabbard, ScabbardVersion, SERVICE_TYPE};
+#[cfg(feature = "rest-api-actix")]
+use crate::service::rest_api::actix;
+use crate::service::{error::ScabbardError, Scabbard, ScabbardVersion, SERVICE_TYPE};
 
 const DEFAULT_STATE_DB_DIR: &str = "/var/lib/splinter";
 const DEFAULT_STATE_DB_SIZE: usize = 1 << 30; // 1024 ** 3
@@ -442,22 +442,6 @@ impl ServiceFactory for ScabbardFactory {
             ))
         })?;
 
-        for key in admin_keys.iter() {
-            let key_bytes = parse_hex(key).map_err(|_| {
-                FactoryCreateError::InvalidArguments(format!(
-                    "{:?} is not a valid hex-formatted public key",
-                    key,
-                ))
-            })?;
-
-            if key_bytes.len() != 33 {
-                return Err(FactoryCreateError::InvalidArguments(format!(
-                    "{} is not a valid public key: invalid length",
-                    key
-                )));
-            }
-        }
-
         let coordinator_timeout = args
             .get("coordinator_timeout")
             .map(|timeout| match timeout.parse::<u64>() {
@@ -617,7 +601,6 @@ impl ServiceFactory for ScabbardFactory {
 
         #[cfg(feature = "rest-api-actix")]
         {
-            use super::rest_api::actix;
             endpoints.append(&mut vec![
                 actix::batches::make_add_batches_to_queue_endpoint(),
                 actix::ws_subscribe::make_subscribe_endpoint(),
@@ -700,7 +683,7 @@ mod tests {
     }
 
     /// Verify that the scabbard factory produces a valid `Scabbard` instance if the service
-    /// arguments are comma seperated instead of json fmt.
+    /// arguments are commo seperated instead of json fmt.
     #[test]
     fn create_successful_no_json() {
         let (_tempdir, factory) = get_factory();
@@ -760,19 +743,6 @@ mod tests {
         assert!(
             factory.create("".into(), "", "", args).is_err(),
             "Creating factory without admin_keys did not fail"
-        );
-    }
-
-    /// Verify that `Scabbard` creation fails when the `admin_keys` argument isn't specified.
-    #[test]
-    fn create_with_invalid_admin_keys() {
-        let (_tempdir, factory) = get_factory();
-        let mut args = get_mock_args();
-        args.insert("admin_keys".to_string(), "bad_key".to_string());
-
-        assert!(
-            factory.create("".into(), "", "", args).is_err(),
-            "Creating factory with invalid admin keys did not fail"
         );
     }
 

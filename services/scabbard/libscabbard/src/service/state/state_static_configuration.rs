@@ -57,8 +57,7 @@ use transact::{
 
 use crate::hex;
 use crate::protos::scabbard::{Setting, Setting_Entry};
-
-use super::error::{ScabbardStateError, StateSubscriberError};
+use crate::service::error::{ScabbardStateError, StateSubscriberError};
 
 const EXECUTION_TIMEOUT: u64 = 300; // five minutes
 const CURRENT_STATE_ROOT_INDEX: &str = "current_state_root";

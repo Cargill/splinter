@@ -40,7 +40,7 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 splinter = { path = "../../../libsplinter" }
-transact = { version = "0.3", features = ["sawtooth-compat"] }
+transact = { version = "0.3.10", features = ["sawtooth-compat"] }
 
 [dependencies.sawtooth]
 version = "0.6.7"
@@ -49,7 +49,7 @@ features = ["lmdb-store", "receipt-store", "transaction-receipt-store"]
 
 [dev-dependencies]
 tempdir = "0.3"
-transact = { version = "0.3", features = ["family-command", "sawtooth-compat"] }
+transact = { version = "0.3.10", features = ["family-command", "sawtooth-compat"] }
 
 [build-dependencies]
 protoc-rust = "2.14"
@@ -76,6 +76,7 @@ experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
+  "database-support",
   "receipt-store",
   "https",
 ]
@@ -83,11 +84,12 @@ experimental = [
 authorization = ["splinter/authorization"]
 client = []
 client-reqwest = ["client", "reqwest"]
+database-support = ["transact/state-merkle-sql", "receipt-store"]
 receipt-store = ["diesel", "sawtooth/lmdb"]
 events = ["splinter/events"]
 https = []
 lmdb = []
-postgres = ["diesel/postgres", "diesel_migrations", "sawtooth/postgres"]
+postgres = ["diesel/postgres", "diesel_migrations", "sawtooth/postgres", "transact/postgres"]
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
-sqlite = ["diesel/sqlite", "diesel_migrations", "sawtooth/sqlite"]
+sqlite = ["diesel/sqlite", "diesel_migrations", "sawtooth/sqlite", "transact/sqlite"]
