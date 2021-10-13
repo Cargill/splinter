@@ -87,6 +87,8 @@ struct TomlConfig {
     appenders: Option<HashMap<String, UnnamedAppenderConfig>>,
     #[cfg(feature = "log-config")]
     loggers: Option<HashMap<String, UnnamedLoggerConfig>>,
+    #[cfg(feature = "scabbard-database-support")]
+    scabbard_storage: Option<ScabbardStorageToml>,
 
     // Deprecated values
     cert_dir: Option<String>,
@@ -222,6 +224,12 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             partial_config = partial_config.with_appenders(self.toml_config.appenders);
         }
 
+        #[cfg(feature = "scabbard-database-support")]
+        {
+            partial_config = partial_config
+                .with_scabbard_storage(self.toml_config.scabbard_storage.map(|inner| inner.into()));
+        }
+
         // deprecated values, only set if the current value was not set
         if partial_config.tls_cert_dir().is_none() {
             partial_config = partial_config.with_tls_cert_dir(self.toml_config.cert_dir)
@@ -262,6 +270,15 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
 
         Ok(partial_config)
     }
+}
+
+#[cfg(feature = "scabbard-database-support")]
+#[derive(Deserialize, Debug)]
+pub enum ScabbardStorageToml {
+    #[serde(rename = "database")]
+    Database,
+    #[serde(rename = "lmdb")]
+    Lmdb,
 }
 
 #[cfg(test)]

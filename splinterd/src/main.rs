@@ -501,6 +501,15 @@ fn main() {
                 .takes_value(true),
         );
 
+    #[cfg(feature = "scabbard-database-support")]
+    let app = app.arg(
+        Arg::with_name("scabbard-state")
+            .long("scabbard-state")
+            .possible_values(&["lmdb", "database"])
+            .long_help("Specifies where scabbard stores its internal state")
+            .takes_value(true),
+    );
+
     let matches = app.get_matches();
 
     let log_handle = {

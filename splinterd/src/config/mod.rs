@@ -28,6 +28,8 @@ mod error;
 #[cfg(feature = "log-config")]
 mod logging;
 mod partial;
+#[cfg(feature = "scabbard-database-support")]
+mod scabbard_storage;
 mod toml;
 
 use std::time::Duration;
@@ -39,6 +41,8 @@ pub use crate::config::toml::TomlPartialConfigBuilder;
 pub use builder::{ConfigBuilder, PartialConfigBuilder};
 pub use error::ConfigError;
 pub use partial::{ConfigSource, PartialConfig};
+#[cfg(feature = "scabbard-database-support")]
+pub use scabbard_storage::ScabbardStorage;
 
 #[cfg(feature = "log-config")]
 pub use logging::{
@@ -116,6 +120,8 @@ pub struct Config {
     verbosity: (log::Level, ConfigSource),
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: (String, ConfigSource),
+    #[cfg(feature = "scabbard-database-support")]
+    scabbard_storage: (ScabbardStorage, ConfigSource),
 }
 
 impl Config {
@@ -627,6 +633,16 @@ impl Config {
         &self.allow_keys_file.1
     }
 
+    #[cfg(feature = "scabbard-database-support")]
+    pub fn scabbard_storage(&self) -> &ScabbardStorage {
+        &self.scabbard_storage.0
+    }
+
+    #[cfg(feature = "scabbard-database-support")]
+    pub fn scabbard_storage_source(&self) -> &ConfigSource {
+        &self.scabbard_storage.1
+    }
+
     #[allow(clippy::cognitive_complexity)]
     /// Displays the configuration value along with where the value was sourced from.
     pub fn log_as_debug(&self) {
@@ -885,6 +901,15 @@ impl Config {
                 "Config: allow_keys_file: {:?} (source: {:?})",
                 self.allow_keys_file(),
                 self.allow_keys_file_source()
+            );
+        }
+
+        #[cfg(feature = "scabbard-database-support")]
+        {
+            debug!(
+                "Config: scabbard_storage: {:?}, (source: {:?})",
+                self.scabbard_storage(),
+                self.scabbard_storage_source()
             );
         }
     }
