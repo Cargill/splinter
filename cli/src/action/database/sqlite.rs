@@ -22,11 +22,7 @@ use diesel::{
     sqlite::SqliteConnection,
 };
 
-#[cfg(feature = "scabbard-receipt-store")]
-use sawtooth::migrations::run_sqlite_migrations as run_receipt_store_sqlite_migrations;
 use splinter::migrations::run_sqlite_migrations;
-#[cfg(feature = "scabbard-migrations")]
-use transact::state::merkle::sql::{backend::SqliteBackend, migration::MigrationManager};
 
 use super::SplinterEnvironment;
 use crate::error::CliError;
@@ -93,17 +89,6 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
     })?)
     .map_err(|err| CliError::ActionError(format!("Unable to run Sqlite migrations: {}", err)))?;
 
-    #[cfg(feature = "scabbard-receipt-store")]
-    run_receipt_store_sqlite_migrations(&*pool.get().map_err(|_| {
-        CliError::ActionError("Failed to get connection for migrations".to_string())
-    })?)
-    .map_err(|err| {
-        CliError::ActionError(format!(
-            "Unable to run Sqlite migrations for receipt store: {}",
-            err
-        ))
-    })?;
-
     #[cfg(feature = "scabbard-migrations")]
     {
         scabbard::migrations::run_sqlite_migrations(&*pool.get().map_err(|_| {
@@ -112,14 +97,6 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
         .map_err(|err| {
             CliError::ActionError(format!(
                 "Unable to run Sqlite migrations for scabbard: {}",
-                err
-            ))
-        })?;
-
-        let sqlite_backend: SqliteBackend = pool.into();
-        sqlite_backend.run_migrations().map_err(|err| {
-            CliError::ActionError(format!(
-                "Unable to run Sqlite migrations for scabbard merkle state: {}",
                 err
             ))
         })?;

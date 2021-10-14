@@ -16,11 +16,7 @@ use diesel::{
     pg::PgConnection,
     r2d2::{ConnectionManager, Pool},
 };
-#[cfg(feature = "scabbard-receipt-store")]
-use sawtooth::migrations::run_postgres_migrations as run_receipt_store_postgres_migrations;
 use splinter::migrations::run_postgres_migrations;
-#[cfg(feature = "scabbard-migrations")]
-use transact::state::merkle::sql::{backend::PostgresBackend, migration::MigrationManager};
 
 use crate::error::CliError;
 
@@ -43,33 +39,12 @@ pub fn postgres_migrations(url: &str) -> Result<(), CliError> {
     run_postgres_migrations(conn!(pool)).map_err(|err| {
         CliError::ActionError(format!("Unable to run Postgres migrations: {}", err))
     })?;
-    #[cfg(feature = "scabbard-receipt-store")]
-    {
-        info!(
-            "Running migrations against PostgreSQL database for receipt store: {}",
-            url
-        );
-        run_receipt_store_postgres_migrations(conn!(pool)).map_err(|err| {
-            CliError::ActionError(format!(
-                "Unable to run Postgres migrations for receipt store: {}",
-                err
-            ))
-        })?;
-    }
 
     #[cfg(feature = "scabbard-migrations")]
     {
         scabbard::migrations::run_postgres_migrations(conn!(pool)).map_err(|err| {
             CliError::ActionError(format!(
                 "Unable to run Postgres migrations for scabbard: {}",
-                err
-            ))
-        })?;
-
-        let postgres_backend: PostgresBackend = pool.into();
-        postgres_backend.run_migrations().map_err(|err| {
-            CliError::ActionError(format!(
-                "Unable to run Postgres migrations for scabbard merkle state: {}",
                 err
             ))
         })?;
