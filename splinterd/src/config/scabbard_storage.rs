@@ -18,7 +18,7 @@ use std::str::FromStr;
 
 use super::toml::ScabbardStorageToml;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ScabbardStorage {
     Database,
     Lmdb,
