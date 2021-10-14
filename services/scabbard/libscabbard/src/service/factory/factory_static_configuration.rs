@@ -502,11 +502,11 @@ impl ServiceFactory for ScabbardFactory {
                         )
                     })?;
 
-                let purge_db_path = receipt_db_path.clone();
+                let purge_db_path = receipt_db_path;
                 (
                     Arc::new(RwLock::new(
                         LmdbReceiptStore::new(
-                            &receipt_db_path,
+                            receipt_db_dir_path,
                             &[file.clone()],
                             file,
                             Some(*db_size),
