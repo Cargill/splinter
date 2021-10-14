@@ -164,8 +164,8 @@ impl ScabbardFactoryBuilder {
 
     /// Sets the receipt db directory to be used by the resulting factory.
     pub fn with_receipt_db_dir(mut self, receipt_db_dir: String) -> Self {
-        self.state_storage_configuration = self
-            .state_storage_configuration
+        self.receipt_storage_configuration = self
+            .receipt_storage_configuration
             .or_else(|| Some(ScabbardStorageConfiguration::lmdb()))
             .map(|config| config.with_db_dir(receipt_db_dir));
         self
@@ -173,8 +173,8 @@ impl ScabbardFactoryBuilder {
 
     /// Sets the receipt db size to be used by the resulting factory.
     pub fn with_receipt_db_size(mut self, receipt_db_size: usize) -> Self {
-        self.state_storage_configuration = self
-            .state_storage_configuration
+        self.receipt_storage_configuration = self
+            .receipt_storage_configuration
             .or_else(|| Some(ScabbardStorageConfiguration::lmdb()))
             .map(|config| config.with_db_size(receipt_db_size));
         self
