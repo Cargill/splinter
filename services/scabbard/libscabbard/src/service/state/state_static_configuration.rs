@@ -16,7 +16,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
 use std::path::Path;
-#[cfg(feature = "receipt-store")]
 use std::str::FromStr;
 use std::sync::{
     mpsc::{channel, Receiver, RecvTimeoutError, Sender},
@@ -25,10 +24,7 @@ use std::sync::{
 use std::time::{Duration, Instant, SystemTime};
 
 use protobuf::Message;
-#[cfg(feature = "receipt-store")]
 use sawtooth::receipt::store::ReceiptStore;
-#[cfg(not(feature = "receipt-store"))]
-use sawtooth::store::receipt_store::TransactionReceiptStore;
 use sawtooth_sabre::{
     handler::SabreTransactionHandler, ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
 };
@@ -65,10 +61,6 @@ const ITER_CACHE_SIZE: usize = 64;
 const COMPLETED_BATCH_INFO_ITER_RETRY_MILLIS: u64 = 100;
 const DEFAULT_BATCH_HISTORY_SIZE: usize = 100;
 
-#[cfg(not(feature = "receipt-store"))]
-type ScabbardReceiptStore = Arc<RwLock<TransactionReceiptStore>>;
-
-#[cfg(feature = "receipt-store")]
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
 
 /// Iterator over entries in a Scabbard service's state
@@ -324,24 +316,6 @@ impl ScabbardState {
                     .map(StateChangeEvent::try_from)
                     .collect::<Result<Vec<_>, _>>()?;
 
-                #[cfg(not(feature = "receipt-store"))]
-                self.receipt_store
-                    .write()
-                    .map_err(|err| {
-                        ScabbardStateError(format!(
-                            "transaction receipt store lock poisoned: {}",
-                            err
-                        ))
-                    })?
-                    .append(txn_receipts)
-                    .map_err(|err| {
-                        ScabbardStateError(format!(
-                            "failed to add transaction receipts to store: {}",
-                            err
-                        ))
-                    })?;
-
-                #[cfg(feature = "receipt-store")]
                 self.receipt_store
                     .write()
                     .map_err(|err| {
@@ -396,11 +370,7 @@ impl ScabbardState {
     }
 
     pub fn get_events_since(&self, event_id: Option<String>) -> Result<Events, ScabbardStateError> {
-        #[cfg(not(feature = "receipt-store"))]
-        let events = Events::new(self.receipt_store.clone(), event_id);
-        #[cfg(feature = "receipt-store")]
-        let events = Events::new(self.receipt_store.clone(), event_id);
-        events
+        Events::new(self.receipt_store.clone(), event_id)
     }
 
     pub fn add_subscriber(&mut self, subscriber: Box<dyn StateSubscriber>) {
@@ -413,13 +383,11 @@ impl ScabbardState {
 }
 
 /// The possible connection types and identifiers passed to the migrate command
-#[cfg(feature = "receipt-store")]
 pub enum ConnectionUri {
     Postgres(String),
     Sqlite(String),
 }
 
-#[cfg(feature = "receipt-store")]
 impl FromStr for ConnectionUri {
     type Err = ScabbardStateError;
 
@@ -528,70 +496,6 @@ enum EventQuery {
     Exhausted,
 }
 
-#[cfg(not(feature = "receipt-store"))]
-/// An iterator that wraps the `TransactionReceiptStore` and returns `StateChangeEvent`s using an
-/// in-memory cache.
-pub struct Events {
-    transaction_receipt_store: Arc<RwLock<TransactionReceiptStore>>,
-    query: EventQuery,
-    cache: VecDeque<StateChangeEvent>,
-}
-
-#[cfg(not(feature = "receipt-store"))]
-impl Events {
-    fn new(
-        transaction_receipt_store: Arc<RwLock<TransactionReceiptStore>>,
-        start_id: Option<String>,
-    ) -> Result<Self, ScabbardStateError> {
-        let mut iter = Events {
-            transaction_receipt_store,
-            query: EventQuery::Fetch(start_id),
-            cache: VecDeque::default(),
-        };
-        iter.reload_cache()?;
-        Ok(iter)
-    }
-
-    fn reload_cache(&mut self) -> Result<(), ScabbardStateError> {
-        match self.query {
-            EventQuery::Fetch(ref start_id) => {
-                let transaction_receipt_store =
-                    self.transaction_receipt_store.read().map_err(|err| {
-                        ScabbardStateError(format!(
-                            "transaction receipt store lock poisoned: {}",
-                            err
-                        ))
-                    })?;
-
-                self.cache = if let Some(id) = start_id.as_ref() {
-                    transaction_receipt_store.iter_since_id(id.clone())
-                } else {
-                    transaction_receipt_store.iter()
-                }
-                .map_err(|err| {
-                    ScabbardStateError(format!(
-                        "failed to get transaction receipts from store: {}",
-                        err
-                    ))
-                })?
-                .take(ITER_CACHE_SIZE)
-                .map(StateChangeEvent::try_from)
-                .collect::<Result<VecDeque<_>, _>>()?;
-
-                self.query = self
-                    .cache
-                    .back()
-                    .map(|event| EventQuery::Fetch(Some(event.id.clone())))
-                    .unwrap_or(EventQuery::Exhausted);
-
-                Ok(())
-            }
-            EventQuery::Exhausted => Ok(()),
-        }
-    }
-}
-
-#[cfg(feature = "receipt-store")]
 /// An iterator that wraps the `ReceiptStore` and returns `StateChangeEvent`s using an
 /// in-memory cache.
 pub struct Events {
@@ -600,7 +504,6 @@ pub struct Events {
     cache: VecDeque<StateChangeEvent>,
 }
 
-#[cfg(feature = "receipt-store")]
 impl Events {
     fn new(
         receipt_store: Arc<RwLock<dyn ReceiptStore>>,

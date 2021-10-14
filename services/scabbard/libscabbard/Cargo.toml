@@ -45,7 +45,7 @@ transact = { version = "0.3.11", features = ["sawtooth-compat"] }
 [dependencies.sawtooth]
 version = "0.6.7"
 default-features = false
-features = ["lmdb-store", "receipt-store", "transaction-receipt-store"]
+features = ["lmdb", "transaction-receipt-store"]
 
 [dev-dependencies]
 tempdir = "0.3"
@@ -77,15 +77,13 @@ experimental = [
   "stable",
   # The following features are experimental:
   "database-support",
-  "receipt-store",
   "https",
 ]
 
 authorization = ["splinter/authorization"]
 client = []
 client-reqwest = ["client", "reqwest"]
-database-support = ["transact/state-merkle-sql", "receipt-store"]
-receipt-store = ["diesel", "sawtooth/lmdb"]
+database-support = ["transact/state-merkle-sql"]
 events = ["splinter/events"]
 https = []
 lmdb = []

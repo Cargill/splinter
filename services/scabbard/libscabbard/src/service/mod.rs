@@ -32,10 +32,7 @@ use std::time::Duration;
 
 use cylinder::Verifier as SignatureVerifier;
 use protobuf::Message;
-#[cfg(feature = "receipt-store")]
 use sawtooth::receipt::store::ReceiptStore;
-#[cfg(not(feature = "receipt-store"))]
-use sawtooth::store::receipt_store::TransactionReceiptStore;
 use splinter::{
     consensus::{Proposal, ProposalUpdate},
     service::{
@@ -89,10 +86,6 @@ impl TryFrom<Option<&str>> for ScabbardVersion {
     }
 }
 
-#[cfg(not(feature = "receipt-store"))]
-type ScabbardReceiptStore = Arc<RwLock<TransactionReceiptStore>>;
-
-#[cfg(feature = "receipt-store")]
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
 
 /// A service for running Sawtooth Sabre smart contracts with two-phase commit consensus.
@@ -541,17 +534,13 @@ pub mod tests {
     use std::error::Error;
 
     use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
-    #[cfg(feature = "receipt-store")]
     use sawtooth::receipt::store::{ReceiptIter, ReceiptStoreError};
-    #[cfg(not(feature = "receipt-store"))]
-    use sawtooth::store::lmdb::LmdbOrderedStore;
     use splinter::service::{
         ServiceConnectionError, ServiceDisconnectionError, ServiceMessageContext,
         ServiceNetworkSender, ServiceSendError,
     };
     #[cfg(not(feature = "database-support"))]
     use tempdir::TempDir;
-    #[cfg(feature = "receipt-store")]
     use transact::protocol::receipt::TransactionReceipt;
     #[cfg(feature = "database-support")]
     use transact::{
@@ -595,12 +584,6 @@ pub mod tests {
             merkle_state,
             #[cfg(feature = "database-support")]
             commit_hash_store,
-            #[cfg(not(feature = "receipt-store"))]
-            Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-                LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
-                    .expect("Unable to make lmdb store"),
-            )))),
-            #[cfg(feature = "receipt-store")]
             Arc::new(RwLock::new(MockReceiptStore)),
             Box::new(|| Ok(())),
             Secp256k1Context::new().new_verifier(),
@@ -634,12 +617,6 @@ pub mod tests {
             merkle_state,
             #[cfg(feature = "database-support")]
             commit_hash_store,
-            #[cfg(not(feature = "receipt-store"))]
-            Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-                LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
-                    .expect("Unable to make lmdb store"),
-            )))),
-            #[cfg(feature = "receipt-store")]
             Arc::new(RwLock::new(MockReceiptStore)),
             Box::new(|| Ok(())),
             Secp256k1Context::new().new_verifier(),
@@ -673,12 +650,6 @@ pub mod tests {
             merkle_state,
             #[cfg(feature = "database-support")]
             commit_hash_store,
-            #[cfg(not(feature = "receipt-store"))]
-            Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-                LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
-                    .expect("Unable to make lmdb store"),
-            )))),
-            #[cfg(feature = "receipt-store")]
             Arc::new(RwLock::new(MockReceiptStore)),
             Box::new(|| Ok(())),
             Secp256k1Context::new().new_verifier(),
@@ -706,8 +677,6 @@ pub mod tests {
         // this is deleted when dropped
         _temp_dir: TempDir,
         pub state_db_path: std::path::PathBuf,
-        #[cfg(not(feature = "receipt-store"))]
-        pub receipt_db_path: std::path::PathBuf,
     }
 
     #[cfg(not(feature = "database-support"))]
@@ -719,19 +688,9 @@ pub mod tests {
             let state_db_path =
                 compute_db_path(MOCK_SERVICE_ID, MOCK_CIRCUIT_ID, temp_dir.path(), "-state")
                     .expect("Failed to compute DB paths");
-            #[cfg(not(feature = "receipt-store"))]
-            let receipt_db_path = compute_db_path(
-                MOCK_SERVICE_ID,
-                MOCK_CIRCUIT_ID,
-                temp_dir.path(),
-                "-receipts",
-            )
-            .expect("Failed to compute DB paths");
             Self {
                 _temp_dir: temp_dir,
                 state_db_path,
-                #[cfg(not(feature = "receipt-store"))]
-                receipt_db_path,
             }
         }
     }
@@ -870,10 +829,8 @@ pub mod tests {
         }
     }
 
-    #[cfg(feature = "receipt-store")]
     struct MockReceiptStore;
 
-    #[cfg(feature = "receipt-store")]
     impl ReceiptStore for MockReceiptStore {
         fn get_txn_receipt_by_id(
             &self,
