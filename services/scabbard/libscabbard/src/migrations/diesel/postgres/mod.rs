@@ -20,7 +20,11 @@ use diesel::pg::PgConnection;
 use diesel::Connection;
 use diesel_migrations::MigrationConnection;
 
+#[cfg(feature = "receipt-store")]
+use sawtooth::migrations::run_postgres_migrations as run_sawtooth_postgres_migrations;
 use splinter::error::InternalError;
+#[cfg(feature = "database-support")]
+use transact::state::merkle::sql::migration::run_postgres_migrations as run_transact_postgres_migrations;
 
 /// Run all pending database migrations.
 ///
@@ -30,6 +34,14 @@ use splinter::error::InternalError;
 ///
 pub fn run_migrations(conn: &PgConnection) -> Result<(), InternalError> {
     embedded_migrations::run(conn).map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+    #[cfg(feature = "database-support")]
+    run_transact_postgres_migrations(conn)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+    #[cfg(feature = "receipt-store")]
+    run_sawtooth_postgres_migrations(conn)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
     debug!("Successfully applied Scabbard PostgreSQL migrations");
 
