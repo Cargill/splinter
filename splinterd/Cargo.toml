@@ -143,6 +143,7 @@ node = [
     "diesel",
     "sawtooth",
     "scabbard/client-reqwest",
+    "scabbard-database-support",
     "splinter/admin-service-client",
     "splinter/admin-service-event-client",
     "splinter/admin-service-event-client-actix-web-client",
