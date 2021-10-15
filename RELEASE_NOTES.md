@@ -1,5 +1,61 @@
 # Release Notes
 
+## Changes in Splinter 0.5.22
+
+### Highlights
+
+* Experimental support for database-backed MerkleState in libscabbard has been
+  added.
+
+* Stabilize argument validation for internal services. This enables being able
+  to validate arbitrary service arguments in the admin service by defining
+  ServiceArgValidator for a service type. The admin service will run the
+  validator against a proposed circuit, rejecting a proposal if they are
+  invalid.
+
+### libsplinter
+
+* Stabilize `"service-arg-validation"` by removing the feature.
+
+* Fix type for admin service event ID for Postgres. The event ID was being set
+  to `INTEGER` but needs to be set to `BIGINT`.
+
+### splinterd
+
+* Stabilize `"service-arg-validation"` by removing the feature.
+
+* Add `scabbard_storage` configuration value. This value will allow splinterd to
+  enable the use of LMDB scabbard state.  This value may be configured via
+  `splinterd.toml` or the `--scabbard-storage` CLI argument. This is behind the
+  experimental feature `"scabbard-database-support"`.
+
+### libscabbard
+
+* Stabilize `"service-arg-validation"` by removing the feature.
+
+* Stabilize `"receipt-store"` by removing the feature.
+
+* Enable the use of dynamic storage in the scabbard service, including the
+  `CommitHashStore` and the `ReceiptStore`. This is behind the experimental
+  feature `"database-support"`.
+
+* Enable the use of the transact library's `SqlMerkleState` in the scabbard
+  service, with LMDB as an optional alternative. This is behind the experimental
+  feature `"database-support"`.
+
+* Fix the `dir_path` arg given when creating a new `LmdbReceiptStore`.
+  Previously the value given for this argument included the name of the LMDB
+  file in the path which caused an error.
+
+* Fix receipt store configuration in scabbard. Previously, this was setting the
+  wrong value, resulting in the receipt-store configuration to be the default
+  values.
+
+* Consolidate scabbard migrations, by including transact and sawtooth migration
+  execution under the scabbard migration functions.  This removes the need for
+  library consumers to use either of those libraries and prevents situations
+  where the database might be only partially migrated for scabbard's purposes.
+
 ## Changes in Splinter 0.5.21
 
 ### Highlights
