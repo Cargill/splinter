@@ -361,8 +361,8 @@ impl SplinterDaemon {
             routing_writer.clone(),
             self.signers
                 .iter()
-                .map(|signer| Ok(signer.public_key()?.as_hex()))
-                .collect::<Result<Vec<String>, SigningError>>()
+                .map(|signer| Ok(PublicKey::from_bytes(signer.public_key()?.into_bytes())))
+                .collect::<Result<Vec<PublicKey>, SigningError>>()
                 .map_err(|err| {
                     StartError::AdminServiceError(format!(
                         "Unable to get public keys from signer for Admin message handler:
@@ -1064,7 +1064,7 @@ fn set_up_circuit_dispatcher(
     node_id: &str,
     routing_reader: Box<dyn RoutingTableReader>,
     routing_writer: Box<dyn RoutingTableWriter>,
-    public_keys: Vec<String>,
+    public_keys: Vec<PublicKey>,
 ) -> Dispatcher<CircuitMessageType> {
     let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(network_sender));
 
