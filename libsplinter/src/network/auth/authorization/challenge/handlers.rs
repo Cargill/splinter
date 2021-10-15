@@ -191,18 +191,15 @@ impl Handler for AuthChallengeNonceResponseHandler {
                     })?
                     .take_bytes();
 
-                let public_key = signer
-                    .public_key()
-                    .map_err(|err| {
-                        DispatchError::HandleError(format!(
-                            "Unable to get public key for signer: {}",
-                            err
-                        ))
-                    })?
-                    .into_bytes();
+                let public_key = signer.public_key().map_err(|err| {
+                    DispatchError::HandleError(format!(
+                        "Unable to get public key for signer: {}",
+                        err
+                    ))
+                })?;
 
                 Ok(SubmitRequest {
-                    public_key,
+                    public_key: public_key.into(),
                     signature,
                 })
             })
@@ -339,11 +336,11 @@ impl Handler for AuthChallengeSubmitRequestHandler {
 
                 return Ok(());
             }
-            public_keys.push(request.public_key.to_vec());
+            public_keys.push(request.public_key);
         }
 
         let identity = if let Some(public_key) = &self.expected_public_key {
-            if public_keys.contains(&public_key.as_slice().to_vec()) {
+            if public_keys.contains(public_key) {
                 public_key.clone()
             } else {
                 send_authorization_error(
@@ -359,7 +356,7 @@ impl Handler for AuthChallengeSubmitRequestHandler {
         } else if !public_keys.is_empty() {
             // we know this is safe because of above length check
             // defaults to the first key in the list
-            public_key::PublicKey::from_bytes(public_keys[0].clone())
+            public_keys[0].clone()
         } else {
             send_authorization_error(
                 &self.auth_manager,
@@ -397,7 +394,7 @@ impl Handler for AuthChallengeSubmitRequestHandler {
             )) => {
                 let auth_msg = AuthorizationMessage::AuthChallengeSubmitResponse(
                     AuthChallengeSubmitResponse {
-                        public_key: identity.into_bytes(),
+                        public_key: identity,
                     },
                 );
 
@@ -475,9 +472,7 @@ impl Handler for AuthChallengeSubmitResponseHandler {
             context.source_connection_id(),
             AuthorizationInitiatingAction::Challenge(
                 ChallengeAuthorizationInitiatingAction::ReceiveAuthChallengeSubmitResponse(
-                    Identity::Challenge {
-                        public_key: public_key::PublicKey::from_bytes(public_key),
-                    },
+                    Identity::Challenge { public_key },
                 ),
             ),
         ) {
@@ -1002,7 +997,7 @@ mod tests {
                     public_key: other_signer
                         .public_key()
                         .expect("Unable to get public key")
-                        .into_bytes(),
+                        .into(),
                     signature: other_signer
                         .sign(&nonce)
                         .expect("Unable to sign nonce")
@@ -1129,7 +1124,7 @@ mod tests {
                 public_key: local_signer
                     .public_key()
                     .expect("unable to get public key")
-                    .into_bytes(),
+                    .into(),
             }),
         )
         .expect("Unable to get message bytes");
@@ -1244,7 +1239,7 @@ mod tests {
                 public_key: local_signer
                     .public_key()
                     .expect("unable to get public key")
-                    .into_bytes(),
+                    .into(),
             }),
         )
         .expect("Unable to get message bytes");
