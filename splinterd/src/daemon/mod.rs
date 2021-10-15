@@ -443,12 +443,12 @@ impl SplinterDaemon {
             .with_state_db_dir(self.state_dir.to_string())
             .with_signature_verifier_factory(signing_context);
 
-        #[cfg(not(feature = "scabbard-receipt-store"))]
+        #[cfg(not(all(feature = "database-postgres", feature = "database-sqlite")))]
         {
             scabbard_factory_builder =
                 scabbard_factory_builder.with_receipt_db_dir(self.state_dir.to_string());
         }
-        #[cfg(feature = "scabbard-receipt-store")]
+        #[cfg(any(feature = "database-postgres", feature = "database-sqlite"))]
         {
             scabbard_factory_builder =
                 scabbard_factory_builder.with_receipt_db_url(self.db_url.to_string());
