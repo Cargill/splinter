@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use super::service::messages::v1;
+
 pub use super::service::messages::{
     is_valid_circuit_id, is_valid_service_id, AdminServiceEvent, AuthorizationType, BuilderError,
     CircuitProposal, CircuitProposalVote, CircuitStatus, CreateCircuit, CreateCircuitBuilder,
