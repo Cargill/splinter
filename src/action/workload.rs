@@ -246,6 +246,7 @@ fn start_smallbank_workloads(
                 rate.into(),
                 auth.to_string(),
                 update,
+                false,
             )
             .map_err(|err| CliError::ActionError(format!("Unable to start workload: {}", err)))?
     }
@@ -299,6 +300,7 @@ fn start_command_workloads(
                 rate.into(),
                 auth.to_string(),
                 update,
+                true,
             )
             .map_err(|err| CliError::ActionError(format!("Unable to start workload: {}", err)))?
     }
