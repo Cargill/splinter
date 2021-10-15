@@ -81,7 +81,6 @@ experimental = [
     "health",
     "https-certs",
     "registry",
-    "scabbard-receipt-store",
     "scabbard-migrations",
 ]
 
@@ -96,7 +95,6 @@ postgres = [
     "splinter/postgres",
 ]
 registry = []
-scabbard-receipt-store = []
 scabbard-migrations = ["scabbard"]
 sqlite = [
     "diesel/sqlite",
