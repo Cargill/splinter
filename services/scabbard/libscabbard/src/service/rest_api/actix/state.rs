@@ -95,6 +95,7 @@ pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
     }
 }
 
+#[cfg(feature = "sqlite")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -102,15 +103,10 @@ mod tests {
     use std::sync::{Arc, Mutex, RwLock};
 
     use cylinder::{secp256k1::Secp256k1Context, Context};
-    #[cfg(feature = "receipt-store")]
     use diesel::r2d2::{ConnectionManager, Pool};
     use reqwest::{blocking::Client, StatusCode, Url};
-    #[cfg(feature = "receipt-store")]
     use sawtooth::migrations::run_sqlite_migrations;
-    #[cfg(feature = "receipt-store")]
     use sawtooth::receipt::store::diesel::DieselReceiptStore;
-    #[cfg(not(feature = "receipt-store"))]
-    use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
     use serde_json::{to_value, Value as JsonValue};
     #[cfg(not(feature = "database-support"))]
     use tempdir::TempDir;
@@ -181,12 +177,6 @@ mod tests {
         #[cfg(feature = "database-support")]
         let (merkle_state, commit_hash_store) = create_merkle_state_and_commit_hash_store();
 
-        #[cfg(not(feature = "receipt-store"))]
-        let receipt_store = Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-            LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
-                .expect("Failed to create LMDB store"),
-        ))));
-        #[cfg(feature = "receipt-store")]
         let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
             create_connection_pool_and_migrate(":memory:".to_string()),
             None,
@@ -394,8 +384,6 @@ mod tests {
         // This is deleted when dropped
         _temp_dir: TempDir,
         pub state_db_path: std::path::PathBuf,
-        #[cfg(not(feature = "receipt-store"))]
-        pub receipt_db_path: std::path::PathBuf,
     }
 
     #[cfg(not(feature = "database-support"))]
@@ -407,19 +395,9 @@ mod tests {
             let state_db_path =
                 compute_db_path(MOCK_SERVICE_ID, MOCK_CIRCUIT_ID, temp_dir.path(), "-state")
                     .expect("Failed to compute DB paths");
-            #[cfg(not(feature = "receipt-store"))]
-            let receipt_db_path = compute_db_path(
-                MOCK_SERVICE_ID,
-                MOCK_CIRCUIT_ID,
-                temp_dir.path(),
-                "-receipts",
-            )
-            .expect("Failed to compute DB paths");
             Self {
                 _temp_dir: temp_dir,
                 state_db_path,
-                #[cfg(not(feature = "receipt-store"))]
-                receipt_db_path,
             }
         }
     }
@@ -527,7 +505,6 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "receipt-store", feature = "sqlite"))]
     fn create_connection_pool_and_migrate(
         connection_string: String,
     ) -> Pool<ConnectionManager<diesel::SqliteConnection>> {

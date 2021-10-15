@@ -20,7 +20,6 @@ use diesel::sqlite::SqliteConnection;
 use diesel::Connection;
 use diesel_migrations::MigrationConnection;
 
-#[cfg(feature = "receipt-store")]
 use sawtooth::migrations::run_sqlite_migrations as run_sawtooth_sqlite_migrations;
 use splinter::error::InternalError;
 #[cfg(feature = "database-support")]
@@ -39,7 +38,6 @@ pub fn run_migrations(conn: &SqliteConnection) -> Result<(), InternalError> {
     run_transact_sqlite_migrations(conn)
         .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-    #[cfg(feature = "receipt-store")]
     run_sawtooth_sqlite_migrations(conn)
         .map_err(|err| InternalError::from_source(Box::new(err)))?;
 

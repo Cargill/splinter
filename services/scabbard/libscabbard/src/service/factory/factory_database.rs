@@ -44,7 +44,6 @@ use crate::store::{
 
 const DEFAULT_LMDB_DIR: &str = "/var/lib/splinter";
 
-#[cfg(feature = "receipt-store")]
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
 
 #[cfg(any(feature = "postgres", feature = "sqlite"))]

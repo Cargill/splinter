@@ -19,21 +19,12 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use cylinder::VerifierFactory;
-#[cfg(all(
-    feature = "receipt-store",
-    any(feature = "postgres", feature = "sqlite")
-))]
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use diesel::r2d2::{ConnectionManager, Pool};
 use openssl::hash::{hash, MessageDigest};
-#[cfg(all(
-    feature = "receipt-store",
-    any(feature = "postgres", feature = "sqlite")
-))]
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use sawtooth::receipt::store::diesel::DieselReceiptStore;
-#[cfg(feature = "receipt-store")]
 use sawtooth::receipt::store::{lmdb::LmdbReceiptStore, ReceiptStore};
-#[cfg(not(feature = "receipt-store"))]
-use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
 use splinter::error::InvalidArgumentError;
 use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::validation::ServiceArgValidator;
@@ -50,13 +41,8 @@ const DEFAULT_STATE_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 const DEFAULT_RECEIPT_DB_DIR: &str = "/var/lib/splinter";
 const DEFAULT_RECEIPT_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
-#[cfg(not(feature = "receipt-store"))]
-type ScabbardReceiptStore = Arc<RwLock<TransactionReceiptStore>>;
-
-#[cfg(feature = "receipt-store")]
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
 
-#[cfg(feature = "receipt-store")]
 pub enum ConnectionUri {
     #[cfg(feature = "postgres")]
     Postgres(Box<str>),
@@ -73,8 +59,9 @@ pub enum ScabbardStorageConfiguration {
         db_dir: Option<String>,
         db_size: Option<usize>,
     },
-    #[cfg(feature = "receipt-store")]
-    DatabaseConnectionUri { connection_uri: ConnectionUri },
+    DatabaseConnectionUri {
+        connection_uri: ConnectionUri,
+    },
 }
 
 impl ScabbardStorageConfiguration {
@@ -85,10 +72,7 @@ impl ScabbardStorageConfiguration {
         }
     }
 
-    #[cfg(all(
-        feature = "receipt-store",
-        any(feature = "postgres", feature = "sqlite")
-    ))]
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     fn connection_uri(connection_uri: &str) -> Self {
         let connection_uri = match connection_uri {
             #[cfg(feature = "postgres")]
@@ -107,7 +91,6 @@ impl ScabbardStorageConfiguration {
                 db_dir: Some(db_dir),
                 db_size,
             },
-            #[cfg(feature = "receipt-store")]
             _ => Self::Lmdb {
                 db_dir: Some(db_dir),
                 db_size: None,
@@ -121,7 +104,6 @@ impl ScabbardStorageConfiguration {
                 db_dir,
                 db_size: Some(db_size),
             },
-            #[cfg(feature = "receipt-store")]
             _ => Self::Lmdb {
                 db_dir: None,
                 db_size: Some(db_size),
@@ -180,10 +162,7 @@ impl ScabbardFactoryBuilder {
         self
     }
 
-    #[cfg(all(
-        feature = "receipt-store",
-        any(feature = "postgres", feature = "sqlite")
-    ))]
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     /// Sets the receipt db connection url to be used by the resulting factory.
     pub fn with_receipt_db_url(mut self, receipt_db_url: String) -> Self {
         self.receipt_storage_configuration = Some(ScabbardStorageConfiguration::connection_uri(
@@ -233,7 +212,6 @@ impl ScabbardFactoryBuilder {
                     db_size: db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
                 }
             }
-            #[cfg(feature = "receipt-store")]
             ScabbardStorageConfiguration::DatabaseConnectionUri { connection_uri } => {
                 match connection_uri {
                     #[cfg(feature = "postgres")]
@@ -293,7 +271,6 @@ impl ScabbardFactoryBuilder {
                 db_dir.unwrap_or_else(|| DEFAULT_STATE_DB_DIR.into()),
                 db_size.unwrap_or(DEFAULT_STATE_DB_SIZE),
             ),
-            #[cfg(feature = "receipt-store")]
             _ => unreachable!(),
         };
 
@@ -313,11 +290,11 @@ enum ScabbardFactoryStorageConfig {
         db_dir: String,
         db_size: usize,
     },
-    #[cfg(all(feature = "receipt-store", feature = "postgres"))]
+    #[cfg(feature = "postgres")]
     Postgres {
         pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
     },
-    #[cfg(all(feature = "receipt-store", feature = "sqlite"))]
+    #[cfg(feature = "sqlite")]
     Sqlite {
         pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
     },
@@ -457,95 +434,65 @@ impl ServiceFactory for ScabbardFactory {
 
         let state_db_path = compute_db_path(&service_id, circuit_id, state_db_dir, "state")?;
 
-        let (receipt_store, receipt_purge): (ScabbardReceiptStore, _) = match &self
-            .receipt_store_factory_config
-        {
-            #[cfg(not(feature = "receipt-store"))]
-            ScabbardFactoryStorageConfig::Lmdb { db_dir, db_size } => {
-                let receipt_db_path =
-                    compute_db_path(&service_id, circuit_id, Path::new(&db_dir), "-receipts")?;
+        let (receipt_store, receipt_purge): (ScabbardReceiptStore, _) =
+            match &self.receipt_store_factory_config {
+                ScabbardFactoryStorageConfig::Lmdb { db_dir, db_size } => {
+                    let receipt_db_dir_path = Path::new(&db_dir);
 
-                let receipt_store = Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-                    LmdbOrderedStore::new(&receipt_db_path.with_extension("lmdb"), Some(*db_size))
-                        .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
-                ))));
+                    let receipt_db_path =
+                        compute_db_path(&service_id, circuit_id, receipt_db_dir_path, "receipts")?;
 
-                (
-                    receipt_store,
-                    Box::new(move || {
-                        purge_paths(&receipt_db_path)?;
-                        Ok(())
-                    })
-                        as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
-                )
-            }
-            #[cfg(feature = "receipt-store")]
-            ScabbardFactoryStorageConfig::Lmdb { db_dir, db_size } => {
-                let receipt_db_dir_path = Path::new(&db_dir);
+                    let file: String = receipt_db_path
+                        .with_extension("lmdb")
+                        .components()
+                        .rev()
+                        .next()
+                        .map(|p| {
+                            let p: &std::path::Path = p.as_ref();
+                            p.to_str().map(|s| s.to_string())
+                        })
+                        .flatten()
+                        .ok_or_else(|| {
+                            FactoryCreateError::Internal(
+                                "File name produced was not valid UTF-8".into(),
+                            )
+                        })?;
 
-                let receipt_db_path =
-                    compute_db_path(&service_id, circuit_id, receipt_db_dir_path, "receipts")?;
-
-                let file: String = receipt_db_path
-                    .with_extension("lmdb")
-                    .components()
-                    .rev()
-                    .next()
-                    .map(|p| {
-                        let p: &std::path::Path = p.as_ref();
-                        p.to_str().map(|s| s.to_string())
-                    })
-                    .flatten()
-                    .ok_or_else(|| {
-                        FactoryCreateError::Internal(
-                            "File name produced was not valid UTF-8".into(),
-                        )
-                    })?;
-
-                let purge_db_path = receipt_db_path;
-                (
-                    Arc::new(RwLock::new(
-                        LmdbReceiptStore::new(
-                            receipt_db_dir_path,
-                            &[file.clone()],
-                            file,
-                            Some(*db_size),
-                        )
-                        .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
-                    )),
-                    Box::new(move || {
-                        purge_paths(&purge_db_path)?;
-                        Ok(())
-                    })
-                        as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
-                )
-            }
-            #[cfg(all(feature = "receipt-store", feature = "postgres"))]
-            ScabbardFactoryStorageConfig::Postgres { pool } => (
-                Arc::new(RwLock::new(DieselReceiptStore::new(
-                    pool.clone(),
-                    Some(format!("{}::{}", circuit_id, service_id)),
-                ))),
-                Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
-            ),
-            #[cfg(all(feature = "receipt-store", feature = "sqlite"))]
-            ScabbardFactoryStorageConfig::Sqlite { pool } => (
-                Arc::new(RwLock::new(DieselReceiptStore::new(
-                    pool.clone(),
-                    Some(format!("{}::{}", circuit_id, service_id)),
-                ))),
-                Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
-            ),
-            #[cfg(all(
-                feature = "receipt-store",
-                not(any(feature = "postgres", feature = "sqlite"))
-            ))]
-            _ => {
-                return Err(FactoryCreateError::Internal(
-                    "receipt-store was enabled, but without any databases".into(),
-                ))
-            }
-        };
+                    let purge_db_path = receipt_db_path;
+                    (
+                        Arc::new(RwLock::new(
+                            LmdbReceiptStore::new(
+                                receipt_db_dir_path,
+                                &[file.clone()],
+                                file,
+                                Some(*db_size),
+                            )
+                            .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
+                        )),
+                        Box::new(move || {
+                            purge_paths(&purge_db_path)?;
+                            Ok(())
+                        })
+                            as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+                    )
+                }
+                #[cfg(feature = "postgres")]
+                ScabbardFactoryStorageConfig::Postgres { pool } => (
+                    Arc::new(RwLock::new(DieselReceiptStore::new(
+                        pool.clone(),
+                        Some(format!("{}::{}", circuit_id, service_id)),
+                    ))),
+                    Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+                ),
+                #[cfg(feature = "sqlite")]
+                ScabbardFactoryStorageConfig::Sqlite { pool } => (
+                    Arc::new(RwLock::new(DieselReceiptStore::new(
+                        pool.clone(),
+                        Some(format!("{}::{}", circuit_id, service_id)),
+                    ))),
+                    Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+                ),
+            };
 
         let purge_state_db_path = state_db_path.clone();
         let purge_fn = Box::new(move || {
@@ -782,12 +729,12 @@ mod tests {
 
     fn get_factory() -> (TempDir, ScabbardFactory) {
         let tempdir = TempDir::new("scabbard_factory").expect("Unable to create new tempdir");
-        #[cfg(not(all(feature = "receipt-store", feature = "sqlite")))]
+        #[cfg(not(feature = "sqlite"))]
         let receipt_store_factory_config = ScabbardFactoryStorageConfig::Lmdb {
             db_dir: tempdir.path().to_string_lossy().into(),
             db_size: 1024 * 1024,
         };
-        #[cfg(all(feature = "receipt-store", feature = "sqlite"))]
+        #[cfg(feature = "sqlite")]
         let receipt_store_factory_config = ScabbardFactoryStorageConfig::Sqlite {
             pool: {
                 let connection_manager =
