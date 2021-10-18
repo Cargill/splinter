@@ -46,9 +46,9 @@ pub struct LoggerConfig {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct UnnamedLoggerConfig {
-    appenders: Vec<String>,
+    pub appenders: Vec<String>,
     #[serde(alias = "filter")]
-    level: Level,
+    pub level: Level,
 }
 
 #[derive(Deserialize, Clone, Debug)]

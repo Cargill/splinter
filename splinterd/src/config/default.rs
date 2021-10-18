@@ -17,6 +17,8 @@
 #[cfg(feature = "log-config")]
 use std::collections::HashMap;
 
+#[cfg(feature = "log-config")]
+use crate::config::logging::UnnamedLoggerConfig;
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
 #[cfg(feature = "log-config")]
@@ -122,11 +124,37 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 size: None,
                 filename: None,
             };
+            let loggers = vec![
+                (
+                    "tokio".to_string(),
+                    UnnamedLoggerConfig {
+                        appenders: vec!["default".into()],
+                        level: log::Level::Warn,
+                    },
+                ),
+                (
+                    "tokio_reactor".to_string(),
+                    UnnamedLoggerConfig {
+                        appenders: vec!["default".into()],
+                        level: log::Level::Warn,
+                    },
+                ),
+                (
+                    "hyper".to_string(),
+                    UnnamedLoggerConfig {
+                        appenders: vec!["default".into()],
+                        level: log::Level::Warn,
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect::<HashMap<String, UnnamedLoggerConfig>>();
             let mut appenders = HashMap::new();
             appenders.insert("stdout".to_string(), stdout);
             partial_config = partial_config
                 .with_root_logger(root_logger)
                 .with_appenders(Some(appenders))
+                .with_loggers(Some(loggers))
                 .with_verbosity(Some(log::Level::Info));
         }
 
