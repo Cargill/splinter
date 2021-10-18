@@ -23,6 +23,7 @@ mod circuit_list;
 mod node_lifecycle;
 pub(super) mod payload;
 mod registry;
+mod rest_api;
 
 use scabbard::client::ServiceId;
 use splinterd::node::Node;
