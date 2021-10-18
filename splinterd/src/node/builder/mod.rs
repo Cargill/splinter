@@ -35,7 +35,7 @@ use splinter::rest_api::auth::{
     identity::Identity,
 };
 use splinter::rest_api::BindConfig;
-use splinter::store::StoreFactory;
+use splinter::store::{memory::MemoryStoreFactory, StoreFactory};
 
 use super::{RunnableNode, RunnableNodeRestApiVariant, ScabbardConfig};
 
@@ -64,6 +64,7 @@ pub struct NodeBuilder {
     signers: Option<Vec<Box<dyn Signer>>>,
     biome_auth: Option<BiomeCredentialsRestResourceProvider>,
     cylinder_auth: Option<Box<dyn Verifier>>,
+    store_factory: Option<Box<dyn StoreFactory>>,
 }
 
 impl Default for NodeBuilder {
@@ -86,6 +87,7 @@ impl NodeBuilder {
             signers: None,
             biome_auth: None,
             cylinder_auth: None,
+            store_factory: None,
         }
     }
 
@@ -135,9 +137,7 @@ impl NodeBuilder {
 
     /// Specifies the store factory to use with the node. Defaults to the MemoryStoreFactory.
     pub fn with_store_factory(mut self, store_factory: Box<dyn StoreFactory>) -> Self {
-        self.admin_subsystem_builder = self
-            .admin_subsystem_builder
-            .with_store_factory(store_factory);
+        self.store_factory = Some(store_factory);
         self
     }
 
@@ -250,6 +250,11 @@ impl NodeBuilder {
             .with_signers(signers.clone())
             .build()?;
 
+        let store_factory = match self.store_factory {
+            Some(store_factory) => store_factory,
+            None => Box::new(MemoryStoreFactory::new()?),
+        };
+
         let admin_subsystem_builder = self
             .admin_subsystem_builder
             .with_node_id(node_id.clone())
@@ -264,7 +269,8 @@ impl NodeBuilder {
                             .map_err(|err| InternalError::from_source(Box::new(err)))
                     })
                     .collect::<Result<Vec<PublicKey>, InternalError>>()?,
-            );
+            )
+            .with_store_factory(store_factory);
 
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => RunnableNodeRestApiVariant::ActixWeb1(
