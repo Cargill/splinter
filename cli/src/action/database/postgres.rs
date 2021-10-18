@@ -12,37 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use diesel::{
-    pg::PgConnection,
-    r2d2::{ConnectionManager, Pool},
-};
+use diesel::{pg::PgConnection, Connection};
 use splinter::migrations::run_postgres_migrations;
 
 use crate::error::CliError;
 
-macro_rules! conn {
-    ($pool:ident) => {
-        &*$pool.get().map_err(|_| {
-            CliError::ActionError("Failed to get connection for migrations".to_string())
-        })?
-    };
-}
-
 pub fn postgres_migrations(url: &str) -> Result<(), CliError> {
-    let connection_manager = ConnectionManager::<PgConnection>::new(url);
-    let pool = Pool::builder()
-        .max_size(1)
-        .build(connection_manager)
-        .map_err(|_| CliError::ActionError("Failed to build connection pool".to_string()))?;
+    let connection = PgConnection::establish(url).map_err(|err| {
+        CliError::ActionError(format!(
+            "Failed to establish database connection to '{}': {}",
+            url, err
+        ))
+    })?;
 
     info!("Running migrations against PostgreSQL database: {}", url);
-    run_postgres_migrations(conn!(pool)).map_err(|err| {
+    run_postgres_migrations(&connection).map_err(|err| {
         CliError::ActionError(format!("Unable to run Postgres migrations: {}", err))
     })?;
 
     #[cfg(feature = "scabbard-migrations")]
     {
-        scabbard::migrations::run_postgres_migrations(conn!(pool)).map_err(|err| {
+        scabbard::migrations::run_postgres_migrations(&connection).map_err(|err| {
             CliError::ActionError(format!(
                 "Unable to run Postgres migrations for scabbard: {}",
                 err
