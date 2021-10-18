@@ -147,6 +147,7 @@ struct TomlConfig {
     loggers: Option<HashMap<String, TomlUnnamedLoggerConfig>>,
     #[cfg(feature = "scabbard-database-support")]
     scabbard_storage: Option<ScabbardStorageToml>,
+    config_dir: Option<String>,
 
     // Deprecated values
     cert_dir: Option<String>,
@@ -227,7 +228,8 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_registry_forced_refresh(self.toml_config.registry_forced_refresh)
             .with_heartbeat(self.toml_config.heartbeat)
             .with_admin_timeout(self.toml_config.admin_timeout)
-            .with_peering_key(self.toml_config.peering_key);
+            .with_peering_key(self.toml_config.peering_key)
+            .with_config_dir(self.toml_config.config_dir);
 
         #[cfg(feature = "https-bind")]
         {
