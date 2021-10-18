@@ -106,7 +106,8 @@ impl Network {
                 .with_admin_signer(admin_signer)
                 .with_signers(signers)
                 .with_external_registries(self.external_registries.clone())
-                .with_biome_enabled();
+                .with_biome_enabled()
+                .with_permission_config(self.permission_config.clone());
             if self.cylinder_auth {
                 builder = builder.with_cylinder_auth(Box::new(Secp256k1Context::new()));
             }
