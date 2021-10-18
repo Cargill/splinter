@@ -313,6 +313,28 @@ impl NodeBuilder {
     }
 }
 
+#[derive(Clone)]
+pub struct PermissionConfig {
+    permissions: Vec<String>,
+    signer: Box<dyn Signer>,
+}
+
+impl PermissionConfig {
+    pub fn new(permissions: Vec<String>, signer: Box<dyn Signer>) -> Self {
+        Self {
+            permissions,
+            signer,
+        }
+    }
+
+    pub fn permissions(&self) -> Vec<String> {
+        self.permissions.clone()
+    }
+    pub fn signer(&self) -> Box<dyn Signer> {
+        self.signer.clone()
+    }
+}
+
 struct MockAuthorizationHandler;
 
 impl AuthorizationHandler for MockAuthorizationHandler {
