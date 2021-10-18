@@ -186,9 +186,10 @@ version = "1"
 
 # The appenders field is a list of defined appender names.
 #appenders = [ "stdout", "rolling_file"]
-# Filter defines the level of log the logger writes to appenders.
-# Valid filter options are, Trace, Debug, Info, Warn, and Error in decreasing order of verbosity.
-#filter = "Warn"
+
+# Level defines the level of log the logger writes to appenders.
+# Valid options are, Trace, Debug, Info, Warn, and Error in decreasing order of verbosity.
+#level = "Warn"
 
 # Where scabbard will store its internal state, valid options are "database" or "lmdb"
 #scabbard_storage = "database"
