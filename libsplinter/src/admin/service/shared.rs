@@ -3181,7 +3181,7 @@ impl AdminServiceShared {
                 public_key: circuit_node.public_key().clone(),
             })
             .collect::<Vec<messages::SplinterNode>>();
-        let mut create_circuit_builder = messages::builders::CreateCircuitBuilder::new()
+        let mut create_circuit_builder = messages::CreateCircuitBuilder::new()
             .with_circuit_id(circuit_id)
             .with_roster(
                 store_circuit
