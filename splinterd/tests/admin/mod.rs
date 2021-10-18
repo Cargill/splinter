@@ -49,3 +49,31 @@ pub(super) fn get_node_service_id(circuit_id: &str, node: &Node) -> ServiceId {
         .parse::<ServiceId>()
         .expect("Unable to parse `ServiceId`")
 }
+
+// This function differs from the helper function above in that it takes an additional `auth` arg.
+// The string given in the `auth` arg is passed to the `admin_service_client_with_auth` method. The
+// admin service client will use the auth string in authorization headers when submitting requests
+// to the REST API.
+pub(super) fn get_node_service_id_with_auth(
+    circuit_id: &str,
+    node: &Node,
+    auth: String,
+) -> ServiceId {
+    // Retrieve the node's associated `service_id` from the circuit just committed
+    let circuit = node
+        .admin_service_client_with_auth(auth)
+        .fetch_circuit(&circuit_id)
+        .expect("Unable to fetch circuit")
+        .unwrap();
+    // Create the `ServiceId` struct based on the node's associated `service_id` and the
+    // committed `circuit_id`
+    let node_service = &circuit
+        .roster
+        .iter()
+        .find(|service_slice| &service_slice.node_id == node.node_id())
+        .expect("Circuit committed without service for node")
+        .service_id;
+    format!("{}::{}", &circuit_id, node_service)
+        .parse::<ServiceId>()
+        .expect("Unable to parse `ServiceId`")
+}
