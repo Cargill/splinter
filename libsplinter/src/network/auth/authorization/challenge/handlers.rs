@@ -14,7 +14,7 @@
 
 //! Message handlers for v1 authorization messages
 
-use cylinder::{PublicKey, Signature, Signer, Verifier};
+use cylinder::{Signature, Signer, Verifier};
 
 use crate::error::InternalError;
 use crate::network::auth::state_machine::challenge_v1::{
@@ -323,7 +323,7 @@ impl Handler for AuthChallengeSubmitRequestHandler {
                 .verify(
                     &self.nonce,
                     &Signature::new(request.signature.to_vec()),
-                    &PublicKey::new(request.public_key.to_vec()),
+                    &request.public_key.clone().into(),
                 )
                 .map_err(|err| {
                     DispatchError::HandleError(format!("Unable to verify submit request: {}", err))
@@ -624,20 +624,16 @@ mod tests {
         let other_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
         let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                other_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: other_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let local_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                local_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: local_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
@@ -737,20 +733,16 @@ mod tests {
         let other_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
         let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                other_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: other_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let local_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                local_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: local_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
@@ -853,20 +845,16 @@ mod tests {
         let other_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
         let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                other_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: other_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let local_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                local_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: local_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
@@ -982,20 +970,16 @@ mod tests {
         let other_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
         let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                other_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: other_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let local_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                local_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: local_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
@@ -1065,12 +1049,10 @@ mod tests {
         assert_eq!(
             managed_state.accepting_state,
             AuthorizationAcceptingState::Done(Identity::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    other_signer
-                        .public_key()
-                        .expect("Unable to get public key")
-                        .into_bytes()
-                ),
+                public_key: other_signer
+                    .public_key()
+                    .expect("Unable to get public key")
+                    .into()
             })
         );
         assert_eq!(managed_state.received_complete, false);
@@ -1089,11 +1071,8 @@ mod tests {
         let connection_id = "test_connection".to_string();
         let other_signer = new_signer();
         // need to setup expected authorization state
-        let public_key = public_key::PublicKey::from_bytes(
-            other_signer
-                .public_key()
-                .expect("unable to get public key")
-                .into_bytes(),
+        let public_key = public_key::PublicKey::from(
+            other_signer.public_key().expect("unable to get public key"),
         );
         let auth_mgr = AuthorizationManagerStateMachine::default();
         auth_mgr
@@ -1119,20 +1098,16 @@ mod tests {
         let local_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
         let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                other_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: other_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let local_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                local_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: local_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
@@ -1211,11 +1186,8 @@ mod tests {
         let connection_id = "test_connection".to_string();
         let other_signer = new_signer();
         // need to setup expected authorization state
-        let public_key = public_key::PublicKey::from_bytes(
-            other_signer
-                .public_key()
-                .expect("unable to get public key")
-                .into_bytes(),
+        let public_key = public_key::PublicKey::from(
+            other_signer.public_key().expect("unable to get public key"),
         );
         let auth_mgr = AuthorizationManagerStateMachine::default();
         auth_mgr
@@ -1241,20 +1213,16 @@ mod tests {
         let local_signer = new_signer();
         let nonce: Vec<u8> = (0..70).map(|_| rand::random::<u8>()).collect();
         let expected_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                other_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: other_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let local_authorization = Some(ConnectionAuthorizationType::Challenge {
-            public_key: public_key::PublicKey::from_bytes(
-                local_signer
-                    .public_key()
-                    .expect("unable to get public key")
-                    .into_bytes(),
-            ),
+            public_key: local_signer
+                .public_key()
+                .expect("unable to get public key")
+                .into(),
         });
         let dispatcher = AuthorizationDispatchBuilder::new()
             .add_authorization(Box::new(ChallengeAuthorization::new(
