@@ -362,6 +362,9 @@ pub enum ScabbardStorageToml {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "log-config")]
+    use crate::config::LoggerConfig;
+
     use super::*;
 
     use std::time::Duration;
@@ -774,6 +777,45 @@ mod tests {
             assert!(matches!(toml.influx_db() , Some(text) if text == "database"));
             assert!(matches!(toml.influx_username() , Some(text) if text == "username"));
             assert!(matches!(toml.influx_password() , Some(text) if text == "pa$$w0rd"));
+        }
+
+        #[cfg(feature = "log-config")]
+        {
+            let appenders = toml.appenders();
+            assert!(appenders.is_some());
+            let appenders = appenders.unwrap();
+            assert!(appenders.contains_key("stdout"));
+            assert!(appenders.get("stdout").is_some());
+            let stdout = appenders.get("stdout").unwrap();
+            assert!(matches!(stdout.kind, crate::config::RawLogTarget::Stdout));
+            assert!(stdout.size.is_none());
+            assert!(stdout.filename.is_none());
+            assert_eq!(stdout.encoder, default_pattern());
+
+            assert!(appenders.contains_key("rolling_file"));
+            assert!(appenders.get("rolling_file").is_some());
+            let rolling_file = appenders.get("rolling_file").unwrap();
+            assert!(matches!(
+                rolling_file.kind,
+                crate::config::RawLogTarget::RollingFile
+            ));
+            assert!(rolling_file.size.is_some());
+            assert_eq!(rolling_file.size.unwrap(), 16_000_000);
+            assert!(rolling_file.filename.is_some());
+            assert_eq!(
+                rolling_file.filename.as_ref().unwrap(),
+                "/var/log/splinter/splinterd.log"
+            );
+            assert_eq!(rolling_file.encoder, default_pattern());
+
+            let loggers = toml.loggers();
+            assert!(loggers.is_some());
+            let loggers = loggers.unwrap();
+            assert!(loggers.contains_key("splinter"));
+            let splinter = loggers.get("splinter").unwrap();
+            let splinter: LoggerConfig = ("splinter".to_string(), splinter.clone()).into();
+            assert!(matches!(splinter.level, Level::Warn));
+            assert_eq!(splinter.appenders, ["stdout", "rolling_file"]);
         }
     }
 }
