@@ -26,10 +26,14 @@ use splinter::rest_api::actix_web_1::RestApiBuilder;
 use splinter::rest_api::actix_web_3::RunnableRestApi;
 use splinter::rest_api::{
     auth::{
+        authorization::{
+            maintenance::MaintenanceModeAuthorizationHandler,
+            rbac::rest_api::RoleBasedAuthorizationResourceProvider,
+        },
         identity::{Identity, IdentityProvider},
         AuthorizationHeader,
     },
-    AuthConfig,
+    AuthConfig, RestResourceProvider,
 };
 
 use super::builder::admin::AdminSubsystemBuilder;
@@ -113,12 +117,30 @@ impl RunnableNode {
                     biome_resources.append(&mut biome_resource_provider.take_actix1_resources());
                 };
 
+                // Create the authroization handler resources to allow the node to access the
+                // authorization endpoints
+                let auth_handler_resources = vec![
+                    RoleBasedAuthorizationResourceProvider::new(
+                        admin_subsystem
+                            .store_factory
+                            .get_role_based_authorization_store(),
+                    )
+                    .resources(),
+                    MaintenanceModeAuthorizationHandler::new(Some(
+                        admin_subsystem
+                            .store_factory
+                            .get_role_based_authorization_store(),
+                    ))
+                    .resources(),
+                ];
+
                 let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api
                     .append_auth_configs(&mut auth_configs)
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?
                     .add_resources(admin_resources)
                     .add_resources(biome_resources)
+                    .add_resources(auth_handler_resources.into_iter().flatten().collect())
                     .run()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
