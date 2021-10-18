@@ -655,4 +655,51 @@ mod tests {
         // Compare the generated `PartialConfig` object against the expected values.
         assert_deprecated_config_values(built_config);
     }
+
+    static FULL_TOML_CONFIG: &str = r#"
+            version = "1"
+            config_dir = "/etc/splinter"
+            state_dir = "/var/lib/splinter"
+            database = "splinter_state.db"
+            node_id = "node_id"
+            display_name = "display_name"
+            network_endpoints = [ "tcps://127.0.0.1:8044" ]
+            rest_api_endpoint = "127.0.0.1:8080"
+            advertised_endpoints = [ "tcps://127.0.0.1:8044" ]
+            peers = ["splinter.dev"]
+            peering_key = "splinterd"
+            heartbeat = 30
+            admin_timeout = 30
+            allow_keys_file = "allow_keys"
+            registries = ["file:///etc/splinter/registry.yaml"]
+            registry_auto_refresh = 600
+            registry_forced_refresh = 10
+            tls_cert_dir = "/etc/splinter/certs"
+            tls_ca_file = "/etc/splinter/certs/ca.pem"
+            tls_client_cert = "/etc/splinter/certs/client.crt"
+            tls_client_key = "/etc/splinter/certs/private/client.key"
+            tls_server_cert = "/etc/splinter/certs/server.crt"
+            tls_server_key = "/etc/splinter/certs/private/server.key"
+            oauth_provider = "google"
+            oauth_client_id = "qwerty"
+            oauth_client_secret = "QWERTY"
+            oauth_redirect_url = "splinter.dev"
+            oauth_openid_url = "splinter.dev"
+            oauth_openid_auth_params = [["test","test1"]]
+            oauth_openid_scopes = ["test"]
+            influx_url = "splinter.dev"
+            influx_db = "database"
+            influx_username = "username"
+            influx_password = "pa$$w0rd"
+            [appenders.stdout]
+            kind = "stdout"
+            pattern = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n"
+            [appenders.rolling_file]
+            kind = "rolling_file"
+            filename = "/var/log/splinter/splinterd.log"
+            size = "16.0M"
+            [loggers.splinter]
+            appenders = [ "stdout", "rolling_file"]
+            level = "Warn"
+        "#;
 }
