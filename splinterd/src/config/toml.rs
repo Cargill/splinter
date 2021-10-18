@@ -702,4 +702,78 @@ mod tests {
             appenders = [ "stdout", "rolling_file"]
             level = "Warn"
         "#;
+    #[test]
+    fn test_full_toml_config() {
+        let toml = TomlPartialConfigBuilder::new(
+            FULL_TOML_CONFIG.to_string(),
+            "fake_file_path".to_string(),
+        )
+        .expect("Could not deserialize full toml")
+        .build()
+        .expect("A config error has occured");
+        assert!(matches!(toml.config_dir(), Some(text) if text == "/etc/splinter"));
+        assert!(matches!(toml.state_dir() , Some(text) if text == "/var/lib/splinter"));
+        assert!(matches!(toml.database() , Some(text) if text == "splinter_state.db"));
+        assert!(matches!(toml.node_id() , Some(text) if text == "node_id"));
+        assert!(matches!(toml.display_name() , Some(text) if text == "display_name"));
+        assert!(
+            matches!(toml.network_endpoints() , Some(vec) if    matches!(vec.get(0), Some(text) if text == "tcps://127.0.0.1:8044"))
+        );
+        assert!(matches!(toml.rest_api_endpoint() , Some(text) if text == "127.0.0.1:8080"));
+        assert!(
+            matches!(toml.advertised_endpoints() , Some(vec) if matches!(vec.get(0), Some(text) if text == "tcps://127.0.0.1:8044")  )
+        );
+        assert!(
+            matches!(toml.peers(), Some(vec) if matches!(vec.get(0), Some(text) if text == "splinter.dev") )
+        );
+        assert!(matches!(toml.peering_key() , Some(text) if text == "splinterd"));
+        assert!(matches!(toml.heartbeat(), Some(30)));
+        assert!(matches!(
+            toml.admin_timeout(),
+            Some(duration) if duration == Duration::from_secs(30)
+        ));
+        //assert!(matches!(toml.allow_keys_file() , Some(text) if text == "allow_keys"));
+        assert!(
+            matches!(toml.registries() ,Some(vec) if vec[..] == ["file:///etc/splinter/registry.yaml"])
+        );
+        assert!(matches!(toml.registry_auto_refresh(), Some(600)));
+        assert!(matches!(toml.registry_forced_refresh(), Some(10)));
+        assert!(matches!(toml.tls_cert_dir() , Some(text) if text == "/etc/splinter/certs"));
+        assert!(matches!(toml.tls_ca_file() , Some(text) if text == "/etc/splinter/certs/ca.pem"));
+        assert!(
+            matches!(toml.tls_client_cert() , Some(text) if text == "/etc/splinter/certs/client.crt")
+        );
+        assert!(
+            matches!(toml.tls_client_key() , Some(text) if text == "/etc/splinter/certs/private/client.key")
+        );
+        assert!(
+            matches!(toml.tls_server_cert() , Some(text) if text == "/etc/splinter/certs/server.crt")
+        );
+        assert!(
+            matches!(toml.tls_server_key() , Some(text) if text == "/etc/splinter/certs/private/server.key")
+        );
+
+        #[cfg(feature = "oauth")]
+        {
+            assert!(matches!(toml.oauth_provider() , Some(text) if text == "google"));
+            assert!(matches!(toml.oauth_client_id() , Some(text) if text == "qwerty"));
+            assert!(matches!(toml.oauth_client_secret() , Some(text) if text == "QWERTY"));
+            assert!(matches!(toml.oauth_redirect_url() , Some(text) if text == "splinter.dev"));
+            assert!(matches!(toml.oauth_openid_url() , Some(text) if text == "splinter.dev"));
+            assert!(
+                matches!(toml.oauth_openid_auth_params(), Some(vec) if matches!(vec.get(0),Some(pair) if pair == &("test".to_string(), "test1".to_string())))
+            );
+            assert!(
+                matches!(toml.oauth_openid_scopes(), Some(vec) if matches!(vec.get(0), Some(val) if val == "test"))
+            );
+        }
+
+        #[cfg(feature = "tap")]
+        {
+            assert!(matches!(toml.influx_url() , Some(text) if text == "splinter.dev"));
+            assert!(matches!(toml.influx_db() , Some(text) if text == "database"));
+            assert!(matches!(toml.influx_username() , Some(text) if text == "username"));
+            assert!(matches!(toml.influx_password() , Some(text) if text == "pa$$w0rd"));
+        }
+    }
 }
