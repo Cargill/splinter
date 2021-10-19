@@ -19,6 +19,7 @@
 
 use crate::protos::authorization;
 use crate::protos::prelude::*;
+use crate::public_key::PublicKey;
 
 /// The authorization message envelope.
 #[derive(Debug)]
@@ -282,7 +283,7 @@ pub struct AuthChallengeNonceResponse {
 
 #[derive(Debug)]
 pub struct SubmitRequest {
-    pub public_key: Vec<u8>,
+    pub public_key: PublicKey,
     pub signature: Vec<u8>,
 }
 
@@ -300,7 +301,7 @@ pub struct AuthChallengeSubmitRequest {
 /// This message is returned if challenge submit request is accepted
 #[derive(Debug)]
 pub struct AuthChallengeSubmitResponse {
-    pub public_key: Vec<u8>,
+    pub public_key: PublicKey,
 }
 
 impl FromProto<authorization::AuthComplete> for AuthComplete {
@@ -447,7 +448,7 @@ impl FromProto<authorization::AuthChallengeSubmitRequest> for AuthChallengeSubmi
                 .take_submit_requests()
                 .into_iter()
                 .map(|mut submit_request| SubmitRequest {
-                    public_key: submit_request.take_public_key(),
+                    public_key: PublicKey::from_bytes(submit_request.take_public_key()),
                     signature: submit_request.take_signature(),
                 })
                 .collect(),
@@ -463,7 +464,7 @@ impl FromNative<AuthChallengeSubmitRequest> for authorization::AuthChallengeSubm
             .iter()
             .map(|submit_request| {
                 let mut proto_submit_request = authorization::SubmitRequest::new();
-                proto_submit_request.set_public_key(submit_request.public_key.to_vec());
+                proto_submit_request.set_public_key(submit_request.public_key.clone().into_bytes());
                 proto_submit_request.set_signature(submit_request.signature.to_vec());
                 proto_submit_request
             })
@@ -477,7 +478,7 @@ impl FromNative<AuthChallengeSubmitRequest> for authorization::AuthChallengeSubm
 impl FromNative<AuthChallengeSubmitResponse> for authorization::AuthChallengeSubmitResponse {
     fn from_native(response: AuthChallengeSubmitResponse) -> Result<Self, ProtoConversionError> {
         let mut proto_response = authorization::AuthChallengeSubmitResponse::new();
-        proto_response.set_public_key(response.public_key);
+        proto_response.set_public_key(response.public_key.into_bytes());
         Ok(proto_response)
     }
 }
@@ -487,7 +488,7 @@ impl FromProto<authorization::AuthChallengeSubmitResponse> for AuthChallengeSubm
         mut source: authorization::AuthChallengeSubmitResponse,
     ) -> Result<Self, ProtoConversionError> {
         Ok(AuthChallengeSubmitResponse {
-            public_key: source.take_public_key(),
+            public_key: PublicKey::from_bytes(source.take_public_key()),
         })
     }
 }

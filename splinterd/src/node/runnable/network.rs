@@ -37,6 +37,7 @@ use splinter::peer::interconnect::NetworkMessageSender;
 use splinter::peer::{interconnect::PeerInterconnectBuilder, PeerManager};
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::NetworkMessageType;
+use splinter::public_key::PublicKey;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, Incoming, Listener, Transport,
 };
@@ -121,12 +122,14 @@ impl RunnableNetworkSubsystem {
             .signers
             .iter()
             .map(|signer| {
-                Ok(signer
-                    .public_key()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?
-                    .as_hex())
+                Ok(PublicKey::from_bytes(
+                    signer
+                        .public_key()
+                        .map_err(|err| InternalError::from_source(Box::new(err)))?
+                        .into_bytes(),
+                ))
             })
-            .collect::<Result<Vec<String>, InternalError>>()?;
+            .collect::<Result<Vec<PublicKey>, InternalError>>()?;
 
         // Set up the Circuit dispatcher
         let circuit_dispatcher = Self::set_up_circuit_dispatcher(
@@ -265,7 +268,7 @@ impl RunnableNetworkSubsystem {
         node_id: &str,
         routing_reader: Box<dyn RoutingTableReader>,
         routing_writer: Box<dyn RoutingTableWriter>,
-        public_keys: Vec<String>,
+        public_keys: Vec<PublicKey>,
     ) -> Dispatcher<CircuitMessageType> {
         let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(network_sender));
 

@@ -16,6 +16,8 @@
 
 use std::cmp::Ordering;
 
+use cylinder;
+
 /// Local representation of a public key
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PublicKey {
@@ -48,5 +50,17 @@ impl Ord for PublicKey {
 impl PartialOrd for PublicKey {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl From<cylinder::PublicKey> for PublicKey {
+    fn from(public_key: cylinder::PublicKey) -> Self {
+        PublicKey::from_bytes(public_key.into_bytes())
+    }
+}
+
+impl From<PublicKey> for cylinder::PublicKey {
+    fn from(public_key: PublicKey) -> Self {
+        cylinder::PublicKey::new(public_key.into_bytes())
     }
 }

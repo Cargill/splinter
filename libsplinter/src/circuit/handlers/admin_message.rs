@@ -22,6 +22,7 @@ use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
 use crate::protos::circuit::{
     AdminDirectMessage, CircuitError, CircuitError_Error, CircuitMessageType,
 };
+use crate::public_key::PublicKey;
 
 const ADMIN_SERVICE_ID_PREFIX: &str = "admin::";
 const ADMIN_SERVICE_PUBLIC_KEY_PREFIX: &str = "public_key";
@@ -30,7 +31,7 @@ const ADMIN_SERVICE_PUBLIC_KEY_PREFIX: &str = "public_key";
 pub struct AdminDirectMessageHandler {
     node_id: String,
     routing_table: Box<dyn RoutingTableReader>,
-    public_keys: Vec<String>,
+    public_keys: Vec<PublicKey>,
 }
 
 impl Handler for AdminDirectMessageHandler {
@@ -84,7 +85,7 @@ impl AdminDirectMessageHandler {
     pub fn new(
         node_id: String,
         routing_table: Box<dyn RoutingTableReader>,
-        public_keys: Vec<String>,
+        public_keys: Vec<PublicKey>,
     ) -> Self {
         Self {
             node_id,
@@ -210,7 +211,10 @@ impl AdminDirectMessageHandler {
                     ));
                 }
 
-                if self.public_keys.contains(&public_key) {
+                if self.public_keys.contains(&PublicKey::from_bytes(
+                    parse_hex(&public_key)
+                        .map_err(|err| DispatchError::HandleError(err.to_string()))?,
+                )) {
                     // The internal admin service is at the node and connected using trust
                     let mut msg = msg.clone();
                     let recipient = admin_service_id(&self.node_id);
