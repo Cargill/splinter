@@ -92,6 +92,16 @@ impl Node {
         ))
     }
 
+    pub fn admin_service_client_with_auth(
+        self: &Node,
+        auth: String,
+    ) -> Box<dyn AdminServiceClient> {
+        Box::new(ReqwestAdminServiceClient::new(
+            format!("http://localhost:{}", self.rest_api_port),
+            auth,
+        ))
+    }
+
     pub fn admin_service_event_client(
         &self,
         event_type: &str,
