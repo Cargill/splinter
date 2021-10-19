@@ -1485,7 +1485,7 @@ fn retry_pending(
                         error_kind: Some(err_kind),
                     } => match err_kind {
                         ErrorKind::ConnectionRefused => info!(
-                            "Received connection refused attempting to establish a \
+                            "Received connection refused while attempting to establish a \
                                         connection to peer at endpoint {}",
                             endpoint
                         ),
@@ -1527,7 +1527,7 @@ fn log_connect_request_err(
             error_kind: Some(err_kind),
         } => match err_kind {
             ErrorKind::ConnectionRefused => info!(
-                "Received connection refused attempting to establish a \
+                "Received connection refused while attempting to establish a \
                         connection to peer {}: endpoint {}",
                 peer_id, endpoint
             ),
