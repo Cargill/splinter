@@ -519,8 +519,6 @@ mod tests {
     use crate::protocol::authorization::AuthComplete;
     use crate::protos::network::NetworkMessageType;
     use crate::protos::{authorization, network};
-    #[cfg(feature = "challenge-authorization")]
-    use crate::public_key;
 
     /// Test that an auth protocol request is properly handled via the dispatcher when no
     /// required authorization types are set
@@ -603,20 +601,16 @@ mod tests {
         let dispatcher = AuthorizationDispatchBuilder::new()
             .with_identity("mock_identity")
             .with_expected_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    new_signer()
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
+                public_key: new_signer()
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into(),
             }))
             .with_local_authorization(Some(ConnectionAuthorizationType::Challenge {
-                public_key: public_key::PublicKey::from_bytes(
-                    local_signer
-                        .public_key()
-                        .expect("unable to get public key")
-                        .into_bytes(),
-                ),
+                public_key: local_signer
+                    .public_key()
+                    .expect("unable to get public key")
+                    .into(),
             }))
             .build(dispatch_sender, auth_mgr)
             .expect("Unable to build authorization dispatcher");

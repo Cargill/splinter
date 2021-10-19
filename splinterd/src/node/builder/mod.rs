@@ -260,7 +260,7 @@ impl NodeBuilder {
                     .map(|signer| {
                         signer
                             .public_key()
-                            .map(|public_key| PublicKey::from_bytes(public_key.into_bytes()))
+                            .map(|public_key| public_key.into())
                             .map_err(|err| InternalError::from_source(Box::new(err)))
                     })
                     .collect::<Result<Vec<PublicKey>, InternalError>>()?,
