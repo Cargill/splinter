@@ -45,6 +45,9 @@ case "$1" in
         chown -R root:$group /etc/splinter/certs
         chmod 750 /etc/splinter/certs/private
         install -m 640 -g splinterd /dev/null /etc/splinter/allow_keys
+        mkdir /var/log/splinter
+        chown $user:$group /var/log/splinter
+        chmod 770 /var/log/splinter
     else
         true
     fi
