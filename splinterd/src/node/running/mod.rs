@@ -115,6 +115,20 @@ impl Node {
         )
     }
 
+    pub fn admin_service_event_client_with_auth(
+        &self,
+        event_type: &str,
+        last_event_id: Option<u64>,
+        auth: String,
+    ) -> Result<Box<dyn AdminServiceEventClient>, InternalError> {
+        self.admin_subsystem.admin_service_event_client(
+            format!("http://localhost:{}", self.rest_api_port),
+            auth,
+            event_type.to_string(),
+            last_event_id,
+        )
+    }
+
     pub fn scabbard_client(&self) -> Result<Box<dyn ScabbardClient>, InternalError> {
         Ok(Box::new(
             ReqwestScabbardClientBuilder::new()
