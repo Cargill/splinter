@@ -73,14 +73,12 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
             "Running migrations against SQLite database: {}",
             full_path.display()
         );
-        #[cfg(feature = "scabbard-receipt-store")]
         info!(
             "Running migrations against SQLite database for receipt store: {}",
             full_path.display()
         );
     } else {
         info!("Running migrations against SQLite database: :memory: ");
-        #[cfg(feature = "scabbard-receipt-store")]
         info!("Running migrations against SQLite database: :memory: for receipt store");
     };
 
