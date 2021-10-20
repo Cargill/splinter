@@ -38,6 +38,13 @@ const DEFAULT_SYSTEM_KEY_NAME: &str = "splinterd";
 
 pub struct KeyGenAction;
 
+#[derive(Debug)]
+pub enum GroupOptions {
+    Auto,
+    Named(String),
+    GroupID(u32),
+}
+
 impl Action for KeyGenAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
