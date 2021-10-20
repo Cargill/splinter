@@ -69,7 +69,6 @@ tokio-0-2 = { package = "tokio", version = "0.2", optional = true }
 tungstenite = { version = "0.10", optional = true }
 url = "1.7.1"
 uuid = { version = "0.8", features = ["v4", "v5"] }
-zmq = { version = "0.9", optional = true }
 
 [dev-dependencies]
 reqwest = { version = "0.10", features = ["blocking", "json"] }
@@ -131,7 +130,6 @@ experimental = [
     "rest-api-actix-web-3",
     "service-network",
     "ws-transport",
-    "zmq-transport",
 ]
 
 # used for turning benchmark tests on
@@ -188,7 +186,6 @@ store-factory = []
 tap = ["chrono", "futures-0-3", "influxdb", "metrics", "tokio-0-2"]
 trust-authorization = []
 ws-transport = ["tungstenite"]
-zmq-transport = ["zmq"]
 
 [package.metadata.docs.rs]
 features = [
