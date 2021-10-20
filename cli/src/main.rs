@@ -123,7 +123,11 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 Arg::with_name("system")
                     .long("system")
                     .help("Generate system keys in /etc/splinter/keys"),
-            ),
+            )
+            .arg(Arg::with_name("group").long("group").help(
+                "Key file owning group, options are none|auto|<name_of_group>|<gid_of_group>",
+            )
+            .takes_value(true)),
     );
 
     let propose_circuit = SubCommand::with_name("propose")
