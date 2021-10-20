@@ -47,7 +47,10 @@ impl From<&ProposedNode> for CircuitNode {
         CircuitNode {
             id: proposed_node.node_id().into(),
             endpoints: proposed_node.endpoints().to_vec(),
-            public_key: proposed_node.public_key().clone(),
+            public_key: proposed_node
+                .public_key()
+                .clone()
+                .map(|public_key| public_key.into_bytes()),
         }
     }
 }
@@ -57,7 +60,10 @@ impl From<ProposedNode> for CircuitNode {
         CircuitNode {
             id: node.node_id().into(),
             endpoints: node.endpoints().to_vec(),
-            public_key: node.public_key().clone(),
+            public_key: node
+                .public_key()
+                .clone()
+                .map(|public_key| public_key.into_bytes()),
         }
     }
 }

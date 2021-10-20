@@ -614,7 +614,10 @@ impl From<store::CircuitProposal> for CircuitProposal {
                 .map(|node| SplinterNode {
                     node_id: node.node_id().to_string(),
                     endpoints: node.endpoints().to_vec(),
-                    public_key: node.public_key().clone(),
+                    public_key: node
+                        .public_key()
+                        .clone()
+                        .map(|public_key| public_key.into_bytes()),
                 })
                 .collect::<Vec<SplinterNode>>(),
             authorization_type: AuthorizationType::from(store_circuit.authorization_type()),

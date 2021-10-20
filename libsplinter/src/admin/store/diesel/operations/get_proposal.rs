@@ -38,6 +38,7 @@ use crate::admin::store::{
     PersistenceType, ProposalType, ProposedCircuitBuilder, ProposedNode, ProposedNodeBuilder,
     ProposedService, ProposedServiceBuilder, RouteType, VoteRecord,
 };
+use crate::public_key::PublicKey;
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchProposalOperation {
     fn get_proposal(
@@ -143,7 +144,8 @@ where
                     }
 
                     if let Some(public_key) = &node.public_key {
-                        builder = builder.with_public_key(public_key)
+                        builder =
+                            builder.with_public_key(&PublicKey::from_bytes(public_key.to_vec()))
                     }
 
                     builder

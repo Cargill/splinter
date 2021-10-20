@@ -40,6 +40,7 @@ use crate::admin::store::{
     ProposedNodeBuilder, ProposedService, ProposedServiceBuilder, RouteType, VoteRecord,
 };
 use crate::error::InvalidStateError;
+use crate::public_key::PublicKey;
 
 use super::AdminServiceStoreOperations;
 
@@ -311,7 +312,8 @@ where
                             ProposedNodeBuilder::new().with_node_id(&node.node_id);
 
                         if let Some(public_key) = &node.public_key {
-                            proposed_node = proposed_node.with_public_key(public_key)
+                            proposed_node = proposed_node
+                                .with_public_key(&PublicKey::from_bytes(public_key.to_vec()))
                         }
 
                         proposed_nodes.insert(

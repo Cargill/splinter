@@ -37,7 +37,7 @@ impl PeerAuthorizationTokenReader for ProposedCircuit {
                 AuthorizationType::Challenge => {
                     if let Some(public_key) = member.public_key() {
                         Ok(PeerTokenPair::new(
-                            PeerAuthorizationToken::from_public_key(public_key),
+                            PeerAuthorizationToken::from_public_key(public_key.as_slice()),
                             local_required_auth.clone(),
                         ))
                     } else {
@@ -65,7 +65,7 @@ impl PeerAuthorizationTokenReader for ProposedCircuit {
                 AuthorizationType::Challenge => {
                     if let Some(public_key) = member.public_key() {
                         Ok(PeerNode {
-                            token: PeerAuthorizationToken::from_public_key(public_key),
+                            token: PeerAuthorizationToken::from_public_key(public_key.as_slice()),
                             node_id: member.node_id().to_string(),
                             endpoints: member.endpoints().to_vec(),
                             admin_service: admin_service_id(member.node_id()),
@@ -97,7 +97,9 @@ impl PeerAuthorizationTokenReader for ProposedCircuit {
                 }
                 AuthorizationType::Challenge => {
                     if let Some(public_key) = member.public_key() {
-                        Ok(Some(PeerAuthorizationToken::from_public_key(public_key)))
+                        Ok(Some(PeerAuthorizationToken::from_public_key(
+                            public_key.as_slice(),
+                        )))
                     } else {
                         Err(InvalidStateError::with_message(
                             "Public key not set when required by a circuit".to_string(),
