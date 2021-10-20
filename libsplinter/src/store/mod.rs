@@ -23,16 +23,7 @@ pub mod sqlite;
 
 use std::{fmt::Display, str::FromStr};
 
-#[cfg(all(feature = "sqlite", not(test)))]
-use self::sqlite::ForeignKeyCustomizer;
-#[cfg(all(feature = "sqlite", test))]
-pub use self::sqlite::ForeignKeyCustomizer;
-#[cfg(feature = "diesel")]
-use diesel::r2d2::{ConnectionManager, Pool};
-
 use crate::error::{InternalError, InvalidArgumentError};
-#[cfg(feature = "sqlite")]
-use crate::migrations::any_pending_sqlite_migrations;
 
 /// An abstract factory for creating Splinter stores backed by the same storage
 pub trait StoreFactory {
@@ -94,38 +85,7 @@ pub fn create_store_factory(
         }
         #[cfg(feature = "sqlite")]
         ConnectionUri::Sqlite(conn_str) => {
-            if (conn_str != ":memory:") && !std::path::Path::new(&conn_str).exists() {
-                return Err(InternalError::with_message(format!(
-                    "Database file '{}' does not exist",
-                    conn_str
-                )));
-            }
-            let connection_manager =
-                ConnectionManager::<diesel::sqlite::SqliteConnection>::new(&conn_str);
-            let mut pool_builder =
-                Pool::builder().connection_customizer(Box::new(ForeignKeyCustomizer::default()));
-            // A new database is created for each connection to the in-memory SQLite
-            // implementation; to ensure that the resulting stores will operate on the same
-            // database, only one connection is allowed.
-            if conn_str == ":memory:" {
-                pool_builder = pool_builder.max_size(1);
-            }
-            let pool = pool_builder.build(connection_manager).map_err(|err| {
-                InternalError::from_source_with_prefix(
-                    Box::new(err),
-                    "Failed to build connection pool".to_string(),
-                )
-            })?;
-            let conn = pool
-                .get()
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
-            if !any_pending_sqlite_migrations(&conn)? {
-                return Err(InternalError::with_message(String::from(
-                    "This version of splinter requires migrations that are not yet applied \
-                    to the database. Run `splinter database migrate` to apply migrations \
-                    before running splinterd",
-                )));
-            }
+            let pool = sqlite::create_sqlite_connection_pool(&conn_str)?;
             Ok(Box::new(sqlite::SqliteStoreFactory::new(pool)))
         }
     }
