@@ -45,8 +45,6 @@ pub mod socket;
 pub mod tls;
 #[cfg(feature = "ws-transport")]
 pub mod ws;
-#[cfg(feature = "zmq-transport")]
-pub mod zmq;
 
 use mio::Evented;
 
