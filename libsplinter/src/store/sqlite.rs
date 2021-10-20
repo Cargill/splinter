@@ -21,7 +21,7 @@ use diesel::{
 };
 
 use crate::error::InternalError;
-use crate::migrations::any_pending_sqlite_migrations;
+use crate::migrations::{any_pending_sqlite_migrations, run_sqlite_migrations};
 
 use super::StoreFactory;
 
@@ -64,13 +64,16 @@ pub fn create_sqlite_connection_pool(
     let conn = pool
         .get()
         .map_err(|err| InternalError::from_source(Box::new(err)))?;
-    if !any_pending_sqlite_migrations(&conn)? {
+    if conn_str == ":memory:" {
+        run_sqlite_migrations(&conn)?;
+    } else if !any_pending_sqlite_migrations(&conn)? {
         return Err(InternalError::with_message(String::from(
             "This version of splinter requires migrations that are not yet applied \
             to the database. Run `splinter database migrate` to apply migrations \
             before running splinterd",
         )));
     }
+
     Ok(pool)
 }
 
