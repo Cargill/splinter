@@ -27,6 +27,7 @@ use std::os::unix::fs::MetadataExt;
 use clap::ArgMatches;
 use cylinder::{secp256k1::Secp256k1Context, Context};
 use cylinder::{PrivateKey, PublicKey};
+use users::get_group_by_name;
 
 use crate::error::CliError;
 
@@ -134,7 +135,7 @@ impl Action for KeyGenAction {
             public_key_path,
             args.is_present("force"),
             args.is_present("skip"),
-            true,
+            group,
         )?;
 
         Ok(())
@@ -148,7 +149,7 @@ fn write_keys(
     public_key_path: PathBuf,
     force_create: bool,
     skip_create: bool,
-    change_permissions: bool,
+    group: Option<GroupOptions>,
 ) -> Result<(), CliError> {
     let (private_key, public_key) = keys;
     if !force_create {
@@ -205,9 +206,9 @@ fn write_keys(
     })?;
 
     #[cfg(not(target_os = "linux"))]
-    let (key_dir_uid, key_dir_gid) = (key_dir_info.uid(), key_dir_info.gid());
+    let key_dir_uid = key_dir_info.uid();
     #[cfg(target_os = "linux")]
-    let (key_dir_uid, key_dir_gid) = (key_dir_info.st_uid(), key_dir_info.st_gid());
+    let key_dir_uid = key_dir_info.st_uid();
 
     {
         if private_key_path.exists() {
@@ -269,9 +270,26 @@ fn write_keys(
             ))
         })?;
     }
-    if change_permissions {
-        chown(private_key_path.as_path(), key_dir_uid, key_dir_gid)?;
-        chown(public_key_path.as_path(), key_dir_uid, key_dir_gid)?;
+    if let Some(group_option) = group {
+        let group_id = match group_option {
+            GroupOptions::GroupID(id) => Ok(id),
+            #[cfg(target_os = "linux")]
+            GroupOptions::Auto => Ok(key_dir_info.st_gid()),
+            #[cfg(not(target_os = "linux"))]
+            GroupOptions::Auto => Ok(key_dir_info.gid()),
+            GroupOptions::Named(name) => {
+                if let Some(g) = get_group_by_name(&name) {
+                    Ok(g.gid())
+                } else {
+                    Err(CliError::EnvironmentError(format!(
+                        "Could not find group with name: {}",
+                        name
+                    )))
+                }
+            }
+        }?;
+        chown(private_key_path.as_path(), key_dir_uid, group_id)?;
+        chown(public_key_path.as_path(), key_dir_uid, group_id)?;
     }
 
     Ok(())
