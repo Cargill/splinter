@@ -17,6 +17,7 @@ use std::fs::{create_dir_all, metadata, OpenOptions};
 use std::io::prelude::*;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 #[cfg(target_os = "linux")]
 use std::os::linux::fs::MetadataExt;
@@ -48,6 +49,28 @@ pub enum GroupOptions {
 impl Action for KeyGenAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
+        let group: Option<GroupOptions> = args
+            .value_of("group")
+            .map(|s| -> Result<GroupOptions, CliError> {
+                match s {
+                    "auto" => Ok(GroupOptions::Auto),
+                    val => {
+                        if let Ok(num) = u32::from_str(val) {
+                            Ok(GroupOptions::GroupID(num))
+                        } else {
+                            Ok(GroupOptions::Named(val.to_string()))
+                        }
+                    }
+                }
+            })
+            .or_else(|| {
+                if args.is_present("system") {
+                    Some(Ok(GroupOptions::Auto))
+                } else {
+                    None
+                }
+            })
+            .transpose()?;
 
         let key_name = args
             .value_of("key-name")
