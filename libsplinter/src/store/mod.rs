@@ -21,10 +21,6 @@ pub mod postgres;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 
-use std::{fmt::Display, str::FromStr};
-
-use crate::error::{InternalError, InvalidArgumentError};
-
 /// An abstract factory for creating Splinter stores backed by the same storage
 pub trait StoreFactory {
     /// Get a new `CredentialsStore`
@@ -64,73 +60,4 @@ pub trait StoreFactory {
 
     #[cfg(feature = "node-id-store")]
     fn get_node_id_store(&self) -> Box<dyn crate::node_id::store::NodeIdStore>;
-}
-
-/// Creates a `StoreFactory` backed by the given connection
-///
-/// # Arguments
-///
-/// * `connection_uri` - The identifier of the storage connection that will be used by all stores
-///   created by the resulting factory
-pub fn create_store_factory(
-    connection_uri: ConnectionUri,
-) -> Result<Box<dyn StoreFactory>, InternalError> {
-    match connection_uri {
-        #[cfg(feature = "memory")]
-        ConnectionUri::Memory => Ok(Box::new(memory::MemoryStoreFactory::new()?)),
-        #[cfg(feature = "postgres")]
-        ConnectionUri::Postgres(url) => {
-            let pool = postgres::create_postgres_connection_pool(&url)?;
-            Ok(Box::new(postgres::PgStoreFactory::new(pool)))
-        }
-        #[cfg(feature = "sqlite")]
-        ConnectionUri::Sqlite(conn_str) => {
-            let pool = sqlite::create_sqlite_connection_pool(&conn_str)?;
-            Ok(Box::new(sqlite::SqliteStoreFactory::new(pool)))
-        }
-    }
-}
-
-/// The possible connection types and identifiers for a `StoreFactory`
-pub enum ConnectionUri {
-    #[cfg(feature = "memory")]
-    Memory,
-    #[cfg(feature = "postgres")]
-    Postgres(String),
-    #[cfg(feature = "sqlite")]
-    Sqlite(String),
-}
-
-impl Display for ConnectionUri {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = match self {
-            #[cfg(feature = "memory")]
-            ConnectionUri::Memory => "memory",
-            #[cfg(feature = "sqlite")]
-            ConnectionUri::Sqlite(sqlite) => sqlite,
-            #[cfg(feature = "postgres")]
-            ConnectionUri::Postgres(pg) => pg,
-        };
-        write!(f, "{}", string)
-    }
-}
-
-impl FromStr for ConnectionUri {
-    type Err = InvalidArgumentError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            #[cfg(feature = "memory")]
-            "memory" => Ok(ConnectionUri::Memory),
-            #[cfg(feature = "postgres")]
-            _ if s.starts_with("postgres://") => Ok(ConnectionUri::Postgres(s.into())),
-            #[cfg(feature = "sqlite")]
-            _ => Ok(ConnectionUri::Sqlite(s.into())),
-            #[cfg(not(feature = "sqlite"))]
-            _ => Err(InvalidArgumentError::new(
-                "s".to_string(),
-                format!("No compatible connection type: {}", s),
-            )),
-        }
-    }
 }

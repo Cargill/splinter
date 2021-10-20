@@ -457,8 +457,7 @@ mod tests {
 
     use crate::rest_api::auth::authorization::rbac::store::{AssignmentBuilder, RoleBuilder};
 
-    use crate::migrations::run_sqlite_migrations;
-    use crate::store::ForeignKeyCustomizer;
+    use crate::store::sqlite::create_sqlite_connection_pool;
 
     use diesel::{
         prelude::*,
@@ -1184,15 +1183,8 @@ mod tests {
     /// available. Each connection is backed by a different in-memory SQLite database, so limiting
     /// the pool to a single connection insures that the same DB is used for all operations.
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {
-        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-        let pool = Pool::builder()
-            .connection_customizer(Box::new(ForeignKeyCustomizer))
-            .max_size(1)
-            .build(connection_manager)
-            .expect("Failed to build connection pool");
-
-        run_sqlite_migrations(&*pool.get().expect("Failed to get connection for migrations"))
-            .expect("Failed to run migrations");
+        let pool =
+            create_sqlite_connection_pool(":memory:").expect("Failed to build connection pool");
 
         pool
     }
