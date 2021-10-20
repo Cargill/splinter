@@ -15,6 +15,7 @@
 pub mod builder;
 mod error;
 mod registry;
+mod store;
 
 use std::collections::HashMap;
 use std::fs;
@@ -1034,7 +1035,7 @@ fn create_store_factory(
     let connection_uri = db_url.parse().map_err(|err| {
         StartError::StorageError(format!("Invalid database URL provided: {}", err))
     })?;
-    splinter::store::create_store_factory(connection_uri).map_err(|err| {
+    store::create_store_factory(connection_uri).map_err(|err| {
         StartError::StorageError(format!("Failed to initialize store factory: {}", err))
     })
 }
