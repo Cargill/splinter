@@ -3178,7 +3178,10 @@ impl AdminServiceShared {
             .map(|circuit_node| messages::SplinterNode {
                 node_id: circuit_node.node_id().to_string(),
                 endpoints: circuit_node.endpoints().to_vec(),
-                public_key: circuit_node.public_key().clone(),
+                public_key: circuit_node
+                    .public_key()
+                    .clone()
+                    .map(|public_key| public_key.into_bytes()),
             })
             .collect::<Vec<messages::SplinterNode>>();
         let mut create_circuit_builder = messages::CreateCircuitBuilder::new()
@@ -3260,7 +3263,7 @@ impl AdminServiceShared {
                 node.set_endpoints(RepeatedField::from_vec(circuit_node.endpoints().to_vec()));
                 {
                     if let Some(public_key) = circuit_node.public_key() {
-                        node.set_public_key(public_key.clone());
+                        node.set_public_key(public_key.clone().into_bytes());
                     }
                 }
                 node

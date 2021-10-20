@@ -162,10 +162,7 @@ impl From<&messages::SplinterNode> for ProposedNode {
         ProposedNode {
             node_id: admin_node.node_id.to_string(),
             endpoints: admin_node.endpoints.to_vec(),
-            public_key: admin_node
-                .public_key
-                .clone()
-                .map(PublicKey::from_bytes),
+            public_key: admin_node.public_key.clone().map(PublicKey::from_bytes),
         }
     }
 }

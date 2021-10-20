@@ -14,6 +14,7 @@
 
 //! Structs for building circuits nodes
 use crate::error::InvalidStateError;
+use crate::public_key::PublicKey;
 
 use super::ProposedNode;
 
@@ -22,7 +23,7 @@ use super::ProposedNode;
 pub struct CircuitNode {
     id: String,
     endpoints: Vec<String>,
-    public_key: Option<Vec<u8>>,
+    public_key: Option<PublicKey>,
 }
 
 impl CircuitNode {
@@ -37,7 +38,7 @@ impl CircuitNode {
     }
 
     /// Returns the public key that belongs to the node
-    pub fn public_key(&self) -> &Option<Vec<u8>> {
+    pub fn public_key(&self) -> &Option<PublicKey> {
         &self.public_key
     }
 }
@@ -47,10 +48,7 @@ impl From<&ProposedNode> for CircuitNode {
         CircuitNode {
             id: proposed_node.node_id().into(),
             endpoints: proposed_node.endpoints().to_vec(),
-            public_key: proposed_node
-                .public_key()
-                .clone()
-                .map(|public_key| public_key.into_bytes()),
+            public_key: proposed_node.public_key().clone(),
         }
     }
 }
@@ -60,10 +58,7 @@ impl From<ProposedNode> for CircuitNode {
         CircuitNode {
             id: node.node_id().into(),
             endpoints: node.endpoints().to_vec(),
-            public_key: node
-                .public_key()
-                .clone()
-                .map(|public_key| public_key.into_bytes()),
+            public_key: node.public_key().clone(),
         }
     }
 }
@@ -73,7 +68,7 @@ impl From<ProposedNode> for CircuitNode {
 pub struct CircuitNodeBuilder {
     node_id: Option<String>,
     endpoints: Option<Vec<String>>,
-    public_key: Option<Vec<u8>>,
+    public_key: Option<PublicKey>,
 }
 
 impl CircuitNodeBuilder {
@@ -93,7 +88,7 @@ impl CircuitNodeBuilder {
     }
 
     /// Returns the public key for the node
-    pub fn public_key(&self) -> Option<Vec<u8>> {
+    pub fn public_key(&self) -> Option<PublicKey> {
         self.public_key.clone()
     }
 
@@ -122,8 +117,8 @@ impl CircuitNodeBuilder {
     /// # Arguments
     ///
     ///  * `public_key` - The bytes of the node's public key
-    pub fn with_public_key(mut self, public_key: &[u8]) -> CircuitNodeBuilder {
-        self.public_key = Some(public_key.into());
+    pub fn with_public_key(mut self, public_key: &PublicKey) -> CircuitNodeBuilder {
+        self.public_key = Some(public_key.clone());
         self
     }
 

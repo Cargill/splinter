@@ -464,7 +464,10 @@ impl TryFrom<&Circuit> for Vec<CircuitMemberModel> {
                             "Unable to convert index into i32".to_string(),
                         ))
                     })?,
-                    public_key: node.public_key().clone(),
+                    public_key: node
+                        .public_key()
+                        .clone()
+                        .map(|public_key| public_key.into_bytes()),
                 })
             })
             .collect::<Result<Vec<CircuitMemberModel>, AdminServiceStoreError>>()

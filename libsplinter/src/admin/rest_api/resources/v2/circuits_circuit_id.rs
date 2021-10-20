@@ -84,7 +84,7 @@ impl<'a> From<&'a CircuitNode> for CircuitNodeResponse<'a> {
             public_key: node_def
                 .public_key()
                 .as_ref()
-                .map(|public_key| to_hex(public_key)),
+                .map(|public_key| to_hex(public_key.as_slice())),
         }
     }
 }

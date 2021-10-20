@@ -30,6 +30,7 @@ use crate::admin::store::{
     CircuitNode, CircuitNodeBuilder,
 };
 use crate::error::InvalidStateError;
+use crate::public_key::PublicKey;
 
 use super::AdminServiceStoreOperations;
 
@@ -88,7 +89,7 @@ where
                 let mut builder = CircuitNodeBuilder::new().with_node_id(&node.node_id);
 
                 if let Some(public_key) = &node.public_key {
-                    builder = builder.with_public_key(public_key);
+                    builder = builder.with_public_key(&PublicKey::from_bytes(public_key.to_vec()));
                 }
 
                 if let Some(endpoints) = node_map.get(&node.node_id) {

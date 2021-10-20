@@ -33,6 +33,7 @@ use crate::admin::store::{
     CircuitStatus, DurabilityType, PersistenceType, RouteType, Service, ServiceBuilder,
 };
 use crate::error::InvalidStateError;
+use crate::public_key::PublicKey;
 
 use super::AdminServiceStoreOperations;
 
@@ -271,7 +272,9 @@ where
                                 }
 
                                 if let Some(public_key) = &member.public_key {
-                                    builder = builder.with_public_key(public_key);
+                                    builder = builder.with_public_key(&PublicKey::from_bytes(
+                                        public_key.to_vec(),
+                                    ));
                                 }
 
                                 builder.build()

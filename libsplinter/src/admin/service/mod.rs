@@ -343,7 +343,9 @@ impl AdminService {
                     routing::CircuitNode::new(
                         node.node_id().to_string(),
                         node.endpoints().to_vec(),
-                        node.public_key().clone(),
+                        node.public_key()
+                            .clone()
+                            .map(|public_key| public_key.into_bytes()),
                     )
                 })
                 .collect::<Vec<routing::CircuitNode>>();
