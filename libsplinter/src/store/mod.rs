@@ -31,8 +31,6 @@ pub use self::sqlite::ForeignKeyCustomizer;
 use diesel::r2d2::{ConnectionManager, Pool};
 
 use crate::error::{InternalError, InvalidArgumentError};
-#[cfg(feature = "postgres")]
-use crate::migrations::any_pending_postgres_migrations;
 #[cfg(feature = "sqlite")]
 use crate::migrations::any_pending_sqlite_migrations;
 
@@ -91,23 +89,7 @@ pub fn create_store_factory(
         ConnectionUri::Memory => Ok(Box::new(memory::MemoryStoreFactory::new()?)),
         #[cfg(feature = "postgres")]
         ConnectionUri::Postgres(url) => {
-            let connection_manager = ConnectionManager::<diesel::pg::PgConnection>::new(url);
-            let pool = Pool::builder().build(connection_manager).map_err(|err| {
-                InternalError::from_source_with_prefix(
-                    Box::new(err),
-                    "Failed to build connection pool".to_string(),
-                )
-            })?;
-            let conn = pool
-                .get()
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
-            if !any_pending_postgres_migrations(&conn)? {
-                return Err(InternalError::with_message(String::from(
-                    "This version of splinter requires migrations that are not yet applied \
-                    to the database. Run `splinter database migrate` to apply migrations \
-                    before running splinterd",
-                )));
-            }
+            let pool = postgres::create_postgres_connection_pool(&url)?;
             Ok(Box::new(postgres::PgStoreFactory::new(pool)))
         }
         #[cfg(feature = "sqlite")]

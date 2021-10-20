@@ -19,7 +19,44 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
 };
 
+use crate::error::InternalError;
+use crate::migrations::any_pending_postgres_migrations;
+
 use super::StoreFactory;
+
+/// Create a Postgres connection pool.
+///
+/// # Arguments
+///
+/// * url - a valid postges connection url
+///
+/// # Errors
+///
+/// An [InternalError] is returned if
+/// * The pool cannot be created
+/// * The database requires any pending migrations
+pub fn create_postgres_connection_pool(
+    url: &str,
+) -> Result<Pool<ConnectionManager<PgConnection>>, InternalError> {
+    let connection_manager = ConnectionManager::<diesel::pg::PgConnection>::new(url);
+    let pool = Pool::builder().build(connection_manager).map_err(|err| {
+        InternalError::from_source_with_prefix(
+            Box::new(err),
+            "Failed to build connection pool".to_string(),
+        )
+    })?;
+    let conn = pool
+        .get()
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+    if !any_pending_postgres_migrations(&conn)? {
+        return Err(InternalError::with_message(String::from(
+            "This version of splinter requires migrations that are not yet applied  to the \
+            database. Run `splinter database migrate` to apply migrations before running splinterd",
+        )));
+    }
+
+    Ok(pool)
+}
 
 /// A `StoryFactory` backed by a PostgreSQL database.
 pub struct PgStoreFactory {
