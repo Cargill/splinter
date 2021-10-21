@@ -50,7 +50,6 @@ features = ["admin-service", "registry", "node-id-store"]
 
 [dependencies.scabbard]
 path = "../services/scabbard/libscabbard"
-features = ["postgres", "sqlite", "lmdb", "database-support"]
 optional = true
 
 [dev-dependencies]
@@ -93,12 +92,17 @@ https-certs = []
 postgres = [
     "diesel/postgres",
     "splinter/postgres",
+    "scabbard/postgres"
 ]
 registry = []
-scabbard-migrations = ["scabbard"]
+scabbard-migrations = [
+  "scabbard/database-support",
+  "scabbard/lmdb"
+]
 sqlite = [
     "diesel/sqlite",
     "splinter/sqlite",
+    "scabbard/sqlite"
 ]
 upgrade = [
     "database",

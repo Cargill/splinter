@@ -30,15 +30,12 @@ pub fn postgres_migrations(url: &str) -> Result<(), CliError> {
         CliError::ActionError(format!("Unable to run Postgres migrations: {}", err))
     })?;
 
-    #[cfg(feature = "scabbard-migrations")]
-    {
-        scabbard::migrations::run_postgres_migrations(&connection).map_err(|err| {
-            CliError::ActionError(format!(
-                "Unable to run Postgres migrations for scabbard: {}",
-                err
-            ))
-        })?;
-    }
+    scabbard::migrations::run_postgres_migrations(&connection).map_err(|err| {
+        CliError::ActionError(format!(
+            "Unable to run Postgres migrations for scabbard: {}",
+            err
+        ))
+    })?;
 
     Ok(())
 }
