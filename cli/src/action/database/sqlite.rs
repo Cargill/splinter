@@ -82,18 +82,15 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
     })?)
     .map_err(|err| CliError::ActionError(format!("Unable to run Sqlite migrations: {}", err)))?;
 
-    #[cfg(feature = "scabbard-migrations")]
-    {
-        scabbard::migrations::run_sqlite_migrations(&*pool.get().map_err(|_| {
-            CliError::ActionError("Failed to get connection for migrations".to_string())
-        })?)
-        .map_err(|err| {
-            CliError::ActionError(format!(
-                "Unable to run Sqlite migrations for scabbard: {}",
-                err
-            ))
-        })?;
-    }
+    scabbard::migrations::run_sqlite_migrations(&*pool.get().map_err(|_| {
+        CliError::ActionError("Failed to get connection for migrations".to_string())
+    })?)
+    .map_err(|err| {
+        CliError::ActionError(format!(
+            "Unable to run Sqlite migrations for scabbard: {}",
+            err
+        ))
+    })?;
 
     Ok(())
 }
