@@ -167,7 +167,15 @@ pub struct ConnectionCustomizer;
 
 impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCustomizer {
     fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
-        conn.batch_execute("PRAGMA foreign_keys = ON;")
-            .map_err(diesel::r2d2::Error::QueryError)
+        conn.batch_execute(
+            r#"
+            PRAGMA busy_timeout = 2000;
+            PRAGMA journal_mode = WAL;
+            PRAGMA wal_checkpoint(truncate);
+            PRAGMA synchronous = FULL;
+            PRAGMA foreign_keys = ON;
+            "#,
+        )
+        .map_err(diesel::r2d2::Error::QueryError)
     }
 }
