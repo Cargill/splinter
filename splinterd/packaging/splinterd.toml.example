@@ -25,7 +25,10 @@ version = "1"
 # Specifies the database used for Splinter state.
 #database = "splinter_state.db"
 
-# Where scabbard will store its internal state, valid options are "database" or "lmdb"
+# Where scabbard will store its internal state; valid options are
+# "database" or "lmdb". When set to "database" scabbard state will be stored in
+# in the database specified by the database key above. When set to "lmdb", lmdb
+# files will be created in the Splinter state_dir.
 #scabbard_storage = "database"
 
 # Identifier for this node. Must be unique on the network. This value will be
