@@ -584,11 +584,11 @@ impl CircuitBuilder {
 
         let authorization_type = self.authorization_type.unwrap_or(AuthorizationType::Trust);
 
-        let persistence = self.persistence.unwrap_or_else(PersistenceType::default);
+        let persistence = self.persistence.unwrap_or_default();
 
         let durability = self.durability.unwrap_or(DurabilityType::NoDurability);
 
-        let routes = self.routes.unwrap_or_else(RouteType::default);
+        let routes = self.routes.unwrap_or_default();
 
         let circuit_management_type = self.circuit_management_type.ok_or_else(|| {
             InvalidStateError::with_message(

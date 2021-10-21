@@ -548,11 +548,11 @@ impl ProposedCircuitBuilder {
 
         let authorization_type = self.authorization_type.unwrap_or(AuthorizationType::Trust);
 
-        let persistence = self.persistence.unwrap_or_else(PersistenceType::default);
+        let persistence = self.persistence.unwrap_or_default();
 
         let durability = self.durability.unwrap_or(DurabilityType::NoDurability);
 
-        let routes = self.routes.unwrap_or_else(RouteType::default);
+        let routes = self.routes.unwrap_or_default();
 
         let circuit_management_type = self.circuit_management_type.ok_or_else(|| {
             InvalidStateError::with_message(
@@ -568,7 +568,7 @@ impl ProposedCircuitBuilder {
 
         let circuit_version = self.circuit_version.unwrap_or(UNSET_CIRCUIT_VERSION);
 
-        let circuit_status = self.circuit_status.unwrap_or_else(CircuitStatus::default);
+        let circuit_status = self.circuit_status.unwrap_or_default();
 
         let create_circuit_message = ProposedCircuit {
             circuit_id,
