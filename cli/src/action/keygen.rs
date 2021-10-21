@@ -27,7 +27,7 @@ use std::os::unix::fs::MetadataExt;
 use clap::ArgMatches;
 use cylinder::{secp256k1::Secp256k1Context, Context};
 use cylinder::{PrivateKey, PublicKey};
-use users::get_group_by_name;
+use users::{get_group_by_gid, get_group_by_name};
 
 use crate::error::CliError;
 
@@ -47,10 +47,43 @@ pub enum GroupOptions {
     GroupID(u32),
 }
 
+enum ValidatedGroupOptions {
+    Auto,
+    GroupID(u32),
+}
+
+impl GroupOptions {
+    fn validate(self) -> Result<ValidatedGroupOptions, CliError> {
+        match self {
+            GroupOptions::Auto => Ok(ValidatedGroupOptions::Auto),
+            GroupOptions::Named(ref name) => {
+                if let Some(g) = get_group_by_name(&name) {
+                    Ok(ValidatedGroupOptions::GroupID(g.gid()))
+                } else {
+                    Err(CliError::EnvironmentError(format!(
+                        "No group with the name: {}",
+                        name
+                    )))
+                }
+            }
+            GroupOptions::GroupID(id) => {
+                if get_group_by_gid(id).is_some() {
+                    Ok(ValidatedGroupOptions::GroupID(id))
+                } else {
+                    Err(CliError::EnvironmentError(format!(
+                        "No group with the id: {}",
+                        id
+                    )))
+                }
+            }
+        }
+    }
+}
+
 impl Action for KeyGenAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
-        let group: Option<GroupOptions> = args
+        let group: Option<ValidatedGroupOptions> = args
             .value_of("group")
             .map(|s| -> Result<GroupOptions, CliError> {
                 match s {
@@ -71,6 +104,8 @@ impl Action for KeyGenAction {
                     None
                 }
             })
+            .transpose()?
+            .map(|g| g.validate())
             .transpose()?;
 
         let key_name = args
@@ -149,7 +184,7 @@ fn write_keys(
     public_key_path: PathBuf,
     force_create: bool,
     skip_create: bool,
-    group: Option<GroupOptions>,
+    group: Option<ValidatedGroupOptions>,
 ) -> Result<(), CliError> {
     let (private_key, public_key) = keys;
     if !force_create {
@@ -272,22 +307,12 @@ fn write_keys(
     }
     if let Some(group_option) = group {
         let group_id = match group_option {
-            GroupOptions::GroupID(id) => Ok(id),
+            ValidatedGroupOptions::GroupID(id) => id,
             #[cfg(target_os = "linux")]
-            GroupOptions::Auto => Ok(key_dir_info.st_gid()),
+            ValidatedGroupOptions::Auto => key_dir_info.st_gid(),
             #[cfg(not(target_os = "linux"))]
-            GroupOptions::Auto => Ok(key_dir_info.gid()),
-            GroupOptions::Named(name) => {
-                if let Some(g) = get_group_by_name(&name) {
-                    Ok(g.gid())
-                } else {
-                    Err(CliError::EnvironmentError(format!(
-                        "Could not find group with name: {}",
-                        name
-                    )))
-                }
-            }
-        }?;
+            ValidatedGroupOptions::Auto => key_dir_info.gid(),
+        };
         chown(private_key_path.as_path(), key_dir_uid, group_id)?;
         chown(public_key_path.as_path(), key_dir_uid, group_id)?;
     }
