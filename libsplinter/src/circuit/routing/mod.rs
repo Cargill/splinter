@@ -44,6 +44,7 @@ use self::error::RoutingTableReaderError;
 use crate::error::InternalError;
 use crate::error::InvalidStateError;
 use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
+use crate::public_key::PublicKey;
 
 /// Interface for updating the routing table
 pub trait RoutingTableWriter: Send {
@@ -245,7 +246,7 @@ pub enum AuthorizationType {
 pub struct CircuitNode {
     node_id: String,
     endpoints: Vec<String>,
-    public_key: Option<Vec<u8>>,
+    public_key: Option<PublicKey>,
 }
 
 impl CircuitNode {
@@ -255,7 +256,7 @@ impl CircuitNode {
     ///
     /// * `node_id` -  The unique ID for the circuit
     /// * `endpoints` -  A list of endpoints the node can be reached at
-    pub fn new(node_id: String, endpoints: Vec<String>, public_key: Option<Vec<u8>>) -> Self {
+    pub fn new(node_id: String, endpoints: Vec<String>, public_key: Option<PublicKey>) -> Self {
         CircuitNode {
             node_id,
             endpoints,
@@ -279,7 +280,9 @@ impl CircuitNode {
                         ),
                     ))
                 })?;
-                Ok(PeerAuthorizationToken::from_public_key(&public_key))
+                Ok(PeerAuthorizationToken::from_public_key(
+                    public_key.as_slice(),
+                ))
             }
         }
     }

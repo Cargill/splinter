@@ -462,7 +462,9 @@ impl AdminServiceShared {
                                         if node.get_public_key().is_empty() {
                                             None
                                         } else {
-                                            Some(node.get_public_key().to_vec())
+                                            Some(public_key::PublicKey::from_bytes(
+                                                node.get_public_key().to_vec(),
+                                            ))
                                         },
                                     )
                                 })
