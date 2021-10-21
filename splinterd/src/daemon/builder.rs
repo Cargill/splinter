@@ -278,9 +278,13 @@ impl SplinterDaemonBuilder {
             (None, None) => None,
         };
 
-        let db_url = self.db_url.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: db_url".to_string())
-        })?;
+        let db_url = self
+            .db_url
+            .ok_or_else(|| CreateError::MissingRequiredField("Missing field: db_url".to_string()))?
+            .parse()
+            .map_err(|e| {
+                CreateError::InvalidArgument(format!("Invalid database URL provided: {}", e))
+            })?;
 
         let registry_auto_refresh = self.registry_auto_refresh.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: registry_auto_refresh".to_string())

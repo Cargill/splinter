@@ -98,6 +98,7 @@ use crate::routes;
 
 pub use error::{CreateError, StartError};
 use registry::RegistryShutdownHandle;
+pub use store::ConnectionUri;
 
 const ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
@@ -125,7 +126,7 @@ pub struct SplinterDaemon {
     rest_api_endpoint: String,
     #[cfg(feature = "https-bind")]
     rest_api_ssl_settings: Option<(String, String)>,
-    db_url: String,
+    db_url: ConnectionUri,
     registries: Vec<String>,
     registry_auto_refresh: u64,
     registry_forced_refresh: u64,
@@ -1030,11 +1031,8 @@ fn start_health_service(
 }
 
 fn create_store_factory(
-    db_url: &str,
+    connection_uri: &ConnectionUri,
 ) -> Result<Box<dyn splinter::store::StoreFactory>, StartError> {
-    let connection_uri = db_url.parse().map_err(|err| {
-        StartError::StorageError(format!("Invalid database URL provided: {}", err))
-    })?;
     store::create_store_factory(connection_uri).map_err(|err| {
         StartError::StorageError(format!("Failed to initialize store factory: {}", err))
     })
