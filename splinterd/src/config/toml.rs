@@ -362,6 +362,9 @@ pub enum ScabbardStorageToml {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "log-config")]
+    use crate::config::LoggerConfig;
+
     use super::*;
 
     use std::time::Duration;
@@ -654,5 +657,165 @@ mod tests {
             .expect("Unable to build TomlPartialConfigBuilder");
         // Compare the generated `PartialConfig` object against the expected values.
         assert_deprecated_config_values(built_config);
+    }
+
+    static FULL_TOML_CONFIG: &str = r#"
+            version = "1"
+            config_dir = "/etc/splinter"
+            state_dir = "/var/lib/splinter"
+            database = "splinter_state.db"
+            node_id = "node_id"
+            display_name = "display_name"
+            network_endpoints = [ "tcps://127.0.0.1:8044" ]
+            rest_api_endpoint = "127.0.0.1:8080"
+            advertised_endpoints = [ "tcps://127.0.0.1:8044" ]
+            peers = ["splinter.dev"]
+            peering_key = "splinterd"
+            heartbeat = 30
+            admin_timeout = 30
+            allow_keys_file = "allow_keys"
+            registries = ["file:///etc/splinter/registry.yaml"]
+            registry_auto_refresh = 600
+            registry_forced_refresh = 10
+            tls_cert_dir = "/etc/splinter/certs"
+            tls_ca_file = "/etc/splinter/certs/ca.pem"
+            tls_client_cert = "/etc/splinter/certs/client.crt"
+            tls_client_key = "/etc/splinter/certs/private/client.key"
+            tls_server_cert = "/etc/splinter/certs/server.crt"
+            tls_server_key = "/etc/splinter/certs/private/server.key"
+            oauth_provider = "google"
+            oauth_client_id = "qwerty"
+            oauth_client_secret = "QWERTY"
+            oauth_redirect_url = "splinter.dev"
+            oauth_openid_url = "splinter.dev"
+            oauth_openid_auth_params = [["test","test1"]]
+            oauth_openid_scopes = ["test"]
+            influx_url = "splinter.dev"
+            influx_db = "database"
+            influx_username = "username"
+            influx_password = "pa$$w0rd"
+            [appenders.stdout]
+            kind = "stdout"
+            pattern = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n"
+            [appenders.rolling_file]
+            kind = "rolling_file"
+            filename = "/var/log/splinter/splinterd.log"
+            size = "16.0M"
+            [loggers.splinter]
+            appenders = [ "stdout", "rolling_file"]
+            level = "Warn"
+        "#;
+    #[test]
+    fn test_full_toml_config() {
+        let toml = TomlPartialConfigBuilder::new(
+            FULL_TOML_CONFIG.to_string(),
+            "fake_file_path".to_string(),
+        )
+        .expect("Could not deserialize full toml")
+        .build()
+        .expect("A config error has occured");
+        assert!(matches!(toml.config_dir(), Some(text) if text == "/etc/splinter"));
+        assert!(matches!(toml.state_dir() , Some(text) if text == "/var/lib/splinter"));
+        assert!(matches!(toml.database() , Some(text) if text == "splinter_state.db"));
+        assert!(matches!(toml.node_id() , Some(text) if text == "node_id"));
+        assert!(matches!(toml.display_name() , Some(text) if text == "display_name"));
+        assert!(
+            matches!(toml.network_endpoints() , Some(vec) if    matches!(vec.get(0), Some(text) if text == "tcps://127.0.0.1:8044"))
+        );
+        assert!(matches!(toml.rest_api_endpoint() , Some(text) if text == "127.0.0.1:8080"));
+        assert!(
+            matches!(toml.advertised_endpoints() , Some(vec) if matches!(vec.get(0), Some(text) if text == "tcps://127.0.0.1:8044")  )
+        );
+        assert!(
+            matches!(toml.peers(), Some(vec) if matches!(vec.get(0), Some(text) if text == "splinter.dev") )
+        );
+        assert!(matches!(toml.peering_key() , Some(text) if text == "splinterd"));
+        assert!(matches!(toml.heartbeat(), Some(30)));
+        assert!(matches!(
+            toml.admin_timeout(),
+            Some(duration) if duration == Duration::from_secs(30)
+        ));
+        //assert!(matches!(toml.allow_keys_file() , Some(text) if text == "allow_keys"));
+        assert!(
+            matches!(toml.registries() ,Some(vec) if vec[..] == ["file:///etc/splinter/registry.yaml"])
+        );
+        assert!(matches!(toml.registry_auto_refresh(), Some(600)));
+        assert!(matches!(toml.registry_forced_refresh(), Some(10)));
+        assert!(matches!(toml.tls_cert_dir() , Some(text) if text == "/etc/splinter/certs"));
+        assert!(matches!(toml.tls_ca_file() , Some(text) if text == "/etc/splinter/certs/ca.pem"));
+        assert!(
+            matches!(toml.tls_client_cert() , Some(text) if text == "/etc/splinter/certs/client.crt")
+        );
+        assert!(
+            matches!(toml.tls_client_key() , Some(text) if text == "/etc/splinter/certs/private/client.key")
+        );
+        assert!(
+            matches!(toml.tls_server_cert() , Some(text) if text == "/etc/splinter/certs/server.crt")
+        );
+        assert!(
+            matches!(toml.tls_server_key() , Some(text) if text == "/etc/splinter/certs/private/server.key")
+        );
+
+        #[cfg(feature = "oauth")]
+        {
+            assert!(matches!(toml.oauth_provider() , Some(text) if text == "google"));
+            assert!(matches!(toml.oauth_client_id() , Some(text) if text == "qwerty"));
+            assert!(matches!(toml.oauth_client_secret() , Some(text) if text == "QWERTY"));
+            assert!(matches!(toml.oauth_redirect_url() , Some(text) if text == "splinter.dev"));
+            assert!(matches!(toml.oauth_openid_url() , Some(text) if text == "splinter.dev"));
+            assert!(
+                matches!(toml.oauth_openid_auth_params(), Some(vec) if matches!(vec.get(0),Some(pair) if pair == &("test".to_string(), "test1".to_string())))
+            );
+            assert!(
+                matches!(toml.oauth_openid_scopes(), Some(vec) if matches!(vec.get(0), Some(val) if val == "test"))
+            );
+        }
+
+        #[cfg(feature = "tap")]
+        {
+            assert!(matches!(toml.influx_url() , Some(text) if text == "splinter.dev"));
+            assert!(matches!(toml.influx_db() , Some(text) if text == "database"));
+            assert!(matches!(toml.influx_username() , Some(text) if text == "username"));
+            assert!(matches!(toml.influx_password() , Some(text) if text == "pa$$w0rd"));
+        }
+
+        #[cfg(feature = "log-config")]
+        {
+            let appenders = toml.appenders();
+            assert!(appenders.is_some());
+            let appenders = appenders.unwrap();
+            assert!(appenders.contains_key("stdout"));
+            assert!(appenders.get("stdout").is_some());
+            let stdout = appenders.get("stdout").unwrap();
+            assert!(matches!(stdout.kind, crate::config::RawLogTarget::Stdout));
+            assert!(stdout.size.is_none());
+            assert!(stdout.filename.is_none());
+            assert_eq!(stdout.encoder, default_pattern());
+
+            assert!(appenders.contains_key("rolling_file"));
+            assert!(appenders.get("rolling_file").is_some());
+            let rolling_file = appenders.get("rolling_file").unwrap();
+            assert!(matches!(
+                rolling_file.kind,
+                crate::config::RawLogTarget::RollingFile
+            ));
+            assert!(rolling_file.size.is_some());
+            assert_eq!(rolling_file.size.unwrap(), 16_000_000);
+            assert!(rolling_file.filename.is_some());
+            assert_eq!(
+                rolling_file.filename.as_ref().unwrap(),
+                "/var/log/splinter/splinterd.log"
+            );
+            assert_eq!(rolling_file.encoder, default_pattern());
+
+            let loggers = toml.loggers();
+            assert!(loggers.is_some());
+            let loggers = loggers.unwrap();
+            assert!(loggers.contains_key("splinter"));
+            let splinter = loggers.get("splinter").unwrap();
+            let splinter: LoggerConfig = ("splinter".to_string(), splinter.clone()).into();
+            assert!(matches!(splinter.level, Level::Warn));
+            assert_eq!(splinter.appenders, ["stdout", "rolling_file"]);
+        }
     }
 }
