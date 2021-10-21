@@ -25,7 +25,14 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use clap::ArgMatches;
-use splinter::store::ConnectionUri;
+#[cfg(feature = "postgres")]
+use splinter::store::postgres;
+#[cfg(feature = "sqlite")]
+use splinter::store::sqlite;
+use splinter::{
+    error::{InternalError, InvalidArgumentError},
+    store::StoreFactory,
+};
 
 #[cfg(feature = "sqlite")]
 use crate::action::database::sqlite::{get_database_at_state_path, get_default_database};
@@ -42,7 +49,7 @@ impl Action for UpgradeAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let state_dir = get_state_dir(arg_matches)?;
         let database_uri = get_database_uri(arg_matches)?;
-        let store_factory = splinter::store::create_store_factory(database_uri).map_err(|err| {
+        let store_factory = create_store_factory(database_uri).map_err(|err| {
             CliError::ActionError(format!("failed to initialized store factory: {}", err))
         })?;
         info!("Upgrading splinterd state");
@@ -140,4 +147,59 @@ fn get_database_uri(arg_matches: Option<&ArgMatches>) -> Result<ConnectionUri, C
         })?;
     }
     Ok(parsed_uri)
+}
+
+/// The possible connection types and identifiers for the upgrade
+enum ConnectionUri {
+    #[cfg(feature = "postgres")]
+    Postgres(String),
+    #[cfg(feature = "sqlite")]
+    Sqlite(String),
+}
+
+impl std::fmt::Display for ConnectionUri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            #[cfg(feature = "postgres")]
+            ConnectionUri::Postgres(pg) => pg,
+            #[cfg(feature = "sqlite")]
+            ConnectionUri::Sqlite(sqlite) => sqlite,
+        };
+        f.write_str(string)
+    }
+}
+
+impl FromStr for ConnectionUri {
+    type Err = InvalidArgumentError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            #[cfg(feature = "postgres")]
+            _ if s.starts_with("postgres://") => Ok(ConnectionUri::Postgres(s.into())),
+            #[cfg(feature = "sqlite")]
+            _ => Ok(ConnectionUri::Sqlite(s.into())),
+            #[cfg(not(feature = "sqlite"))]
+            _ => Err(InvalidArgumentError::new(
+                "s".to_string(),
+                format!("No compatible connection type: {}", s),
+            )),
+        }
+    }
+}
+
+fn create_store_factory(
+    connection_uri: ConnectionUri,
+) -> Result<Box<dyn StoreFactory>, InternalError> {
+    match connection_uri {
+        #[cfg(feature = "postgres")]
+        ConnectionUri::Postgres(url) => {
+            let pool = postgres::create_postgres_connection_pool(&url)?;
+            Ok(Box::new(postgres::PgStoreFactory::new(pool)))
+        }
+        #[cfg(feature = "sqlite")]
+        ConnectionUri::Sqlite(conn_str) => {
+            let pool = sqlite::create_sqlite_connection_pool(&conn_str)?;
+            Ok(Box::new(sqlite::SqliteStoreFactory::new(pool)))
+        }
+    }
 }

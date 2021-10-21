@@ -26,13 +26,12 @@ use splinter::{
     admin::store::{diesel::DieselAdminServiceStore, AdminServiceStore},
     error::InternalError,
     node_id::store::{diesel::DieselNodeIdStore, NodeIdStore},
-    store::ConnectionUri,
 };
 
-use super::error::UpgradeError;
+use super::{error::UpgradeError, ConnectionUri};
 
 /// Migrate all of the service state's current commit hashes to the [`CommitHashStore`].
-pub fn upgrade_scabbard_commit_hash_state(
+pub(super) fn upgrade_scabbard_commit_hash_state(
     state_dir: &Path,
     database_uri: &ConnectionUri,
 ) -> Result<(), UpgradeError> {
@@ -156,10 +155,6 @@ fn new_upgrade_stores(
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;
             Ok(Box::new(SqliteUpgradeStores(pool)))
         }
-        #[cfg(feature = "memory")]
-        _ => Err(UpgradeError::InvalidState(InvalidStateError::with_message(
-            format!("Unsupported database: {}", database_uri),
-        ))),
     }
 }
 

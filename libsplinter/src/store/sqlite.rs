@@ -20,7 +20,62 @@ use diesel::{
     sqlite::SqliteConnection,
 };
 
+use crate::error::InternalError;
+use crate::migrations::{any_pending_sqlite_migrations, run_sqlite_migrations};
+
 use super::StoreFactory;
+
+/// Create a SQLite connection pool.
+///
+/// # Arguments
+///
+/// * conn_str - a filename or ":memory:"
+///
+/// # Errors
+///
+/// An [InternalError] is returned if
+/// * The file does not exist
+/// * The pool cannot be created
+/// * The database requires any pending migrations
+pub fn create_sqlite_connection_pool(
+    conn_str: &str,
+) -> Result<Pool<ConnectionManager<SqliteConnection>>, InternalError> {
+    if (conn_str != ":memory:") && !std::path::Path::new(&conn_str).exists() {
+        return Err(InternalError::with_message(format!(
+            "Database file '{}' does not exist",
+            conn_str
+        )));
+    }
+    let connection_manager = ConnectionManager::<SqliteConnection>::new(conn_str);
+    let mut pool_builder =
+        Pool::builder().connection_customizer(Box::new(ForeignKeyCustomizer::default()));
+    // A new database is created for each connection to the in-memory SQLite
+    // implementation; to ensure that the resulting stores will operate on the same
+    // database, only one connection is allowed.
+    if conn_str == ":memory:" {
+        pool_builder = pool_builder.max_size(1);
+    }
+    let pool = pool_builder.build(connection_manager).map_err(|err| {
+        InternalError::from_source_with_prefix(
+            Box::new(err),
+            "Failed to build connection pool".to_string(),
+        )
+    })?;
+    let conn = pool
+        .get()
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+    if conn_str == ":memory:" {
+        run_sqlite_migrations(&conn)?;
+    } else if !any_pending_sqlite_migrations(&conn)? {
+        return Err(InternalError::with_message(String::from(
+            "This version of splinter requires migrations that are not yet applied \
+            to the database. Run `splinter database migrate` to apply migrations \
+            before running splinterd",
+        )));
+    }
+
+    Ok(pool)
+}
 
 /// A `StoreFactory` backed by a SQLite database.
 pub struct SqliteStoreFactory {
