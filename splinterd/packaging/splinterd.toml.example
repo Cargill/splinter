@@ -25,6 +25,9 @@ version = "1"
 # Specifies the database used for Splinter state.
 #database = "splinter_state.db"
 
+# Where scabbard will store its internal state, valid options are "database" or "lmdb"
+#scabbard_storage = "database"
+
 # Identifier for this node. Must be unique on the network. This value will be
 # used to initialize a "node_id" file in the Splinter state directory. Once
 # node_id is created, the value in the configuration below must match the
@@ -190,6 +193,3 @@ version = "1"
 # Level defines the level of log the logger writes to appenders.
 # Valid options are, Trace, Debug, Info, Warn, and Error in decreasing order of verbosity.
 #level = "Warn"
-
-# Where scabbard will store its internal state, valid options are "database" or "lmdb"
-#scabbard_storage = "database"
