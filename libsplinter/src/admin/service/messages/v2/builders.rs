@@ -235,7 +235,7 @@ impl CreateCircuitBuilder {
 
         let circuit_version = self.circuit_version.unwrap_or(UNSET_CIRCUIT_VERSION);
 
-        let circuit_status = self.circuit_status.unwrap_or_else(CircuitStatus::default);
+        let circuit_status = self.circuit_status.unwrap_or_default();
 
         let create_circuit_message = CreateCircuit {
             circuit_id,
