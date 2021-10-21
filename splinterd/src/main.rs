@@ -28,6 +28,11 @@ pub mod node_id;
 mod routes;
 mod transport;
 
+#[cfg(feature = "log-config")]
+use std::fs::OpenOptions;
+
+#[cfg(feature = "log-config")]
+use config::AppenderConfig;
 use cylinder::{load_key_from_path, secp256k1::Secp256k1Context, Context, Signer};
 #[cfg(not(feature = "log-config"))]
 use log4rs::config::{Appender, Logger, Root};
@@ -515,7 +520,7 @@ fn main() {
     let log_handle = {
         #[cfg(feature = "log-config")]
         {
-            use crate::config::{AppenderConfig, LogTarget, RootConfig, DEFAULT_LOGGING_PATTERN};
+            use crate::config::{LogTarget, RootConfig, DEFAULT_LOGGING_PATTERN};
             let default_config: LogConfig = LogConfig {
                 root: RootConfig {
                     appenders: vec![String::from("default")],
@@ -665,6 +670,39 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
     #[cfg(feature = "log-config")]
     {
         let appenders = if let Some(appenders) = config.appenders() {
+            let check_file_readability = |path: &Path| {
+                OpenOptions::new()
+                    .write(true)
+                    .create(!path.exists())
+                    .open(path)
+                    .map(|_| ())
+                    .map_err(|err| UserError::IoError {
+                        context: format!("logfile is not writeable: {}", path.display()),
+                        source: Some(Box::new(err)),
+                    })
+            };
+            appenders
+                .iter()
+                .filter_map(AppenderConfig::get_filename)
+                .try_for_each(|filename| {
+                    let path = Path::new(filename);
+                    if let Some(parent) = path.parent() {
+                        if !parent.exists() {
+                            Err(UserError::IoError {
+                                context: format!(
+                                    "logfile directory does not exist: {}",
+                                    parent.display()
+                                ),
+                                source: None,
+                            })
+                        } else {
+                            check_file_readability(path)
+                        }
+                    } else {
+                        check_file_readability(path)
+                    }
+                })?;
+
             appenders
         } else {
             vec![]

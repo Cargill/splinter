@@ -94,6 +94,19 @@ pub enum RawLogTarget {
     RollingFile,
 }
 
+impl AppenderConfig {
+    pub fn get_filename(&self) -> Option<&str> {
+        match &self.kind {
+            LogTarget::File(file) => Some(file),
+            LogTarget::RollingFile {
+                filename: file,
+                size: _,
+            } => Some(file),
+            _ => None,
+        }
+    }
+}
+
 impl From<TomlRawLogTarget> for RawLogTarget {
     fn from(unnamed: TomlRawLogTarget) -> Self {
         match unnamed {
