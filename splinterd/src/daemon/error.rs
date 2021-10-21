@@ -23,6 +23,7 @@ use crate::error::UserError;
 #[derive(Debug)]
 pub enum CreateError {
     MissingRequiredField(String),
+    InvalidArgument(String),
 }
 
 impl Error for CreateError {}
@@ -31,6 +32,7 @@ impl fmt::Display for CreateError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             CreateError::MissingRequiredField(msg) => write!(f, "missing required field: {}", msg),
+            CreateError::InvalidArgument(msg) => f.write_str(msg),
         }
     }
 }
