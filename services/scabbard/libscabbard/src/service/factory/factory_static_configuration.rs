@@ -62,6 +62,14 @@ pub enum ScabbardStorageConfiguration {
     DatabaseConnectionUri {
         connection_uri: ConnectionUri,
     },
+    #[cfg(feature = "postgres")]
+    Postgres {
+        pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
+    },
+    #[cfg(feature = "sqlite")]
+    Sqlite {
+        pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
+    },
 }
 
 impl ScabbardStorageConfiguration {
@@ -83,6 +91,20 @@ impl ScabbardStorageConfiguration {
             s => ConnectionUri::Unknown(s.into()),
         };
         ScabbardStorageConfiguration::DatabaseConnectionUri { connection_uri }
+    }
+
+    #[cfg(feature = "postgres")]
+    fn with_postgres_connection_pool(
+        pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
+    ) -> Self {
+        Self::Postgres { pool }
+    }
+
+    #[cfg(feature = "sqlite")]
+    fn with_sqlite_connection_pool(
+        pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
+    ) -> Self {
+        Self::Sqlite { pool }
     }
 
     fn with_db_dir(self, db_dir: String) -> Self {
@@ -171,6 +193,32 @@ impl ScabbardFactoryBuilder {
         self
     }
 
+    #[cfg(feature = "postgres")]
+    /// Sets the receipt db connection pool to be used by the resulting factory with a Postgres
+    /// connection pool.
+    pub fn with_receipt_postgres_connection_pool(
+        mut self,
+        pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
+    ) -> Self {
+        self.receipt_storage_configuration = Some(
+            ScabbardStorageConfiguration::with_postgres_connection_pool(pool),
+        );
+        self
+    }
+
+    #[cfg(feature = "sqlite")]
+    /// Sets the receipt db connection pool to be used by the resulting factory with a SQLite
+    /// connection pool.
+    pub fn with_receipt_sqlite_connection_pool(
+        mut self,
+        pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
+    ) -> Self {
+        self.receipt_storage_configuration = Some(
+            ScabbardStorageConfiguration::with_sqlite_connection_pool(pool),
+        );
+        self
+    }
+
     pub fn with_receipt_storage_configuration(
         mut self,
         storage_config: ScabbardStorageConfiguration,
@@ -211,6 +259,14 @@ impl ScabbardFactoryBuilder {
                     db_dir: db_dir.unwrap_or_else(|| DEFAULT_RECEIPT_DB_DIR.into()),
                     db_size: db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
                 }
+            }
+            #[cfg(feature = "postgres")]
+            ScabbardStorageConfiguration::Postgres { pool } => {
+                ScabbardFactoryStorageConfig::Postgres { pool }
+            }
+            #[cfg(feature = "sqlite")]
+            ScabbardStorageConfiguration::Sqlite { pool } => {
+                ScabbardFactoryStorageConfig::Sqlite { pool }
             }
             ScabbardStorageConfiguration::DatabaseConnectionUri { connection_uri } => {
                 match connection_uri {

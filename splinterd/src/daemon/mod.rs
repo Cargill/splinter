@@ -98,6 +98,7 @@ use crate::routes;
 
 pub use error::{CreateError, StartError};
 use registry::RegistryShutdownHandle;
+pub use store::ConnectionUri;
 
 const ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
@@ -125,7 +126,7 @@ pub struct SplinterDaemon {
     rest_api_endpoint: String,
     #[cfg(feature = "https-bind")]
     rest_api_ssl_settings: Option<(String, String)>,
-    db_url: String,
+    db_url: ConnectionUri,
     registries: Vec<String>,
     registry_auto_refresh: u64,
     registry_forced_refresh: u64,
@@ -164,7 +165,12 @@ impl SplinterDaemon {
         let mut service_transport = InprocTransport::default();
         transport.add_transport(Box::new(service_transport.clone()));
 
-        let store_factory = create_store_factory(&self.db_url)?;
+        let connection_pool = store::create_connection_pool(&self.db_url).map_err(|err| {
+            StartError::StorageError(format!("Failed to initialize connection pool: {}", err))
+        })?;
+        let store_factory = store::create_store_factory(&connection_pool).map_err(|err| {
+            StartError::StorageError(format!("Failed to initialize store factory: {}", err))
+        })?;
 
         let circuits_location = Path::new(&self.state_dir).join("circuits.yaml");
         let proposals_location = Path::new(&self.state_dir).join("circuit_proposals.yaml");
@@ -451,8 +457,18 @@ impl SplinterDaemon {
         }
         #[cfg(any(feature = "database-postgres", feature = "database-sqlite"))]
         {
-            scabbard_factory_builder =
-                scabbard_factory_builder.with_receipt_db_url(self.db_url.to_string());
+            match connection_pool {
+                #[cfg(feature = "database-postgres")]
+                store::ConnectionPool::Postgres { pool } => {
+                    scabbard_factory_builder =
+                        scabbard_factory_builder.with_receipt_postgres_connection_pool(pool);
+                }
+                #[cfg(feature = "database-sqlite")]
+                store::ConnectionPool::Sqlite { pool } => {
+                    scabbard_factory_builder =
+                        scabbard_factory_builder.with_receipt_sqlite_connection_pool(pool);
+                }
+            }
         }
 
         let scabbard_factory = scabbard_factory_builder.build().map_err(|err| {
@@ -1026,17 +1042,6 @@ fn start_health_service(
 
     health_service_processor.start().map_err(|err| {
         StartError::HealthServiceError(format!("unable to health service processor: {}", err))
-    })
-}
-
-fn create_store_factory(
-    db_url: &str,
-) -> Result<Box<dyn splinter::store::StoreFactory>, StartError> {
-    let connection_uri = db_url.parse().map_err(|err| {
-        StartError::StorageError(format!("Invalid database URL provided: {}", err))
-    })?;
-    store::create_store_factory(connection_uri).map_err(|err| {
-        StartError::StorageError(format!("Failed to initialize store factory: {}", err))
     })
 }
 
