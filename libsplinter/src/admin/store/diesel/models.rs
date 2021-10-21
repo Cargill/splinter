@@ -46,6 +46,7 @@ use crate::admin::store::{
 };
 use crate::admin::store::{Circuit, CircuitProposal, ProposedCircuit};
 use crate::error::{InternalError, InvalidStateError};
+use crate::public_key::PublicKey;
 
 /// Database model representation of a `CircuitProposal`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
@@ -65,7 +66,7 @@ impl From<&CircuitProposal> for CircuitProposalModel {
             proposal_type: String::from(proposal.proposal_type()),
             circuit_id: proposal.circuit_id().into(),
             circuit_hash: proposal.circuit_hash().into(),
-            requester: proposal.requester().to_vec(),
+            requester: proposal.requester().as_slice().to_vec(),
             requester_node_id: proposal.requester_node_id().into(),
         }
     }
@@ -132,7 +133,7 @@ impl TryFrom<&CircuitProposal> for Vec<VoteRecordModel> {
             .map(|(idx, vote)| {
                 Ok(VoteRecordModel {
                     circuit_id: proposal.circuit_id().into(),
-                    public_key: vote.public_key().into(),
+                    public_key: vote.public_key().as_slice().to_vec(),
                     vote: String::from(vote.vote()),
                     voter_node_id: vote.voter_node_id().into(),
                     position: i32::try_from(idx).map_err(|_| {
@@ -150,7 +151,7 @@ impl TryFrom<&VoteRecordModel> for VoteRecord {
     type Error = AdminServiceStoreError;
     fn try_from(vote: &VoteRecordModel) -> Result<Self, Self::Error> {
         VoteRecordBuilder::new()
-            .with_public_key(&vote.public_key)
+            .with_public_key(&PublicKey::from_bytes(vote.public_key.to_vec()))
             .with_vote(&Vote::try_from(vote.vote.clone())?)
             .with_voter_node_id(&vote.voter_node_id)
             .build()
@@ -619,7 +620,9 @@ impl TryFrom<&AdminEventVoteRecordModel> for VoteRecord {
         admin_event_vote_record_model: &AdminEventVoteRecordModel,
     ) -> Result<Self, Self::Error> {
         VoteRecordBuilder::new()
-            .with_public_key(&admin_event_vote_record_model.public_key)
+            .with_public_key(&PublicKey::from_bytes(
+                admin_event_vote_record_model.public_key.to_vec(),
+            ))
             .with_vote(
                 &Vote::try_from(admin_event_vote_record_model.vote.clone()).map_err(|_| {
                     InvalidStateError::with_message("Unable to convert string to Vote".into())

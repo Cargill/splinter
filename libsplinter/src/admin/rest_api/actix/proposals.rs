@@ -242,6 +242,7 @@ mod tests {
             ProposedCircuitBuilder, ProposedNodeBuilder,
         },
     };
+    use crate::public_key::PublicKey;
     use crate::rest_api::{
         actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
         paging::Paging,
@@ -690,7 +691,7 @@ mod tests {
                         .build()
                         .expect("Unable to create proposed circuit"),
                 )
-                .with_requester(&[])
+                .with_requester(&PublicKey::from_bytes(vec![]))
                 .with_requester_node_id("node_id")
                 .build()
                 .expect("unable to build proposal"),
@@ -714,7 +715,7 @@ mod tests {
                         .build()
                         .expect("Unable to create proposed circuit"),
                 )
-                .with_requester(&[])
+                .with_requester(&PublicKey::from_bytes(vec![]))
                 .with_requester_node_id("node_id")
                 .build()
                 .expect("unable to build proposal"),
@@ -740,7 +741,7 @@ mod tests {
                         .build()
                         .expect("Unable to create proposed circuit"),
                 )
-                .with_requester(&[])
+                .with_requester(&PublicKey::from_bytes(vec![]))
                 .with_requester_node_id("node_id")
                 .build()
                 .expect("unable to build proposal"),

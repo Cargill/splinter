@@ -794,7 +794,9 @@ impl AdminServiceShared {
                 };
 
                 let vote_record = VoteRecordBuilder::new()
-                    .with_public_key(signer_public_key)
+                    .with_public_key(&public_key::PublicKey::from_bytes(
+                        signer_public_key.to_vec(),
+                    ))
                     .with_vote(&vote)
                     .with_voter_node_id(header.get_requester_node_id())
                     .build()
@@ -2736,7 +2738,7 @@ impl AdminServiceShared {
         if circuit_proposal.requester_node_id() == node_id {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Received vote from requester node: {}",
-                to_hex(circuit_proposal.requester())
+                to_hex(circuit_proposal.requester().as_slice())
             )));
         }
 

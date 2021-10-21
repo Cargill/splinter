@@ -19,6 +19,7 @@ use std::convert::TryFrom;
 use crate::admin::messages::{self, is_valid_circuit_id};
 use crate::error::InvalidStateError;
 use crate::protos::admin;
+use crate::public_key::PublicKey;
 
 use super::ProposedCircuit;
 
@@ -30,7 +31,7 @@ pub struct CircuitProposal {
     circuit_hash: String,
     circuit: ProposedCircuit,
     votes: Vec<VoteRecord>,
-    requester: Vec<u8>,
+    requester: PublicKey,
     requester_node_id: String,
 }
 
@@ -61,7 +62,7 @@ impl CircuitProposal {
     }
 
     /// Returns the public key that requested the proposal
-    pub fn requester(&self) -> &[u8] {
+    pub fn requester(&self) -> &PublicKey {
         &self.requester
     }
 
@@ -107,7 +108,7 @@ impl CircuitProposal {
             circuit_hash: proto.take_circuit_hash(),
             circuit: ProposedCircuit::from_proto(proto.take_circuit_proposal())?,
             votes,
-            requester: proto.take_requester(),
+            requester: PublicKey::from_bytes(proto.take_requester()),
             requester_node_id: proto.take_requester_node_id(),
         })
     }
@@ -135,7 +136,7 @@ impl CircuitProposal {
         proposal.set_circuit_hash(self.circuit_hash.to_string());
         proposal.set_circuit_proposal(circuit);
         proposal.set_votes(protobuf::RepeatedField::from_vec(votes));
-        proposal.set_requester(self.requester.to_vec());
+        proposal.set_requester(self.requester.into_bytes());
         proposal.set_requester_node_id(self.requester_node_id);
 
         proposal
@@ -150,7 +151,7 @@ pub struct CircuitProposalBuilder {
     circuit_hash: Option<String>,
     circuit: Option<ProposedCircuit>,
     votes: Option<Vec<VoteRecord>>,
-    requester: Option<Vec<u8>>,
+    requester: Option<PublicKey>,
     requester_node_id: Option<String>,
 }
 
@@ -186,7 +187,7 @@ impl CircuitProposalBuilder {
     }
 
     /// Returns the public key of the original request of the proposal
-    pub fn requester(&self) -> Option<Vec<u8>> {
+    pub fn requester(&self) -> Option<PublicKey> {
         self.requester.clone()
     }
 
@@ -251,8 +252,8 @@ impl CircuitProposalBuilder {
     /// # Arguments
     ///
     ///  * `requester` - The public key of the requester
-    pub fn with_requester(mut self, requester: &[u8]) -> CircuitProposalBuilder {
-        self.requester = Some(requester.to_vec());
+    pub fn with_requester(mut self, requester: &PublicKey) -> CircuitProposalBuilder {
+        self.requester = Some(requester.clone());
         self
     }
 
@@ -346,7 +347,7 @@ impl TryFrom<&messages::CircuitProposal> for CircuitProposal {
                     .map(VoteRecord::from)
                     .collect::<Vec<VoteRecord>>(),
             )
-            .with_requester(&admin_proposal.requester)
+            .with_requester(&PublicKey::from_bytes(admin_proposal.requester.clone()))
             .with_requester_node_id(&admin_proposal.requester_node_id)
             .build()
     }
@@ -355,14 +356,14 @@ impl TryFrom<&messages::CircuitProposal> for CircuitProposal {
 // Native representation of a vote record for a proposal
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VoteRecord {
-    public_key: Vec<u8>,
+    public_key: PublicKey,
     vote: Vote,
     voter_node_id: String,
 }
 
 impl VoteRecord {
     /// Returns the public key that submitted the vote
-    pub fn public_key(&self) -> &[u8] {
+    pub fn public_key(&self) -> &PublicKey {
         &self.public_key
     }
 
@@ -388,7 +389,7 @@ impl VoteRecord {
         };
 
         Ok(Self {
-            public_key: proto.take_public_key(),
+            public_key: PublicKey::from_bytes(proto.take_public_key()),
             vote,
             voter_node_id: proto.take_voter_node_id(),
         })
@@ -402,7 +403,7 @@ impl VoteRecord {
 
         let mut vote_record = admin::CircuitProposal_VoteRecord::new();
         vote_record.set_vote(vote);
-        vote_record.set_public_key(self.public_key);
+        vote_record.set_public_key(self.public_key.into_bytes());
         vote_record.set_voter_node_id(self.voter_node_id);
 
         vote_record
@@ -411,7 +412,7 @@ impl VoteRecord {
 
 #[derive(Default)]
 pub struct VoteRecordBuilder {
-    public_key: Option<Vec<u8>>,
+    public_key: Option<PublicKey>,
     vote: Option<Vote>,
     voter_node_id: Option<String>,
 }
@@ -422,7 +423,7 @@ impl VoteRecordBuilder {
     }
 
     /// Returns the public key that submitted the vote
-    pub fn public_key(&self) -> Option<Vec<u8>> {
+    pub fn public_key(&self) -> Option<PublicKey> {
         self.public_key.clone()
     }
 
@@ -436,8 +437,8 @@ impl VoteRecordBuilder {
         self.voter_node_id.clone()
     }
 
-    pub fn with_public_key(mut self, public_key: &[u8]) -> VoteRecordBuilder {
-        self.public_key = Some(public_key.to_vec());
+    pub fn with_public_key(mut self, public_key: &PublicKey) -> VoteRecordBuilder {
+        self.public_key = Some(public_key.clone());
         self
     }
 
@@ -534,7 +535,7 @@ impl TryFrom<&admin::CircuitProposal_ProposalType> for ProposalType {
 impl From<&messages::VoteRecord> for VoteRecord {
     fn from(admin_vote_record: &messages::VoteRecord) -> Self {
         VoteRecord {
-            public_key: admin_vote_record.public_key.to_vec(),
+            public_key: PublicKey::from_bytes(admin_vote_record.public_key.to_vec()),
             vote: Vote::from(&admin_vote_record.vote),
             voter_node_id: admin_vote_record.voter_node_id.to_string(),
         }

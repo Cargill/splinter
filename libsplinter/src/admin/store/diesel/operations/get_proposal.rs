@@ -271,7 +271,7 @@ where
                     .with_circuit_hash(&proposal.circuit_hash)
                     .with_circuit(&native_proposed_circuit)
                     .with_votes(&vote_record)
-                    .with_requester(&proposal.requester)
+                    .with_requester(&PublicKey::from_bytes(proposal.requester.to_vec()))
                     .with_requester_node_id(&proposal.requester_node_id)
                     .build()
                     .map_err(AdminServiceStoreError::InvalidStateError)?,

@@ -650,13 +650,13 @@ impl From<store::CircuitProposal> for CircuitProposal {
                     };
 
                     VoteRecord {
-                        public_key: vote_record.public_key().into(),
+                        public_key: vote_record.public_key().as_slice().to_vec(),
                         vote,
                         voter_node_id: vote_record.voter_node_id().into(),
                     }
                 })
                 .collect(),
-            requester: store_proposal.requester().into(),
+            requester: store_proposal.requester().as_slice().to_vec(),
             requester_node_id: store_proposal.requester_node_id().into(),
         }
     }
