@@ -23,7 +23,7 @@ use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::MetadataExt;
 
 use clap::ArgMatches;
-use cylinder::{secp256k1::Secp256k1Context, Context};
+use sawtooth_sdk::signing;
 
 use crate::error::CliError;
 
@@ -99,11 +99,15 @@ pub fn create_key_pair(
         }
     }
 
-    let context = Secp256k1Context::new();
+    let context = signing::create_context("secp256k1").map_err(|err| {
+        CliError::ActionError(format!("Failed to create signing context: {}", err))
+    })?;
 
-    let private_key = context.new_random_private_key();
+    let private_key = context.new_random_private_key().map_err(|err| {
+        CliError::ActionError(format!("Failed to generate new private key: {}", err))
+    })?;
     let public_key = context
-        .get_public_key(&private_key)
+        .get_public_key(&*private_key)
         .map_err(|err| CliError::ActionError(format!("Failed to get public key: {}", err)))?;
 
     let key_dir_info = metadata(key_dir).map_err(|err| {
@@ -184,5 +188,5 @@ pub fn create_key_pair(
         chown(public_key_path.as_path(), key_dir_uid, key_dir_gid)?;
     }
 
-    Ok(public_key.into_bytes())
+    Ok(public_key.as_slice().to_vec())
 }
