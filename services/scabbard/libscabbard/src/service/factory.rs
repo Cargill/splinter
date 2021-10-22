@@ -16,10 +16,12 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::time::Duration;
 
-use cylinder::VerifierFactory;
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::{ServiceArgValidationError, ServiceArgValidator};
-use splinter::service::{FactoryCreateError, Service, ServiceFactory};
+use splinter::{
+    service::{FactoryCreateError, Service, ServiceFactory},
+    signing::SignatureVerifierFactory,
+};
 
 #[cfg(feature = "service-arg-validation")]
 use crate::hex::parse_hex;
@@ -37,7 +39,7 @@ pub struct ScabbardFactory {
     state_db_size: usize,
     receipt_db_dir: String,
     receipt_db_size: usize,
-    signature_verifier_factory: Box<dyn VerifierFactory>,
+    signature_verifier_factory: Box<dyn SignatureVerifierFactory>,
 }
 
 impl ScabbardFactory {
@@ -46,7 +48,7 @@ impl ScabbardFactory {
         state_db_size: Option<usize>,
         receipt_db_dir: Option<String>,
         receipt_db_size: Option<usize>,
-        signature_verifier_factory: Box<dyn VerifierFactory>,
+        signature_verifier_factory: Box<dyn SignatureVerifierFactory>,
     ) -> Self {
         ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
@@ -165,7 +167,7 @@ impl ServiceFactory for ScabbardFactory {
             self.state_db_size,
             receipt_db_dir,
             self.receipt_db_size,
-            self.signature_verifier_factory.new_verifier(),
+            self.signature_verifier_factory.create_verifier(),
             admin_keys,
             coordinator_timeout,
         )
@@ -217,7 +219,7 @@ impl ServiceFactory for ScabbardFactory {
 mod tests {
     use super::*;
 
-    use cylinder::secp256k1::Secp256k1Context;
+    use splinter::signing::hash::HashVerifier;
 
     /// Verify that the scabbard factory produces a valid `Scabbard` instance.
     #[test]
@@ -288,7 +290,7 @@ mod tests {
             Some(1024 * 1024),
             Some("/tmp".into()),
             Some(1024 * 1024),
-            Box::new(Secp256k1Context::new()),
+            Box::new(HashVerifier),
         )
     }
 
