@@ -453,7 +453,7 @@ paths:
                   data:
                     type: array
                     items:
-                      type: '#/components/schemas/Permission'
+                      $ref: '#/components/schemas/Permission'
         400:
           description: Request was malformed
           content:
