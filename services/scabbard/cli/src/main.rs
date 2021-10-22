@@ -777,9 +777,9 @@ fn run() -> Result<(), CliError> {
                     .with_outputs(smart_contract.metadata.outputs)
                     .with_contract(smart_contract.contract)
                     .into_payload_builder()?
-                    .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_transaction_builder(&signer)?
+                    .into_batch_builder(&signer)?
+                    .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -930,9 +930,9 @@ fn run() -> Result<(), CliError> {
                 .with_outputs(outputs)
                 .with_payload(contract_payload)
                 .into_payload_builder()?
-                .into_transaction_builder(&*signer)?
-                .into_batch_builder(&*signer)?
-                .build(&*signer)?;
+                .into_transaction_builder(&signer)?
+                .into_batch_builder(&signer)?
+                .build(&signer)?;
 
             Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
         }
@@ -972,9 +972,9 @@ fn run() -> Result<(), CliError> {
                     .with_namespace(namespace.into())
                     .with_owners(owners)
                     .into_payload_builder()?
-                    .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_transaction_builder(&signer)?
+                    .into_batch_builder(&signer)?
+                    .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1013,9 +1013,9 @@ fn run() -> Result<(), CliError> {
                     .with_namespace(namespace.into())
                     .with_owners(owners)
                     .into_payload_builder()?
-                    .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_transaction_builder(&signer)?
+                    .into_batch_builder(&signer)?
+                    .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1048,9 +1048,9 @@ fn run() -> Result<(), CliError> {
                 let batch = DeleteNamespaceRegistryActionBuilder::new()
                     .with_namespace(namespace.into())
                     .into_payload_builder()?
-                    .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_transaction_builder(&signer)?
+                    .into_batch_builder(&signer)?
+                    .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1102,9 +1102,9 @@ fn run() -> Result<(), CliError> {
             };
 
             let batch = payload_builder
-                .into_transaction_builder(&*signer)?
-                .into_batch_builder(&*signer)?
-                .build(&*signer)?;
+                .into_transaction_builder(&signer)?
+                .into_batch_builder(&signer)?
+                .build(&signer)?;
 
             Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
         }
@@ -1144,9 +1144,9 @@ fn run() -> Result<(), CliError> {
                     .with_name(name.into())
                     .with_owners(owners)
                     .into_payload_builder()?
-                    .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_transaction_builder(&signer)?
+                    .into_batch_builder(&signer)?
+                    .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1185,9 +1185,9 @@ fn run() -> Result<(), CliError> {
                     .with_name(name.into())
                     .with_owners(owners)
                     .into_payload_builder()?
-                    .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_transaction_builder(&signer)?
+                    .into_batch_builder(&signer)?
+                    .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1220,9 +1220,9 @@ fn run() -> Result<(), CliError> {
                 let batch = DeleteContractRegistryActionBuilder::new()
                     .with_name(name.into())
                     .into_payload_builder()?
-                    .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_transaction_builder(&signer)?
+                    .into_batch_builder(&signer)?
+                    .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1267,9 +1267,9 @@ fn run() -> Result<(), CliError> {
                     .with_org_id(org_id.to_string())
                     .with_function(function)
                     .into_payload_builder()?
-                    .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_transaction_builder(&signer)?
+                    .into_batch_builder(&signer)?
+                    .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1311,9 +1311,9 @@ fn run() -> Result<(), CliError> {
                     .with_org_id(org_id.to_string())
                     .with_function(function)
                     .into_payload_builder()?
-                    .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_transaction_builder(&signer)?
+                    .into_batch_builder(&signer)?
+                    .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
@@ -1350,9 +1350,9 @@ fn run() -> Result<(), CliError> {
                     .with_name(name.to_string())
                     .with_org_id(org_id.to_string())
                     .into_payload_builder()?
-                    .into_transaction_builder(&*signer)?
-                    .into_batch_builder(&*signer)?
-                    .build(&*signer)?;
+                    .into_transaction_builder(&signer)?
+                    .into_batch_builder(&signer)?
+                    .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
