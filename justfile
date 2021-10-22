@@ -57,6 +57,7 @@ build:
 ci:
     just ci-lint-client
     just ci-lint-dockerfiles
+    just ci-lint-openapi
     just ci-lint-splinter
     just ci-shellcheck
     just ci-test
@@ -77,6 +78,8 @@ ci-lint-splinter:
     docker-compose -f docker/compose/run-lint.yaml build lint-splinter
     docker-compose -f docker/compose/run-lint.yaml up \
       --abort-on-container-exit lint-splinter
+
+ci-lint-openapi: lint-openapi
 
 ci-shellcheck:
     #!/usr/bin/env sh
@@ -156,6 +159,13 @@ lint-ignore:
     set -e
     diff -u .dockerignore .gitignore
     echo "\n\033[92mLint Ignore Files Success\033[0m\n"
+
+lint-openapi:
+    #!/usr/bin/env sh
+    set -e
+    docker run --volume "$PWD":/data jamescooke/openapi-validator:0.46.0 -e \
+    	splinterd/api/static/openapi.yaml examples/gameroom/daemon/openapi.yml
+    echo "\n\033[92mLint Splinter OpenAPI Success\033[0m\n"
 
 metrics:
     docker-compose -f docker/metrics/docker-compose.yaml down;
