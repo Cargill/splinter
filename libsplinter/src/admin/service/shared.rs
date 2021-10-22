@@ -1911,7 +1911,7 @@ impl AdminServiceShared {
         let public_key = header.get_requester();
 
         self.signature_verifier
-            .verify(&payload.get_header(), &signature, &public_key)
+            .verify(payload.get_header(), signature, public_key)
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
     }
 }
