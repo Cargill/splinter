@@ -178,6 +178,172 @@ pub(in crate::admin) fn commit_2_party_circuit(
     assert_eq!(circuit_a, circuit_b);
 }
 
+/// This method has the same functionality as `commit_2_party_circuit` but takes an extra arg,
+/// `auth`. The string stored in `auth` is passed to the `admin_service_client_with_auth` and
+/// `admin_service_event_client_with_auth` methods. The clients will use the auth string in
+/// authorization headers when submitting requests to the REST API.
+pub(in crate::admin) fn commit_2_party_circuit_with_auth(
+    circuit_id: &str,
+    node_a: &Node,
+    node_b: &Node,
+    auth_type: AuthorizationType,
+    auth: String,
+) {
+    // Create the list of node details needed to build the `CircuitCreateRequest`
+    let node_info = vec![
+        (
+            node_a.node_id().to_string(),
+            (
+                node_a.network_endpoints().to_vec(),
+                node_a
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
+        ),
+        (
+            node_b.node_id().to_string(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
+                    .public_key()
+                    .expect("Unable to get second node's public key"),
+            ),
+        ),
+    ]
+    .into_iter()
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
+
+    let node_b_admin_pubkey = admin_pubkey(node_b);
+
+    let node_a_event_client = node_a
+        .admin_service_event_client_with_auth(
+            &format!("test_circuit_{}", &circuit_id),
+            None,
+            auth.clone(),
+        )
+        .expect("Unable to get event client");
+    let node_b_event_client = node_b
+        .admin_service_event_client_with_auth(
+            &format!("test_circuit_{}", &circuit_id),
+            None,
+            auth.clone(),
+        )
+        .expect("Unable to get event client");
+
+    let circuit_payload_bytes = make_create_circuit_payload(
+        &circuit_id,
+        node_a.node_id(),
+        node_info,
+        &*node_a.admin_signer().clone_box(),
+        &vec![
+            node_a
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get first node's public key")
+                .as_hex(),
+            node_b
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get second node's public key")
+                .as_hex(),
+        ],
+        auth_type,
+    )
+    .expect("Unable to generate circuit request");
+    // Submit the `CircuitManagementPayload` to the first node
+    let res = node_a
+        .admin_service_client_with_auth(auth.clone())
+        .submit_admin_payload(circuit_payload_bytes.clone());
+    assert!(res.is_ok());
+
+    // Wait for the proposal event from each node.
+    let proposal_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let proposal_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+
+    assert_eq!(&EventType::ProposalSubmitted, proposal_a_event.event_type());
+    assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
+    assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
+
+    // Submit the same `CircuitManagmentPayload` to create the circuit to the second node
+    // to validate this duplicate proposal is rejected
+    let duplicate_res = node_b
+        .admin_service_client_with_auth(auth.clone())
+        .submit_admin_payload(circuit_payload_bytes);
+    assert!(
+        duplicate_res.is_err(),
+        "node {} erroneously accepted a duplicate proposal",
+        node_b.node_id()
+    );
+
+    // Create the `CircuitProposalVote` to be sent to a node
+    // Uses `true` for the `accept` argument to create a vote to accept the proposal
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_a_event.proposal().clone(),
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_b
+        .admin_service_client_with_auth(auth.clone())
+        .submit_admin_payload(vote_payload_bytes);
+    assert!(res.is_ok());
+
+    // Wait for proposal accepted
+    let accepted_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let accepted_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_b_admin_pubkey.clone()
+        },
+        accepted_a_event.event_type(),
+    );
+    assert_eq!(
+        &EventType::ProposalAccepted {
+            requester: node_b_admin_pubkey.clone()
+        },
+        accepted_b_event.event_type(),
+    );
+    assert_eq!(accepted_a_event.proposal(), accepted_b_event.proposal());
+
+    // Wait for circuit ready.
+    let ready_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let ready_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    assert_eq!(ready_a_event.event_type(), &EventType::CircuitReady);
+    assert_eq!(ready_b_event.event_type(), &EventType::CircuitReady);
+    assert_eq!(ready_a_event.proposal(), ready_b_event.proposal());
+
+    let circuit_a = node_a
+        .admin_service_client_with_auth(auth.clone())
+        .fetch_circuit(&circuit_id)
+        .expect("Unable to get circuit from node_b")
+        .expect("Circuit was not found");
+    let circuit_b = node_b
+        .admin_service_client_with_auth(auth)
+        .fetch_circuit(&circuit_id)
+        .expect("Unable to get circuit from node_b")
+        .expect("Circuit was not found");
+
+    assert_eq!(circuit_a, circuit_b);
+}
+
 /// Commit a 3-party circuit on a network that is already running
 /// This function also validates that any duplicate proposal of the circuit being created is
 /// rejected when submitted.

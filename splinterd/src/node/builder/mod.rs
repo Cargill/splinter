@@ -30,12 +30,16 @@ use splinter::error::InternalError;
 use splinter::public_key::PublicKey;
 use splinter::rest_api::actix_web_1::RestApiBuilder as RestApiBuilder1;
 use splinter::rest_api::actix_web_3::RestApiBuilder as RestApiBuilder3;
+use splinter::rest_api::auth::authorization::rbac::RoleBasedAuthorizationHandler;
 use splinter::rest_api::auth::{
-    authorization::{AuthorizationHandler, AuthorizationHandlerResult},
+    authorization::{
+        rbac::store::{AssignmentBuilder, Identity as AssignmentIdentity, RoleBuilder},
+        AuthorizationHandler, AuthorizationHandlerResult,
+    },
     identity::Identity,
 };
 use splinter::rest_api::BindConfig;
-use splinter::store::StoreFactory;
+use splinter::store::{memory::MemoryStoreFactory, StoreFactory};
 
 use super::{RunnableNode, RunnableNodeRestApiVariant, ScabbardConfig};
 
@@ -64,6 +68,8 @@ pub struct NodeBuilder {
     signers: Option<Vec<Box<dyn Signer>>>,
     biome_auth: Option<BiomeCredentialsRestResourceProvider>,
     cylinder_auth: Option<Box<dyn Verifier>>,
+    permission_config: Option<Vec<PermissionConfig>>,
+    store_factory: Option<Box<dyn StoreFactory>>,
 }
 
 impl Default for NodeBuilder {
@@ -86,6 +92,8 @@ impl NodeBuilder {
             signers: None,
             biome_auth: None,
             cylinder_auth: None,
+            permission_config: None,
+            store_factory: None,
         }
     }
 
@@ -135,9 +143,7 @@ impl NodeBuilder {
 
     /// Specifies the store factory to use with the node. Defaults to the MemoryStoreFactory.
     pub fn with_store_factory(mut self, store_factory: Box<dyn StoreFactory>) -> Self {
-        self.admin_subsystem_builder = self
-            .admin_subsystem_builder
-            .with_store_factory(store_factory);
+        self.store_factory = Some(store_factory);
         self
     }
 
@@ -189,6 +195,14 @@ impl NodeBuilder {
     /// Make Biome resources available on the network
     pub fn with_biome_enabled(mut self) -> Self {
         self.enable_biome = true;
+        self
+    }
+
+    pub fn with_permission_config(
+        mut self,
+        permission_config: Option<Vec<PermissionConfig>>,
+    ) -> Self {
+        self.permission_config = permission_config;
         self
     }
 
@@ -250,6 +264,43 @@ impl NodeBuilder {
             .with_signers(signers.clone())
             .build()?;
 
+        let store_factory = match self.store_factory {
+            Some(store_factory) => store_factory,
+            None => Box::new(MemoryStoreFactory::new()?),
+        };
+
+        let rbac_store = store_factory.get_role_based_authorization_store();
+
+        // Sets permissions if any were given
+        if let Some(ref permission_config) = self.permission_config {
+            for (i, perm) in permission_config.iter().enumerate() {
+                let permissions = &perm.permissions();
+                let pub_key = perm
+                    .signer()
+                    .public_key()
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                let role = RoleBuilder::new()
+                    .with_id(format!("{}", i))
+                    .with_display_name(format!("{}", i))
+                    .with_permissions(permissions.to_vec())
+                    .build()
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+                let assignment = AssignmentBuilder::new()
+                    .with_identity(AssignmentIdentity::Key(pub_key.as_hex()))
+                    .with_roles(vec![format!("{}", i)])
+                    .build()
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+                rbac_store
+                    .add_role(role)
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                rbac_store
+                    .add_assignment(assignment)
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            }
+        };
+
         let admin_subsystem_builder = self
             .admin_subsystem_builder
             .with_node_id(node_id.clone())
@@ -264,13 +315,24 @@ impl NodeBuilder {
                             .map_err(|err| InternalError::from_source(Box::new(err)))
                     })
                     .collect::<Result<Vec<PublicKey>, InternalError>>()?,
-            );
+            )
+            .with_store_factory(store_factory);
+
+        let authorization_handlers: Vec<Box<dyn AuthorizationHandler>> =
+            match self.permission_config {
+                Some(_) => {
+                    vec![Box::new(RoleBasedAuthorizationHandler::new(
+                        rbac_store.clone(),
+                    ))]
+                }
+                None => vec![Box::new(MockAuthorizationHandler)],
+            };
 
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => RunnableNodeRestApiVariant::ActixWeb1(
                 RestApiBuilder1::new()
                     .with_bind(BindConfig::Http(url))
-                    .with_authorization_handlers(vec![Box::new(MockAuthorizationHandler)]),
+                    .with_authorization_handlers(authorization_handlers),
             ),
             RestApiVariant::ActixWeb3 => RunnableNodeRestApiVariant::ActixWeb3(
                 RestApiBuilder3::new()
@@ -304,6 +366,28 @@ impl NodeBuilder {
             enable_biome,
             signers,
         })
+    }
+}
+
+#[derive(Clone)]
+pub struct PermissionConfig {
+    permissions: Vec<String>,
+    signer: Box<dyn Signer>,
+}
+
+impl PermissionConfig {
+    pub fn new(permissions: Vec<String>, signer: Box<dyn Signer>) -> Self {
+        Self {
+            permissions,
+            signer,
+        }
+    }
+
+    pub fn permissions(&self) -> Vec<String> {
+        self.permissions.clone()
+    }
+    pub fn signer(&self) -> Box<dyn Signer> {
+        self.signer.clone()
     }
 }
 

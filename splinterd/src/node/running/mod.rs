@@ -92,6 +92,16 @@ impl Node {
         ))
     }
 
+    pub fn admin_service_client_with_auth(
+        self: &Node,
+        auth: String,
+    ) -> Box<dyn AdminServiceClient> {
+        Box::new(ReqwestAdminServiceClient::new(
+            format!("http://localhost:{}", self.rest_api_port),
+            auth,
+        ))
+    }
+
     pub fn admin_service_event_client(
         &self,
         event_type: &str,
@@ -100,6 +110,20 @@ impl Node {
         self.admin_subsystem.admin_service_event_client(
             format!("http://localhost:{}", self.rest_api_port),
             "foo".to_string(),
+            event_type.to_string(),
+            last_event_id,
+        )
+    }
+
+    pub fn admin_service_event_client_with_auth(
+        &self,
+        event_type: &str,
+        last_event_id: Option<u64>,
+        auth: String,
+    ) -> Result<Box<dyn AdminServiceEventClient>, InternalError> {
+        self.admin_subsystem.admin_service_event_client(
+            format!("http://localhost:{}", self.rest_api_port),
+            auth,
             event_type.to_string(),
             last_event_id,
         )

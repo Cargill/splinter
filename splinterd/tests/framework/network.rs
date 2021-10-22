@@ -21,7 +21,9 @@ use cylinder::{secp256k1::Secp256k1Context, Context};
 use splinter::error::{InternalError, InvalidArgumentError};
 use splinter::registry::Node as RegistryNode;
 use splinter::threading::lifecycle::ShutdownHandle;
-use splinterd::node::{Node, NodeBuilder, RestApiVariant, RunnableNode, ScabbardConfigBuilder};
+use splinterd::node::{
+    Node, NodeBuilder, PermissionConfig, RestApiVariant, RunnableNode, ScabbardConfigBuilder,
+};
 use tempdir::TempDir;
 
 use super::circuit_builder::CircuitBuilder;
@@ -33,6 +35,7 @@ pub struct Network {
     external_registries: Option<Vec<String>>,
     num_of_keys: usize,
     cylinder_auth: bool,
+    permission_config: Option<Vec<PermissionConfig>>,
 }
 
 pub enum NetworkNode {
@@ -49,6 +52,7 @@ impl Network {
             external_registries: None,
             num_of_keys: 1,
             cylinder_auth: true,
+            permission_config: None,
         }
     }
 
@@ -102,7 +106,8 @@ impl Network {
                 .with_admin_signer(admin_signer)
                 .with_signers(signers)
                 .with_external_registries(self.external_registries.clone())
-                .with_biome_enabled();
+                .with_biome_enabled()
+                .with_permission_config(self.permission_config.clone());
             if self.cylinder_auth {
                 builder = builder.with_cylinder_auth(Box::new(Secp256k1Context::new()));
             }
@@ -155,6 +160,11 @@ impl Network {
 
     pub fn set_num_of_keys(mut self, num_of_keys: usize) -> Self {
         self.num_of_keys = num_of_keys;
+        self
+    }
+
+    pub fn with_permission_config(mut self, permission_config: Vec<PermissionConfig>) -> Self {
+        self.permission_config = Some(permission_config);
         self
     }
 
