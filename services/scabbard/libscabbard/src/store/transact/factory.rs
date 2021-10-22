@@ -70,7 +70,7 @@ impl LmdbDatabaseFactory {
             return Ok(db.clone());
         }
 
-        let db_path = self.path_from_key(&key)?;
+        let db_path = self.path_from_key(&key)?.with_extension("lmdb");
 
         let db = LmdbDatabase::new(
             LmdbContext::new(&db_path, self.indexes.len(), Some(self.db_size))
