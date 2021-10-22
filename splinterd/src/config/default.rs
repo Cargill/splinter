@@ -128,21 +128,21 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 (
                     "tokio".to_string(),
                     UnnamedLoggerConfig {
-                        appenders: vec!["default".into()],
+                        appenders: vec!["stdout".into()],
                         level: log::Level::Warn,
                     },
                 ),
                 (
                     "tokio_reactor".to_string(),
                     UnnamedLoggerConfig {
-                        appenders: vec!["default".into()],
+                        appenders: vec!["stdout".into()],
                         level: log::Level::Warn,
                     },
                 ),
                 (
                     "hyper".to_string(),
                     UnnamedLoggerConfig {
-                        appenders: vec!["default".into()],
+                        appenders: vec!["stdout".into()],
                         level: log::Level::Warn,
                     },
                 ),
