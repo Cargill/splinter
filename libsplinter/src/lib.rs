@@ -81,6 +81,7 @@ pub mod registry;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 pub mod service;
+pub mod signing;
 pub mod storage;
 mod threading;
 pub mod transport;
