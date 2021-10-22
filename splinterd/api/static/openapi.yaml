@@ -2130,17 +2130,23 @@ components:
       required: true
       schema:
         type: string
-        examples:
-          Biome: Bearer Biome:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lk\
+      examples:
+        Biome:
+          summary: Biome example
+          value: Bearer Biome:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lk\
             IjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE0IiwiaXNzIjoic2V\
             sZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_xriYX7qryl08ZEp86t5HD\
             _AEVPEUXY70Ehc
-          Cylinder: Bearer Cylinder:eyJhbGciOiJzZWNwMjU2azEiLCJ0eXAiOiJjeWxpbmR\
+        Cylinder:
+          summary: Cylinder example
+          value: Bearer Cylinder:eyJhbGciOiJzZWNwMjU2azEiLCJ0eXAiOiJjeWxpbmR\
             lcitqd3QifQ==.eyJpc3MiOiIwMjc5YmU2NjdlZjlkY2JiYWM1NWEwNjI5NWNlODcwY\
             jA3MDI5YmZjZGIyZGNlMjhkOTU5ZjI4MTViMTZmODE3OTgifQ==.71Vw3+m9R4b8iZU\
             zhRHOAtX/hO5WYA9PgMe27/CeZ6NhIXFYkBBzreoIGpHbfJ8UxT+1MLUgjsQB8TISaf\
             neRA==
-          OAuth2: Bearer OAuth2:55eeea7ce2b472d69d406990939baa698e34e955
+        OAuth2:
+          summary: OAuth2 example
+          value: Bearer OAuth2:55eeea7ce2b472d69d406990939baa698e34e955
 
     protocol_version:
       name: SplinterProtocolVersion
