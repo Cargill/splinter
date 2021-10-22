@@ -22,8 +22,7 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
     sqlite::SqliteConnection,
 };
-use sawtooth::migrations::run_sqlite_migrations;
-use scabbard::service::ScabbardFactoryBuilder;
+use scabbard::service::{ScabbardFactoryBuilder, ScabbardStorageConfiguration};
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
 use splinter::peer::PeerManagerConnector;
@@ -201,17 +200,17 @@ impl AdminSubsystemBuilder {
                     .build(connection_manager)
                     .expect("Failed to build connection pool");
 
-                run_sqlite_migrations(
+                scabbard::migrations::run_sqlite_migrations(
                     &*pool.get().expect("Failed to get connection for migrations"),
                 )
                 .expect("Failed to run migrations");
 
                 ScabbardFactoryBuilder::new()
-                    .with_state_db_dir(config.data_dir.to_string_lossy().into())
-                    .with_state_db_size(config.database_size)
-                    .with_receipt_db_dir(config.data_dir.to_string_lossy().into())
-                    .with_receipt_db_size(config.database_size)
-                    .with_receipt_db_url(config.receipt_db_url)
+                    .with_lmdb_state_db_dir(config.data_dir.to_string_lossy().into())
+                    .with_lmdb_state_db_size(config.database_size)
+                    .with_storage_configuration(ScabbardStorageConfiguration::connection_uri(
+                        &config.receipt_db_url,
+                    ))
                     .with_signature_verifier_factory(signing_context.clone())
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))

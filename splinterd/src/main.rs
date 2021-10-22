@@ -824,6 +824,12 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
             .with_oauth_openid_auth_params(config.oauth_openid_auth_params().map(ToOwned::to_owned))
             .with_oauth_openid_scopes(config.oauth_openid_scopes().map(ToOwned::to_owned));
     }
+    #[cfg(feature = "scabbard-database-support")]
+    {
+        if config.scabbard_storage() == &config::ScabbardStorage::Lmdb {
+            daemon_builder = daemon_builder.with_lmdb_state_enabled();
+        }
+    }
 
     let (signers, peering_token) = load_signer_keys(config.config_dir(), config.peering_key())?;
     daemon_builder = daemon_builder

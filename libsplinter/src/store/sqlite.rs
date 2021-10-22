@@ -48,7 +48,7 @@ pub fn create_sqlite_connection_pool(
     }
     let connection_manager = ConnectionManager::<SqliteConnection>::new(conn_str);
     let mut pool_builder =
-        Pool::builder().connection_customizer(Box::new(ForeignKeyCustomizer::default()));
+        Pool::builder().connection_customizer(Box::new(ConnectionCustomizer::default()));
     // A new database is created for each connection to the in-memory SQLite
     // implementation; to ensure that the resulting stores will operate on the same
     // database, only one connection is allowed.
@@ -163,11 +163,19 @@ impl StoreFactory for SqliteStoreFactory {
 #[derive(Default, Debug)]
 /// Foreign keys must be enabled on a per connection basis. This customizer will be added to the
 /// SQLite pool builder and then ran against every connection returned from the pool.
-pub struct ForeignKeyCustomizer;
+pub struct ConnectionCustomizer;
 
-impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ForeignKeyCustomizer {
+impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCustomizer {
     fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
-        conn.batch_execute("PRAGMA foreign_keys = ON;")
-            .map_err(diesel::r2d2::Error::QueryError)
+        conn.batch_execute(
+            r#"
+            PRAGMA busy_timeout = 2000;
+            PRAGMA journal_mode = WAL;
+            PRAGMA wal_checkpoint(truncate);
+            PRAGMA synchronous = FULL;
+            PRAGMA foreign_keys = ON;
+            "#,
+        )
+        .map_err(diesel::r2d2::Error::QueryError)
     }
 }
