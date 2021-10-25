@@ -122,12 +122,10 @@ impl RunnableNetworkSubsystem {
             .signers
             .iter()
             .map(|signer| {
-                Ok(PublicKey::from_bytes(
-                    signer
-                        .public_key()
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?
-                        .into_bytes(),
-                ))
+                Ok(signer
+                    .public_key()
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?
+                    .into())
             })
             .collect::<Result<Vec<PublicKey>, InternalError>>()?;
 

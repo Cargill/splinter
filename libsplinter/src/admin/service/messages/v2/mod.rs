@@ -614,7 +614,10 @@ impl From<store::CircuitProposal> for CircuitProposal {
                 .map(|node| SplinterNode {
                     node_id: node.node_id().to_string(),
                     endpoints: node.endpoints().to_vec(),
-                    public_key: node.public_key().clone(),
+                    public_key: node
+                        .public_key()
+                        .clone()
+                        .map(|public_key| public_key.into_bytes()),
                 })
                 .collect::<Vec<SplinterNode>>(),
             authorization_type: AuthorizationType::from(store_circuit.authorization_type()),
@@ -647,13 +650,13 @@ impl From<store::CircuitProposal> for CircuitProposal {
                     };
 
                     VoteRecord {
-                        public_key: vote_record.public_key().into(),
+                        public_key: vote_record.public_key().as_slice().to_vec(),
                         vote,
                         voter_node_id: vote_record.voter_node_id().into(),
                     }
                 })
                 .collect(),
-            requester: store_proposal.requester().into(),
+            requester: store_proposal.requester().as_slice().to_vec(),
             requester_node_id: store_proposal.requester_node_id().into(),
         }
     }

@@ -370,7 +370,7 @@ impl SplinterDaemon {
             routing_writer.clone(),
             self.signers
                 .iter()
-                .map(|signer| Ok(PublicKey::from_bytes(signer.public_key()?.into_bytes())))
+                .map(|signer| Ok(signer.public_key()?.into()))
                 .collect::<Result<Vec<PublicKey>, SigningError>>()
                 .map_err(|err| {
                     StartError::AdminServiceError(format!(
@@ -536,7 +536,7 @@ impl SplinterDaemon {
             .with_public_keys(
                 self.signers
                     .iter()
-                    .map(|signer| Ok(PublicKey::from_bytes(signer.public_key()?.into_bytes())))
+                    .map(|signer| Ok(signer.public_key()?.into()))
                     .collect::<Result<Vec<PublicKey>, SigningError>>()
                     .map_err(|err| {
                         StartError::AdminServiceError(format!(

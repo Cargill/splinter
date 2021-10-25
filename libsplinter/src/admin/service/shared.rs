@@ -462,7 +462,9 @@ impl AdminServiceShared {
                                         if node.get_public_key().is_empty() {
                                             None
                                         } else {
-                                            Some(node.get_public_key().to_vec())
+                                            Some(public_key::PublicKey::from_bytes(
+                                                node.get_public_key().to_vec(),
+                                            ))
                                         },
                                     )
                                 })
@@ -794,7 +796,9 @@ impl AdminServiceShared {
                 };
 
                 let vote_record = VoteRecordBuilder::new()
-                    .with_public_key(signer_public_key)
+                    .with_public_key(&public_key::PublicKey::from_bytes(
+                        signer_public_key.to_vec(),
+                    ))
                     .with_vote(&vote)
                     .with_voter_node_id(header.get_requester_node_id())
                     .build()
@@ -2736,7 +2740,7 @@ impl AdminServiceShared {
         if circuit_proposal.requester_node_id() == node_id {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Received vote from requester node: {}",
-                to_hex(circuit_proposal.requester())
+                to_hex(circuit_proposal.requester().as_slice())
             )));
         }
 
@@ -3178,7 +3182,10 @@ impl AdminServiceShared {
             .map(|circuit_node| messages::SplinterNode {
                 node_id: circuit_node.node_id().to_string(),
                 endpoints: circuit_node.endpoints().to_vec(),
-                public_key: circuit_node.public_key().clone(),
+                public_key: circuit_node
+                    .public_key()
+                    .clone()
+                    .map(|public_key| public_key.into_bytes()),
             })
             .collect::<Vec<messages::SplinterNode>>();
         let mut create_circuit_builder = messages::CreateCircuitBuilder::new()
@@ -3260,7 +3267,7 @@ impl AdminServiceShared {
                 node.set_endpoints(RepeatedField::from_vec(circuit_node.endpoints().to_vec()));
                 {
                     if let Some(public_key) = circuit_node.public_key() {
-                        node.set_public_key(public_key.clone());
+                        node.set_public_key(public_key.clone().into_bytes());
                     }
                 }
                 node

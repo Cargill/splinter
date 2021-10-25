@@ -30,6 +30,7 @@ use crate::admin::store::{
     DurabilityType, PersistenceType, RouteType, Service,
 };
 use crate::error::InvalidStateError;
+use crate::public_key::PublicKey;
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchCircuitOperation {
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError>;
@@ -105,7 +106,8 @@ where
                     }
 
                     if let Some(public_key) = &member.public_key {
-                        builder = builder.with_public_key(public_key);
+                        builder =
+                            builder.with_public_key(&PublicKey::from_bytes(public_key.to_vec()));
                     }
 
                     builder.build()

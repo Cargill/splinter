@@ -41,6 +41,7 @@ use crate::error::{
     ConstraintViolationError, ConstraintViolationType, InternalError, InvalidStateError,
 };
 use crate::hex::{parse_hex, to_hex};
+use crate::public_key::PublicKey;
 
 /// A YAML backed implementation of the `AdminServiceStore`
 #[derive(Clone)]
@@ -1369,9 +1370,13 @@ impl TryFrom<YamlCircuitProposal> for CircuitProposal {
                     .map(VoteRecord::try_from)
                     .collect::<Result<Vec<VoteRecord>, InvalidStateError>>()?,
             )
-            .with_requester(&parse_hex(&proposal.requester).map_err(|_| {
-                InvalidStateError::with_message("Requester public key is not valid hex".to_string())
-            })?)
+            .with_requester(&PublicKey::from_bytes(
+                parse_hex(&proposal.requester).map_err(|_| {
+                    InvalidStateError::with_message(
+                        "Requester public key is not valid hex".to_string(),
+                    )
+                })?,
+            ))
             .with_requester_node_id(&proposal.requester_node_id)
             .build()
     }
@@ -1389,7 +1394,7 @@ impl From<CircuitProposal> for YamlCircuitProposal {
                 .iter()
                 .map(|vote| YamlVoteRecord::from(vote.clone()))
                 .collect(),
-            requester: to_hex(proposal.requester()),
+            requester: to_hex(proposal.requester().as_slice()),
             requester_node_id: proposal.requester_node_id().into(),
         }
     }
@@ -1443,9 +1448,13 @@ impl TryFrom<YamlVoteRecord> for VoteRecord {
 
     fn try_from(vote: YamlVoteRecord) -> Result<Self, Self::Error> {
         VoteRecordBuilder::new()
-            .with_public_key(&parse_hex(&vote.public_key).map_err(|_| {
-                InvalidStateError::with_message("Requester public key is not valid hex".to_string())
-            })?)
+            .with_public_key(&PublicKey::from_bytes(
+                parse_hex(&vote.public_key).map_err(|_| {
+                    InvalidStateError::with_message(
+                        "Requester public key is not valid hex".to_string(),
+                    )
+                })?,
+            ))
             .with_vote(&Vote::from(vote.vote))
             .with_voter_node_id(&vote.voter_node_id)
             .build()
@@ -1455,7 +1464,7 @@ impl TryFrom<YamlVoteRecord> for VoteRecord {
 impl From<VoteRecord> for YamlVoteRecord {
     fn from(vote: VoteRecord) -> Self {
         YamlVoteRecord {
-            public_key: to_hex(vote.public_key()),
+            public_key: to_hex(vote.public_key().as_slice()),
             vote: vote.vote().clone().into(),
             voter_node_id: vote.voter_node_id().into(),
         }
@@ -2070,12 +2079,10 @@ proposals:
         let updated_proposal = proposal
             .builder()
             .with_votes(&vec![VoteRecordBuilder::new()
-                .with_public_key(
-                    &parse_hex(
-                        "035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550",
-                    )
-                    .unwrap(),
-                )
+                .with_public_key(&PublicKey::from_bytes(
+                    parse_hex("035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550")
+                        .unwrap(),
+                ))
                 .with_vote(&Vote::Accept)
                 .with_voter_node_id("bubba-node-000")
                 .build()
@@ -2562,8 +2569,8 @@ proposals:
                     .build().expect("Unable to build circuit")
             )
             .with_requester(
-                &parse_hex(
-                    "0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482").unwrap())
+                &PublicKey::from_bytes(parse_hex(
+                    "0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482").unwrap()))
             .with_requester_node_id("acme-node-000")
             .build().expect("Unable to build proposals")
     }
@@ -2666,8 +2673,8 @@ proposals:
                     .build().expect("Unable to build circuit")
             )
             .with_requester(
-                &parse_hex(
-                    "0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482").unwrap())
+                &PublicKey::from_bytes(parse_hex(
+                    "0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482").unwrap()))
             .with_requester_node_id("acme-node-000")
             .build().expect("Unable to build proposals")
     }

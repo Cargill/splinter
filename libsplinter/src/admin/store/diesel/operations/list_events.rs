@@ -40,6 +40,7 @@ use crate::admin::store::{
     DurabilityType, EventIter, PersistenceType, ProposalType, ProposedCircuitBuilder, ProposedNode,
     ProposedNodeBuilder, ProposedService, ProposedServiceBuilder, RouteType, VoteRecord,
 };
+use crate::public_key::PublicKey;
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreListEventsOperation {
     fn list_events(&self, events_id: Vec<i64>) -> Result<EventIter, AdminServiceStoreError>;
@@ -95,7 +96,9 @@ where
                             )?)
                             .with_circuit_id(&circuit_proposal_model.circuit_id)
                             .with_circuit_hash(&circuit_proposal_model.circuit_hash)
-                            .with_requester(&circuit_proposal_model.requester)
+                            .with_requester(&PublicKey::from_bytes(
+                                circuit_proposal_model.requester.to_vec(),
+                            ))
                             .with_requester_node_id(&circuit_proposal_model.requester_node_id);
                         let mut proposed_circuit_builder = ProposedCircuitBuilder::new()
                             .with_circuit_id(&proposed_circuit_model.circuit_id)

@@ -17,13 +17,14 @@
 use crate::admin::messages;
 use crate::error::InvalidStateError;
 use crate::protos::admin;
+use crate::public_key::PublicKey;
 
 /// Native representation of a node in a proposed circuit
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProposedNode {
     node_id: String,
     endpoints: Vec<String>,
-    public_key: Option<Vec<u8>>,
+    public_key: Option<PublicKey>,
 }
 
 impl ProposedNode {
@@ -38,7 +39,7 @@ impl ProposedNode {
     }
 
     /// Returns the public key that belongs to the proposed node
-    pub fn public_key(&self) -> &Option<Vec<u8>> {
+    pub fn public_key(&self) -> &Option<PublicKey> {
         &self.public_key
     }
 
@@ -49,7 +50,7 @@ impl ProposedNode {
         proto.set_endpoints(self.endpoints.into());
 
         if let Some(public_key) = self.public_key {
-            proto.set_public_key(public_key);
+            proto.set_public_key(public_key.into_bytes());
         }
 
         proto
@@ -61,7 +62,7 @@ impl ProposedNode {
             if public_key.is_empty() {
                 None
             } else {
-                Some(public_key)
+                Some(PublicKey::from_bytes(public_key))
             }
         };
 
@@ -78,7 +79,7 @@ impl ProposedNode {
 pub struct ProposedNodeBuilder {
     node_id: Option<String>,
     endpoints: Option<Vec<String>>,
-    public_key: Option<Vec<u8>>,
+    public_key: Option<PublicKey>,
 }
 
 impl ProposedNodeBuilder {
@@ -98,7 +99,7 @@ impl ProposedNodeBuilder {
     }
 
     /// Returns the publice key for the node
-    pub fn public_key(&self) -> Option<Vec<u8>> {
+    pub fn public_key(&self) -> Option<PublicKey> {
         self.public_key.clone()
     }
 
@@ -127,8 +128,8 @@ impl ProposedNodeBuilder {
     /// # Arguments
     ///
     ///  * `public_key` - The bytes of the node's public key
-    pub fn with_public_key(mut self, public_key: &[u8]) -> ProposedNodeBuilder {
-        self.public_key = Some(public_key.into());
+    pub fn with_public_key(mut self, public_key: &PublicKey) -> ProposedNodeBuilder {
+        self.public_key = Some(public_key.clone());
         self
     }
 
@@ -161,7 +162,7 @@ impl From<&messages::SplinterNode> for ProposedNode {
         ProposedNode {
             node_id: admin_node.node_id.to_string(),
             endpoints: admin_node.endpoints.to_vec(),
-            public_key: admin_node.public_key.clone(),
+            public_key: admin_node.public_key.clone().map(PublicKey::from_bytes),
         }
     }
 }

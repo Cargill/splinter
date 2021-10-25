@@ -348,6 +348,7 @@ pub mod tests {
     use crate::admin::store::{AdminServiceEventBuilder, EventType};
     use crate::hex::parse_hex;
     use crate::migrations::run_sqlite_migrations;
+    use crate::public_key::PublicKey;
 
     use diesel::{
         r2d2::{ConnectionManager, Pool},
@@ -606,12 +607,10 @@ pub mod tests {
         let updated_proposal = proposal
             .builder()
             .with_votes(&vec![VoteRecordBuilder::new()
-                .with_public_key(
-                    &parse_hex(
-                        "035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550",
-                    )
-                    .unwrap(),
-                )
+                .with_public_key(&PublicKey::from_bytes(
+                    parse_hex("035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550")
+                        .unwrap(),
+                ))
                 .with_vote(&Vote::Accept)
                 .with_voter_node_id("bubba-node-000")
                 .build()
@@ -1403,15 +1402,15 @@ pub mod tests {
                     .expect("Unable to build circuit")
             )
             .with_requester(
-                &parse_hex(
-                    "0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482").unwrap())
+                &PublicKey::from_bytes(parse_hex(
+                    "0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482").unwrap()))
             .with_requester_node_id("acme-node-000")
             .with_votes(&vec![VoteRecordBuilder::new()
                 .with_public_key(
-                    &parse_hex(
+                    &PublicKey::from_bytes(parse_hex(
                         "035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550",
                     )
-                    .unwrap(),
+                    .unwrap()),
                 )
                 .with_vote(&Vote::Accept)
                 .with_voter_node_id("bubba-node-000")
@@ -1419,10 +1418,10 @@ pub mod tests {
                 .expect("Unable to build vote record"),
                 VoteRecordBuilder::new()
                     .with_public_key(
-                        &parse_hex(
+                        &PublicKey::from_bytes(parse_hex(
                             "035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550",
                         )
-                        .unwrap(),
+                        .unwrap()),
                     )
                     .with_vote(&Vote::Accept)
                     .with_voter_node_id("bubba-node-002")
@@ -1481,8 +1480,8 @@ pub mod tests {
                     .build().expect("Unable to build circuit")
             )
             .with_requester(
-                &parse_hex(
-                    "0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482").unwrap())
+                &PublicKey::from_bytes(parse_hex(
+                    "0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482").unwrap()))
             .with_requester_node_id("acme-node-000")
             .build().expect("Unable to build proposals")
     }
@@ -1669,15 +1668,15 @@ pub mod tests {
                     .expect("Unable to build circuit")
             )
             .with_requester(
-                &parse_hex(
-                    "0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482").unwrap())
+                &PublicKey::from_bytes(parse_hex(
+                    "0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482").unwrap()))
             .with_requester_node_id("acme-node-000")
             .with_votes(&vec![VoteRecordBuilder::new()
                 .with_public_key(
-                    &parse_hex(
+                    &PublicKey::from_bytes(parse_hex(
                         "035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550",
                     )
-                    .unwrap(),
+                    .unwrap()),
                 )
                 .with_vote(&Vote::Accept)
                 .with_voter_node_id("bubba-node-000")
@@ -1685,10 +1684,10 @@ pub mod tests {
                 .expect("Unable to build vote record"),
                 VoteRecordBuilder::new()
                     .with_public_key(
-                        &parse_hex(
+                        &PublicKey::from_bytes(parse_hex(
                             "035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550",
                         )
-                        .unwrap(),
+                        .unwrap()),
                     )
                     .with_vote(&Vote::Accept)
                     .with_voter_node_id("bubba-node-002")

@@ -38,6 +38,7 @@ use crate::admin::store::{
     PersistenceType, ProposalType, ProposedCircuitBuilder, ProposedNode, ProposedNodeBuilder,
     ProposedService, ProposedServiceBuilder, RouteType, VoteRecord,
 };
+use crate::public_key::PublicKey;
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchProposalOperation {
     fn get_proposal(
@@ -143,7 +144,8 @@ where
                     }
 
                     if let Some(public_key) = &node.public_key {
-                        builder = builder.with_public_key(public_key)
+                        builder =
+                            builder.with_public_key(&PublicKey::from_bytes(public_key.to_vec()))
                     }
 
                     builder
@@ -269,7 +271,7 @@ where
                     .with_circuit_hash(&proposal.circuit_hash)
                     .with_circuit(&native_proposed_circuit)
                     .with_votes(&vote_record)
-                    .with_requester(&proposal.requester)
+                    .with_requester(&PublicKey::from_bytes(proposal.requester.to_vec()))
                     .with_requester_node_id(&proposal.requester_node_id)
                     .build()
                     .map_err(AdminServiceStoreError::InvalidStateError)?,

@@ -40,6 +40,7 @@ use crate::admin::store::{
     ProposedNodeBuilder, ProposedService, ProposedServiceBuilder, RouteType, VoteRecord,
 };
 use crate::error::InvalidStateError;
+use crate::public_key::PublicKey;
 
 use super::AdminServiceStoreOperations;
 
@@ -166,7 +167,7 @@ where
                             )?)
                             .with_circuit_id(&proposal.circuit_id)
                             .with_circuit_hash(&proposal.circuit_hash)
-                            .with_requester(&proposal.requester)
+                            .with_requester(&PublicKey::from_bytes(proposal.requester.to_vec()))
                             .with_requester_node_id(&proposal.requester_node_id);
                         let mut proposed_circuit_builder = ProposedCircuitBuilder::new()
                             .with_circuit_id(&proposed_circuit.circuit_id)
@@ -311,7 +312,8 @@ where
                             ProposedNodeBuilder::new().with_node_id(&node.node_id);
 
                         if let Some(public_key) = &node.public_key {
-                            proposed_node = proposed_node.with_public_key(public_key)
+                            proposed_node = proposed_node
+                                .with_public_key(&PublicKey::from_bytes(public_key.to_vec()))
                         }
 
                         proposed_nodes.insert(
