@@ -27,7 +27,6 @@ use std::sync::{mpsc::channel, Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::{self, Message};
 
@@ -49,6 +48,7 @@ use crate::service::{
     error::{ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError},
     Service, ServiceMessageContext, ServiceNetworkRegistry,
 };
+use crate::signing::SignatureVerifier;
 
 use self::consensus::AdminConsensusManager;
 use self::error::{AdminError, Sha256Error};
@@ -165,7 +165,7 @@ impl AdminService {
         >,
         peer_connector: PeerManagerConnector,
         splinter_state: SplinterState,
-        signature_verifier: Box<dyn SignatureVerifier>,
+        signature_verifier: Box<dyn SignatureVerifier + Send>,
         key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         storage_type: &str,
@@ -740,8 +740,6 @@ mod tests {
     use std::sync::mpsc::{channel, Sender};
     use std::time::{Duration, Instant};
 
-    use cylinder::{secp256k1::Secp256k1Context, Context};
-
     use crate::circuit::{directory::CircuitDirectory, SplinterState};
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;
@@ -751,8 +749,17 @@ mod tests {
     use crate::peer::PeerManager;
     use crate::protos::admin;
     use crate::service::{error, ServiceNetworkRegistry, ServiceNetworkSender};
+    use crate::signing::{
+        hash::{HashSigner, HashVerifier},
+        Signer,
+    };
     use crate::storage::get_storage;
     use crate::transport::{inproc::InprocTransport, Transport};
+
+    const PUB_KEY: &[u8] = &[
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32,
+    ];
 
     const STATE_DIR: &str = "/var/lib/splinter/";
 
@@ -816,11 +823,6 @@ mod tests {
         let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
 
-        let context = Secp256k1Context::new();
-        let private_key = context.new_random_private_key();
-        let signer = context.new_signer(private_key);
-        let signature_verifier = context.new_verifier();
-
         let (mut admin_service, _) = AdminService::new(
             "test-node".into(),
             orchestrator,
@@ -828,7 +830,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            signature_verifier,
+            Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -866,17 +868,12 @@ mod tests {
 
         let mut header = admin::CircuitManagementPayload_Header::new();
         header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
-        header.set_requester(
-            signer
-                .public_key()
-                .expect("Failed to get signer's public key")
-                .into_bytes(),
-        );
+        header.set_requester(PUB_KEY.into());
         header.set_requester_node_id("test-node".to_string());
 
         let mut payload = admin::CircuitManagementPayload::new();
 
-        payload.set_signature(signer.sign(&payload.header).unwrap().take_bytes());
+        payload.set_signature(HashSigner.sign(&payload.header).unwrap());
         payload.set_header(protobuf::Message::write_to_bytes(&header).unwrap());
         payload.set_circuit_create_request(request);
 

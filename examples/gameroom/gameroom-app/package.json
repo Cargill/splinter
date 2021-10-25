@@ -24,7 +24,7 @@
     "moment": "2.24.0",
     "protobufjs": "^6.8.8",
     "sjcl": "^1.0.8",
-    "transact-sdk-javascript": "github:hyperledger/transact-sdk-javascript",
+    "transact-sdk-javascript": "github:hyperledger/transact-sdk-javascript#v0.1.0",
     "vue": "^2.6.10",
     "vue-class-component": "^7.0.2",
     "vue-clickaway": "^2.2.2",

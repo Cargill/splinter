@@ -15,7 +15,7 @@
 use std::error::Error;
 use std::fmt;
 
-use cylinder::ContextError;
+use sawtooth_sdk::signing::Error as KeyGenError;
 
 use crate::authorization_handler::AppAuthHandlerError;
 use crate::rest_api::RestApiServerError;
@@ -28,7 +28,7 @@ pub enum GameroomDaemonError {
     Database(Box<DatabaseError>),
     RestApi(RestApiServerError),
     AppAuthHandler(AppAuthHandlerError),
-    SigningContext(String),
+    KeyGen(KeyGenError),
     GetNode(GetNodeError),
 }
 
@@ -40,7 +40,7 @@ impl Error for GameroomDaemonError {
             GameroomDaemonError::Database(err) => Some(&**err),
             GameroomDaemonError::RestApi(err) => Some(err),
             GameroomDaemonError::AppAuthHandler(err) => Some(err),
-            GameroomDaemonError::SigningContext(_) => None,
+            GameroomDaemonError::KeyGen(err) => Some(err),
             GameroomDaemonError::GetNode(err) => Some(err),
         }
     }
@@ -60,7 +60,11 @@ impl fmt::Display for GameroomDaemonError {
                 "The application authorization handler returned an error: {}",
                 e
             ),
-            GameroomDaemonError::SigningContext(e) => write!(f, "A signing error occurred: {}", e),
+            GameroomDaemonError::KeyGen(e) => write!(
+                f,
+                "an error occurred while generating a new key pair: {}",
+                e
+            ),
             GameroomDaemonError::GetNode(e) => write!(
                 f,
                 "an error occurred while getting splinterd node information: {}",
@@ -94,9 +98,9 @@ impl From<AppAuthHandlerError> for GameroomDaemonError {
     }
 }
 
-impl From<ContextError> for GameroomDaemonError {
-    fn from(err: ContextError) -> GameroomDaemonError {
-        GameroomDaemonError::SigningContext(err.to_string())
+impl From<KeyGenError> for GameroomDaemonError {
+    fn from(err: KeyGenError) -> GameroomDaemonError {
+        GameroomDaemonError::KeyGen(err)
     }
 }
 

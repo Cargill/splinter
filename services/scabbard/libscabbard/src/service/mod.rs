@@ -31,7 +31,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
 use splinter::{
     consensus::{Proposal, ProposalUpdate},
@@ -39,6 +38,7 @@ use splinter::{
         Service, ServiceDestroyError, ServiceError, ServiceMessageContext, ServiceNetworkRegistry,
         ServiceStartError, ServiceStopError,
     },
+    signing::SignatureVerifier,
 };
 use transact::{protocol::batch::BatchPair, protos::FromBytes};
 
@@ -383,10 +383,12 @@ pub mod tests {
 
     use std::error::Error;
 
-    use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
-    use splinter::service::{
-        ServiceConnectionError, ServiceDisconnectionError, ServiceMessageContext,
-        ServiceNetworkSender, ServiceSendError,
+    use splinter::{
+        service::{
+            ServiceConnectionError, ServiceDisconnectionError, ServiceMessageContext,
+            ServiceNetworkSender, ServiceSendError,
+        },
+        signing::hash::HashVerifier,
     };
 
     /// Tests that a new scabbard service is properly instantiated.
@@ -400,7 +402,7 @@ pub mod tests {
             1024 * 1024,
             Path::new("/tmp"),
             1024 * 1024,
-            Secp256k1Context::new().new_verifier(),
+            Box::new(HashVerifier),
             vec![],
             None,
         )
@@ -421,7 +423,7 @@ pub mod tests {
             1024 * 1024,
             Path::new("/tmp"),
             1024 * 1024,
-            Secp256k1Context::new().new_verifier(),
+            Box::new(HashVerifier),
             vec![],
             None,
         )
@@ -442,7 +444,7 @@ pub mod tests {
             1024 * 1024,
             Path::new("/tmp"),
             1024 * 1024,
-            Secp256k1Context::new().new_verifier(),
+            Box::new(HashVerifier),
             vec![],
             None,
         )

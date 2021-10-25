@@ -380,8 +380,10 @@ mod tests {
 
     use std::collections::{HashSet, VecDeque};
 
-    use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
-    use splinter::service::{ServiceMessageContext, ServiceNetworkSender, ServiceSendError};
+    use splinter::{
+        service::{ServiceMessageContext, ServiceNetworkSender, ServiceSendError},
+        signing::hash::HashVerifier,
+    };
 
     /// Tests that the network sender properly creates messages and sends them using the
     /// `ServiceNetworkSender`.
@@ -396,7 +398,7 @@ mod tests {
             VecDeque::new(),
             Some(Box::new(service_sender.clone())),
             peer_services.clone(),
-            Secp256k1Context::new().new_verifier(),
+            Box::new(HashVerifier),
         )));
         let consensus_sender = ScabbardConsensusNetworkSender::new("0".into(), shared);
 

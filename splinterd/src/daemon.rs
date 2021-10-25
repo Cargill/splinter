@@ -22,7 +22,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
 #[cfg(feature = "health")]
 use health::HealthService;
 #[cfg(feature = "service-arg-validation")]
@@ -72,6 +71,7 @@ use splinter::rest_api::{
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{self, ServiceProcessor, ShutdownHandle};
+use splinter::signing::sawtooth::SawtoothSecp256k1SignatureVerifier;
 use splinter::storage::get_storage;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Connection,
@@ -373,16 +373,13 @@ impl SplinterDaemon {
             }
         }
 
-        let signing_context = Secp256k1Context::new();
-        let admin_service_verifier = signing_context.new_verifier();
-
         let (orchestrator, orchestator_join_handles) = ServiceOrchestrator::new(
             vec![Box::new(ScabbardFactory::new(
                 None,
                 None,
                 None,
                 None,
-                Box::new(signing_context),
+                Box::new(SawtoothSecp256k1SignatureVerifier::new()),
             ))],
             orchestrator_connection,
             ORCHESTRATOR_INCOMING_CAPACITY,
@@ -390,6 +387,8 @@ impl SplinterDaemon {
             ORCHESTRATOR_CHANNEL_CAPACITY,
         )?;
         let orchestrator_resources = orchestrator.resources();
+
+        let signature_verifier = SawtoothSecp256k1SignatureVerifier::new();
 
         let (registry, registry_shutdown) = create_registry(
             &self.state_dir,
@@ -410,7 +409,7 @@ impl SplinterDaemon {
             },
             peer_connector,
             state.clone(),
-            admin_service_verifier,
+            Box::new(signature_verifier),
             Box::new(registry.clone_box_as_reader()),
             Box::new(AllowAllKeyPermissionManager),
             &self.storage_type,

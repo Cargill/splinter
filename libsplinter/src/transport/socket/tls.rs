@@ -76,16 +76,12 @@ impl TlsTransport {
                 connector.set_ca_file(ca_cert_path)?;
                 connector.set_verify(SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT);
                 acceptor.set_verify(SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT);
-                let connector = connector.build();
-                let acceptor = acceptor.build();
-                (acceptor, connector)
             } else {
                 connector.set_verify(SslVerifyMode::NONE);
                 acceptor.set_verify(SslVerifyMode::NONE);
-                let connector = connector.build();
-                let acceptor = acceptor.build();
-                (acceptor, connector)
             }
+
+            (acceptor.build(), connector.build())
         };
 
         Ok(TlsTransport {

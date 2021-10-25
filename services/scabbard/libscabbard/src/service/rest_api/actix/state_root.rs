@@ -66,7 +66,6 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Mutex;
 
-    use cylinder::{secp256k1::Secp256k1Context, Context};
     use reqwest::{blocking::Client, StatusCode, Url};
     use tempdir::TempDir;
     use transact::{
@@ -75,11 +74,13 @@ mod tests {
             batch::BatchBuilder,
             command::{BytesEntry, Command, SetState},
         },
+        signing::hash::HashSigner,
     };
 
     use splinter::{
         rest_api::{Resource, RestApiBuilder, RestApiServerError, RestApiShutdownHandle},
         service::Service,
+        signing::hash::HashVerifier,
     };
 
     use crate::service::{compute_db_paths, state::ScabbardState, Scabbard};
@@ -113,21 +114,17 @@ mod tests {
             )
             .expect("Failed to initialize state");
 
-            let signing_context = Secp256k1Context::new();
-            let signer = signing_context.new_signer(signing_context.new_random_private_key());
+            let signer = HashSigner::default();
             let batch = BatchBuilder::new()
                 .with_transactions(vec![
-                    make_command_transaction(
-                        &[Command::SetState(SetState::new(vec![
-                            BytesEntry::new("abcdef".into(), b"value1".to_vec()),
-                            BytesEntry::new("012345".into(), b"value2".to_vec()),
-                        ]))],
-                        &*signer,
-                    )
+                    make_command_transaction(&[Command::SetState(SetState::new(vec![
+                        BytesEntry::new("abcdef".into(), b"value1".to_vec()),
+                        BytesEntry::new("012345".into(), b"value2".to_vec()),
+                    ]))])
                     .take()
                     .0,
                 ])
-                .build_pair(&*signer)
+                .build_pair(&signer)
                 .expect("Failed to build batch");
             state
                 .prepare_change(batch)
@@ -145,7 +142,7 @@ mod tests {
             TEMP_DB_SIZE,
             paths.temp_dir.path(),
             TEMP_DB_SIZE,
-            Secp256k1Context::new().new_verifier(),
+            Box::new(HashVerifier),
             vec![],
             None,
         )
