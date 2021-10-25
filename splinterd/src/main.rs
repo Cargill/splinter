@@ -712,6 +712,7 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
         if let Ok(log_config) = log_config.try_into() {
             _log_handle.set_config(log_config);
         }
+        config.log_as_debug();
     }
 
     let state_dir = config.state_dir();
@@ -743,6 +744,7 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
 
     let admin_timeout = config.admin_timeout();
 
+    #[cfg(not(feature = "log-config"))]
     config.log_as_debug();
 
     let node_id = find_node_id(&config)?;
