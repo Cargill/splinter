@@ -61,6 +61,7 @@ pub enum ConnectionUri {
 pub struct ScabbardLmdbStateConfiguration {
     db_dir: Option<String>,
     db_size: Option<usize>,
+    enable_lmdb: bool,
 }
 
 /// Configuration for underlying storage that will be enabled for each service produced by the
@@ -156,6 +157,19 @@ impl ScabbardFactoryBuilder {
         self
     }
 
+    pub fn with_lmdb_state_enabled(mut self, enable: bool) -> Self {
+        self.state_storage_configuration = self
+            .state_storage_configuration
+            .take()
+            .or_else(|| Some(ScabbardLmdbStateConfiguration::default()))
+            .map(|mut config| {
+                config.enable_lmdb = enable;
+                config
+            });
+
+        self
+    }
+
     pub fn with_storage_configuration(
         mut self,
         storage_configuration: ScabbardStorageConfiguration,
@@ -179,7 +193,7 @@ impl ScabbardFactoryBuilder {
     /// # Errors
     ///
     /// Returns an InvalidStateError if a signature_verifier_factory has not been set.
-    pub fn build(mut self) -> Result<ScabbardFactory, InvalidStateError> {
+    pub fn build(self) -> Result<ScabbardFactory, InvalidStateError> {
         let signature_verifier_factory = self.signature_verifier_factory.ok_or_else(|| {
             splinter::error::InvalidStateError::with_message(
                 "A scabbard factory requires a signature verifier factory".into(),
@@ -190,12 +204,17 @@ impl ScabbardFactoryBuilder {
             InvalidStateError::with_message("A storage configuration must be provided".into())
         })?;
 
-        let state_store_factory = self.state_storage_configuration.take().map(|config| {
-            LmdbDatabaseFactory::new_state_db_factory(
-                Path::new(config.db_dir.as_deref().unwrap_or(DEFAULT_LMDB_DIR)),
-                config.db_size,
-            )
-        });
+        let state_storage_configuration = self.state_storage_configuration.unwrap_or_default();
+
+        let state_store_factory = LmdbDatabaseFactory::new_state_db_factory(
+            Path::new(
+                state_storage_configuration
+                    .db_dir
+                    .as_deref()
+                    .unwrap_or(DEFAULT_LMDB_DIR),
+            ),
+            state_storage_configuration.db_size,
+        );
 
         let store_factory_config = match storage_configuration {
             #[cfg(feature = "postgres")]
@@ -223,6 +242,7 @@ impl ScabbardFactoryBuilder {
         Ok(ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
             state_store_factory,
+            enable_lmdb_state: state_storage_configuration.enable_lmdb,
             store_factory_config,
             signature_verifier_factory,
         })
@@ -242,7 +262,8 @@ enum ScabbardFactoryStorageConfig {
 
 pub struct ScabbardFactory {
     service_types: Vec<String>,
-    state_store_factory: Option<LmdbDatabaseFactory>,
+    state_store_factory: LmdbDatabaseFactory,
+    enable_lmdb_state: bool,
     store_factory_config: ScabbardFactoryStorageConfig,
     signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
@@ -370,14 +391,14 @@ impl ServiceFactory for ScabbardFactory {
         let version = ScabbardVersion::try_from(args.get("version").map(String::as_str))
             .map_err(FactoryCreateError::InvalidArguments)?;
 
-        let (merkle_state, state_purge) = if let Some(lmdb_database_factory) =
-            self.state_store_factory.as_ref()
-        {
-            let db = lmdb_database_factory
+        let (merkle_state, state_purge) = if self.enable_lmdb_state {
+            let db = self
+                .state_store_factory
                 .get_database(circuit_id, &service_id)
                 .map_err(|e| FactoryCreateError::Internal(e.to_string()))?;
 
-            let db_purge_handle = lmdb_database_factory
+            let db_purge_handle = self
+                .state_store_factory
                 .get_database_purge_handle(circuit_id, &service_id)
                 .map_err(|e| FactoryCreateError::Internal(e.to_string()))?;
 
@@ -698,7 +719,11 @@ mod tests {
         let store_factory_config = ScabbardFactoryStorageConfig::Sqlite { pool };
         ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
-            state_store_factory: None,
+            state_store_factory: LmdbDatabaseFactory::new_state_db_factory(
+                &Path::new("/tmp"),
+                None,
+            ),
+            enable_lmdb_state: false,
             store_factory_config,
             signature_verifier_factory: Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
         }
