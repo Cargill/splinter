@@ -463,8 +463,18 @@ impl SplinterDaemon {
             }
             #[cfg(any(feature = "database-postgres", feature = "database-sqlite"))]
             {
-                scabbard_factory_builder =
-                    scabbard_factory_builder.with_receipt_db_url(self.db_url.to_string());
+                match connection_pool {
+                    #[cfg(feature = "database-postgres")]
+                    store::ConnectionPool::Postgres { pool } => {
+                        scabbard_factory_builder =
+                            scabbard_factory_builder.with_receipt_postgres_connection_pool(pool);
+                    }
+                    #[cfg(feature = "database-sqlite")]
+                    store::ConnectionPool::Sqlite { pool } => {
+                        scabbard_factory_builder =
+                            scabbard_factory_builder.with_receipt_sqlite_connection_pool(pool);
+                    }
+                }
             }
         }
         #[cfg(feature = "scabbard-database-support")]
