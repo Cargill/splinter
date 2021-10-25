@@ -87,10 +87,16 @@ fn fetch_circuit(
                 "1" => Ok(HttpResponse::Ok().json(
                     resources::v1::circuits_circuit_id::CircuitResponse::from(&circuit),
                 )),
-                // Handles 2 (and catch all)
-                _ => Ok(HttpResponse::Ok().json(
+                // Handles 2
+                "2" => Ok(HttpResponse::Ok().json(
                     resources::v2::circuits_circuit_id::CircuitResponse::from(&circuit),
                 )),
+                _ => Ok(
+                    HttpResponse::BadRequest().json(ErrorResponse::bad_request(&format!(
+                        "Unsupported SplinterProtocolVersion: {}",
+                        protocol_version
+                    ))),
+                ),
             },
             Err(err) => match err {
                 BlockingError::Error(err) => match err {

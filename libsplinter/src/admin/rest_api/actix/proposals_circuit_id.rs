@@ -90,8 +90,8 @@ fn fetch_proposal<PS: ProposalStore + 'static>(
                 "1" => Ok(HttpResponse::Ok().json(
                     resources::v1::proposals_circuit_id::ProposalResponse::from(&proposal),
                 )),
-                // Handles 2 (and catch all)
-                _ => {
+                // Handles 2
+                "2" => {
                     match resources::v2::proposals_circuit_id::ProposalResponse::try_from(&proposal)
                     {
                         Ok(proposal_response) => Ok(HttpResponse::Ok().json(proposal_response)),
@@ -102,6 +102,12 @@ fn fetch_proposal<PS: ProposalStore + 'static>(
                         }
                     }
                 }
+                _ => Ok(
+                    HttpResponse::BadRequest().json(ErrorResponse::bad_request(&format!(
+                        "Unsupported SplinterProtocolVersion: {}",
+                        protocol_version
+                    ))),
+                ),
             },
             Err(err) => match err {
                 BlockingError::Error(err) => match err {

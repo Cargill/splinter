@@ -205,8 +205,8 @@ fn query_list_circuits(
                     }),
                 ),
 
-                // Handles 2 (and catch all)
-                _ => Ok(
+                // Handles 2
+                "2" => Ok(
                     HttpResponse::Ok().json(resources::v2::circuits::ListCircuitsResponse {
                         data: circuits
                             .iter()
@@ -214,6 +214,12 @@ fn query_list_circuits(
                             .collect(),
                         paging: get_response_paging_info(limit, offset, &link, total_count),
                     }),
+                ),
+                _ => Ok(
+                    HttpResponse::BadRequest().json(ErrorResponse::bad_request(&format!(
+                        "Unsupported SplinterProtocolVersion: {}",
+                        protocol_version
+                    ))),
                 ),
             }
         }
