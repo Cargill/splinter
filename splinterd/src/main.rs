@@ -120,19 +120,16 @@ fn load_signer_keys(
     peering_key: &str,
 ) -> Result<ChallengeAuthorizationArgs, UserError> {
     let splinterd_key_path = Path::new(config_dir).join("keys");
-    let paths = match fs::read_dir(splinterd_key_path) {
-        Ok(paths) => paths,
-        Err(err) => {
-            return Err(UserError::io_err_with_source(
-                &format!(
-                    "Unable to read splinterd keys directory: {}, run the \
+    let paths = fs::read_dir(splinterd_key_path).map_err(|err| {
+        UserError::io_err_with_source(
+            &format!(
+                "Unable to read splinterd keys directory: {}, run the \
                 `splinter keygen --system` command to generate a key for the daemon",
-                    config_dir
-                ),
-                Box::new(err),
-            ))
-        }
-    };
+                config_dir
+            ),
+            Box::new(err),
+        )
+    })?;
 
     let mut peer_token = None;
     let mut signing_keys = vec![];
