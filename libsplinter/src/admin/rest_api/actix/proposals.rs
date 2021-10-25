@@ -189,8 +189,8 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
                         paging: get_response_paging_info(limit, offset, &link, total_count),
                     },
                 )),
-                // Handles 2 (and catch all)
-                _ => {
+                // Handles 2
+                "2" => {
                     let proposal_responses = match proposals
                         .iter()
                         .map(resources::v2::proposals::ProposalResponse::try_from)
@@ -210,6 +210,12 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
                         }),
                     )
                 }
+                _ => Ok(
+                    HttpResponse::BadRequest().json(ErrorResponse::bad_request(&format!(
+                        "Unsupported SplinterProtocolVersion: {}",
+                        protocol_version
+                    ))),
+                ),
             }
         }
         Err(err) => match err {

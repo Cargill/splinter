@@ -363,13 +363,17 @@ impl JsonAdminEvent {
                 })?),
                 event_id: Some(*event.event_id()),
             }),
-            // Handles 2 (and catch all)
-            _ => Ok(Self {
+            // Handles 2
+            2 => Ok(Self {
                 timestamp: time::SystemTime::now(),
                 event: Some(AdminServiceEvent::from(event)),
                 event_v1: None,
                 event_id: Some(*event.event_id()),
             }),
+            _ => Err(InvalidStateError::with_message(format!(
+                "Unsupported SplinterProtocolVersion: {}",
+                protocol_version
+            ))),
         }
     }
 }
