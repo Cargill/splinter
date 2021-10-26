@@ -82,6 +82,8 @@ impl Action for UpgradeAction {
                 })?;
         }
 
+        receipt_store::upgrade_scabbard_receipt_store(state_dir.as_path(), &database_uri)?;
+
         Ok(())
     }
 }
