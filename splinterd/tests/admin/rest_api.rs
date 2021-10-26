@@ -27,7 +27,7 @@ use splinterd::node::RestApiVariant;
 
 use crate::admin::circuit_commit::commit_2_party_circuit_with_auth;
 use crate::admin::get_node_service_id_with_auth;
-use crate::admin::payload::make_create_circuit_payload;
+use crate::admin::payload::{make_create_circuit_payload, make_create_contract_registry_batch};
 use crate::framework::network::Network;
 
 /// Test that if no permissions are configured, all REST API endpoints that require permission
@@ -99,6 +99,134 @@ fn test_endpoints_with_no_permissions() {
     shutdown!(network).expect("Unable to shutdown network");
 }
 
+/// Test that if the correct permissions are configured, all REST API endpoints that require
+/// permission will return a successful response
+///
+/// 1. Get a hashmap of all rest api endpoints provided by the testing framework that require
+///    permissions to be accessed
+/// 2. Create a permission config with the `circuit.read`, `circuit.write`, `scabbard.read`,
+///    `scabbard.write` and `biome.user.read` permissions so that the signer can be used to create
+///    circuits, submit batches to scabbard, and register biome users
+/// 3. Create a network with two nodes, using `with_permission_config` and passing in the permission
+///    config created in the last step as well as the list of permission configs for the endpoints
+/// 4. Create a 2 party circuit
+/// 5. Add a test profile
+/// 6. Register a biome user
+/// 7. Submit a batch containing a `CreateContractRegistryAction`
+/// 8. Attempt to access each endpoint
+/// 9. Check that each endpoint can be accessed with the correct permissions configured
+#[test]
+fn test_endpoints_with_valid_permissions() {
+    // Get all endpoints and their methods and permissions
+    let endpoint_perm_map = create_endpoint_permission_map();
+    let mut perm_configs: Vec<PermissionConfig> = Vec::new();
+    for (_, method_perm_pair) in endpoint_perm_map.iter() {
+        for (_, perm) in method_perm_pair.clone().into_iter() {
+            perm_configs.push(perm.clone());
+        }
+    }
+
+    // Create a separate `PermissionConfig` with the necessary permissions to create circuits,
+    // submit batches to scabbard and register biome users
+    let admin_perm_config = PermissionConfig::new(
+        vec![
+            "circuit.write".into(),
+            "circuit.read".into(),
+            "scabbard.write".into(),
+            "scabbard.read".into(),
+            "biome.user.read".into(),
+        ],
+        new_signer(),
+    );
+    let admin_signer = &*admin_perm_config.signer();
+    perm_configs.push(admin_perm_config);
+
+    // Start a 2-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .with_permission_config(perm_configs)
+        .with_cylinder_auth()
+        .set_num_of_keys(2)
+        .with_admin_signer(admin_signer.clone_box())
+        .add_nodes_with_defaults(2)
+        .expect("Unable to start 2-node ActixWeb1 network");
+    // Get the first node in the network
+    let node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node in the network
+    let node_b = network.node(1).expect("Unable to get second node");
+
+    let node_a_id = node_a.node_id();
+
+    let token = JsonWebTokenBuilder::new()
+        .build(admin_signer)
+        .expect("failed to build jwt");
+
+    let auth = &format!("Bearer Cylinder:{}", token);
+
+    let circuit_id = "ABCDE-01234";
+
+    // Create a circuit
+    commit_2_party_circuit_with_auth(
+        circuit_id,
+        node_a,
+        node_b,
+        AuthorizationType::Trust,
+        auth.into(),
+    );
+
+    // Get the first node's scabbard client
+    let scabbard_client = node_a
+        .scabbard_client_with_auth(&auth)
+        .expect("unable to get first node's scabbard client");
+
+    let service_id_a = get_node_service_id_with_auth(&circuit_id, node_a, auth.into());
+
+    let second_circuit_id = "ABCDE-56789";
+
+    // Create and submit a circuit proposal to use in querying the `/admin/proposals/{circuit_id}`
+    // endpoint
+    create_circuit_proposal(second_circuit_id, node_a, node_b, auth);
+
+    // Add a profile to use in querying the `/biome/profiles/{user_id}` endpoint
+    add_profile(node_a).expect("failed to add profile");
+
+    // Register a Biome user so that the `biome/users/{id}` endpoint can be reached
+    assert!(node_a
+        .biome_client(Some(&auth))
+        .register("user", "password")
+        .is_ok());
+    let user_id = &node_a
+        .biome_client(Some(&auth))
+        .list_users()
+        .expect("failed to list users")
+        .collect::<Vec<_>>()[0]
+        .user_id;
+
+    // Submit a `CreateContractRegistryAction` so that the
+    // `scabbard/circuit_id/service_id/state/address` endpoint can be reached
+    let scabbard_batch = make_create_contract_registry_batch("name", admin_signer)
+        .expect("Unable to build `CreateContractRegistryAction`");
+    assert!(scabbard_client
+        .submit(
+            &service_id_a,
+            vec![scabbard_batch],
+            Some(std::time::Duration::from_secs(25))
+        )
+        .is_ok());
+
+    // Loop through all endpoints checking that a successful response is returned indicating the
+    // endpoint was accessible with the necessary permissions configured
+    for (endpoint, methods) in endpoint_perm_map {
+        let endpoint = endpoint.replace("SERVICE_ID", service_id_a.service_id());
+        let endpoint = endpoint.replace("NODE_ID", node_a_id);
+        let endpoint = endpoint.replace("USER_ID", user_id);
+        let url = format!("http://localhost:{}{}", &node_a.rest_api_port(), endpoint);
+        assert!(check_endpoint_with_perm(methods, url).is_ok());
+    }
+
+    shutdown!(network).expect("Unable to shutdown network");
+}
+
 // Send requests to the given endpoint and check that a 401 is returned each time
 fn check_endpoint_no_perm(
     methods: Vec<(String, PermissionConfig)>,
@@ -157,6 +285,86 @@ fn check_endpoint_no_perm(
 
                 return Err(InternalError::with_message(format!(
                     "Got a response other than 401 from endpoint {}: {}",
+                    endpoint_url, message
+                )));
+            }
+        })?;
+    }
+
+    Ok(())
+}
+
+// Send requests to the given endpoint and check that a response indicating the endpoint was
+// successfully accessed is returned
+fn check_endpoint_with_perm(
+    methods: Vec<(String, PermissionConfig)>,
+    endpoint_url: String,
+) -> Result<(), InternalError> {
+    for (method, perm_config) in methods {
+        // Create a jwt for the associated signer in the `PermissionConfig`
+        let token = JsonWebTokenBuilder::new()
+            .build(&*perm_config.signer())
+            .expect("failed to build jwt");
+        let auth = format!("Bearer Cylinder:{}", token);
+        // Send a request to the specified endpoint
+        let res = match method.as_ref() {
+            "get" => Client::new()
+                .get(&endpoint_url)
+                .header("Authorization", auth.clone())
+                .send()
+                .map_err(|err| InternalError::from_source(Box::new(err))),
+            "post" => Client::new()
+                .post(&endpoint_url)
+                .header("Authorization", auth.clone())
+                .send()
+                .map_err(|err| InternalError::from_source(Box::new(err))),
+            "put" => Client::new()
+                .put(&endpoint_url)
+                .header("Authorization", auth.clone())
+                .send()
+                .map_err(|err| InternalError::from_source(Box::new(err))),
+            "patch" => Client::new()
+                .patch(&endpoint_url)
+                .header("Authorization", auth.clone())
+                .send()
+                .map_err(|err| InternalError::from_source(Box::new(err))),
+            "delete" => Client::new()
+                .delete(&endpoint_url)
+                .header("Authorization", auth.clone())
+                .send()
+                .map_err(|err| InternalError::from_source(Box::new(err))),
+            _ => panic!("shouldn't reach here"),
+        };
+        res.and_then(|res| {
+            let status = res.status();
+            if status.is_success() {
+                Ok(())
+            } else if status.as_u16() == 400 && (method == "post" || method == "put") {
+                // The "post" and "put" requests do not contain the additional data required
+                // to recieve a '200' response but a '400' response would not be possible
+                // without the necessary permissions configured for the requestor so this
+                // response for these methods is considered a successful response
+                Ok(())
+            } else if status.as_u16() == 500 && endpoint_url.contains("/ws/admin/register/") {
+                // This endpoint returns an internal server error when querried in the tests
+                // but would not be able to return this error without the necessary
+                // permissions configured for the requestor so this response from this
+                // endpoint is considered a successful response
+                Ok(())
+            } else {
+                let message = res
+                    .json::<ServerError>()
+                    .map_err(|_| {
+                        InternalError::with_message(format!(
+                            "Request failed with status code '{}', but error \
+                            response was not valid",
+                            status
+                        ))
+                    })?
+                    .message;
+
+                return Err(InternalError::with_message(format!(
+                    "Got an unexpected response from endpoint {}: {}",
                     endpoint_url, message
                 )));
             }
