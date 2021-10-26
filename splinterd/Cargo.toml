@@ -41,7 +41,7 @@ cylinder = { version = "0.2.2", features = ["key-load"] }
 diesel = { version = "1.0", features = ["postgres"], optional = true }
 health = { path = "../services/health", optional = true }
 log = "0.4"
-log4rs = "1"
+log4rs = {version = "1", features = ["threshold_filter"]}
 openssl = { version = "0.10", optional = true }
 protobuf = "2.23"
 rand = "0.7"
