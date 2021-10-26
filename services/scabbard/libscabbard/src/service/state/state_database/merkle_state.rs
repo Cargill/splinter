@@ -109,6 +109,36 @@ impl MerkleState {
         }
     }
 
+    /// Check to see if the merkle state exists, based on the underlying implementation's criteria.
+    pub fn check_existence(merkle_state_config: &MerkleStateConfig) -> bool {
+        match merkle_state_config {
+            // These are always auto-generated
+            MerkleStateConfig::KeyValue { .. } => true,
+            #[cfg(feature = "postgres")]
+            MerkleStateConfig::Postgres { pool, tree_name } => {
+                let postgres_backend = sql::backend::PostgresBackend::from(pool.clone());
+
+                // This will fail if the tree does not previously exist.
+                sql::SqlMerkleStateBuilder::new()
+                    .with_backend(postgres_backend)
+                    .with_tree(tree_name)
+                    .build()
+                    .is_ok()
+            }
+            #[cfg(feature = "sqlite")]
+            MerkleStateConfig::Sqlite { pool, tree_name } => {
+                let sqlite_backend = sql::backend::SqliteBackend::from(pool.clone());
+
+                // This will fail if the tree does not previously exist.
+                sql::SqlMerkleStateBuilder::new()
+                    .with_backend(sqlite_backend)
+                    .with_tree(tree_name)
+                    .build()
+                    .is_ok()
+            }
+        }
+    }
+
     pub fn get_initial_state_root(&self) -> Result<String, InternalError> {
         match self {
             MerkleState::KeyValue {
@@ -218,5 +248,58 @@ impl Prune for MerkleState {
             #[cfg(feature = "sqlite")]
             MerkleState::SqlSqlite { state } => state.prune(state_ids),
         }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
+
+    /// Check for the existence of a tree:
+    ///
+    /// 1. Create a connection pool
+    /// 2. Create a merkle state config with the pool
+    /// 3. Check that the config is shown not to exist
+    /// 4. Use that config to create a state
+    /// 5. Verify that an identical config is shown to exist
+    #[test]
+    fn check_existence() -> TestResult<()> {
+        let pool = create_connection_pool()?;
+
+        let config = MerkleStateConfig::Sqlite {
+            pool: pool.clone(),
+            tree_name: "test_check_existence".into(),
+        };
+
+        assert!(
+            !MerkleState::check_existence(&config),
+            "Tree in DB should not exist"
+        );
+
+        // this should create the state
+        let _ = MerkleState::new(config)?;
+
+        let config = MerkleStateConfig::Sqlite {
+            pool,
+            tree_name: "test_check_existence".into(),
+        };
+        assert!(
+            MerkleState::check_existence(&config),
+            "Tree in DB should exist"
+        );
+
+        Ok(())
+    }
+
+    fn create_connection_pool() -> TestResult<Pool<ConnectionManager<diesel::SqliteConnection>>> {
+        let connection_manager = ConnectionManager::<diesel::SqliteConnection>::new(":memory:");
+        let pool = Pool::builder().max_size(1).build(connection_manager)?;
+
+        crate::migrations::run_sqlite_migrations(&*pool.get()?)?;
+
+        Ok(pool)
     }
 }
