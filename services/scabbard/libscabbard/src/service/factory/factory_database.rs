@@ -392,6 +392,8 @@ impl ServiceFactory for ScabbardFactory {
             .map_err(FactoryCreateError::InvalidArguments)?;
 
         let (merkle_state, state_purge) = if self.enable_lmdb_state {
+            self.sql_state_check(circuit_id, &service_id)?;
+
             let db = self
                 .state_store_factory
                 .get_database(circuit_id, &service_id)
@@ -547,6 +549,41 @@ impl ScabbardFactory {
             .into());
         }
         Ok(())
+    }
+
+    /// Check that the SQL state doesn't exist for the given service.
+    fn sql_state_check(&self, circuit_id: &str, service_id: &str) -> Result<(), InvalidStateError> {
+        let exists = MerkleState::check_existence(
+            &self.create_sql_merkle_state_config(circuit_id, service_id),
+        );
+
+        if exists {
+            return Err(InvalidStateError::with_message(format!(
+                "A SQL-based merkle tree exists for {}::{}, but database storage is not enabled",
+                circuit_id, service_id
+            )));
+        }
+
+        Ok(())
+    }
+
+    fn create_sql_merkle_state_config(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> MerkleStateConfig {
+        match &self.store_factory_config {
+            #[cfg(feature = "postgres")]
+            ScabbardFactoryStorageConfig::Postgres { pool } => MerkleStateConfig::Postgres {
+                pool: pool.clone(),
+                tree_name: format!("{}::{}", circuit_id, service_id),
+            },
+            #[cfg(feature = "sqlite")]
+            ScabbardFactoryStorageConfig::Sqlite { pool } => MerkleStateConfig::Sqlite {
+                pool: pool.clone(),
+                tree_name: format!("{}::{}", circuit_id, service_id),
+            },
+        }
     }
 }
 
