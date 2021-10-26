@@ -18,6 +18,8 @@ use std::io::Error as IoError;
 
 use protobuf::error::ProtobufError;
 
+use crate::error::InvalidStateError;
+
 #[derive(Debug)]
 pub struct ServiceSendError(pub Box<dyn Error + Send>);
 
@@ -271,6 +273,7 @@ pub enum FactoryCreateError {
     CreationFailed(Box<dyn Error + Send>),
     InvalidArguments(String),
     Internal(String),
+    InvalidState(InvalidStateError),
 }
 
 impl Error for FactoryCreateError {
@@ -279,6 +282,7 @@ impl Error for FactoryCreateError {
             FactoryCreateError::CreationFailed(err) => Some(&**err),
             FactoryCreateError::InvalidArguments(_) => None,
             FactoryCreateError::Internal(_) => None,
+            FactoryCreateError::InvalidState(ref err) => Some(&*err),
         }
     }
 }
@@ -293,7 +297,14 @@ impl std::fmt::Display for FactoryCreateError {
                 write!(f, "invalid arguments specified: {}", err)
             }
             FactoryCreateError::Internal(msg) => f.write_str(msg),
+            FactoryCreateError::InvalidState(err) => f.write_str(&err.to_string()),
         }
+    }
+}
+
+impl From<InvalidStateError> for FactoryCreateError {
+    fn from(err: InvalidStateError) -> Self {
+        Self::InvalidState(err)
     }
 }
 
