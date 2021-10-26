@@ -32,6 +32,7 @@ use log4rs::{
     },
     config::{runtime::ConfigErrors, Appender, Logger, Root},
     encode::{pattern::PatternEncoder, Encode},
+    filter::threshold::ThresholdFilter,
     Config,
 };
 
@@ -69,7 +70,11 @@ impl TryInto<Appender> for AppenderConfig {
                 )
             }
         };
-        Ok(Appender::builder().build(&self.name, boxed))
+        let mut builder = Appender::builder();
+        if let Some(level) = self.level {
+            builder = builder.filter(Box::new(ThresholdFilter::new(level.to_level_filter())))
+        }
+        Ok(builder.build(&self.name, boxed))
     }
 }
 
