@@ -703,8 +703,21 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
                         check_file_readability(path)
                     }
                 })?;
-
             appenders
+                .iter()
+                .map(|a| {
+                    if a.name == "stdout" {
+                        AppenderConfig {
+                            level: Some(config.verbosity()),
+                            name: a.name.to_owned(),
+                            encoder: a.encoder.to_owned(),
+                            kind: a.kind.to_owned(),
+                        }
+                    } else {
+                        a.to_owned()
+                    }
+                })
+                .collect()
         } else {
             vec![]
         };
