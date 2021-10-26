@@ -180,7 +180,7 @@ fn create_endpoint_permission_map() -> HashMap<String, Vec<(String, PermissionCo
         )],
     );
     endpoints.insert(
-        "/admin/proposals/ABCDE-01234".into(),
+        "/admin/proposals/ABCDE-56789".into(),
         vec![(
             "get".into(),
             PermissionConfig::new(vec!["circuit.read".into()], new_signer()),
@@ -292,7 +292,7 @@ fn create_endpoint_permission_map() -> HashMap<String, Vec<(String, PermissionCo
         )],
     );
     endpoints.insert(
-        "/scabbard/ABCDE-01234/SERVICE_ID/batch_statuses".into(),
+        "/scabbard/ABCDE-01234/SERVICE_ID/batch_statuses?ids=6ff35474a572087e08fd6a54d563bd8172951b363e5c9731f1a40a855e14bba45dac515364a08d8403f4fb5d4a206174b7f63c29e4f4e425dc71b95494b8a798".into(),
         vec![(
             "get".into(),
             PermissionConfig::new(vec!["scabbard.read".into()], new_signer()),
@@ -306,7 +306,7 @@ fn create_endpoint_permission_map() -> HashMap<String, Vec<(String, PermissionCo
         )],
     );
     endpoints.insert(
-        "/scabbard/ABCDE-01234/SERVICE_ID/state/address".into(),
+        "/scabbard/ABCDE-01234/SERVICE_ID/state/00ec01b114f311db0e009ca2a88a9b97b1d7b362ddb27dc3dd214c6d20327a1fc3add8".into(),
         vec![(
             "get".into(),
             PermissionConfig::new(vec!["scabbard.read".into()], new_signer()),
@@ -320,7 +320,7 @@ fn create_endpoint_permission_map() -> HashMap<String, Vec<(String, PermissionCo
         )],
     );
     endpoints.insert(
-        "/biome/users/test-id".into(),
+        "/biome/users/USER_ID".into(),
         vec![
             (
                 "get".into(),
