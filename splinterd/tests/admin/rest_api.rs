@@ -18,7 +18,9 @@ use cylinder::{jwt::JsonWebTokenBuilder, secp256k1::Secp256k1Context, Context, S
 use reqwest::blocking::Client;
 use serde::Deserialize;
 use splinter::admin::messages::AuthorizationType;
+use splinter::biome::profile::store::ProfileBuilder;
 use splinter::error::InternalError;
+use splinterd::node::Node;
 use splinterd::node::PermissionConfig;
 use splinterd::node::RestApiVariant;
 
@@ -357,4 +359,19 @@ fn new_signer() -> Box<dyn Signer> {
 #[derive(Deserialize)]
 pub struct ServerError {
     pub message: String,
+}
+
+// Adds a test profile to the user profile store
+fn add_profile(node: &Node) -> Result<(), InternalError> {
+    let profile = ProfileBuilder::new()
+        .with_user_id("test_user_id".into())
+        .with_subject("subject".into())
+        .with_name(Some("name".into()))
+        .build()
+        .expect("Unable to build profile");
+
+    let profile_store = node.user_profile_store();
+    Ok(profile_store
+        .add_profile(profile)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?)
 }
