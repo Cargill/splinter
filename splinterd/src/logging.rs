@@ -14,7 +14,6 @@
 
 use std::convert::{From, Into, TryInto};
 
-use log::Level;
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
@@ -96,12 +95,6 @@ impl From<RootConfig> for Root {
     }
 }
 
-impl RootConfig {
-    fn set_level(self, level: Level) -> Self {
-        Self { level, ..self }
-    }
-}
-
 impl TryInto<Config> for LogConfig {
     type Error = ConfigErrors;
     fn try_into(self) -> Result<Config, Self::Error> {
@@ -114,14 +107,5 @@ impl TryInto<Config> for LogConfig {
             )
             .loggers(self.loggers.iter().map(|lc| lc.to_owned().into()))
             .build(root)
-    }
-}
-
-impl LogConfig {
-    pub fn set_root_level(self, level: Level) -> Self {
-        Self {
-            root: self.root.set_level(level),
-            ..self
-        }
     }
 }
