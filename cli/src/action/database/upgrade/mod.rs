@@ -17,6 +17,7 @@
 #[cfg(feature = "scabbard-migrations")]
 mod error;
 mod node_id;
+mod receipt_store;
 #[cfg(feature = "scabbard-migrations")]
 mod scabbard;
 mod yaml;
