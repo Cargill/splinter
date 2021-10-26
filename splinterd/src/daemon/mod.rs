@@ -492,10 +492,9 @@ impl SplinterDaemon {
                 }
             }
 
-            if self.enable_lmdb_state {
-                scabbard_factory_builder =
-                    scabbard_factory_builder.with_lmdb_state_db_dir(self.state_dir.to_string());
-            }
+            scabbard_factory_builder = scabbard_factory_builder
+                .with_lmdb_state_db_dir(self.state_dir.to_string())
+                .with_lmdb_state_enabled(self.enable_lmdb_state);
         }
 
         let scabbard_factory = scabbard_factory_builder.build().map_err(|err| {
