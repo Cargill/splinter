@@ -139,6 +139,19 @@ impl Node {
         ))
     }
 
+    pub fn scabbard_client_with_auth(
+        &self,
+        auth: &str,
+    ) -> Result<Box<dyn ScabbardClient>, InternalError> {
+        Ok(Box::new(
+            ReqwestScabbardClientBuilder::new()
+                .with_url(&format!("http://localhost:{}", self.rest_api_port))
+                .with_auth(auth)
+                .build()
+                .map_err(|e| InternalError::from_source(Box::new(e)))?,
+        ))
+    }
+
     pub fn registry_client(self: &Node) -> Box<dyn RegistryClient> {
         Box::new(ReqwestRegistryClient::new(
             format!("http://localhost:{}", self.rest_api_port),
