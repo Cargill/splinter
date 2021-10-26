@@ -413,6 +413,8 @@ impl ServiceFactory for ScabbardFactory {
                 }) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
             )
         } else {
+            self.lmdb_state_check(circuit_id, &service_id)?;
+
             match &self.store_factory_config {
                 #[cfg(feature = "postgres")]
                 ScabbardFactoryStorageConfig::Postgres { pool } => (
@@ -523,6 +525,28 @@ impl ServiceFactory for ScabbardFactory {
         }
 
         endpoints
+    }
+}
+
+impl ScabbardFactory {
+    /// Check that the LMDB files doesn't exist for the given service.
+    fn lmdb_state_check(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> Result<(), FactoryCreateError> {
+        let path = self
+            .state_store_factory
+            .compute_path(circuit_id, service_id)
+            .map_err(|e| FactoryCreateError::Internal(e.to_string()))?;
+        if path.with_extension("lmdb").exists() {
+            return Err(InvalidStateError::with_message(format!(
+                "LMDB database files exist for {}::{}, but LMDB storage is not enabled",
+                circuit_id, service_id
+            ))
+            .into());
+        }
+        Ok(())
     }
 }
 
