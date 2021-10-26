@@ -54,6 +54,7 @@ pub struct TomlUnnamedAppenderConfig {
     pub kind: TomlRawLogTarget,
     pub filename: Option<String>,
     pub size: Option<ByteSize>,
+    pub level: Option<TomlLogLevel>,
 }
 
 #[cfg(feature = "log-config")]
