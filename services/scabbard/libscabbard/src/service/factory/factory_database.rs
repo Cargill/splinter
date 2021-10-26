@@ -417,26 +417,11 @@ impl ServiceFactory for ScabbardFactory {
         } else {
             self.lmdb_state_check(circuit_id, &service_id)?;
 
-            match &self.store_factory_config {
-                #[cfg(feature = "postgres")]
-                ScabbardFactoryStorageConfig::Postgres { pool } => (
-                    MerkleState::new(MerkleStateConfig::Postgres {
-                        pool: pool.clone(),
-                        tree_name: format!("{}::{}", circuit_id, service_id),
-                    })
+            (
+                MerkleState::new(self.create_sql_merkle_state_config(circuit_id, &service_id))
                     .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
-                    Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
-                ),
-                #[cfg(feature = "sqlite")]
-                ScabbardFactoryStorageConfig::Sqlite { pool } => (
-                    MerkleState::new(MerkleStateConfig::Sqlite {
-                        pool: pool.clone(),
-                        tree_name: format!("{}::{}", circuit_id, service_id),
-                    })
-                    .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
-                    Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
-                ),
-            }
+                Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+            )
         };
 
         let (receipt_store, commit_hash_store): (ScabbardReceiptStore, Box<dyn CommitHashStore>) =
