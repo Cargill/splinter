@@ -521,6 +521,7 @@ fn main() {
                     name: String::from("default"),
                     encoder: String::from(DEFAULT_LOGGING_PATTERN),
                     kind: LogTarget::Stdout,
+                    level: None,
                 }],
                 loggers: vec![],
             };

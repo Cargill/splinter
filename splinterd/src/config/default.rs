@@ -123,6 +123,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 kind: super::logging::RawLogTarget::Stdout,
                 size: None,
                 filename: None,
+                level: None,
             };
             let loggers = vec![
                 (

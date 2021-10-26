@@ -62,6 +62,7 @@ pub struct AppenderConfig {
     pub name: String,
     pub encoder: String,
     pub kind: LogTarget,
+    pub level: Option<Level>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -72,6 +73,7 @@ pub struct UnnamedAppenderConfig {
     pub kind: RawLogTarget,
     pub filename: Option<String>,
     pub size: Option<u64>,
+    pub level: Option<Level>,
 }
 
 #[derive(Clone, Debug)]
@@ -143,6 +145,7 @@ impl TryFrom<(String, UnnamedAppenderConfig)> for AppenderConfig {
             name: value.0,
             encoder: value.1.encoder,
             kind,
+            level: value.1.level,
         })
     }
 }
@@ -162,6 +165,7 @@ impl From<TomlUnnamedAppenderConfig> for UnnamedAppenderConfig {
             kind: unnamed.kind.into(),
             filename: unnamed.filename,
             size: unnamed.size.map(|s| s.into()),
+            level: unnamed.level.map(|l| l.into()),
         }
     }
 }
