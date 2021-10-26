@@ -70,7 +70,7 @@ ARGUMENTS
 
 ENVIRONMENT VARIABLES
 =====================
-**SCAR_PATH_ENV_VAR**
+**SCAR_PATH**
 : List of directories to use when searching for the scar file to upload. (See
   `-p`, `--path`.)
 
