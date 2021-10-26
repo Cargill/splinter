@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use cylinder::{jwt::JsonWebTokenBuilder, secp256k1::Secp256k1Context, Context, Signer};
 use reqwest::blocking::Client;
 use serde::Deserialize;
+use splinter::admin::client::event::EventType;
 use splinter::admin::messages::AuthorizationType;
 use splinter::biome::profile::store::ProfileBuilder;
 use splinter::error::InternalError;
@@ -26,6 +27,7 @@ use splinterd::node::RestApiVariant;
 
 use crate::admin::circuit_commit::commit_2_party_circuit_with_auth;
 use crate::admin::get_node_service_id_with_auth;
+use crate::admin::payload::make_create_circuit_payload;
 use crate::framework::network::Network;
 
 /// Test that if no permissions are configured, all REST API endpoints that require permission
@@ -338,17 +340,104 @@ fn create_endpoint_permission_map() -> HashMap<String, Vec<(String, PermissionCo
         "/biome/profiles".into(),
         vec![(
             "get".into(),
-            PermissionConfig::new(vec!["biome.user.read".into()], new_signer()),
+            PermissionConfig::new(vec!["biome.profile.read".into()], new_signer()),
         )],
     );
     endpoints.insert(
-        "/biome/profiles/user_id".into(),
+        "/biome/profiles/test_user_id".into(),
         vec![(
             "get".into(),
-            PermissionConfig::new(vec!["biome.user.read".into()], new_signer()),
+            PermissionConfig::new(vec!["biome.profile.read".into()], new_signer()),
         )],
     );
     endpoints
+}
+
+// Creates and submits a new circuit proposal
+fn create_circuit_proposal(circuit_id: &str, node_a: &Node, node_b: &Node, auth: &str) {
+    // Create the list of node details needed to build the `CircuitCreateRequest`
+    let node_info = vec![
+        (
+            node_a.node_id().to_string(),
+            (
+                node_a.network_endpoints().to_vec(),
+                // get the second signer (not the normal key in the first position)
+                node_a
+                    .signers()
+                    .get(1)
+                    .expect("node does not have enough signers configured")
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
+        ),
+        (
+            node_b.node_id().to_string(),
+            (
+                node_b.network_endpoints().to_vec(),
+                node_b
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
+                    .public_key()
+                    .expect("Unable to get first node's public key"),
+            ),
+        ),
+    ]
+    .into_iter()
+    .collect::<HashMap<String, (Vec<String>, cylinder::PublicKey)>>();
+
+    let node_a_event_client = node_a
+        .admin_service_event_client_with_auth(
+            &format!("test_circuit_{}", &circuit_id),
+            None,
+            auth.into(),
+        )
+        .expect("Unable to get event client");
+    let node_b_event_client = node_b
+        .admin_service_event_client_with_auth(
+            &format!("test_circuit_{}", &circuit_id),
+            None,
+            auth.into(),
+        )
+        .expect("Unable to get event client");
+
+    let circuit_payload_bytes = make_create_circuit_payload(
+        &circuit_id,
+        node_a.node_id(),
+        node_info,
+        &*node_a.admin_signer().clone_box(),
+        &vec![
+            node_a
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get first node's public key")
+                .as_hex(),
+            node_b
+                .admin_signer()
+                .public_key()
+                .expect("Unable to get second node's public key")
+                .as_hex(),
+        ],
+        AuthorizationType::Challenge,
+    )
+    .expect("Unable to generate circuit request");
+    // Submit the `CircuitManagementPayload` to the first node
+    let res = node_a
+        .admin_service_client_with_auth(auth.into())
+        .submit_admin_payload(circuit_payload_bytes.clone());
+    assert!(res.is_ok());
+
+    // Wait for the proposal event from each node.
+    let proposal_a_event = node_a_event_client
+        .next_event()
+        .expect("Unable to get next event");
+    let proposal_b_event = node_b_event_client
+        .next_event()
+        .expect("Unable to get next event");
+
+    assert_eq!(&EventType::ProposalSubmitted, proposal_a_event.event_type());
+    assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
+    assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
 }
 
 fn new_signer() -> Box<dyn Signer> {
