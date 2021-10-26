@@ -730,8 +730,7 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
             root: config.root_logger().to_owned(),
             appenders,
             loggers,
-        }
-        .set_root_level(config.verbosity().to_owned());
+        };
         if let Ok(log_config) = log_config.try_into() {
             _log_handle.set_config(log_config);
         }
