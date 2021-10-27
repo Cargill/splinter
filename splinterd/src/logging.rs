@@ -84,12 +84,22 @@ impl TryInto<Appender> for AppenderConfig {
     }
 }
 
-impl From<LoggerConfig> for Logger {
-    fn from(logger_config: LoggerConfig) -> Self {
-        let level = logger_config.level.to_level_filter();
+struct LoggerFactory {
+    default: RootConfig,
+}
+impl LoggerFactory {
+    fn new(default: RootConfig) -> Self {
+        Self { default }
+    }
+    fn get_logger(&self, config: LoggerConfig) -> Logger {
+        let level = config
+            .level
+            .map(|l| l.to_level_filter())
+            .unwrap_or_else(|| self.default.level.to_level_filter());
+        let appenders = config.appenders.unwrap_or_else(Vec::new);
         Logger::builder()
-            .appenders(logger_config.appenders.clone())
-            .build(&logger_config.name, level)
+            .appenders(appenders)
+            .build(config.name, level)
     }
 }
 
@@ -105,6 +115,7 @@ impl From<RootConfig> for Root {
 impl TryInto<Config> for LogConfig {
     type Error = ConfigErrors;
     fn try_into(self) -> Result<Config, Self::Error> {
+        let factory = LoggerFactory::new(self.root.clone());
         let root = self.root.into();
         Config::builder()
             .appenders(
@@ -112,7 +123,7 @@ impl TryInto<Config> for LogConfig {
                     .iter()
                     .filter_map(|ac| ac.to_owned().try_into().ok()),
             )
-            .loggers(self.loggers.iter().map(|lc| lc.to_owned().into()))
+            .loggers(self.loggers.into_iter().map(|lc| factory.get_logger(lc)))
             .build(root)
     }
 }
