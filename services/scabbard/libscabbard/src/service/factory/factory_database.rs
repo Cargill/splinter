@@ -392,6 +392,8 @@ impl ServiceFactory for ScabbardFactory {
             .map_err(FactoryCreateError::InvalidArguments)?;
 
         let (merkle_state, state_purge) = if self.enable_lmdb_state {
+            self.sql_state_check(circuit_id, &service_id)?;
+
             let db = self
                 .state_store_factory
                 .get_database(circuit_id, &service_id)
@@ -413,26 +415,13 @@ impl ServiceFactory for ScabbardFactory {
                 }) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
             )
         } else {
-            match &self.store_factory_config {
-                #[cfg(feature = "postgres")]
-                ScabbardFactoryStorageConfig::Postgres { pool } => (
-                    MerkleState::new(MerkleStateConfig::Postgres {
-                        pool: pool.clone(),
-                        tree_name: format!("{}::{}", circuit_id, service_id),
-                    })
+            self.lmdb_state_check(circuit_id, &service_id)?;
+
+            (
+                MerkleState::new(self.create_sql_merkle_state_config(circuit_id, &service_id))
                     .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
-                    Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
-                ),
-                #[cfg(feature = "sqlite")]
-                ScabbardFactoryStorageConfig::Sqlite { pool } => (
-                    MerkleState::new(MerkleStateConfig::Sqlite {
-                        pool: pool.clone(),
-                        tree_name: format!("{}::{}", circuit_id, service_id),
-                    })
-                    .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
-                    Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
-                ),
-            }
+                Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+            )
         };
 
         let (receipt_store, commit_hash_store): (ScabbardReceiptStore, Box<dyn CommitHashStore>) =
@@ -523,6 +512,63 @@ impl ServiceFactory for ScabbardFactory {
         }
 
         endpoints
+    }
+}
+
+impl ScabbardFactory {
+    /// Check that the LMDB files doesn't exist for the given service.
+    fn lmdb_state_check(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> Result<(), FactoryCreateError> {
+        let path = self
+            .state_store_factory
+            .compute_path(circuit_id, service_id)
+            .map_err(|e| FactoryCreateError::Internal(e.to_string()))?;
+        if path.with_extension("lmdb").exists() {
+            return Err(InvalidStateError::with_message(format!(
+                "LMDB database files exist for {}::{}, but LMDB storage is not enabled",
+                circuit_id, service_id
+            ))
+            .into());
+        }
+        Ok(())
+    }
+
+    /// Check that the SQL state doesn't exist for the given service.
+    fn sql_state_check(&self, circuit_id: &str, service_id: &str) -> Result<(), InvalidStateError> {
+        let exists = MerkleState::check_existence(
+            &self.create_sql_merkle_state_config(circuit_id, service_id),
+        );
+
+        if exists {
+            return Err(InvalidStateError::with_message(format!(
+                "A SQL-based merkle tree exists for {}::{}, but database storage is not enabled",
+                circuit_id, service_id
+            )));
+        }
+
+        Ok(())
+    }
+
+    fn create_sql_merkle_state_config(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> MerkleStateConfig {
+        match &self.store_factory_config {
+            #[cfg(feature = "postgres")]
+            ScabbardFactoryStorageConfig::Postgres { pool } => MerkleStateConfig::Postgres {
+                pool: pool.clone(),
+                tree_name: format!("{}::{}", circuit_id, service_id),
+            },
+            #[cfg(feature = "sqlite")]
+            ScabbardFactoryStorageConfig::Sqlite { pool } => MerkleStateConfig::Sqlite {
+                pool: pool.clone(),
+                tree_name: format!("{}::{}", circuit_id, service_id),
+            },
+        }
     }
 }
 
