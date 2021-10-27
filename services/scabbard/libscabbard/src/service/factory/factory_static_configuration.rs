@@ -37,8 +37,15 @@ use crate::service::rest_api::actix;
 use crate::service::{error::ScabbardError, Scabbard, ScabbardVersion, SERVICE_TYPE};
 
 const DEFAULT_STATE_DB_DIR: &str = "/var/lib/splinter";
+// Linux, with a 64bit CPU supports sparse files of a large size
+#[cfg(target_os = "linux")]
+const DEFAULT_STATE_DB_SIZE: usize = 1 << 40; // 1024 ** 4
+#[cfg(any(target_arch = "x86", target_arch = "arm", not(target_os = "linux")))]
 const DEFAULT_STATE_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 const DEFAULT_RECEIPT_DB_DIR: &str = "/var/lib/splinter";
+#[cfg(target_os = "linux")]
+const DEFAULT_RECEIPT_DB_SIZE: usize = 1 << 40; // 1024 ** 4
+#[cfg(any(target_arch = "x86", target_arch = "arm", not(target_os = "linux")))]
 const DEFAULT_RECEIPT_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;

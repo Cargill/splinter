@@ -29,6 +29,10 @@ use crate::hex::to_hex;
 
 use super::CURRENT_STATE_ROOT_INDEX;
 
+// Linux, with a 64bit CPU supports sparse files of a large size
+#[cfg(target_os = "linux")]
+const DEFAULT_DB_SIZE: usize = 1 << 40; // 1024 ** 4
+#[cfg(any(target_arch = "x86", target_arch = "arm", not(target_os = "linux")))]
 const DEFAULT_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
 #[derive(Clone)]
