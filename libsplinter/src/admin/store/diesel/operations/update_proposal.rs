@@ -87,18 +87,13 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 .execute(self.conn)?;
 
             // Delete existing data associated with the `CircuitProposal` and `ProposedCircuit`
-            let node_ids: Vec<String> = proposed_node::table
-                .filter(proposed_node::circuit_id.eq(proposal.circuit_id()))
-                .select(proposed_node::node_id)
-                .load(self.conn)?;
-
             delete(
                 proposed_node::table.filter(proposed_node::circuit_id.eq(proposal.circuit_id())),
             )
             .execute(self.conn)?;
             delete(
                 proposed_node_endpoint::table
-                    .filter(proposed_node_endpoint::node_id.eq_any(&node_ids)),
+                    .filter(proposed_node_endpoint::circuit_id.eq(proposal.circuit_id())),
             )
             .execute(self.conn)?;
             delete(
@@ -193,18 +188,13 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 .execute(self.conn)?;
 
             // Delete existing data associated with the `CircuitProposal` and `ProposedCircuit`
-            let node_ids: Vec<String> = proposed_node::table
-                .filter(proposed_node::circuit_id.eq(proposal.circuit_id()))
-                .select(proposed_node::node_id)
-                .load(self.conn)?;
-
             delete(
                 proposed_node::table.filter(proposed_node::circuit_id.eq(proposal.circuit_id())),
             )
             .execute(self.conn)?;
             delete(
                 proposed_node_endpoint::table
-                    .filter(proposed_node_endpoint::node_id.eq_any(&node_ids)),
+                    .filter(proposed_node_endpoint::circuit_id.eq(proposal.circuit_id())),
             )
             .execute(self.conn)?;
             delete(
