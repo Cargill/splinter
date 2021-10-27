@@ -497,9 +497,9 @@ impl SplinterDaemon {
                 .with_lmdb_state_enabled(self.enable_lmdb_state);
         }
 
-        let scabbard_factory = scabbard_factory_builder.build().map_err(|err| {
-            StartError::OrchestratorError(format!("failed to create new orchestrator: {}", err))
-        })?;
+        let scabbard_factory = scabbard_factory_builder
+            .build()
+            .map_err(|err| StartError::UserError(err.to_string()))?;
 
         let mut orchestrator = ServiceOrchestratorBuilder::new()
             .with_connection(orchestrator_connection)
