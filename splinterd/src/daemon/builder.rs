@@ -271,9 +271,32 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: initial_peers".to_string())
         })?;
 
-        let rest_api_endpoint = self.rest_api_endpoint.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: rest_api_endpoint".to_string())
-        })?;
+        let rest_api_endpoint = match self.rest_api_endpoint {
+            Some(endpoint) => {
+                if endpoint.contains("http://")
+                    || (cfg!(feature = "https-bind") && endpoint.contains("https://"))
+                {
+                    Ok(endpoint)
+                } else {
+                    #[cfg(not(feature = "https-bind"))]
+                    {
+                        Err(CreateError::InvalidArgument(
+                            "Invalid REST API endpoint, 'http://' protocol required".to_string(),
+                        ))
+                    }
+                    #[cfg(feature = "https-bind")]
+                    {
+                        Err(CreateError::InvalidArgument(
+                            "Invalid REST API endpoint, 'http://' or 'https://' protocol required"
+                                .to_string(),
+                        ))
+                    }
+                }
+            }
+            None => Err(CreateError::MissingRequiredField(
+                "Missing field: rest_api_endpoint".to_string(),
+            )),
+        }?;
 
         #[cfg(feature = "https-bind")]
         let rest_api_ssl_settings = match (self.rest_api_server_cert, self.rest_api_server_key) {
