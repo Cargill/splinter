@@ -205,15 +205,11 @@ impl ScabbardFactoryBuilder {
         })?;
 
         let state_storage_configuration = self.state_storage_configuration.unwrap_or_default();
-
-        let state_store_factory = LmdbDatabaseFactory::new_state_db_factory(
-            Path::new(
-                state_storage_configuration
-                    .db_dir
-                    .as_deref()
-                    .unwrap_or(DEFAULT_LMDB_DIR),
-            ),
-            state_storage_configuration.db_size,
+        let lmdb_path = Path::new(
+            state_storage_configuration
+                .db_dir
+                .as_deref()
+                .unwrap_or(DEFAULT_LMDB_DIR),
         );
 
         let store_factory_config = match storage_configuration {
@@ -239,6 +235,15 @@ impl ScabbardFactoryBuilder {
             }
         };
 
+        if !state_storage_configuration.enable_lmdb {
+            check_for_lmdb_files(lmdb_path)?;
+        }
+
+        let state_store_factory = LmdbDatabaseFactory::new_state_db_factory(
+            lmdb_path,
+            state_storage_configuration.db_size,
+        );
+
         Ok(ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
             state_store_factory,
@@ -248,6 +253,49 @@ impl ScabbardFactoryBuilder {
         })
     }
 }
+
+fn check_for_lmdb_files(lmdb_path: &Path) -> Result<(), InvalidStateError> {
+    if !lmdb_path.is_dir() {
+        return Err(InvalidStateError::with_message(format!(
+            "{} is not a directory",
+            lmdb_path.display(),
+        )));
+    }
+
+    match std::fs::read_dir(lmdb_path) {
+        Ok(entries) => {
+            for entry in entries {
+                let entry = entry.map_err(|err| {
+                    InvalidStateError::with_message(format!(
+                        "Unable to list files in {}: {}",
+                        lmdb_path.display(),
+                        err
+                    ))
+                })?;
+                if entry
+                    .path()
+                    .extension()
+                    .map(|extension| extension == "lmdb")
+                    .unwrap_or(false)
+                {
+                    return Err(InvalidStateError::with_message(
+                        "LMDB database files exist, but LMDB storage is not enabled".into(),
+                    ));
+                }
+            }
+            Ok(())
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(
+            InvalidStateError::with_message(format!("{} is not found", lmdb_path.display())),
+        ),
+        Err(err) => Err(InvalidStateError::with_message(format!(
+            "Unable to read {}: {}",
+            lmdb_path.display(),
+            err
+        ))),
+    }
+}
+
 /// Internal Factory storage configuration.
 enum ScabbardFactoryStorageConfig {
     #[cfg(feature = "postgres")]
