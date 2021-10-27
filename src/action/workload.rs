@@ -28,11 +28,11 @@ use transact::families::{
         playlist::SmallbankGeneratingIter, SmallbankBatchWorkload, SmallbankTransactionWorkload,
     },
 };
-use transact::workload::{WorkloadRunner, DEFAULT_LOG_TIME_SECS};
+use transact::workload::WorkloadRunner;
 
 use crate::error::CliError;
 
-use super::{create_cylinder_jwt_auth_signer_key, Action};
+use super::{create_cylinder_jwt_auth_signer_key, Action, DEFAULT_LOG_TIME_SECS};
 
 pub struct WorkloadAction;
 

@@ -21,12 +21,14 @@ use transact::families::smallbank::workload::playlist::{
     generate_smallbank_playlist, process_smallbank_playlist,
 };
 use transact::workload::batch_gen::generate_signed_batches;
-use transact::workload::{submit_batches_from_source, DEFAULT_LOG_TIME_SECS};
+use transact::workload::submit_batches_from_source;
 
 use crate::action::time::Time;
 use crate::error::CliError;
 
-use super::{create_cylinder_jwt_auth_signer_key, load_cylinder_signer_key, Action};
+use super::{
+    create_cylinder_jwt_auth_signer_key, load_cylinder_signer_key, Action, DEFAULT_LOG_TIME_SECS,
+};
 
 const DEFAULT_ACCOUNTS: &str = "10";
 const DEFAULT_TRANSACTIONS: &str = "10";

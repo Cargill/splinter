@@ -35,6 +35,9 @@ use cylinder::{
 
 use super::error::CliError;
 
+#[cfg(any(feature = "workload", feature = "playlist"))]
+const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
+
 /// A CLI Command Action.
 ///
 /// An Action is a single subcommand for CLI operations.
