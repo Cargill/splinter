@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # build stage
-FROM node:lts-alpine as build-stage
+FROM node:14.18.1-alpine3.11 as build-stage
 
 RUN apk add --no-cache \
     curl \
