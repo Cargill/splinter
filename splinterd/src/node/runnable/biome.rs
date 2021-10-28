@@ -19,13 +19,15 @@ use std::sync::Arc;
 use splinter::biome::{
     credentials::rest_api::BiomeCredentialsRestResourceProviderBuilder,
     key_management::rest_api::BiomeKeyManagementRestResourceProvider,
-    profile::rest_api::BiomeProfileRestResourceProvider,
+    profile::rest_api::BiomeProfileRestResourceProvider, UserProfileStore,
 };
 use splinter::error::InternalError;
 use splinter::rest_api::{
     actix_web_1::Resource as Actix1Resource, AuthConfig, RestResourceProvider,
 };
 use splinter::store::StoreFactory;
+
+use crate::node::running::biome::BiomeSubsystem;
 
 /// Biome resource provider
 pub struct BiomeResourceProvider {
@@ -79,5 +81,16 @@ impl BiomeResourceProvider {
         let mut replaced = vec![];
         std::mem::swap(&mut self.actix1_resources, &mut replaced);
         replaced
+    }
+}
+
+pub struct RunnableBiomeSubsystem {
+    pub profile_store: Box<dyn UserProfileStore>,
+}
+
+impl RunnableBiomeSubsystem {
+    pub fn run(self) -> Result<BiomeSubsystem, InternalError> {
+        let profile_store = self.profile_store;
+        Ok(BiomeSubsystem { profile_store })
     }
 }

@@ -15,6 +15,7 @@
 //! Contains the implementation of `Node`.
 
 pub mod admin;
+pub mod biome;
 pub mod network;
 
 use std::thread::JoinHandle;
@@ -48,6 +49,7 @@ pub(super) enum NodeRestApiVariant {
 pub struct Node {
     pub(super) admin_signer: Box<dyn Signer>,
     pub(super) admin_subsystem: admin::AdminSubsystem,
+    pub(super) biome_subsystem: biome::BiomeSubsystem,
     pub(super) rest_api_variant: NodeRestApiVariant,
     pub(super) rest_api_port: u16,
     pub(super) network_subsystem: network::NetworkSubsystem,
@@ -165,6 +167,7 @@ impl Node {
         let Node {
             admin_signer,
             admin_subsystem,
+            biome_subsystem: _,
             rest_api_variant,
             node_id,
             rest_api_port,
