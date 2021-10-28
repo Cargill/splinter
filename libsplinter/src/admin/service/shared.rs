@@ -2725,6 +2725,20 @@ impl AdminServiceShared {
         circuit_proposal: &StoreProposal,
         node_id: &str,
     ) -> Result<(), AdminSharedError> {
+        if circuit_proposal.proposal_type() == &ProposalType::Create {
+            let circuit = circuit_proposal.circuit();
+            // verify that the circuit version is supported
+            match circuit.circuit_version() {
+                1 | CIRCUIT_PROTOCOL_VERSION => (),
+                _ => {
+                    return Err(AdminSharedError::ValidationFailed(format!(
+                        "Proposed circuit's schema version is unsupported: {}",
+                        circuit.circuit_version()
+                    )));
+                }
+            }
+        };
+
         let circuit_hash = proposal_vote.get_circuit_hash();
 
         self.validate_key(signer_public_key)?;
