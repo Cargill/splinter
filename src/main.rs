@@ -137,8 +137,8 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .about(
                             "Generates a workload transaction playlist. \
                          A playlist is a series of transactions, described in \
-                         YAML.  This command generates a playlist and writes it \
-                         to file or standard out.",
+                         YAML. This command generates a playlist and writes it \
+                         to a file or standard out.",
                         )
                         .arg(
                             Arg::with_name("workload")
@@ -166,7 +166,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .long("smallbank-seed")
                                 .value_name("SEED")
                                 .long_help(
-                                    "An integer to use as a seed generate the same smallbank \
+                                    "An integer to use as a seed to generate the same smallbank \
                                     playlist",
                                 ),
                         )
@@ -184,8 +184,8 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .about(
                             "Processes a transaction playlist. \
                      A playlist is a series of transactions, described in \
-                     YAML.  This command processes a playlist, converting it into \
-                     transactions and writes it to file or standard out.",
+                     YAML. This command processes a playlist, converting it into \
+                     transactions and writes it to a file or standard out.",
                         )
                         .arg(
                             Arg::with_name("input")
@@ -283,8 +283,8 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .long("rate")
                                 .value_name("RATE")
                                 .long_help(
-                                    "Rate of batch submissions, either provice a float, or a rate in form <float>/<h,m,s> \
-                                defaults to 1/s",
+                                    "Rate of batch submissions, either provide a float, or a rate \
+                                    in form <float>/<h,m,s> defaults to 1/s",
                                 ),
                         )
                         .arg(
