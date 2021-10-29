@@ -212,7 +212,7 @@ impl Action for SubmitPlaylistAction {
             interval.into()
         } else {
             let raw_num = rate_string.parse::<f32>().map_err(|_| {
-                CliError::UnparseableArg("time must be floating point value".into())
+                CliError::UnparseableArg("'rate' must be floating point value".into())
             })?;
             std::time::Duration::from_secs_f32(1.0 / raw_num)
         };
