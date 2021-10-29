@@ -30,7 +30,7 @@ use splinter::admin::messages::{
 use splinter::error::InternalError;
 use splinter::protos::admin::{
     CircuitAbandon, CircuitCreateRequest, CircuitDisbandRequest, CircuitManagementPayload,
-    CircuitManagementPayload_Action, CircuitManagementPayload_Header,
+    CircuitManagementPayload_Action, CircuitManagementPayload_Header, CircuitPurgeRequest,
 };
 use transact::protocol::batch::Batch;
 
@@ -351,4 +351,41 @@ pub(in crate::admin) fn make_create_contract_registry_batch(
         .map_err(|err| InternalError::from_source(Box::new(err)))?
         .build(signer)
         .map_err(|err| InternalError::from_source(Box::new(err)))
+}
+
+pub(in crate::admin) fn make_circuit_purge_payload(
+    circuit_id: &str,
+    requester_node_id: &str,
+    signer: &dyn Signer,
+) -> Vec<u8> {
+    let public_key = signer
+        .public_key()
+        .expect("Unable to get signer's public key")
+        .into_bytes();
+    let mut circuit_purge = CircuitPurgeRequest::new();
+    circuit_purge.set_circuit_id(circuit_id.to_string());
+    let serialized_action = circuit_purge
+        .write_to_bytes()
+        .expect("Unable to serialize `CircuitPurgeRequest`");
+    let hashed_bytes = hash(MessageDigest::sha512(), &serialized_action)
+        .expect("unable to hash `CircuitPurgeRequest` bytes");
+    let mut header = CircuitManagementPayload_Header::new();
+    header.set_action(CircuitManagementPayload_Action::CIRCUIT_PURGE_REQUEST);
+    header.set_requester(public_key);
+    header.set_payload_sha512(hashed_bytes.to_vec());
+    header.set_requester_node_id(requester_node_id.to_string());
+
+    let mut payload = CircuitManagementPayload::new();
+    payload.set_signature(
+        signer
+            .sign(&payload.header)
+            .expect("Unable to sign `CircuitManagementPayload` header")
+            .take_bytes(),
+    );
+    payload.set_circuit_purge_request(circuit_purge);
+    payload
+        .set_header(Message::write_to_bytes(&header).expect("unable to serialize payload header"));
+    payload
+        .write_to_bytes()
+        .expect("unable to get bytes from `CircuitPurgeRequest' payload")
 }
