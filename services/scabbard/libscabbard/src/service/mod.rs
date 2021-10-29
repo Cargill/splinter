@@ -86,8 +86,6 @@ impl TryFrom<Option<&str>> for ScabbardVersion {
     }
 }
 
-type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
-
 /// A handler for purging a scabbard instances state
 pub trait ScabbardStatePurgeHandler: Send + Sync {
     /// Purge the scabbard instances state.
@@ -120,7 +118,7 @@ impl Scabbard {
         peer_services: HashSet<String>,
         merkle_state: MerkleState,
         commit_hash_store: Box<dyn CommitHashStore>,
-        receipt_store: ScabbardReceiptStore,
+        receipt_store: Arc<RwLock<dyn ReceiptStore>>,
         purge_handler: Box<dyn ScabbardStatePurgeHandler>,
         signature_verifier: Box<dyn SignatureVerifier>,
         // The public keys that are authorized to create and manage sabre contracts

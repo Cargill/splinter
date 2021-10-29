@@ -64,9 +64,6 @@ use crate::store::CommitHashStore;
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 const DEFAULT_LMDB_DIR: &str = "/var/lib/splinter";
 
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
-type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
-
 /// A connection URI to a database instance.
 #[derive(Clone)]
 pub enum ConnectionUri {
@@ -738,7 +735,7 @@ impl ScabbardFactory {
             self.create_sql_merkle_state_purge_handle(circuit_id, &service_id),
         );
 
-        let (receipt_store, commit_hash_store): (ScabbardReceiptStore, Box<dyn CommitHashStore>) =
+        let (receipt_store, commit_hash_store): (Arc<RwLock<dyn ReceiptStore>>, Box<dyn CommitHashStore>) =
             match &self.store_factory_config {
                 #[cfg(feature = "postgres")]
                 ScabbardFactoryStorageConfig::Postgres { pool } => (
