@@ -1,5 +1,89 @@
 # Release Notes
 
+## Changes in Splinter 0.5.23
+
+### Highlights
+
+* Stabilized `scabbard-receipt-store` feature in splinter cli.
+
+### libsplinter
+
+* Update admin routes to error if protocol version is too high.
+
+* Replace the use of `Vec<u8>` with `splinter::public_key::PublicKey`. For
+  areas that are not on the edges (Rest API/ Database) the structs should use
+  `PublicKey` to represent a public key instead of Vec.
+
+* Update admin register route to handle protocol versions. When submitting the
+  request the `SplinterProtocolVersion` will determine the version of admin
+  events that will be returned over the event subscriber If the protocol is set
+  to 1, 0.4 equivalent `AdminEvents` are returned. If the protocol is set to 2
+  or not set, 0.5/0.6 `AdminEvent` messages will be returned. This allows for
+  backwards compatibility with 0.4 clients to still interact with 0.5 splinter
+  nodes.
+
+* Fix update_proposal so it does not remove incorrect nodes. When updating a
+  proposal, the command was removing all proposed with the same node ID but
+  should remove by circuit ID instead.
+
+* Configure SQLite PRAGMA for multi-threaded support.
+
+* Remove the `create_store_factory` function to push the connection type
+  selection decision closer to the caller.
+
+### splinterd
+
+* Add REST API test that checks permissioned endpoints can’t be accessed by a
+  client without any set permissions.
+
+* Split connection pool and store factory creation. This change splits the
+  creation of the connection pool and the store factory.  It allows the use of
+  the connection pool to be passed to the scabbard service as well.
+
+* Add `create_store_factory` function to create stores. This functionality used
+  to be in libsplinter.
+
+* Effectively remove the use of the `MemoryStoreFactory`, replacing it with a
+  memory-based SQLite version.
+
+* Improve scabbard_state documentation and position in example configuration
+  file.
+
+* Remove the `zmq` feature.
+
+* Add checks for log file permissioning issues.
+
+* Add tests for toml configuration file deserialization.
+
+* Add state_dir and config_dir keys to deserializable toml configuration
+  structure.
+
+* Add default quiet loggers for tokio, tokio_reactor, and hyper crates.
+
+### libscabbard
+
+* Add checks for invalid merkle state and database configuration.
+
+* LMDB files are written with “.lmdb” file extension.
+
+* Update LMDB default file sizes on 64 bit linux build targets to be 1024^4.
+
+* Switch from use of postgres connection pool to single postgres connection to
+  prevent cli looping when a connection could not be established.
+
+### splinter CLI
+
+* Break apart `scabbard-migration` features. The scabbard migrations were only
+  being run if the scabbard-migrations feature was enabled which was
+  experimental. This means the transaction receipt migrations were not being
+  run on stable.
+
+* Switch the use of Pool with PgConnection to just a PgConnection in splinter
+  database migrate. This enables testing the connection to the postgres
+  database and returning an error if not able to connect. Before with the use
+  of Pool, the connection would be retried, causing the CLI command to loop.
+  Now it returns if the connection cannot be established.
+
 ## Changes in Splinter 0.5.22
 
 ### Highlights
