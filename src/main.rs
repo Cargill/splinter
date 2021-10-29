@@ -121,8 +121,9 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .short("d")
                         .takes_value(true)
                         .help(
-                            "The amount of time in hours the workload should run for. \
-                         If not set workload will run indefinitely"
+                            "The amount of time the workload should run for. Time can be given \
+                         in seconds, minutes, hours or days. If not set workload will run \
+                         indefinitely"
                         )
                 ),
         );
