@@ -58,8 +58,6 @@ const ITER_CACHE_SIZE: usize = 64;
 const COMPLETED_BATCH_INFO_ITER_RETRY: Duration = Duration::from_millis(100);
 const DEFAULT_BATCH_HISTORY_SIZE: usize = 100;
 
-type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
-
 /// Iterator over entries in a Scabbard service's state
 pub type StateIter = Box<dyn Iterator<Item = Result<(String, Vec<u8>), ScabbardStateError>>>;
 
@@ -69,7 +67,7 @@ pub struct ScabbardState {
     context_manager: ContextManager,
     executor: Executor,
     current_state_root: String,
-    receipt_store: ScabbardReceiptStore,
+    receipt_store: Arc<RwLock<dyn ReceiptStore>>,
     pending_changes: Option<(String, Vec<TransactionReceipt>)>,
     event_subscribers: Vec<Box<dyn StateSubscriber>>,
     #[cfg(feature = "metrics")]
@@ -83,7 +81,7 @@ impl ScabbardState {
     pub fn new(
         merkle_state: merkle_state::MerkleState,
         commit_hash_store: Box<dyn CommitHashStore>,
-        receipt_store: ScabbardReceiptStore,
+        receipt_store: Arc<RwLock<dyn ReceiptStore>>,
         #[cfg(feature = "metrics")] service_id: String,
         #[cfg(feature = "metrics")] circuit_id: String,
         admin_keys: Vec<String>,
