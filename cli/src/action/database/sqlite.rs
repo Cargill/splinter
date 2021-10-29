@@ -15,7 +15,9 @@
 //! Provides sqlite migration support to the database action
 
 use std::fs::{self, OpenOptions};
-use std::path::PathBuf;
+#[cfg(target_family = "unix")]
+use std::os::unix::prelude::OpenOptionsExt;
+use std::path::{Path, PathBuf};
 
 use diesel::{
     r2d2::{ConnectionManager, Pool},
@@ -36,6 +38,8 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
         if let Err(err) = OpenOptions::new()
             .read(true)
             .write(true)
+            .create(!Path::new(&connection_string).exists())
+            .mode(0o640)
             .open(&connection_string)
         {
             match err.kind() {
