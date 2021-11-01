@@ -2039,6 +2039,55 @@ pub fn test_3_party_circuit_proposal_rejected_stop() {
     shutdown!(network).expect("Unable to shutdown network");
 }
 
+/// This test is designed to tickle issues where a two connections exist for a peer and one
+/// must be removed.
+///
+/// 1. Request connection to unidentified peer from node_b to node_a. Do not wait for notification
+///    of peer connection
+/// 2. Immediately propose a circuit. This creates a good chance that two connection will be
+///    created, where one needs to be closed
+/// 3. Wait for the circuit to be created sucessfully
+#[test]
+#[ignore]
+pub fn test_2_party_circuit_duplicate_connection() {
+    // Start a 2-node network
+    let mut network = Network::new()
+        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+        .add_nodes_with_defaults(2)
+        .expect("Unable to start 2-node ActixWeb1 network");
+    // Get the first node in the network
+    let node_a = network.node(0).expect("Unable to get first node");
+
+    // Get the second node in the network
+    let node_b = network.node(1).expect("Unable to get second node");
+    let circuit_id = "ABCDE-01234";
+
+    let peer_connector_b = node_b.peer_connector();
+    let (tx, _notification_rx): (mpsc::Sender<TestEnum>, mpsc::Receiver<TestEnum>) =
+        mpsc::channel();
+    peer_connector_b
+        .subscribe_sender(tx)
+        .expect("Unable to get subscriber");
+
+    let _peer_ref = peer_connector_b
+        .add_unidentified_peer(
+            node_a.network_endpoints()[0].to_string(),
+            PeerAuthorizationToken::from_public_key(
+                node_b
+                    .signers()
+                    .get(0)
+                    .expect("node does not have enough signers configured")
+                    .public_key()
+                    .expect("Unable to get first node's public key")
+                    .as_slice(),
+            ),
+        )
+        .expect("Unable to request connection to peer by endpoint");
+
+    commit_2_party_circuit(circuit_id, node_a, node_b, AuthorizationType::Challenge);
+    shutdown!(network).expect("Unable to shutdown network");
+}
+
 fn admin_pubkey(node: &Node) -> PublicKey {
     PublicKey(
         node.admin_signer()
