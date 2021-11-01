@@ -829,8 +829,11 @@ mod tests {
             assert!(loggers.contains_key("splinter"));
             let splinter = loggers.get("splinter").unwrap();
             let splinter: LoggerConfig = ("splinter".to_string(), splinter.clone()).into();
-            assert!(matches!(splinter.level, Level::Warn));
-            assert_eq!(splinter.appenders, ["stdout", "rolling_file"]);
+            assert!(matches!(splinter.level,Some(level) if matches!(level, Level::Warn)));
+            assert!(splinter.appenders.is_some());
+            let appenders = splinter.appenders.unwrap();
+            assert!(matches!(appenders.get(0), Some(val) if val == "stdout"));
+            assert!(matches!(appenders.get(1), Some(val) if val == "rolling_file"));
         }
     }
 }
