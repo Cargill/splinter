@@ -15,6 +15,7 @@
 //! Contains the implementation of `NodeBuilder`.
 
 pub(super) mod admin;
+pub(super) mod biome;
 pub(super) mod network;
 pub(super) mod scabbard;
 
@@ -44,6 +45,7 @@ use splinter::store::{memory::MemoryStoreFactory, StoreFactory};
 use super::{RunnableNode, RunnableNodeRestApiVariant, ScabbardConfig};
 
 use self::admin::{AdminServiceEventClientVariant, AdminSubsystemBuilder};
+use self::biome::BiomeSubsystemBuilder;
 use self::network::NetworkSubsystemBuilder;
 
 /// An enumeration of the REST API backend variants.
@@ -59,6 +61,7 @@ pub enum RestApiVariant {
 /// Constructs a `RunnableNode` instance.
 pub struct NodeBuilder {
     admin_subsystem_builder: AdminSubsystemBuilder,
+    biome_subsystem_builder: BiomeSubsystemBuilder,
     admin_signer: Option<Box<dyn Signer>>,
     rest_api_port: Option<u32>,
     rest_api_variant: RestApiVariant,
@@ -83,6 +86,7 @@ impl NodeBuilder {
     pub fn new() -> Self {
         NodeBuilder {
             admin_subsystem_builder: AdminSubsystemBuilder::new(),
+            biome_subsystem_builder: BiomeSubsystemBuilder::new(),
             admin_signer: None,
             rest_api_port: None,
             rest_api_variant: RestApiVariant::ActixWeb1,
@@ -271,6 +275,8 @@ impl NodeBuilder {
 
         let rbac_store = store_factory.get_role_based_authorization_store();
 
+        let profile_store = store_factory.get_biome_user_profile_store();
+
         // Sets permissions if any were given
         if let Some(ref permission_config) = self.permission_config {
             for (i, perm) in permission_config.iter().enumerate() {
@@ -318,6 +324,10 @@ impl NodeBuilder {
             )
             .with_store_factory(store_factory);
 
+        let biome_subsystem_builder = self
+            .biome_subsystem_builder
+            .with_profile_store(profile_store);
+
         let authorization_handlers: Vec<Box<dyn AuthorizationHandler>> =
             match self.permission_config {
                 Some(_) => {
@@ -360,6 +370,7 @@ impl NodeBuilder {
         Ok(RunnableNode {
             admin_signer,
             admin_subsystem_builder,
+            biome_subsystem_builder,
             rest_api_variant,
             runnable_network_subsystem,
             node_id,

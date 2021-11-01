@@ -37,6 +37,7 @@ use splinter::rest_api::{
 };
 
 use super::builder::admin::AdminSubsystemBuilder;
+use super::builder::biome::BiomeSubsystemBuilder;
 use super::{BiomeResourceProvider, Node, NodeRestApiVariant};
 
 use self::network::RunnableNetworkSubsystem;
@@ -74,6 +75,7 @@ impl RunnableNodeRestApiVariant {
 pub struct RunnableNode {
     pub(super) admin_signer: Box<dyn cylinder::Signer>,
     pub(super) admin_subsystem_builder: AdminSubsystemBuilder,
+    pub(super) biome_subsystem_builder: BiomeSubsystemBuilder,
     pub(super) rest_api_variant: RunnableNodeRestApiVariant,
     pub(super) runnable_network_subsystem: RunnableNetworkSubsystem,
     pub(super) node_id: String,
@@ -94,6 +96,10 @@ impl RunnableNode {
             .build()?;
 
         let mut admin_subsystem = runnable_admin_subsystem.run()?;
+
+        let runnable_biome_subsystem = self.biome_subsystem_builder.build()?;
+
+        let biome_subsystem = runnable_biome_subsystem.run()?;
 
         let node_id = self.node_id;
 
@@ -216,6 +222,7 @@ impl RunnableNode {
         Ok(Node {
             admin_signer: self.admin_signer,
             admin_subsystem,
+            biome_subsystem,
             network_subsystem,
             rest_api_variant,
             rest_api_port,

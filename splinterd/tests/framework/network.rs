@@ -17,7 +17,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 
-use cylinder::{secp256k1::Secp256k1Context, Context};
+use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 use splinter::error::{InternalError, InvalidArgumentError};
 use splinter::registry::Node as RegistryNode;
 use splinter::threading::lifecycle::ShutdownHandle;
@@ -36,6 +36,7 @@ pub struct Network {
     num_of_keys: usize,
     cylinder_auth: bool,
     permission_config: Option<Vec<PermissionConfig>>,
+    admin_signer: Option<Box<dyn Signer>>,
 }
 
 pub enum NetworkNode {
@@ -53,6 +54,7 @@ impl Network {
             num_of_keys: 1,
             cylinder_auth: true,
             permission_config: None,
+            admin_signer: None,
         }
     }
 
@@ -70,7 +72,10 @@ impl Network {
         let mut registry_info = vec![];
         let context = Secp256k1Context::new();
         for _ in 0..count {
-            let admin_signer = context.new_signer(context.new_random_private_key());
+            let admin_signer = match self.admin_signer {
+                Some(ref signer) => signer.clone_box(),
+                None => context.new_signer(context.new_random_private_key()),
+            };
             let public_key = admin_signer
                 .public_key()
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
@@ -165,6 +170,11 @@ impl Network {
 
     pub fn with_permission_config(mut self, permission_config: Vec<PermissionConfig>) -> Self {
         self.permission_config = Some(permission_config);
+        self
+    }
+
+    pub fn with_admin_signer(mut self, signer: Box<dyn Signer>) -> Self {
+        self.admin_signer = Some(signer);
         self
     }
 

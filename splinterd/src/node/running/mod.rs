@@ -15,6 +15,7 @@
 //! Contains the implementation of `Node`.
 
 pub mod admin;
+pub mod biome;
 pub mod network;
 
 use std::thread::JoinHandle;
@@ -26,6 +27,7 @@ use splinter::admin::client::event::{
 };
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::biome::client::{BiomeClient, ReqwestBiomeClient};
+use splinter::biome::UserProfileStore;
 use splinter::error::InternalError;
 use splinter::peer::PeerManagerConnector;
 use splinter::registry::{
@@ -48,6 +50,7 @@ pub(super) enum NodeRestApiVariant {
 pub struct Node {
     pub(super) admin_signer: Box<dyn Signer>,
     pub(super) admin_subsystem: admin::AdminSubsystem,
+    pub(super) biome_subsystem: biome::BiomeSubsystem,
     pub(super) rest_api_variant: NodeRestApiVariant,
     pub(super) rest_api_port: u16,
     pub(super) network_subsystem: network::NetworkSubsystem,
@@ -139,11 +142,28 @@ impl Node {
         ))
     }
 
+    pub fn scabbard_client_with_auth(
+        &self,
+        auth: &str,
+    ) -> Result<Box<dyn ScabbardClient>, InternalError> {
+        Ok(Box::new(
+            ReqwestScabbardClientBuilder::new()
+                .with_url(&format!("http://localhost:{}", self.rest_api_port))
+                .with_auth(auth)
+                .build()
+                .map_err(|e| InternalError::from_source(Box::new(e)))?,
+        ))
+    }
+
     pub fn registry_client(self: &Node) -> Box<dyn RegistryClient> {
         Box::new(ReqwestRegistryClient::new(
             format!("http://localhost:{}", self.rest_api_port),
             "foo".to_string(),
         ))
+    }
+
+    pub fn user_profile_store(&self) -> &dyn UserProfileStore {
+        self.biome_subsystem.user_profile_store()
     }
 
     pub fn stop(mut self) -> Result<RunnableNode, InternalError> {
@@ -152,6 +172,7 @@ impl Node {
         let Node {
             admin_signer,
             admin_subsystem,
+            biome_subsystem: _,
             rest_api_variant,
             node_id,
             rest_api_port,
