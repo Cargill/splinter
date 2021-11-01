@@ -17,6 +17,7 @@
 #[cfg(feature = "scabbard-migrations")]
 mod error;
 mod node_id;
+mod receipt_store;
 #[cfg(feature = "scabbard-migrations")]
 mod scabbard;
 mod yaml;
@@ -80,6 +81,8 @@ impl Action for UpgradeAction {
                     ))
                 })?;
         }
+
+        receipt_store::upgrade_scabbard_receipt_store(state_dir.as_path(), &database_uri)?;
 
         Ok(())
     }
