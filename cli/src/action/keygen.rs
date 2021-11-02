@@ -25,6 +25,7 @@ use std::os::unix::fs::MetadataExt;
 
 use clap::ArgMatches;
 use cylinder::{secp256k1::Secp256k1Context, Context};
+use cylinder::{PrivateKey, PublicKey};
 
 use crate::error::CliError;
 
@@ -96,7 +97,8 @@ impl Action for KeyGenAction {
         let private_key_path = key_dir.join(&key_name).with_extension("priv");
         let public_key_path = key_dir.join(&key_name).with_extension("pub");
 
-        create_key_pair(
+        write_keys(
+            create_key_pair()?,
             &key_dir,
             private_key_path,
             public_key_path,
@@ -109,10 +111,8 @@ impl Action for KeyGenAction {
     }
 }
 
-/// Creates a public/private key pair.
-///
-/// Returns the public key in hex, if successful.
-pub fn create_key_pair(
+fn write_keys(
+    keys: (PrivateKey, PublicKey),
     key_dir: &Path,
     private_key_path: PathBuf,
     public_key_path: PathBuf,
@@ -120,6 +120,7 @@ pub fn create_key_pair(
     skip_create: bool,
     change_permissions: bool,
 ) -> Result<(), CliError> {
+    let (private_key, public_key) = keys;
     if !force_create {
         match (private_key_path.exists(), public_key_path.exists()) {
             (true, true) => {
@@ -165,14 +166,6 @@ pub fn create_key_pair(
             (false, false) => (),
         }
     }
-
-    let context = Secp256k1Context::new();
-
-    let private_key = context.new_random_private_key();
-    let public_key = context
-        .get_public_key(&private_key)
-        .map_err(|err| CliError::ActionError(format!("Failed to get public key: {}", err)))?;
-
     let key_dir_info = metadata(key_dir).map_err(|err| {
         CliError::EnvironmentError(format!(
             "Failed to read key directory '{}': {}",
@@ -222,7 +215,7 @@ pub fn create_key_pair(
         if public_key_path.exists() {
             info!("Overwriting public key file: {}", public_key_path.display());
         } else {
-            info!("writing public key file: {}", public_key_path.display());
+            info!("Writing public key file: {}", public_key_path.display());
         }
 
         let public_key_file = OpenOptions::new()
@@ -252,4 +245,17 @@ pub fn create_key_pair(
     }
 
     Ok(())
+}
+
+/// Creates a public/private key pair.
+///
+/// Returns both keys if successful
+fn create_key_pair() -> Result<(PrivateKey, PublicKey), CliError> {
+    let context = Secp256k1Context::new();
+
+    let private_key = context.new_random_private_key();
+    let public_key = context
+        .get_public_key(&private_key)
+        .map_err(|err| CliError::ActionError(format!("Failed to get public key: {}", err)))?;
+    Ok((private_key, public_key))
 }
