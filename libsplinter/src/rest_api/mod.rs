@@ -131,8 +131,8 @@ impl std::fmt::Display for BindConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             #[cfg(feature = "https-bind")]
-            BindConfig::Https { bind, .. } => write!(f, "https://{}", bind),
-            BindConfig::Http(bind) => write!(f, "http://{}", bind),
+            BindConfig::Https { bind, .. } => write!(f, "{}", bind),
+            BindConfig::Http(bind) => write!(f, "{}", bind),
         }
     }
 }
