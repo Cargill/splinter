@@ -192,7 +192,8 @@ impl ScabbardFactoryBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an InvalidStateError if a signature_verifier_factory has not been set.
+    /// Returns an InvalidStateError if a signature_verifier_factory or a storage_configuration have
+    /// not been set.
     pub fn build(self) -> Result<ScabbardFactory, InvalidStateError> {
         let signature_verifier_factory = self.signature_verifier_factory.ok_or_else(|| {
             splinter::error::InvalidStateError::with_message(
