@@ -1327,6 +1327,46 @@ fn handle_connected(
         // if this endpoint has been requested, add this connection to peers with the provided
         // endpoint
         if let Some(requested_endpoint) = unreferenced_peers.requested_endpoints.get(&endpoint) {
+            let mut new_peer_endpoint = endpoint.to_string();
+            let mut new_peer_connection_id = connection_id.clone();
+            let mut old_connection_ids = vec![];
+            if let Some(unreferenced_peer) = unreferenced_peers.peers.remove(&peer_token_pair) {
+                if unreferenced_peer.local_authorization < identity {
+                    info!(
+                        "Removing outbound connection, peer {} is already connected via \
+                            unreferenced ({})",
+                        peer_token_pair, connection_id
+                    );
+
+                    new_peer_endpoint = unreferenced_peer.endpoint.to_string();
+                    new_peer_connection_id = unreferenced_peer.connection_id.to_string();
+                    old_connection_ids = unreferenced_peer.old_connection_ids.clone();
+                    old_connection_ids.push(connection_id.clone());
+
+                    // we are already connected on another connection, remove this connection
+                    if endpoint != unreferenced_peer.endpoint {
+                        if let Err(err) = connector.remove_connection(&endpoint, &connection_id) {
+                            error!("Unable to clean up old connection: {}", err);
+                        }
+                    }
+                } else {
+                    info!(
+                        "Replacing existing unreferenced connection with outbound for peer {} \
+                            connected via {} ({})",
+                        peer_token_pair, endpoint, connection_id
+                    );
+
+                    old_connection_ids.push(unreferenced_peer.connection_id.to_string());
+
+                    if let Err(err) = connector.remove_connection(
+                        &unreferenced_peer.endpoint,
+                        &unreferenced_peer.connection_id,
+                    ) {
+                        error!("Unable to clean up old connection: {}", err);
+                    }
+                }
+            }
+
             debug!(
                 "Adding peer {} by endpoint {} ({})",
                 peer_token_pair, endpoint, connection_id
@@ -1334,12 +1374,12 @@ fn handle_connected(
             ref_map.add_ref(peer_token_pair.clone());
             peers.insert(
                 identity,
-                connection_id,
+                new_peer_connection_id,
                 vec![endpoint.to_string()],
-                endpoint,
+                new_peer_endpoint,
                 PeerStatus::Connected,
                 requested_endpoint.local_authorization.clone(),
-                vec![],
+                old_connection_ids,
             );
 
             let notification = PeerManagerNotification::Connected {
