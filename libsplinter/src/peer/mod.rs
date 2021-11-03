@@ -1326,8 +1326,6 @@ fn handle_connected(
     } else {
         // if this endpoint has been requested, add this connection to peers with the provided
         // endpoint
-        // allow unused-variables, variable required if challenge-authorization is enabled
-        #[allow(unused_variables)]
         if let Some(requested_endpoint) = unreferenced_peers.requested_endpoints.get(&endpoint) {
             debug!(
                 "Adding peer {} by endpoint {} ({})",
