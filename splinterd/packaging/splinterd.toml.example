@@ -45,8 +45,9 @@ version = "1"
 # for TLS connections
 #network_endpoints = ["tcps://127.0.0.1:8044"]
 
-# Specifies the connection endpoint for the REST API.
-#rest_api_endpoint = "127.0.0.1:8080"
+# Specifies the connection endpoint for the REST API. This value must be
+# prefixed with the protocol (http://) or splinterd will not start.
+#rest_api_endpoint = "http://127.0.0.1:8080"
 
 # Specifies the public network endpoint for daemon-to-daemon communication
 # between Splinter nodes, if the network endpoint is not public.
