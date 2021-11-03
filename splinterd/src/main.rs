@@ -499,7 +499,7 @@ fn main() {
 
     #[cfg(feature = "scabbard-database-support")]
     let app = app.arg(
-        Arg::with_name("scabbard-state")
+        Arg::with_name("scabbard_state")
             .long("scabbard-state")
             .possible_values(&["lmdb", "database"])
             .long_help("Specifies where scabbard stores its internal state")
@@ -817,7 +817,7 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
     }
     #[cfg(feature = "scabbard-database-support")]
     {
-        if config.scabbard_storage() == &config::ScabbardStorage::Lmdb {
+        if config.scabbard_state() == &config::ScabbardState::Lmdb {
             daemon_builder = daemon_builder.with_lmdb_state_enabled();
         }
     }

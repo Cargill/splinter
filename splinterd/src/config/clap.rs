@@ -21,7 +21,7 @@ use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuild
 use clap::{ArgMatches, ErrorKind};
 
 #[cfg(feature = "scabbard-database-support")]
-use crate::config::scabbard_storage::ScabbardStorage;
+use crate::config::scabbard_state::ScabbardState;
 
 /// `PartialConfig` builder which holds command line arguments, represented as clap `ArgMatches`.
 pub struct ClapPartialConfigBuilder<'a> {
@@ -198,10 +198,10 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
 
         #[cfg(feature = "scabbard-database-support")]
         {
-            partial_config = partial_config.with_scabbard_storage(
+            partial_config = partial_config.with_scabbard_state(
                 self.matches
-                    .value_of("scabbard-state")
-                    .map(ScabbardStorage::from_str)
+                    .value_of("scabbard_state")
+                    .map(ScabbardState::from_str)
                     .transpose()?,
             )
         }

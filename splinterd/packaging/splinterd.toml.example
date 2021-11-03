@@ -29,7 +29,7 @@ version = "1"
 # "database" or "lmdb". When set to "database" scabbard state will be stored in
 # in the database specified by the database key above. When set to "lmdb", lmdb
 # files will be created in the Splinter state_dir.
-#scabbard_storage = "database"
+#scabbard_state = "database"
 
 # Identifier for this node. Must be unique on the network. This value will be
 # used to initialize a "node_id" file in the Splinter state directory. Once

@@ -29,7 +29,7 @@ mod error;
 mod logging;
 mod partial;
 #[cfg(feature = "scabbard-database-support")]
-mod scabbard_storage;
+mod scabbard_state;
 mod toml;
 
 use std::time::Duration;
@@ -42,7 +42,7 @@ pub use builder::{ConfigBuilder, PartialConfigBuilder};
 pub use error::ConfigError;
 pub use partial::{ConfigSource, PartialConfig};
 #[cfg(feature = "scabbard-database-support")]
-pub use scabbard_storage::ScabbardStorage;
+pub use scabbard_state::ScabbardState;
 
 #[cfg(feature = "log-config")]
 pub use logging::{
@@ -121,7 +121,7 @@ pub struct Config {
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: (String, ConfigSource),
     #[cfg(feature = "scabbard-database-support")]
-    scabbard_storage: (ScabbardStorage, ConfigSource),
+    scabbard_state: (ScabbardState, ConfigSource),
 }
 
 impl Config {
@@ -634,13 +634,13 @@ impl Config {
     }
 
     #[cfg(feature = "scabbard-database-support")]
-    pub fn scabbard_storage(&self) -> &ScabbardStorage {
-        &self.scabbard_storage.0
+    pub fn scabbard_state(&self) -> &ScabbardState {
+        &self.scabbard_state.0
     }
 
     #[cfg(feature = "scabbard-database-support")]
-    pub fn scabbard_storage_source(&self) -> &ConfigSource {
-        &self.scabbard_storage.1
+    pub fn scabbard_state_source(&self) -> &ConfigSource {
+        &self.scabbard_state.1
     }
 
     #[allow(clippy::cognitive_complexity)]
@@ -907,9 +907,9 @@ impl Config {
         #[cfg(feature = "scabbard-database-support")]
         {
             debug!(
-                "Config: scabbard_storage: {:?}, (source: {:?})",
-                self.scabbard_storage(),
-                self.scabbard_storage_source()
+                "Config: scabbard_state: {:?}, (source: {:?})",
+                self.scabbard_state(),
+                self.scabbard_state_source()
             );
         }
     }
