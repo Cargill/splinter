@@ -46,13 +46,17 @@ const DEFAULT_LMDB_DIR: &str = "/var/lib/splinter";
 
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
 
+/// A connection URI to a database instance.
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 #[derive(Clone)]
 pub enum ConnectionUri {
+    /// A Postgres connection URI.
     #[cfg(feature = "postgres")]
     Postgres(Box<str>),
+    /// A SQLite connection string.
     #[cfg(feature = "sqlite")]
     Sqlite(Box<str>),
+    /// An unknown, unsupported connection URI.
     #[cfg(not(feature = "sqlite"))]
     Unknown(Box<str>),
 }
@@ -69,13 +73,14 @@ pub struct ScabbardLmdbStateConfiguration {
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 #[derive(Clone)]
 pub enum ScabbardStorageConfiguration {
-    ConnectionUri {
-        connection_uri: ConnectionUri,
-    },
+    /// Configure scabbard storage via a connection URI.
+    ConnectionUri { connection_uri: ConnectionUri },
+    /// Configure scabbard storage using a shared Postgres connection pool.
     #[cfg(feature = "postgres")]
     Postgres {
         pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
     },
+    /// Configure scabbard storage using a shared SQLite connection pool.
     #[cfg(feature = "sqlite")]
     Sqlite {
         pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
@@ -83,6 +88,7 @@ pub enum ScabbardStorageConfiguration {
 }
 
 impl ScabbardStorageConfiguration {
+    /// Constructs a storage configuration from a connection URI string.
     #[cfg(any(feature = "postgres", feature = "sqlite"))]
     pub fn connection_uri(connection_uri: &str) -> Self {
         let connection_uri = match connection_uri {
@@ -157,6 +163,10 @@ impl ScabbardFactoryBuilder {
         self
     }
 
+    /// Enables LMDB state storage for services created by the resulting factory.
+    ///
+    /// While all other service state will be stored in a database, when this is enabled, the
+    /// merkle state will be stored in LMDB database files.
     pub fn with_lmdb_state_enabled(mut self, enable: bool) -> Self {
         self.state_storage_configuration = self
             .state_storage_configuration
