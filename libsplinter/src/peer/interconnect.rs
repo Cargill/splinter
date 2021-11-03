@@ -415,8 +415,9 @@ where
                 };
 
             trace!(
-                "Received message from {}: {:?}",
+                "Received message from {}({}): {:?}",
                 peer_id,
+                connection_id,
                 network_msg.get_message_type()
             );
             match dispatch_msg_sender.send(
@@ -593,8 +594,9 @@ fn run_pending_recv_loop(
                     };
 
                 trace!(
-                    "Received message from {}: {:?}",
+                    "Received message from {}({}): {:?}",
                     peer_id,
+                    connection_id,
                     network_msg.get_message_type()
                 );
                 match dispatch_msg_sender.send(

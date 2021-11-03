@@ -623,6 +623,7 @@ fn add_peer(
         ..
     }) = unreferenced_peers.peers.remove(&peer_token_pair)
     {
+        debug!("Updating unreferenced peer to full peer {}", peer_id);
         peers.insert(
             peer_id,
             connection_id,
@@ -1125,7 +1126,10 @@ fn handle_inbound_connection(
                 );
             }
             PeerStatus::Pending => {
-                info!("Adding inbound connection to Pending peer: {}", identity);
+                info!(
+                    "Adding inbound connection to Pending peer: {} ({})",
+                    identity, connection_id
+                );
             }
             PeerStatus::Connected => {
                 // Compare identities, if local identity is greater, close incoming connection
@@ -1133,8 +1137,8 @@ fn handle_inbound_connection(
                 if peer_metadata.required_local_auth > identity {
                     // if peer is already connected, remove the inbound connection
                     debug!(
-                        "Removing inbound connection, already connected to {}",
-                        peer_metadata.id
+                        "Removing inbound connection, already connected to {} ({})",
+                        peer_metadata.id, connection_id
                     );
                     if let Err(err) = connector.remove_connection(&endpoint, &connection_id) {
                         error!("Unable to clean up old connection: {}", err);
@@ -1142,8 +1146,8 @@ fn handle_inbound_connection(
                     return;
                 } else {
                     info!(
-                        "Replacing existing connection with inbound for peer {}",
-                        peer_metadata.id
+                        "Replacing existing connection with inbound for peer {} ({})",
+                        peer_metadata.id, connection_id
                     );
                 }
             }
@@ -1180,16 +1184,16 @@ fn handle_inbound_connection(
         if unreferenced_peer.local_authorization > identity {
             // if peer is already connected, remove the inbound connection
             debug!(
-                "Removing inbound connection, already connected to unreferenced peer {}",
-                peer_token_pair
+                "Removing inbound connection, already connected to unreferenced peer {} ({})",
+                peer_token_pair, connection_id
             );
             if let Err(err) = connector.remove_connection(&endpoint, &connection_id) {
                 error!("Unable to clean up old connection: {}", err);
             }
         } else {
             info!(
-                "Replacing existing connection with inbound for unreferenced peer {}",
-                peer_token_pair
+                "Replacing existing connection with inbound for unreferenced peer {} ({})",
+                peer_token_pair, connection_id
             );
 
             debug!(
@@ -1214,6 +1218,10 @@ fn handle_inbound_connection(
             };
         }
     } else {
+        debug!(
+            "Add inbound unreferenced peer for {} ({})",
+            peer_token_pair, connection_id
+        );
         unreferenced_peers.peers.insert(
             peer_token_pair,
             UnreferencedPeer {
@@ -1261,8 +1269,8 @@ fn handle_connected(
                 // otherwise replace inbound connection with outbound.
                 if peer_metadata.required_local_auth < identity {
                     info!(
-                        "Removing outbound connection, peer {} is already connected",
-                        peer_metadata.id
+                        "Removing outbound connection, peer {} is already connected ({})",
+                        peer_metadata.id, connection_id
                     );
                     // we are already connected on another connection, remove this connection
                     if endpoint != peer_metadata.active_endpoint {
@@ -1273,8 +1281,9 @@ fn handle_connected(
                     return;
                 } else {
                     info!(
-                        "Connected Peer {} connected via {}",
-                        peer_metadata.id, endpoint
+                        "Replacing existing connection with outbound for peer {} connected via \
+                         {} ({})",
+                        peer_metadata.id, endpoint, connection_id
                     );
                 }
             }
@@ -1309,13 +1318,15 @@ fn handle_connected(
         // notify subscribers we are connected
         subscribers.broadcast(notification);
     } else {
-        debug!("Adding peer {} by endpoint {}", peer_token_pair, endpoint);
-
         // if this endpoint has been requested, add this connection to peers with the provided
         // endpoint
         // allow unused-variables, variable required if challenge-authorization is enabled
         #[allow(unused_variables)]
         if let Some(requested_endpoint) = unreferenced_peers.requested_endpoints.get(&endpoint) {
+            debug!(
+                "Adding peer {} by endpoint {} ({})",
+                peer_token_pair, endpoint, connection_id
+            );
             ref_map.add_ref(peer_token_pair.clone());
             peers.insert(
                 identity,
@@ -1340,16 +1351,16 @@ fn handle_connected(
             if unreferenced_peer.local_authorization < identity {
                 // if peer is already connected, remove the outbound connection
                 debug!(
-                    "Removing outbound connection, already connected to unreferenced peer {}",
-                    peer_token_pair
+                    "Removing outbound connection, already connected to unreferenced peer {} ({})",
+                    peer_token_pair, connection_id
                 );
                 if let Err(err) = connector.remove_connection(&endpoint, &connection_id) {
                     error!("Unable to clean up old connection: {}", err);
                 }
             } else {
                 info!(
-                    "Replacing existing connection with outbound for unreferenced peer {}",
-                    peer_token_pair
+                    "Replacing existing connection with outbound for unreferenced peer {} ({})",
+                    peer_token_pair, connection_id
                 );
 
                 debug!(
@@ -1374,6 +1385,10 @@ fn handle_connected(
                 };
             }
         } else {
+            debug!(
+                "Adding outbound unreferenced peer {} by endpoint {} ({})",
+                peer_token_pair, endpoint, connection_id
+            );
             unreferenced_peers.peers.insert(
                 peer_token_pair,
                 UnreferencedPeer {
