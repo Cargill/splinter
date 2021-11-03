@@ -53,67 +53,72 @@ pub(super) fn upgrade_scabbard_receipt_store(
         .list_circuits(&[])
         .map_err(|e| CliError::ActionError(format!("{}", e)))?;
 
-    let local_services = circuits
-        .into_iter()
-        .map(|circuit| {
-            circuit
-                .roster()
-                .iter()
-                .filter_map(|svc| {
-                    if svc.node_id() == node_id && svc.service_type() == "scabbard" {
-                        Some((
-                            circuit.circuit_id().to_string(),
-                            svc.service_id().to_string(),
-                        ))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
-        })
-        .flatten();
+    if circuits.len() == 0 {
+        info!("Skipping scabbard receipt store upgrade, no circuits found");
+        Ok(())
+    } else {
+        let local_services = circuits
+            .into_iter()
+            .map(|circuit| {
+                circuit
+                    .roster()
+                    .iter()
+                    .filter_map(|svc| {
+                        if svc.node_id() == node_id && svc.service_type() == "scabbard" {
+                            Some((
+                                circuit.circuit_id().to_string(),
+                                svc.service_id().to_string(),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .flatten();
 
-    let local_services_with_file: Vec<(String, String, String)> = local_services
-        .map(|(circuit_id, service_id)| {
-            match compute_receipt_db_file_name(&circuit_id, &service_id) {
-                Ok(file) => Ok((circuit_id, service_id, file)),
-                Err(e) => Err(CliError::ActionError(format!("{}", e))),
-            }
-        })
-        .collect::<Result<Vec<(_, _, _)>, _>>()?;
+        let local_services_with_file: Vec<(String, String, String)> = local_services
+            .map(|(circuit_id, service_id)| {
+                match compute_receipt_db_file_name(&circuit_id, &service_id) {
+                    Ok(file) => Ok((circuit_id, service_id, file)),
+                    Err(e) => Err(CliError::ActionError(format!("{}", e))),
+                }
+            })
+            .collect::<Result<Vec<(_, _, _)>, _>>()?;
 
-    let lmdb_file_names: Vec<String> = local_services_with_file
-        .iter()
-        .map(|(_, _, file)| file.clone())
-        .collect();
+        let lmdb_file_names: Vec<String> = local_services_with_file
+            .iter()
+            .map(|(_, _, file)| file.clone())
+            .collect();
 
-    let mut lmdb_receipt_store = LmdbReceiptStore::new(
-        receipt_db_dir,
-        &lmdb_file_names,
-        lmdb_file_names[0].clone(),
-        None,
-    )
-    .map_err(|e| CliError::ActionError(format!("{}", e)))?;
+        let mut lmdb_receipt_store = LmdbReceiptStore::new(
+            receipt_db_dir,
+            &lmdb_file_names,
+            lmdb_file_names[0].clone(),
+            None,
+        )
+        .map_err(|e| CliError::ActionError(format!("{}", e)))?;
 
-    for (circuit_id, service_id, file) in local_services_with_file {
-        let filename = receipt_db_dir.join(&file);
-        let new_filename = receipt_db_dir.join(format!("{}.old", &file));
-        lmdb_receipt_store
-            .set_current_db(file)
-            .map_err(|e| CliError::ActionError(format!("{}", e)))?;
-        let receipt_iter = lmdb_receipt_store
-            .list_receipts_since(None)
-            .map_err(|e| CliError::ActionError(format!("{}", e)))?;
-        let db_receipt_store = upgrade_stores.new_receipt_store(&circuit_id, &service_id);
-        let receipts = receipt_iter
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| CliError::ActionError(format!("{}", e)))?;
-        db_receipt_store
-            .add_txn_receipts(receipts)
-            .map_err(|e| CliError::ActionError(format!("{}", e)))?;
-        std::fs::rename(filename, new_filename)?;
+        for (circuit_id, service_id, file) in local_services_with_file {
+            let filename = receipt_db_dir.join(&file);
+            let new_filename = receipt_db_dir.join(format!("{}.old", &file));
+            lmdb_receipt_store
+                .set_current_db(file)
+                .map_err(|e| CliError::ActionError(format!("{}", e)))?;
+            let receipt_iter = lmdb_receipt_store
+                .list_receipts_since(None)
+                .map_err(|e| CliError::ActionError(format!("{}", e)))?;
+            let db_receipt_store = upgrade_stores.new_receipt_store(&circuit_id, &service_id);
+            let receipts = receipt_iter
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| CliError::ActionError(format!("{}", e)))?;
+            db_receipt_store
+                .add_txn_receipts(receipts)
+                .map_err(|e| CliError::ActionError(format!("{}", e)))?;
+            std::fs::rename(filename, new_filename)?;
+        }
+        Ok(())
     }
-    Ok(())
 }
 
 /// Compute the LMDB file name for a circuit_id service_id pair.
