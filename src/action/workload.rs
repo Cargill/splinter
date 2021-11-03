@@ -226,6 +226,9 @@ fn start_smallbank_workloads(
             rate,
             total_duration.map_or("indefinite".into(), |t| format!("{}", t))
         );
+
+        let duration = total_duration.map(Duration::from);
+
         workload_runner
             .add_workload(
                 format!("Smallbank-Workload-{}", i),
@@ -235,6 +238,7 @@ fn start_smallbank_workloads(
                 auth.to_string(),
                 update,
                 false,
+                duration,
             )
             .map_err(|err| CliError::ActionError(format!("Unable to start workload: {}", err)))?
     }
@@ -280,6 +284,8 @@ fn start_command_workloads(
             total_duration.map_or("indefinite".into(), |t| format!("{}", t))
         );
 
+        let duration = total_duration.map(Duration::from);
+
         workload_runner
             .add_workload(
                 format!("Command-Workload-{}", i),
@@ -289,6 +295,7 @@ fn start_command_workloads(
                 auth.to_string(),
                 update,
                 true,
+                duration,
             )
             .map_err(|err| CliError::ActionError(format!("Unable to start workload: {}", err)))?
     }
