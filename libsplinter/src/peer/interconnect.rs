@@ -500,6 +500,10 @@ where
                         if let Err(err) = message_sender.send(new_connection_id, payload) {
                             error!("Unable to send message to {}: {}", recipient, err);
                         }
+                    } else {
+                        error!("Unable to send message to {}: {}", recipient, err);
+                        // remove cached connection id, peer has gone away
+                        peer_id_to_connection_id.remove(&recipient);
                     }
                 } else {
                     error!("Unable to send message to {}: {}", recipient, err);
