@@ -87,10 +87,14 @@ pub enum ScabbardStorageConfiguration {
     },
 }
 
-impl ScabbardStorageConfiguration {
-    /// Constructs a storage configuration from a connection URI string.
-    #[cfg(any(feature = "postgres", feature = "sqlite"))]
-    pub fn connection_uri(connection_uri: &str) -> Self {
+impl From<String> for ScabbardStorageConfiguration {
+    fn from(connection_uri: String) -> Self {
+        connection_uri.as_str().into()
+    }
+}
+
+impl From<&str> for ScabbardStorageConfiguration {
+    fn from(connection_uri: &str) -> Self {
         let connection_uri = match connection_uri {
             #[cfg(feature = "postgres")]
             s if s.starts_with("postgres://") => ConnectionUri::Postgres(s.into()),
