@@ -1162,7 +1162,7 @@ fn handle_inbound_connection(
         let old_connection_id = peer_metadata.connection_id;
         let starting_status = peer_metadata.status;
         peer_metadata.status = PeerStatus::Connected;
-        peer_metadata.connection_id = connection_id;
+        peer_metadata.connection_id = connection_id.clone();
         // reset retry settings
         peer_metadata.retry_frequency = retry_frequency;
         peer_metadata.last_connection_attempt = Instant::now();
@@ -1171,7 +1171,7 @@ fn handle_inbound_connection(
             peer: peer_token_pair.clone(),
         };
 
-        peer_metadata.active_endpoint = endpoint.to_string();
+        peer_metadata.active_endpoint = endpoint;
         if let Err(err) = peers.update_peer(peer_metadata) {
             error!("Unable to update peer: {}", err);
         }
@@ -1179,7 +1179,7 @@ fn handle_inbound_connection(
         subscribers.broadcast(notification);
 
         // if peer is pending there is no connection to remove
-        if endpoint != old_endpoint && starting_status != PeerStatus::Pending {
+        if connection_id != old_connection_id && starting_status != PeerStatus::Pending {
             if let Err(err) = connector.remove_connection(&old_endpoint, &old_connection_id) {
                 warn!("Unable to clean up old connection: {}", err);
             }
@@ -1303,9 +1303,9 @@ fn handle_connected(
         let starting_status = peer_metadata.status;
         let old_endpoint = peer_metadata.active_endpoint;
         let old_connection_id = peer_metadata.connection_id;
-        peer_metadata.active_endpoint = endpoint.to_string();
+        peer_metadata.active_endpoint = endpoint;
         peer_metadata.status = PeerStatus::Connected;
-        peer_metadata.connection_id = connection_id;
+        peer_metadata.connection_id = connection_id.clone();
         // reset retry settings
         peer_metadata.retry_frequency = retry_frequency;
         peer_metadata.last_connection_attempt = Instant::now();
@@ -1315,7 +1315,7 @@ fn handle_connected(
         }
 
         // remove old connection
-        if endpoint != old_endpoint && starting_status != PeerStatus::Pending {
+        if connection_id != old_connection_id && starting_status != PeerStatus::Pending {
             if let Err(err) = connector.remove_connection(&old_endpoint, &old_connection_id) {
                 error!("Unable to clean up old connection: {}", err);
             }
