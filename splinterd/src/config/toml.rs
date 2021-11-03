@@ -667,7 +667,7 @@ mod tests {
             node_id = "node_id"
             display_name = "display_name"
             network_endpoints = [ "tcps://127.0.0.1:8044" ]
-            rest_api_endpoint = "127.0.0.1:8080"
+            rest_api_endpoint = "http://127.0.0.1:8080"
             advertised_endpoints = [ "tcps://127.0.0.1:8044" ]
             peers = ["splinter.dev"]
             peering_key = "splinterd"
@@ -722,7 +722,7 @@ mod tests {
         assert!(
             matches!(toml.network_endpoints() , Some(vec) if    matches!(vec.get(0), Some(text) if text == "tcps://127.0.0.1:8044"))
         );
-        assert!(matches!(toml.rest_api_endpoint() , Some(text) if text == "127.0.0.1:8080"));
+        assert!(matches!(toml.rest_api_endpoint() , Some(text) if text == "http://127.0.0.1:8080"));
         assert!(
             matches!(toml.advertised_endpoints() , Some(vec) if matches!(vec.get(0), Some(text) if text == "tcps://127.0.0.1:8044")  )
         );

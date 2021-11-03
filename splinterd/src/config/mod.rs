@@ -1379,7 +1379,7 @@ mod tests {
                 final_config.rest_api_endpoint(),
                 final_config.rest_api_endpoint_source()
             ),
-            ("127.0.0.1:8080", &ConfigSource::Default)
+            ("http://127.0.0.1:8080", &ConfigSource::Default)
         );
         // The `DefaultPartialConfigBuilder` is the only config with a value for `database` (source
         // should be `Default`). Should have default state file name with `EnvPartialConfigBuilder`
