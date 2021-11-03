@@ -634,6 +634,12 @@ fn add_peer(
             old_connection_ids,
         );
 
+        // Update peer for new state
+        let notification = PeerManagerNotification::Connected {
+            peer: peer_token_pair.clone(),
+        };
+        subscribers.broadcast(notification);
+
         let peer_ref = PeerRef::new(peer_token_pair.clone(), peer_remover.clone());
         return Ok(peer_ref);
     }
