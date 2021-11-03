@@ -136,7 +136,10 @@ impl ScabbardState {
             .map_err(|err| ScabbardStateError(format!("failed to start executor: {}", err)))?;
 
         // initialize committed_batches metric
-        counter!("splinter.scabbard.committed_batches", 0, "service" => format!("{}::{}", &circuit_id, &service_id));
+        counter!("splinter.scabbard.committed_batches", 0,
+            "circuit" => circuit_id.clone(),
+            "service" => format!("{}::{}", &circuit_id, &service_id)
+        );
 
         Ok(ScabbardState {
             merkle_state,
@@ -313,7 +316,10 @@ impl ScabbardState {
                 }
 
                 self.batch_history.commit(&signature);
-                counter!("splinter.scabbard.committed_batches", 1, "service" => format!("{}::{}", self.circuit_id, self.service_id));
+                counter!("splinter.scabbard.committed_batches", 1,
+                    "circuit" => self.circuit_id.clone(),
+                    "service" => format!("{}::{}", &self.circuit_id, &self.service_id)
+                );
                 Ok(())
             }
             None => Err(ScabbardStateError("no pending changes to commit".into())),
