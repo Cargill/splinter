@@ -13,9 +13,7 @@
 // limitations under the License
 
 use crate::action::time::{Time, TimeType, TimeUnit};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use clap::ArgMatches;
 use cylinder::Signer;
@@ -170,30 +168,21 @@ impl Action for WorkloadAction {
             }
         }
 
-        // calculate the end time based on the duration given
-        let end_time = duration.map(|d| Instant::now() + Duration::from(d));
-
         // setup control-c handling
-        let running = Arc::new(AtomicBool::new(true));
-        let r = running.clone();
+        let workload_runner_shutdown_signaler = workload_runner.shutdown_signaler();
 
         ctrlc::set_handler(move || {
-            r.store(false, Ordering::SeqCst);
+            if let Err(err) = workload_runner_shutdown_signaler.signal_shutdown() {
+                error!("Unable to cleanly shutdown workload: {}", err);
+            }
         })
         .map_err(|_| {
             CliError::ActionError("Unable to set up workload ctrlc handler".to_string())
         })?;
 
-        while running.load(Ordering::SeqCst) {
-            // if duration was set, stop the workload when the end time is reached
-            if let Some(end_time) = end_time {
-                if end_time <= Instant::now() {
-                    running.store(false, Ordering::SeqCst);
-                }
-            }
+        if let Err(err) = workload_runner.wait_for_shutdown() {
+            error!("Unable to cleanly shutdown workload runner: {}", err);
         }
-        // shutdown all workloads
-        workload_runner.shutdown();
 
         Ok(())
     }
