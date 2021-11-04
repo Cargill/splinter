@@ -1,5 +1,28 @@
 # Release Notes
 
+## Changes in Splinter 0.5.24
+
+### libsplinter
+
+* Verify proposal circuit version is supported for vote. Verify that the circuit
+  version for the proposal that is being voted on is still valid for the
+  currently support circuit versions.
+
+### splinter CLI
+
+* Create Database file with 640 permissions.
+
+* Add receipt store to the `splinter upgrade` CLI command.
+
+* Check that the value given for the `--rest-api-endpoint` splinterd CLI option
+  contains 'http://' or 'https://' and exit with an error if it does not.
+
+### scabbard
+
+* Detect incorrect state daemon. Changes the `ScabbardFactory` builder to fail
+  if LMDB state is not enabled, but there are any existing LMDB files in the
+  state directory.
+
 ## Changes in Splinter 0.5.23
 
 ### Highlights
