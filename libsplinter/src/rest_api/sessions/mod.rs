@@ -27,7 +27,7 @@ pub use error::{ClaimsBuildError, TokenIssuerError, TokenValidationError};
 pub use token_issuer::AccessTokenIssuer;
 
 #[cfg(feature = "biome-credentials")]
-const DEFAULT_LEEWAY: i64 = 10; // default leeway in seconds.
+const DEFAULT_LEEWAY: u64 = 10; // default leeway in seconds.
 
 /// Implementers can issue JWT tokens
 pub trait TokenIssuer<T: Serialize> {

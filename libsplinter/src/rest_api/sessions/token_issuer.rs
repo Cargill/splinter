@@ -16,7 +16,7 @@
 
 use std::sync::Arc;
 
-use jsonwebtoken::{encode, Header};
+use jsonwebtoken::{encode, EncodingKey, Header};
 
 use super::{Claims, TokenIssuer, TokenIssuerError};
 use crate::rest_api::secrets::SecretManager;
@@ -47,7 +47,7 @@ impl TokenIssuer<Claims> for AccessTokenIssuer {
         let token = encode(
             &Header::default(),
             &claims,
-            self.secret_manager.secret()?.as_ref(),
+            &EncodingKey::from_secret(self.secret_manager.secret()?.as_ref()),
         )?;
         Ok(token)
     }
@@ -57,7 +57,7 @@ impl TokenIssuer<Claims> for AccessTokenIssuer {
         let token = encode(
             &Header::default(),
             &claims,
-            self.refresh_secret_manager.secret()?.as_ref(),
+            &EncodingKey::from_secret(self.refresh_secret_manager.secret()?.as_ref()),
         )?;
         Ok(token)
     }

@@ -16,7 +16,7 @@
 
 use std::sync::Arc;
 
-use jsonwebtoken::{decode, Validation};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 
 use crate::error::InternalError;
 use crate::rest_api::{
@@ -62,9 +62,13 @@ impl IdentityProvider for BiomeUserIdentityProvider {
             .secret()
             .map_err(|err| InternalError::from_source(err.into()))?;
 
-        Ok(decode::<Claims>(token, secret.as_ref(), &self.validation)
-            .map(|token_data| Identity::User(token_data.claims.user_id()))
-            .ok())
+        Ok(decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(secret.as_ref()),
+            &self.validation,
+        )
+        .map(|token_data| Identity::User(token_data.claims.user_id()))
+        .ok())
     }
 
     fn clone_box(&self) -> Box<dyn IdentityProvider> {
