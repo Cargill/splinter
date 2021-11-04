@@ -232,7 +232,7 @@ impl ScabbardFactoryBuilder {
             ScabbardStorageConfiguration::ConnectionUri {
                 connection_uri: ConnectionUri::Postgres(url),
             } => ScabbardFactoryStorageConfig::Postgres {
-                pool: get_postges_pool(&*url)?,
+                pool: get_postgres_pool(&*url)?,
             },
             #[cfg(feature = "sqlite")]
             ScabbardStorageConfiguration::ConnectionUri {
@@ -649,7 +649,7 @@ fn parse_list(values_list: &str) -> Result<Vec<String>, String> {
 }
 
 #[cfg(feature = "postgres")]
-fn get_postges_pool(
+fn get_postgres_pool(
     url: &str,
 ) -> Result<Pool<ConnectionManager<diesel::pg::PgConnection>>, InvalidStateError> {
     let connection_manager = ConnectionManager::<diesel::pg::PgConnection>::new(url);
