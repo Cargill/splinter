@@ -185,8 +185,7 @@ impl Action for WorkloadAction {
         })?;
 
         while running.load(Ordering::SeqCst) {
-            // if a duration was given stop the workload a signal shutdown when the end time
-            // is reached
+            // if duration was set, stop the workload when the end time is reached
             if let Some(end_time) = end_time {
                 if end_time <= Instant::now() {
                     running.store(false, Ordering::SeqCst);
