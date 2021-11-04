@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::convert::From;
 use std::fmt::Display;
 use std::str::FromStr;
-
-use super::toml::ScabbardStateToml;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ScabbardState {
@@ -45,15 +42,6 @@ impl FromStr for ScabbardState {
             "database" => Ok(Self::Database),
             "lmdb" => Ok(Self::Lmdb),
             _ => Err(ScabbardStateError::ParseError(s.to_string())),
-        }
-    }
-}
-
-impl From<ScabbardStateToml> for ScabbardState {
-    fn from(other: ScabbardStateToml) -> Self {
-        match other {
-            ScabbardStateToml::Lmdb => ScabbardState::Lmdb,
-            ScabbardStateToml::Database => ScabbardState::Database,
         }
     }
 }

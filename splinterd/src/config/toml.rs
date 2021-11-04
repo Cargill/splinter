@@ -27,6 +27,8 @@ use std::collections::HashMap;
 use super::bytes::ByteSize;
 #[cfg(feature = "log-config")]
 use super::logging::{default_pattern, UnnamedAppenderConfig, UnnamedLoggerConfig};
+#[cfg(feature = "scabbard-database-support")]
+use super::scabbard_state::ScabbardState;
 
 /// `TOML_VERSION` represents the version of the toml config file.
 /// The version determines the most current valid toml config entries.
@@ -358,6 +360,16 @@ pub enum ScabbardStateToml {
     Database,
     #[serde(rename = "lmdb")]
     Lmdb,
+}
+
+#[cfg(feature = "scabbard-database-support")]
+impl From<ScabbardStateToml> for ScabbardState {
+    fn from(other: ScabbardStateToml) -> Self {
+        match other {
+            ScabbardStateToml::Lmdb => ScabbardState::Lmdb,
+            ScabbardStateToml::Database => ScabbardState::Database,
+        }
+    }
 }
 
 #[cfg(test)]
