@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 #[cfg(feature = "biome-credentials")]
-use jsonwebtoken::{decode, Validation};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 
 use crate::actix_web::HttpRequest;
 #[cfg(feature = "biome-credentials")]
@@ -62,7 +62,11 @@ pub(crate) fn validate_claims(
         }
     };
 
-    match decode::<Claims>(token, secret.as_ref(), validation) {
+    match decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(secret.as_ref()),
+        validation,
+    ) {
         Ok(claims) => AuthorizationResult::Authorized(claims.claims),
         Err(err) => {
             debug!("Invalid token: {}", err);

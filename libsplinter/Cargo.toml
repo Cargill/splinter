@@ -48,7 +48,7 @@ futures = { version = "0.1", optional = true }
 futures-0-3 = { package = "futures", version = "0.3", optional = true }
 glob = { version = "0.3", optional = true }
 hyper = { version = "0.12", optional = true }
-jsonwebtoken = { version = "6.0", optional = true }
+jsonwebtoken = { version = "7.0", optional = true }
 influxdb = { version = "0.4.0", features = ["derive"], optional = true }
 log = "0.3.0"
 metrics = {version = "0.17", features = ["std"], optional = true}
