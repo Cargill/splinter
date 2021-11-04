@@ -22,7 +22,7 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
     sqlite::SqliteConnection,
 };
-use scabbard::service::{ScabbardFactoryBuilder, ScabbardStorageConfiguration};
+use scabbard::service::ScabbardFactoryBuilder;
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
 use splinter::peer::PeerManagerConnector;
@@ -208,9 +208,7 @@ impl AdminSubsystemBuilder {
                 ScabbardFactoryBuilder::new()
                     .with_lmdb_state_db_dir(config.data_dir.to_string_lossy().into())
                     .with_lmdb_state_db_size(config.database_size)
-                    .with_storage_configuration(ScabbardStorageConfiguration::connection_uri(
-                        &config.receipt_db_url,
-                    ))
+                    .with_storage_configuration(config.receipt_db_url.as_str().into())
                     .with_signature_verifier_factory(signing_context.clone())
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))

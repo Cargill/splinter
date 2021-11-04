@@ -52,6 +52,8 @@ use super::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
 
 use consensus::ScabbardConsensusManager;
 use error::ScabbardError;
+#[cfg(feature = "database-support")]
+pub use factory::ConnectionUri;
 pub use factory::ScabbardArgValidator;
 pub use factory::{ScabbardFactory, ScabbardFactoryBuilder, ScabbardStorageConfiguration};
 use shared::ScabbardShared;
