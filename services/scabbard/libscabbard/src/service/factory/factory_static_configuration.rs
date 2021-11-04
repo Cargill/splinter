@@ -34,7 +34,9 @@ use crate::hex::parse_hex;
 use crate::hex::to_hex;
 #[cfg(feature = "rest-api-actix")]
 use crate::service::rest_api::actix;
-use crate::service::{error::ScabbardError, Scabbard, ScabbardVersion, SERVICE_TYPE};
+use crate::service::{
+    error::ScabbardError, Scabbard, ScabbardStatePurgeHandler, ScabbardVersion, SERVICE_TYPE,
+};
 
 const DEFAULT_STATE_DB_DIR: &str = "/var/lib/splinter";
 // Linux, with a 64bit CPU supports sparse files of a large size
@@ -497,7 +499,7 @@ impl ServiceFactory for ScabbardFactory {
 
         let state_db_path = compute_db_path(&service_id, circuit_id, state_db_dir, "state")?;
 
-        let (receipt_store, receipt_purge): (ScabbardReceiptStore, _) =
+        let (receipt_store, receipt_path_opt): (ScabbardReceiptStore, _) =
             match &self.receipt_store_factory_config {
                 ScabbardFactoryStorageConfig::Lmdb { db_dir, db_size } => {
                     let receipt_db_dir_path = Path::new(&db_dir);
@@ -521,7 +523,6 @@ impl ServiceFactory for ScabbardFactory {
                             )
                         })?;
 
-                    let purge_db_path = receipt_db_path;
                     (
                         Arc::new(RwLock::new(
                             LmdbReceiptStore::new(
@@ -532,11 +533,7 @@ impl ServiceFactory for ScabbardFactory {
                             )
                             .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
                         )),
-                        Box::new(move || {
-                            purge_paths(&purge_db_path)?;
-                            Ok(())
-                        })
-                            as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+                        Some(receipt_db_path),
                     )
                 }
                 #[cfg(feature = "postgres")]
@@ -545,7 +542,7 @@ impl ServiceFactory for ScabbardFactory {
                         pool.clone(),
                         Some(format!("{}::{}", circuit_id, service_id)),
                     ))),
-                    Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+                    None,
                 ),
                 #[cfg(feature = "sqlite")]
                 ScabbardFactoryStorageConfig::Sqlite { pool } => (
@@ -553,16 +550,14 @@ impl ServiceFactory for ScabbardFactory {
                         pool.clone(),
                         Some(format!("{}::{}", circuit_id, service_id)),
                     ))),
-                    Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
+                    None,
                 ),
             };
 
-        let purge_state_db_path = state_db_path.clone();
-        let purge_fn = Box::new(move || {
-            purge_paths(&purge_state_db_path)?;
-            receipt_purge()?;
-            Ok(())
-        }) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>;
+        let state_purge_handle = Box::new(LmdbScabbardStatePurgeHandlerHandler {
+            state_lmdb_path: state_db_path.clone(),
+            receipt_lmdb_path: receipt_path_opt,
+        });
 
         let service = Scabbard::new(
             service_id,
@@ -572,7 +567,7 @@ impl ServiceFactory for ScabbardFactory {
             &state_db_path,
             self.state_db_size,
             receipt_store,
-            purge_fn,
+            state_purge_handle,
             self.signature_verifier_factory
                 .lock()
                 .map_err(|_| {
@@ -622,6 +617,21 @@ impl ServiceFactory for ScabbardFactory {
         }
 
         endpoints
+    }
+}
+
+struct LmdbScabbardStatePurgeHandlerHandler {
+    state_lmdb_path: PathBuf,
+    receipt_lmdb_path: Option<PathBuf>,
+}
+
+impl ScabbardStatePurgeHandler for LmdbScabbardStatePurgeHandlerHandler {
+    fn purge_state(&self) -> Result<(), InternalError> {
+        purge_paths(&self.state_lmdb_path)?;
+        if let Some(receipt_lmdb_path) = self.receipt_lmdb_path.as_deref() {
+            purge_paths(receipt_lmdb_path)?;
+        }
+        Ok(())
     }
 }
 
