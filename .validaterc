@@ -64,7 +64,7 @@
         ]
       ],
       "property_case_convention": [
-        "error",
+        "warning",
         "lower_snake_case"
       ],
       "property_case_collision": "error",
