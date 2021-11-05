@@ -415,8 +415,9 @@ where
                 };
 
             trace!(
-                "Received message from {}: {:?}",
+                "Received message from {}({}): {:?}",
                 peer_id,
+                connection_id,
                 network_msg.get_message_type()
             );
             match dispatch_msg_sender.send(
@@ -499,6 +500,10 @@ where
                         if let Err(err) = message_sender.send(new_connection_id, payload) {
                             error!("Unable to send message to {}: {}", recipient, err);
                         }
+                    } else {
+                        error!("Unable to send message to {}: {}", recipient, err);
+                        // remove cached connection id, peer has gone away
+                        peer_id_to_connection_id.remove(&recipient);
                     }
                 } else {
                     error!("Unable to send message to {}: {}", recipient, err);
@@ -593,8 +598,9 @@ fn run_pending_recv_loop(
                     };
 
                 trace!(
-                    "Received message from {}: {:?}",
+                    "Received message from {}({}): {:?}",
                     peer_id,
+                    connection_id,
                     network_msg.get_message_type()
                 );
                 match dispatch_msg_sender.send(

@@ -842,6 +842,7 @@ where
         endpoint: &str,
         connection_id: &str,
     ) -> Result<Option<ConnectionMetadata>, ConnectionManagerError> {
+        debug!("Remove connection {} ({})", endpoint, connection_id);
         let meta = if let Some(meta) = self.connections.get_mut(connection_id) {
             meta.clone()
         } else {

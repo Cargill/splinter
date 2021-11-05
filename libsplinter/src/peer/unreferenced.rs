@@ -27,6 +27,7 @@ pub struct UnreferencedPeer {
     pub endpoint: String,
     pub connection_id: String,
     pub local_authorization: PeerAuthorizationToken,
+    pub old_connection_ids: Vec<String>,
 }
 
 /// An entry for a peer that was only requested by endpoint.
@@ -62,7 +63,10 @@ impl UnreferencedPeerState {
     ) -> Option<(PeerTokenPair, UnreferencedPeer)> {
         self.peers
             .iter()
-            .find(|(_, peer)| peer.connection_id == connection_id)
+            .find(|(_, peer)| {
+                peer.connection_id == connection_id
+                    || peer.old_connection_ids.contains(&connection_id.to_string())
+            })
             .map(|(id, peer)| (id.clone(), peer.clone()))
     }
 }

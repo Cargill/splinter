@@ -2048,7 +2048,6 @@ pub fn test_3_party_circuit_proposal_rejected_stop() {
 ///    created, where one needs to be closed
 /// 3. Wait for the circuit to be created sucessfully
 #[test]
-#[ignore]
 pub fn test_2_party_circuit_duplicate_connection() {
     // Start a 2-node network
     let mut network = Network::new()
