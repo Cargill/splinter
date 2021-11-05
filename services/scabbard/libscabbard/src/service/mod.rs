@@ -90,6 +90,12 @@ impl TryFrom<Option<&str>> for ScabbardVersion {
 
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
 
+/// A handler for purging a scabbard instances state
+pub trait ScabbardStatePurgeHandler: Send + Sync {
+    /// Purge the scabbard instances state.
+    fn purge_state(&self) -> Result<(), splinter::error::InternalError>;
+}
+
 /// A service for running Sawtooth Sabre smart contracts with two-phase commit consensus.
 #[derive(Clone)]
 pub struct Scabbard {
@@ -98,7 +104,7 @@ pub struct Scabbard {
     version: ScabbardVersion,
     shared: Arc<Mutex<ScabbardShared>>,
     state: Arc<Mutex<ScabbardState>>,
-    purge_fn: Arc<dyn Fn() -> Result<(), splinter::error::InternalError> + Send + Sync>,
+    purge_handler: Arc<dyn ScabbardStatePurgeHandler>,
     /// The coordinator timeout for the two-phase commit consensus engine
     coordinator_timeout: Duration,
     consensus: Arc<Mutex<Option<ScabbardConsensusManager>>>,
@@ -123,7 +129,7 @@ impl Scabbard {
         #[cfg(feature = "database-support")] merkle_state: MerkleState,
         #[cfg(feature = "database-support")] commit_hash_store: Box<dyn CommitHashStore>,
         receipt_store: ScabbardReceiptStore,
-        purge_fn: Box<dyn Fn() -> Result<(), splinter::error::InternalError> + Send + Sync>,
+        purge_handler: Box<dyn ScabbardStatePurgeHandler>,
         signature_verifier: Box<dyn SignatureVerifier>,
         // The public keys that are authorized to create and manage sabre contracts
         admin_keys: Vec<String>,
@@ -177,7 +183,7 @@ impl Scabbard {
             version,
             shared: Arc::new(Mutex::new(shared)),
             state: Arc::new(Mutex::new(state)),
-            purge_fn: purge_fn.into(),
+            purge_handler: purge_handler.into(),
             coordinator_timeout,
             consensus: Arc::new(Mutex::new(None)),
         })
@@ -414,7 +420,7 @@ impl Service for Scabbard {
     }
 
     fn purge(&mut self) -> Result<(), splinter::error::InternalError> {
-        (*self.purge_fn)()
+        self.purge_handler.purge_state()
     }
 
     fn handle_message(
@@ -587,7 +593,7 @@ pub mod tests {
             #[cfg(feature = "database-support")]
             commit_hash_store,
             Arc::new(RwLock::new(MockReceiptStore)),
-            Box::new(|| Ok(())),
+            Box::new(NoOpScabbardStatePurgeHandler),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
@@ -620,7 +626,7 @@ pub mod tests {
             #[cfg(feature = "database-support")]
             commit_hash_store,
             Arc::new(RwLock::new(MockReceiptStore)),
-            Box::new(|| Ok(())),
+            Box::new(NoOpScabbardStatePurgeHandler),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
@@ -653,7 +659,7 @@ pub mod tests {
             #[cfg(feature = "database-support")]
             commit_hash_store,
             Arc::new(RwLock::new(MockReceiptStore)),
-            Box::new(|| Ok(())),
+            Box::new(NoOpScabbardStatePurgeHandler),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
@@ -878,6 +884,14 @@ pub mod tests {
             _id: Option<String>,
         ) -> Result<ReceiptIter, ReceiptStoreError> {
             unimplemented!()
+        }
+    }
+
+    struct NoOpScabbardStatePurgeHandler;
+
+    impl ScabbardStatePurgeHandler for NoOpScabbardStatePurgeHandler {
+        fn purge_state(&self) -> Result<(), splinter::error::InternalError> {
+            Ok(())
         }
     }
 

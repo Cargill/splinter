@@ -113,7 +113,9 @@ mod tests {
     use crate::service::factory::compute_db_path;
     #[cfg(feature = "database-support")]
     use crate::service::state::merkle_state::{MerkleState, MerkleStateConfig};
-    use crate::service::{state::ScabbardState, Scabbard, ScabbardVersion};
+    use crate::service::{
+        state::ScabbardState, Scabbard, ScabbardStatePurgeHandler, ScabbardVersion,
+    };
     #[cfg(feature = "database-support")]
     use crate::store::{
         transact::{TransactCommitHashStore, CURRENT_STATE_ROOT_INDEX},
@@ -213,7 +215,7 @@ mod tests {
             #[cfg(feature = "database-support")]
             commit_hash_store,
             receipt_store,
-            Box::new(|| Ok(())),
+            Box::new(NoOpScabbardStatePurgeHandlerHandler),
             Secp256k1Context::new().new_verifier(),
             vec![],
             None,
@@ -336,6 +338,14 @@ mod tests {
                 }
             })
             .expect("No port available")
+    }
+
+    struct NoOpScabbardStatePurgeHandlerHandler;
+
+    impl ScabbardStatePurgeHandler for NoOpScabbardStatePurgeHandlerHandler {
+        fn purge_state(&self) -> Result<(), InternalError> {
+            Ok(())
+        }
     }
 
     /// An identity provider that always returns `Ok(Some(_))`

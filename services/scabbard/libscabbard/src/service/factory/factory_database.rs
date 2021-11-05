@@ -36,10 +36,12 @@ use crate::service::rest_api::actix;
 use crate::service::{
     error::ScabbardError,
     state::merkle_state::{MerkleState, MerkleStateConfig},
-    Scabbard, ScabbardVersion, SERVICE_TYPE,
+    Scabbard, ScabbardStatePurgeHandler, ScabbardVersion, SERVICE_TYPE,
 };
 use crate::store::{
-    diesel::DieselCommitHashStore, transact::factory::LmdbDatabaseFactory, CommitHashStore,
+    diesel::DieselCommitHashStore,
+    transact::factory::{LmdbDatabaseFactory, LmdbDatabasePurgeHandle},
+    CommitHashStore,
 };
 
 const DEFAULT_LMDB_DIR: &str = "/var/lib/splinter";
@@ -454,38 +456,36 @@ impl ServiceFactory for ScabbardFactory {
         let version = ScabbardVersion::try_from(args.get("version").map(String::as_str))
             .map_err(FactoryCreateError::InvalidArguments)?;
 
-        let (merkle_state, state_purge) = if self.enable_lmdb_state {
-            self.sql_state_check(circuit_id, &service_id)?;
+        let (merkle_state, state_purge): (_, Box<dyn ScabbardStatePurgeHandler>) =
+            if self.enable_lmdb_state {
+                self.sql_state_check(circuit_id, &service_id)?;
 
-            let db = self
-                .state_store_factory
-                .get_database(circuit_id, &service_id)
-                .map_err(|e| FactoryCreateError::Internal(e.to_string()))?;
+                let db = self
+                    .state_store_factory
+                    .get_database(circuit_id, &service_id)
+                    .map_err(|e| FactoryCreateError::Internal(e.to_string()))?;
 
-            let db_purge_handle = self
-                .state_store_factory
-                .get_database_purge_handle(circuit_id, &service_id)
-                .map_err(|e| FactoryCreateError::Internal(e.to_string()))?;
+                let db_purge_handle = self
+                    .state_store_factory
+                    .get_database_purge_handle(circuit_id, &service_id)
+                    .map_err(|e| FactoryCreateError::Internal(e.to_string()))?;
 
-            let merkle_state = MerkleState::new(MerkleStateConfig::key_value(db.clone_box()))
-                .map_err(|e| FactoryCreateError::Internal(e.to_string()))?;
+                let merkle_state = MerkleState::new(MerkleStateConfig::key_value(db.clone_box()))
+                    .map_err(|e| FactoryCreateError::Internal(e.to_string()))?;
 
-            (
-                merkle_state,
-                Box::new(move || {
-                    db_purge_handle.purge()?;
-                    Ok(())
-                }) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
-            )
-        } else {
-            self.lmdb_state_check(circuit_id, &service_id)?;
+                (
+                    merkle_state,
+                    Box::new(LmdbScabbardPurgeHandler { db_purge_handle }),
+                )
+            } else {
+                self.lmdb_state_check(circuit_id, &service_id)?;
 
-            (
-                MerkleState::new(self.create_sql_merkle_state_config(circuit_id, &service_id))
-                    .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
-                Box::new(|| Ok(())) as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>,
-            )
-        };
+                (
+                    MerkleState::new(self.create_sql_merkle_state_config(circuit_id, &service_id))
+                        .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
+                    Box::new(NoOpScabbardStatePurgeHandler),
+                )
+            };
 
         let (receipt_store, commit_hash_store): (ScabbardReceiptStore, Box<dyn CommitHashStore>) =
             match &self.store_factory_config {
@@ -515,8 +515,6 @@ impl ServiceFactory for ScabbardFactory {
                 ),
             };
 
-        let purge_fn = state_purge as Box<dyn Fn() -> Result<(), InternalError> + Sync + Send>;
-
         let service = Scabbard::new(
             service_id,
             circuit_id,
@@ -525,7 +523,7 @@ impl ServiceFactory for ScabbardFactory {
             merkle_state,
             commit_hash_store,
             receipt_store,
-            purge_fn,
+            state_purge,
             self.signature_verifier_factory
                 .lock()
                 .map_err(|_| {
@@ -679,6 +677,24 @@ fn get_sqlite_pool(
     pool_builder.build(connection_manager).map_err(|err| {
         InvalidStateError::with_message(format!("Failed to build connection pool: {}", err))
     })
+}
+
+struct LmdbScabbardPurgeHandler {
+    db_purge_handle: LmdbDatabasePurgeHandle,
+}
+
+impl ScabbardStatePurgeHandler for LmdbScabbardPurgeHandler {
+    fn purge_state(&self) -> Result<(), InternalError> {
+        self.db_purge_handle.purge()
+    }
+}
+
+struct NoOpScabbardStatePurgeHandler;
+
+impl ScabbardStatePurgeHandler for NoOpScabbardStatePurgeHandler {
+    fn purge_state(&self) -> Result<(), InternalError> {
+        Ok(())
+    }
 }
 
 #[cfg(feature = "sqlite")]
