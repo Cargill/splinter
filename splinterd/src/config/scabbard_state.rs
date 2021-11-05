@@ -12,48 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::convert::From;
 use std::fmt::Display;
 use std::str::FromStr;
 
-use super::toml::ScabbardStorageToml;
-
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum ScabbardStorage {
+pub enum ScabbardState {
     Database,
     Lmdb,
 }
 
-pub enum ScabbardStorageError {
+pub enum ScabbardStateError {
     ParseError(String),
 }
 
-impl Display for ScabbardStorageError {
+impl Display for ScabbardStateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ScabbardStorageError::ParseError(msg) => {
+            ScabbardStateError::ParseError(msg) => {
                 write!(f, "got {}, expected 'lmdb' or 'database'", msg)
             }
         }
     }
 }
 
-impl FromStr for ScabbardStorage {
-    type Err = ScabbardStorageError;
+impl FromStr for ScabbardState {
+    type Err = ScabbardStateError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "database" => Ok(Self::Database),
             "lmdb" => Ok(Self::Lmdb),
-            _ => Err(ScabbardStorageError::ParseError(s.to_string())),
-        }
-    }
-}
-
-impl From<ScabbardStorageToml> for ScabbardStorage {
-    fn from(other: ScabbardStorageToml) -> Self {
-        match other {
-            ScabbardStorageToml::Lmdb => ScabbardStorage::Lmdb,
-            ScabbardStorageToml::Database => ScabbardStorage::Database,
+            _ => Err(ScabbardStateError::ParseError(s.to_string())),
         }
     }
 }

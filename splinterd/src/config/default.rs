@@ -24,7 +24,7 @@ use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuild
 #[cfg(feature = "log-config")]
 use super::logging::{RootConfig, UnnamedAppenderConfig, DEFAULT_LOGGING_PATTERN};
 #[cfg(feature = "scabbard-database-support")]
-use super::ScabbardStorage;
+use super::ScabbardState;
 
 const CONFIG_DIR: &str = "/etc/splinter";
 const TLS_CERT_DIR: &str = "/etc/splinter/certs";
@@ -166,7 +166,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
 
         #[cfg(feature = "scabbard-database-support")]
         {
-            partial_config = partial_config.with_scabbard_storage(Some(ScabbardStorage::Database));
+            partial_config = partial_config.with_scabbard_state(Some(ScabbardState::Database));
         }
 
         Ok(partial_config)

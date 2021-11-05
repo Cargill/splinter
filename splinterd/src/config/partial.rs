@@ -22,7 +22,7 @@ use std::time::Duration;
 #[cfg(feature = "log-config")]
 use super::logging::{RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig};
 #[cfg(feature = "scabbard-database-support")]
-use super::ScabbardStorage;
+use super::ScabbardState;
 
 /// `ConfigSource` displays the source of configuration values, used to identify which of the various
 /// config modules were used to create a particular `PartialConfig` object.
@@ -107,7 +107,7 @@ pub struct PartialConfig {
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: Option<String>,
     #[cfg(feature = "scabbard-database-support")]
-    scabbard_storage: Option<ScabbardStorage>,
+    scabbard_state: Option<ScabbardState>,
 }
 
 impl PartialConfig {
@@ -182,7 +182,7 @@ impl PartialConfig {
             #[cfg(feature = "config-allow-keys")]
             allow_keys_file: None,
             #[cfg(feature = "scabbard-database-support")]
-            scabbard_storage: None,
+            scabbard_state: None,
         }
     }
 
@@ -389,8 +389,8 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "scabbard-database-support")]
-    pub fn scabbard_storage(&self) -> Option<ScabbardStorage> {
-        self.scabbard_storage
+    pub fn scabbard_state(&self) -> Option<ScabbardState> {
+        self.scabbard_state
     }
 
     /// Adds a `config_dir` value to the `PartialConfig` object.
@@ -922,14 +922,14 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "scabbard-database-support")]
-    /// Adds a `scabbard_storage` value to the  `PartialConfig` object.
+    /// Adds a `scabbard_state` value to the  `PartialConfig` object.
     ///
     /// # Arguments
     ///
-    /// * `scabbard_storage` - Option of ScabbardStorage value for where to store state
+    /// * `scabbard_state` - Option of ScabbardState value for where to store state
     ///
-    pub fn with_scabbard_storage(mut self, scabbard_storage: Option<ScabbardStorage>) -> Self {
-        self.scabbard_storage = scabbard_storage;
+    pub fn with_scabbard_state(mut self, scabbard_state: Option<ScabbardState>) -> Self {
+        self.scabbard_state = scabbard_state;
         self
     }
 }
