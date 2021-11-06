@@ -40,15 +40,15 @@ pub struct LogConfig {
 #[derive(Clone, Debug)]
 pub struct LoggerConfig {
     pub name: String,
-    pub appenders: Vec<String>,
-    pub level: Level,
+    pub appenders: Option<Vec<String>>,
+    pub level: Option<Level>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct UnnamedLoggerConfig {
-    pub appenders: Vec<String>,
+    pub appenders: Option<Vec<String>>,
     #[serde(alias = "filter")]
-    pub level: Level,
+    pub level: Option<Level>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -62,6 +62,7 @@ pub struct AppenderConfig {
     pub name: String,
     pub encoder: String,
     pub kind: LogTarget,
+    pub level: Option<Level>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -72,6 +73,7 @@ pub struct UnnamedAppenderConfig {
     pub kind: RawLogTarget,
     pub filename: Option<String>,
     pub size: Option<u64>,
+    pub level: Option<Level>,
 }
 
 #[derive(Clone, Debug)]
@@ -143,6 +145,7 @@ impl TryFrom<(String, UnnamedAppenderConfig)> for AppenderConfig {
             name: value.0,
             encoder: value.1.encoder,
             kind,
+            level: value.1.level,
         })
     }
 }
@@ -162,6 +165,7 @@ impl From<TomlUnnamedAppenderConfig> for UnnamedAppenderConfig {
             kind: unnamed.kind.into(),
             filename: unnamed.filename,
             size: unnamed.size.map(|s| s.into()),
+            level: unnamed.level.map(|l| l.into()),
         }
     }
 }
@@ -170,7 +174,7 @@ impl From<TomlUnnamedLoggerConfig> for UnnamedLoggerConfig {
     fn from(unnamed: TomlUnnamedLoggerConfig) -> Self {
         Self {
             appenders: unnamed.appenders,
-            level: unnamed.level.into(),
+            level: unnamed.level.map(|v| v.into()),
         }
     }
 }
@@ -185,11 +189,16 @@ impl From<(String, UnnamedLoggerConfig)> for LoggerConfig {
     }
 }
 
-impl From<TomlUnnamedLoggerConfig> for RootConfig {
-    fn from(unnamed: TomlUnnamedLoggerConfig) -> Self {
-        Self {
-            appenders: unnamed.appenders,
-            level: unnamed.level.into(),
+impl TryFrom<TomlUnnamedLoggerConfig> for RootConfig {
+    type Error = ConfigError;
+    fn try_from(value: TomlUnnamedLoggerConfig) -> Result<Self, Self::Error> {
+        match (value.appenders, value.level) {
+            (Some(appenders), Some(level)) => Ok(Self {
+                appenders,
+                level: level.into(),
+            }),
+            (None, _) => Err(ConfigError::MissingValue("root.appenders".to_string())),
+            (_, None) => Err(ConfigError::MissingValue("root.level".to_string())),
         }
     }
 }

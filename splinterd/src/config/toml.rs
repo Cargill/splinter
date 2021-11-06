@@ -22,6 +22,8 @@ use log::Level;
 use serde_derive::Deserialize;
 #[cfg(feature = "log-config")]
 use std::collections::HashMap;
+#[cfg(feature = "log-config")]
+use std::convert::TryInto;
 
 #[cfg(feature = "log-config")]
 use super::bytes::ByteSize;
@@ -56,13 +58,14 @@ pub struct TomlUnnamedAppenderConfig {
     pub kind: TomlRawLogTarget,
     pub filename: Option<String>,
     pub size: Option<ByteSize>,
+    pub level: Option<TomlLogLevel>,
 }
 
 #[cfg(feature = "log-config")]
 #[derive(Deserialize, Clone, Debug)]
 pub struct TomlUnnamedLoggerConfig {
-    pub appenders: Vec<String>,
-    pub level: TomlLogLevel,
+    pub appenders: Option<Vec<String>>,
+    pub level: Option<TomlLogLevel>,
 }
 
 #[cfg(feature = "log-config")]
@@ -277,7 +280,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             if let Some(mut loggers) = self.toml_config.loggers {
                 if let Some(unnamed) = loggers.remove("root") {
                     partial_config = partial_config
-                        .with_root_logger(Some(unnamed.into()))
+                        .with_root_logger(Some(unnamed.try_into()?))
                         .with_loggers(Some(
                             loggers
                                 .drain()
@@ -826,8 +829,11 @@ mod tests {
             assert!(loggers.contains_key("splinter"));
             let splinter = loggers.get("splinter").unwrap();
             let splinter: LoggerConfig = ("splinter".to_string(), splinter.clone()).into();
-            assert!(matches!(splinter.level, Level::Warn));
-            assert_eq!(splinter.appenders, ["stdout", "rolling_file"]);
+            assert!(matches!(splinter.level,Some(level) if matches!(level, Level::Warn)));
+            assert!(splinter.appenders.is_some());
+            let appenders = splinter.appenders.unwrap();
+            assert!(matches!(appenders.get(0), Some(val) if val == "stdout"));
+            assert!(matches!(appenders.get(1), Some(val) if val == "rolling_file"));
         }
     }
 }

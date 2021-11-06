@@ -123,27 +123,28 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 kind: super::logging::RawLogTarget::Stdout,
                 size: None,
                 filename: None,
+                level: None,
             };
             let loggers = vec![
                 (
                     "tokio".to_string(),
                     UnnamedLoggerConfig {
-                        appenders: vec!["default".into()],
-                        level: log::Level::Warn,
+                        appenders: Some(vec!["stdout".into()]),
+                        level: Some(log::Level::Warn),
                     },
                 ),
                 (
                     "tokio_reactor".to_string(),
                     UnnamedLoggerConfig {
-                        appenders: vec!["default".into()],
-                        level: log::Level::Warn,
+                        appenders: Some(vec!["stdout".into()]),
+                        level: Some(log::Level::Warn),
                     },
                 ),
                 (
                     "hyper".to_string(),
                     UnnamedLoggerConfig {
-                        appenders: vec!["default".into()],
-                        level: log::Level::Warn,
+                        appenders: Some(vec!["stdout".into()]),
+                        level: Some(log::Level::Warn),
                     },
                 ),
             ]

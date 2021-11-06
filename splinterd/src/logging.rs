@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use std::convert::{From, Into, TryInto};
+use std::fs::OpenOptions;
+use std::path::Path;
 
-use log::Level;
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
@@ -32,10 +33,16 @@ use log4rs::{
     },
     config::{runtime::ConfigErrors, Appender, Logger, Root},
     encode::{pattern::PatternEncoder, Encode},
+    filter::threshold::ThresholdFilter,
     Config,
 };
+use splinter::error::InternalError;
 
-use crate::config::{AppenderConfig, LogConfig, LogTarget, LoggerConfig, RootConfig};
+use crate::config::{
+    AppenderConfig, Config as InternalConfig, LogConfig, LogTarget, LoggerConfig, RootConfig,
+    DEFAULT_LOGGING_PATTERN,
+};
+use crate::error::UserError;
 
 impl TryInto<Appender> for AppenderConfig {
     type Error = std::io::Error;
@@ -69,16 +76,30 @@ impl TryInto<Appender> for AppenderConfig {
                 )
             }
         };
-        Ok(Appender::builder().build(&self.name, boxed))
+        let mut builder = Appender::builder();
+        if let Some(level) = self.level {
+            builder = builder.filter(Box::new(ThresholdFilter::new(level.to_level_filter())))
+        }
+        Ok(builder.build(&self.name, boxed))
     }
 }
 
-impl From<LoggerConfig> for Logger {
-    fn from(logger_config: LoggerConfig) -> Self {
-        let level = logger_config.level.to_level_filter();
+struct LoggerFactory {
+    default: RootConfig,
+}
+impl LoggerFactory {
+    fn new(default: RootConfig) -> Self {
+        Self { default }
+    }
+    fn get_logger(&self, config: LoggerConfig) -> Logger {
+        let level = config
+            .level
+            .map(|l| l.to_level_filter())
+            .unwrap_or_else(|| self.default.level.to_level_filter());
+        let appenders = config.appenders.unwrap_or_else(Vec::new);
         Logger::builder()
-            .appenders(logger_config.appenders.clone())
-            .build(&logger_config.name, level)
+            .appenders(appenders)
+            .build(config.name, level)
     }
 }
 
@@ -91,15 +112,10 @@ impl From<RootConfig> for Root {
     }
 }
 
-impl RootConfig {
-    fn set_level(self, level: Level) -> Self {
-        Self { level, ..self }
-    }
-}
-
 impl TryInto<Config> for LogConfig {
     type Error = ConfigErrors;
     fn try_into(self) -> Result<Config, Self::Error> {
+        let factory = LoggerFactory::new(self.root.clone());
         let root = self.root.into();
         Config::builder()
             .appenders(
@@ -107,16 +123,104 @@ impl TryInto<Config> for LogConfig {
                     .iter()
                     .filter_map(|ac| ac.to_owned().try_into().ok()),
             )
-            .loggers(self.loggers.iter().map(|lc| lc.to_owned().into()))
+            .loggers(self.loggers.into_iter().map(|lc| factory.get_logger(lc)))
             .build(root)
     }
 }
 
-impl LogConfig {
-    pub fn set_root_level(self, level: Level) -> Self {
-        Self {
-            root: self.root.set_level(level),
-            ..self
+pub fn configure_logging(
+    config: &InternalConfig,
+    log_handle: &log4rs::Handle,
+) -> Result<(), UserError> {
+    let appenders = if let Some(appenders) = config.appenders() {
+        let check_file_readability = |path: &Path| {
+            OpenOptions::new()
+                .write(true)
+                .create(!path.exists())
+                .open(path)
+                .map(|_| ())
+                .map_err(|err| UserError::IoError {
+                    context: format!("logfile is not writeable: {}", path.display()),
+                    source: Some(Box::new(err)),
+                })
+        };
+        appenders
+            .iter()
+            .filter_map(AppenderConfig::get_filename)
+            .try_for_each(|filename| {
+                let path = Path::new(filename);
+                if let Some(parent) = path.parent() {
+                    if !parent.exists() {
+                        Err(UserError::IoError {
+                            context: format!(
+                                "logfile directory does not exist: {}",
+                                parent.display()
+                            ),
+                            source: None,
+                        })
+                    } else {
+                        check_file_readability(path)
+                    }
+                } else {
+                    check_file_readability(path)
+                }
+            })?;
+        appenders
+            .iter()
+            .map(|a| {
+                if a.name == "stdout" {
+                    AppenderConfig {
+                        level: Some(config.verbosity()),
+                        name: a.name.to_owned(),
+                        encoder: a.encoder.to_owned(),
+                        kind: a.kind.to_owned(),
+                    }
+                } else {
+                    a.to_owned()
+                }
+            })
+            .collect()
+    } else {
+        vec![]
+    };
+    let loggers = if let Some(loggers) = config.loggers() {
+        loggers
+    } else {
+        vec![]
+    };
+    let log_config = LogConfig {
+        root: config.root_logger().to_owned(),
+        appenders,
+        loggers,
+    };
+    match log_config.try_into() {
+        Ok(log_config) => {
+            log_handle.set_config(log_config);
+            Ok(())
         }
+        Err(e) => Err(UserError::InternalError(InternalError::from_source(
+            Box::new(e),
+        ))),
+    }
+}
+
+pub fn default_log_settings() -> Config {
+    let default_config: LogConfig = LogConfig {
+        root: RootConfig {
+            appenders: vec![String::from("default")],
+            level: log::Level::Debug,
+        },
+        appenders: vec![AppenderConfig {
+            name: String::from("default"),
+            encoder: String::from(DEFAULT_LOGGING_PATTERN),
+            kind: LogTarget::Stdout,
+            level: None,
+        }],
+        loggers: vec![],
+    };
+    if let Ok(log_config) = default_config.try_into() {
+        log_config
+    } else {
+        unreachable!()
     }
 }
