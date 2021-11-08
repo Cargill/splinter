@@ -16,6 +16,7 @@
 //! Hyperledger Transact for state management. Scabbard uses two-phase consensus to reach agreement
 //! on transactions.
 
+#[cfg(feature = "log")]
 #[macro_use]
 extern crate log;
 #[cfg(feature = "diesel")]
