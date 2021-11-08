@@ -55,7 +55,7 @@ protoc-rust = "2.14"
 glob = "0.2"
 
 [features]
-default = []
+default = ["splinter-service"]
 
 stable = [
   "authorization",
@@ -89,4 +89,5 @@ lmdb = []
 postgres = ["diesel/postgres", "diesel_migrations", "sawtooth/postgres", "transact/postgres"]
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
+splinter-service = []
 sqlite = ["diesel/sqlite", "diesel_migrations", "sawtooth/sqlite", "transact/sqlite"]

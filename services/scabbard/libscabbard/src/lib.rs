@@ -30,16 +30,17 @@ extern crate diesel_migrations;
 extern crate metrics;
 
 // pull in `no-op` metric macros if `metrics` is not enabled
-#[cfg(not(feature = "metrics"))]
-#[macro_use]
+#[cfg_attr(all(not(feature = "metrics"), feature = "splinter-service"), macro_use)]
 extern crate splinter;
 
 #[cfg(feature = "client")]
 pub mod client;
+#[cfg(any(feature = "client-reqwest", feature = "splinter-service"))]
 mod hex;
 #[cfg(feature = "diesel_migrations")]
 pub mod migrations;
 pub mod protocol;
 pub mod protos;
+#[cfg(feature = "splinter-service")]
 pub mod service;
 pub mod store;
