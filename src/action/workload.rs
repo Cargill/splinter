@@ -209,12 +209,17 @@ fn start_smallbank_workloads(
             SmallbankTransactionWorkload::new(smallbank_generator, signer.clone());
         let smallbank_workload = SmallbankBatchWorkload::new(transaction_workload, signer.clone());
 
-        let rate = if target_rate_min < target_rate_max {
+        let rate = if target_rate_min == target_rate_max {
             target_rate_min
         } else {
-            let numeric = rng.gen_range(target_rate_min.to_milli()..=target_rate_max.to_milli());
+            // Calculate the amount of time, in milliseconds, to wait between batch submissions for
+            // the min and max target rates and generate a random number between the two times
+            let time_to_wait =
+                rng.gen_range(target_rate_max.to_milli()..=target_rate_min.to_milli());
+            // Calculate the number of batches that should be submitted per second with the new time
+            let numeric = 1000.0 / time_to_wait;
             Time {
-                numeric: numeric / 1000.0,
+                numeric,
                 unit: TimeUnit::Second,
                 time_type: TimeType::Rate,
             }
@@ -266,12 +271,17 @@ fn start_command_workloads(
             CommandTransactionWorkload::new(command_generator, signer.clone());
         let command_workload = CommandBatchWorkload::new(transaction_workload, signer.clone());
 
-        let rate = if target_rate_min < target_rate_max {
+        let rate = if target_rate_min == target_rate_max {
             target_rate_min
         } else {
-            let numeric = rng.gen_range(target_rate_min.to_milli()..=target_rate_max.to_milli());
+            // Calculate the amount of time, in milliseconds, to wait between batch submissions for
+            // the min and max target rates and generate a random number between the two times
+            let time_to_wait =
+                rng.gen_range(target_rate_max.to_milli()..=target_rate_min.to_milli());
+            // Calculate the number of batches that should be submitted per second with the new time
+            let numeric = 1000.0 / time_to_wait;
             Time {
-                numeric: numeric / 1000.0,
+                numeric,
                 unit: TimeUnit::Second,
                 time_type: TimeType::Rate,
             }

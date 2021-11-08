@@ -41,7 +41,7 @@ impl Time {
             Minute => 60_000.0,
             Second => 1_000.0,
         };
-        self.numeric * mult
+        mult / self.numeric
     }
 
     pub fn make_duration_type_time(time_str: &str) -> Result<Self, TimeParseError> {
@@ -154,7 +154,7 @@ impl From<&Time> for Duration {
     fn from(interval: &Time) -> Duration {
         match interval.time_type {
             TimeType::Rate => {
-                Duration::from_secs_f64(interval.numeric / interval.unit.to_sec() as f64)
+                Duration::from_secs_f64(interval.unit.to_sec() as f64 / interval.numeric)
             }
             TimeType::Duration => {
                 Duration::from_secs_f64(interval.numeric * interval.unit.to_sec() as f64)
