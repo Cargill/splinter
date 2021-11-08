@@ -23,6 +23,9 @@ network.
 
 FLAGS
 =====
+`-n`, `--dry-run`
+: Validate the command without authorizing the identity
+
 `-h`, `--help`
 : Prints help information
 
