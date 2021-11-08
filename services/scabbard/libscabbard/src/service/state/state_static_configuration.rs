@@ -14,7 +14,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::TryFrom;
-use std::fmt;
+use std::fmt::{self, Write as _};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::{
@@ -28,6 +28,7 @@ use sawtooth::receipt::store::ReceiptStore;
 use sawtooth_sabre::{
     handler::SabreTransactionHandler, ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
 };
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "events")]
 use splinter::events::{ParseBytes, ParseError};
 #[cfg(test)]
@@ -167,7 +168,7 @@ impl ScabbardState {
     fn read_current_state_root(db: &dyn Database) -> Result<Option<String>, ScabbardStateError> {
         db.get_reader()
             .and_then(|reader| reader.index_get(CURRENT_STATE_ROOT_INDEX, b"HEAD"))
-            .map(|head| head.map(|bytes| hex::to_hex(&bytes)))
+            .map(|head| head.map(|bytes| to_hex(&bytes)))
             .map_err(|e| ScabbardStateError(format!("Unable to read HEAD entry: {}", e)))
     }
 
@@ -879,6 +880,15 @@ impl Iterator for ChannelBatchInfoIter {
             }
         }
     }
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    let mut buf = String::new();
+    for b in bytes {
+        write!(&mut buf, "{:02x}", b).expect("Unable to write to string");
+    }
+
+    buf
 }
 
 #[cfg(feature = "sqlite")]

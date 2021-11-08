@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use serde::Serialize;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BatchLinkResponse<'a> {
     link: &'a str,

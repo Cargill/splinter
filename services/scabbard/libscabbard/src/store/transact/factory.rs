@@ -25,8 +25,7 @@ use transact::{
     state::merkle::INDEXES,
 };
 
-use crate::hex::to_hex;
-
+use super::to_hex;
 use super::CURRENT_STATE_ROOT_INDEX;
 
 // Linux, with a 64bit CPU supports sparse files of a large size

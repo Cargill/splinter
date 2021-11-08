@@ -28,6 +28,7 @@ use sawtooth::receipt::store::ReceiptStore;
 use sawtooth_sabre::{
     handler::SabreTransactionHandler, ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
 };
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "events")]
 use splinter::events::{ParseBytes, ParseError};
 #[cfg(test)]

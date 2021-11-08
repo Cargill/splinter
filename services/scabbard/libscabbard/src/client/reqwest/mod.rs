@@ -22,6 +22,7 @@ use reqwest::{
     blocking::{Client, RequestBuilder, Response},
     Url,
 };
+use serde::{Deserialize, Serialize};
 use transact::{protocol::batch::Batch, protos::IntoBytes};
 
 use crate::hex::parse_hex;
