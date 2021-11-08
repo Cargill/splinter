@@ -35,6 +35,9 @@ managing a Splinter node.
 SUBCOMMANDS
 ===========
 
+`authid`
+: Role-based authorization role assignment commands
+
 `cert`
 : Generates insecure certificates for development with the `generate`
   subcommand
@@ -52,11 +55,23 @@ SUBCOMMANDS
 `keygen`
 : Generates secp256k1 public/private keys
 
+`maintenance`
+: Maintenance mode commands
+
+`permissions`
+: Lists REST API permissions for a Splinter node
+
 `registry`
 : Provides commands to create and manage Splinter registry information.
 
+`role`
+: Role-based authorization role-related commands
+
 `upgrade`
 : Upgrades splinter YAML state to database state
+
+`user`
+: Splinter user commands
 
 FLAGS
 =====
@@ -107,12 +122,18 @@ SEE ALSO
 | `splinter-database-migrate(1)`
 | `splinter-health-status(1)`
 | `splinter-keygen(1)`
+| `splinter-maintenance-status(1)`
+| `splinter-maintenance-enable(1)`
+| `splinter-maintenance-disable(1)`
+| `splinter-permissions(1)`
+| `splinter-registry-add(1)`
 | `splinter-role-create(1)`
 | `splinter-role-delete(1)`
 | `splinter-role-list(1)`
 | `splinter-role-show(1)`
 | `splinter-role-update(1)`
 | `splinter-upgrade(1)`
+| `splinter-user(1)`
 |
 | `splinterd(1)`
 |
