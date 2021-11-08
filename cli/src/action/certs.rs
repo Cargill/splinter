@@ -94,7 +94,6 @@ impl Action for CertGenAction {
         }
 
         let private_cert_path = cert_dir.join("private/");
-        let cert_path = cert_dir.to_path_buf();
 
         // Check if the provided private key directory for the certs exists, if not create it
         if !private_cert_path.is_dir() {
@@ -144,7 +143,7 @@ impl Action for CertGenAction {
         // the missing files. If only one of the two files exists, this is an error.
         if args.is_present("skip") {
             return handle_skip(
-                cert_path,
+                cert_dir,
                 private_cert_path,
                 server_common_name,
                 #[cfg(feature = "https-certs")]
@@ -237,7 +236,7 @@ impl Action for CertGenAction {
             } else {
                 // if all files need to be generated log what will be written and generate all
                 create_all_certs(
-                    &cert_path,
+                    &cert_dir,
                     &private_cert_path,
                     server_common_name,
                     #[cfg(feature = "https-certs")]
