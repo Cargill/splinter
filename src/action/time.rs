@@ -41,7 +41,7 @@ impl Time {
             Minute => 60_000.0,
             Second => 1_000.0,
         };
-        self.numeric * mult
+        mult / self.numeric
     }
 
     pub fn make_duration_type_time(time_str: &str) -> Result<Self, TimeParseError> {
