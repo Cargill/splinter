@@ -13,16 +13,7 @@
 // limitations under the License.
 
 use std::error::Error;
-use std::fmt::{self, Write};
-
-pub fn to_hex(bytes: &[u8]) -> String {
-    let mut buf = String::new();
-    for b in bytes {
-        write!(&mut buf, "{:02x}", b).expect("Unable to write to string");
-    }
-
-    buf
-}
+use std::fmt;
 
 pub fn parse_hex(hex: &str) -> Result<Vec<u8>, HexError> {
     if hex.len() % 2 != 0 {
@@ -93,16 +84,6 @@ mod tests {
 
         // check that invalid digits fails
         assert!(parse_hex("0G").is_err());
-
-        // check round trip
-        assert_eq!(
-            "abcdef",
-            &to_hex(&parse_hex("abcdef").expect("unable to parse hex for round trip"))
-        );
-        assert_eq!(
-            "012345",
-            &to_hex(&parse_hex("012345").expect("unable to parse hex for round trip"))
-        );
 
         // check empty parses
         let empty: Vec<u8> = Vec::with_capacity(0);

@@ -16,6 +16,8 @@
 
 pub mod factory;
 
+use std::fmt::Write;
+
 use splinter::error::{InternalError, InvalidArgumentError, InvalidStateError};
 use transact::database::{lmdb::LmdbDatabase, Database, DatabaseError};
 
@@ -56,7 +58,7 @@ impl<D: Database + Clone> CommitHashStore for TransactCommitHashStore<D> {
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
         match reader.index_get(CURRENT_STATE_ROOT_INDEX, b"HEAD") {
-            Ok(current_commit_hash) => Ok(current_commit_hash.map(|bytes| hex::to_hex(&bytes))),
+            Ok(current_commit_hash) => Ok(current_commit_hash.map(|bytes| to_hex(&bytes))),
             Err(DatabaseError::ReaderError(msg)) if msg.starts_with("Not an index") => Err(
                 CommitHashStoreError::InvalidState(InvalidStateError::with_message(
                     "Missing current_state_root index in LMDB database".into(),
@@ -108,6 +110,15 @@ impl<D: Database + Clone> CommitHashStore for TransactCommitHashStore<D> {
     fn clone_boxed(&self) -> Box<dyn CommitHashStore> {
         Box::new(self.clone())
     }
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    let mut buf = String::new();
+    for b in bytes {
+        write!(&mut buf, "{:02x}", b).expect("Unable to write to string");
+    }
+
+    buf
 }
 
 #[cfg(test)]

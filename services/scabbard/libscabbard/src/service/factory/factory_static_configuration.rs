@@ -14,6 +14,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
@@ -31,7 +32,6 @@ use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 
 use crate::hex::parse_hex;
-use crate::hex::to_hex;
 #[cfg(feature = "rest-api-actix")]
 use crate::service::rest_api::actix;
 use crate::service::{
@@ -675,6 +675,15 @@ fn purge_paths(lmdb_path: &Path) -> Result<(), InternalError> {
         .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
     Ok(())
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    let mut buf = String::new();
+    for b in bytes {
+        write!(&mut buf, "{:02x}", b).expect("Unable to write to string");
+    }
+
+    buf
 }
 
 #[cfg(test)]
