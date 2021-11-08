@@ -14,6 +14,8 @@
 
 use std::time::SystemTime;
 
+use serde::Serialize;
+
 use crate::service::state::{BatchInfo, BatchStatus, InvalidTransaction, ValidTransaction};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

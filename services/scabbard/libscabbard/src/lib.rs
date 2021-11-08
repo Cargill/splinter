@@ -24,8 +24,6 @@ extern crate diesel;
 #[cfg(feature = "diesel_migrations")]
 #[macro_use]
 extern crate diesel_migrations;
-#[macro_use]
-extern crate serde_derive;
 
 #[cfg(feature = "metrics")]
 #[macro_use]
