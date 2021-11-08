@@ -35,7 +35,7 @@ use gameroom_database::{
 };
 use scabbard::{protocol::SCABBARD_PROTOCOL_VERSION, service::StateChangeEvent};
 use splinter::{
-    admin::messages::{
+    admin::messages::v1::{
         AdminServiceEvent, CircuitProposal, CreateCircuit, SplinterNode, SplinterService,
     },
     events::{Igniter, ParseBytes, ParseError, WebSocketClient, WebSocketError, WsResponse},
@@ -556,9 +556,6 @@ fn process_admin_event(
 
             igniter.start_ws(&xo_ws).map_err(AppAuthHandlerError::from)
         }
-        AdminServiceEvent::CircuitDisbanded(_) => Err(AppAuthHandlerError::InvalidMessage(
-            "Unsupported event type".to_string(),
-        )),
     }
 }
 
@@ -739,9 +736,9 @@ mod test {
         ProposalVoteRecord,
     };
 
-    use splinter::admin::messages::{
-        AuthorizationType, CircuitStatus, CreateCircuit, DurabilityType, PersistenceType,
-        ProposalType, RouteType, Vote, VoteRecord,
+    use splinter::admin::messages::v1::{
+        AuthorizationType, CreateCircuit, DurabilityType, PersistenceType, ProposalType, RouteType,
+        Vote, VoteRecord,
     };
 
     static DATABASE_URL: &str = "postgres://gameroom_test:gameroom_test@db-test:5432/gameroom_test";
@@ -1287,7 +1284,6 @@ mod test {
             members: vec![SplinterNode {
                 node_id: "Node-123".to_string(),
                 endpoints: vec!["127.0.0.1:8282".to_string()],
-                public_key: None,
             }],
             authorization_type: AuthorizationType::Trust,
             persistence: PersistenceType::Any,
@@ -1295,10 +1291,7 @@ mod test {
             routes: RouteType::Any,
             circuit_management_type: "gameroom".to_string(),
             application_metadata,
-            comments: Some("test circuit".to_string()),
-            display_name: None,
-            circuit_version: 1,
-            circuit_status: CircuitStatus::Active,
+            comments: "test circuit".to_string(),
         }
     }
 
