@@ -29,6 +29,8 @@ use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 use transact::database::Database;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+use transact::state::merkle::sql;
 
 use crate::hex::parse_hex;
 #[cfg(feature = "rest-api-actix")]
@@ -483,7 +485,7 @@ impl ServiceFactory for ScabbardFactory {
                 (
                     MerkleState::new(self.create_sql_merkle_state_config(circuit_id, &service_id))
                         .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
-                    Box::new(NoOpScabbardStatePurgeHandler),
+                    self.create_sql_merkle_state_purge_handle(circuit_id, &service_id),
                 )
             };
 
@@ -631,6 +633,29 @@ impl ScabbardFactory {
             },
         }
     }
+
+    fn create_sql_merkle_state_purge_handle(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> Box<dyn ScabbardStatePurgeHandler> {
+        match &self.store_factory_config {
+            #[cfg(feature = "postgres")]
+            ScabbardFactoryStorageConfig::Postgres { pool } => {
+                Box::new(PostgresMerkleStatePurgeHandler {
+                    pool: pool.clone(),
+                    tree_name: format!("{}::{}", circuit_id, service_id),
+                })
+            }
+            #[cfg(feature = "sqlite")]
+            ScabbardFactoryStorageConfig::Sqlite { pool } => {
+                Box::new(SqliteMerkleStatePurgeHandler {
+                    pool: pool.clone(),
+                    tree_name: format!("{}::{}", circuit_id, service_id),
+                })
+            }
+        }
+    }
 }
 
 /// Parse a service argument into a list. Check if the argument is in json or csv format
@@ -689,11 +714,49 @@ impl ScabbardStatePurgeHandler for LmdbScabbardPurgeHandler {
     }
 }
 
-struct NoOpScabbardStatePurgeHandler;
+#[cfg(feature = "postgres")]
+struct PostgresMerkleStatePurgeHandler {
+    pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
+    tree_name: String,
+}
 
-impl ScabbardStatePurgeHandler for NoOpScabbardStatePurgeHandler {
+#[cfg(feature = "postgres")]
+impl ScabbardStatePurgeHandler for PostgresMerkleStatePurgeHandler {
     fn purge_state(&self) -> Result<(), InternalError> {
-        Ok(())
+        let postgres_backend = sql::backend::PostgresBackend::from(self.pool.clone());
+
+        let state = sql::SqlMerkleStateBuilder::new()
+            .with_backend(postgres_backend)
+            .with_tree(self.tree_name.clone())
+            .build()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        state
+            .delete_tree()
+            .map_err(|e| InternalError::from_source(Box::new(e)))
+    }
+}
+
+#[cfg(feature = "sqlite")]
+struct SqliteMerkleStatePurgeHandler {
+    pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
+    tree_name: String,
+}
+
+#[cfg(feature = "sqlite")]
+impl ScabbardStatePurgeHandler for SqliteMerkleStatePurgeHandler {
+    fn purge_state(&self) -> Result<(), InternalError> {
+        let sqlite_backend = sql::backend::SqliteBackend::from(self.pool.clone());
+
+        let state = sql::SqlMerkleStateBuilder::new()
+            .with_backend(sqlite_backend)
+            .with_tree(self.tree_name.clone())
+            .build()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        state
+            .delete_tree()
+            .map_err(|e| InternalError::from_source(Box::new(e)))
     }
 }
 
