@@ -69,31 +69,21 @@ impl Action for CertGenAction {
         #[cfg(feature = "https-certs")]
         let rest_api_common_name = args.value_of("rest_api_common_name").unwrap_or("localhost");
 
-        let cert_dir_string = args
-            .value_of("cert_dir")
-            .map(ToOwned::to_owned)
-            .or_else(|| env::var(CERT_DIR_ENV).ok())
-            .or_else(|| {
-                if let Ok(splinter_home) = env::var(SPLINTER_HOME_ENV) {
-                    let cert_path = Path::new(&splinter_home).join("certs");
-                    if !cert_path.is_dir() {
-                        fs::create_dir_all(&cert_path)
-                            .map_err(|err| {
-                                CliError::ActionError(format!(
-                                    "Unable to create cert directory: {}",
-                                    err
-                                ))
-                            })
-                            .ok()?
-                    }
-                    cert_path.to_str().map(ToOwned::to_owned)
-                } else {
-                    Some(DEFAULT_CERT_DIR.to_string())
-                }
-            })
-            .unwrap();
-
-        let cert_dir = Path::new(&cert_dir_string);
+        let cert_dir = if let Some(dir_string) = args.value_of("cert_dir") {
+            Path::new(dir_string).to_path_buf()
+        } else if let Ok(dir_string) = env::var(CERT_DIR_ENV) {
+            Path::new(&dir_string).to_path_buf()
+        } else if let Ok(splinter_home) = env::var(SPLINTER_HOME_ENV) {
+            let path = Path::new(&splinter_home).join("certs");
+            if !path.is_dir() {
+                fs::create_dir_all(&path).map_err(|err| {
+                    CliError::ActionError(format!("Unable to create cert directory: {}", err))
+                })?;
+            }
+            path
+        } else {
+            Path::new(DEFAULT_CERT_DIR).to_path_buf()
+        };
 
         // Check if the provided cert directory exists
         if !cert_dir.is_dir() {
@@ -119,14 +109,14 @@ impl Action for CertGenAction {
                 if metadata.permissions().readonly() {
                     return Err(CliError::ActionError(format!(
                         "Cert directory is not writeable: {}",
-                        absolute_path(cert_dir)?,
+                        absolute_path(&cert_dir)?,
                     )));
                 }
             }
             Err(err) => {
                 return Err(CliError::ActionError(format!(
                     "Cannot check if cert directory {} is writable: {}",
-                    absolute_path(cert_dir)?,
+                    absolute_path(&cert_dir)?,
                     err
                 )));
             }
@@ -257,7 +247,7 @@ impl Action for CertGenAction {
         } else {
             // if force is true, overwrite all existing files
             create_all_certs(
-                &cert_dir.to_path_buf(),
+                &cert_dir,
                 &private_cert_path,
                 server_common_name,
                 #[cfg(feature = "https-certs")]
