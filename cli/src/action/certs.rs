@@ -69,28 +69,30 @@ impl Action for CertGenAction {
         #[cfg(feature = "https-certs")]
         let rest_api_common_name = args.value_of("rest_api_common_name").unwrap_or("localhost");
 
+        let mut is_cert_derived_from_splinter_home = false;
         let cert_dir = if let Some(dir_string) = args.value_of("cert_dir") {
             Path::new(dir_string).to_path_buf()
         } else if let Ok(dir_string) = env::var(CERT_DIR_ENV) {
             Path::new(&dir_string).to_path_buf()
         } else if let Ok(splinter_home) = env::var(SPLINTER_HOME_ENV) {
-            let path = Path::new(&splinter_home).join("certs");
-            if !path.is_dir() {
-                fs::create_dir_all(&path).map_err(|err| {
-                    CliError::ActionError(format!("Unable to create cert directory: {}", err))
-                })?;
-            }
-            path
+            is_cert_derived_from_splinter_home = true;
+            Path::new(&splinter_home).join("certs")
         } else {
             Path::new(DEFAULT_CERT_DIR).to_path_buf()
         };
 
         // Check if the provided cert directory exists
         if !cert_dir.is_dir() {
-            return Err(CliError::ActionError(format!(
-                "Cert directory does not exist: {}",
-                cert_dir.display()
-            )));
+            if is_cert_derived_from_splinter_home {
+                fs::create_dir_all(&cert_dir).map_err(|err| {
+                    CliError::ActionError(format!("Unable to create cert directory: {}", err))
+                })?;
+            } else {
+                return Err(CliError::ActionError(format!(
+                    "Cert directory does not exist: {}",
+                    cert_dir.display()
+                )));
+            }
         }
 
         let private_cert_path = cert_dir.join("private/");
