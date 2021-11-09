@@ -474,6 +474,9 @@ impl SplinterDaemon {
                         scabbard_factory_builder =
                             scabbard_factory_builder.with_receipt_sqlite_connection_pool(pool);
                     }
+                    // This will have failed in create_store_factory above
+                    #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
+                    store::ConnectionPool::Unknown => unreachable!(),
                 }
             }
         }
@@ -490,6 +493,9 @@ impl SplinterDaemon {
                     scabbard_factory_builder =
                         scabbard_factory_builder.with_storage_configuration(pool.into());
                 }
+                // This will have failed in create_store_factory above
+                #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
+                store::ConnectionPool::Unknown => unreachable!(),
             }
 
             scabbard_factory_builder = scabbard_factory_builder

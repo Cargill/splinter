@@ -36,7 +36,7 @@ pub enum ConnectionPool {
     },
     // This variant is only enabled to such that the compiler does not complain.  It is never
     // constructed.
-    #[cfg(not(all(feature = "database-postgres", feature = "database-sqlite")))]
+    #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
     #[allow(dead_code)]
     Unsupported,
 }
@@ -85,7 +85,7 @@ pub fn create_store_factory(
         ConnectionPool::Sqlite { pool } => {
             Ok(Box::new(sqlite::SqliteStoreFactory::new(pool.clone())))
         }
-        #[cfg(not(all(feature = "database-postgres", feature = "database-sqlite")))]
+        #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
         ConnectionPool::Unsupported => Err(InternalError::with_message(
             "Connection pools are unavailable in this configuration".into(),
         )),
