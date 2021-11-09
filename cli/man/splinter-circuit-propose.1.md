@@ -211,9 +211,13 @@ becomes the following using the glob operator:
 
 SEE ALSO
 ========
+| `splinter-circuit-abandon(1)`
+| `splinter-circuit-disband(1)`
+| `splinter-circuit-list(1)`
 | `splinter-circuit-proposals(1)`
-| `splinter-circuit-template(1)`
-| `splinter-circuit-vote(1)`
+| `splinter-circuit-purge(1)`
 | `splinter-circuit-remove-proposal(1)`
+| `splinter-circuit-show(1)`
+| `splinter-circuit-vote(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/0.5/
