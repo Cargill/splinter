@@ -59,7 +59,7 @@ pub struct TomlUnnamedAppenderConfig {
     pub encoder: String,
     pub kind: TomlRawLogTarget,
     pub filename: Option<String>,
-    pub size: Option<ByteSize>,
+    pub size: Option<TomlLogFileSize>,
     pub level: Option<TomlLogLevel>,
 }
 
@@ -95,33 +95,33 @@ impl From<TomlLogLevel> for Level {
 
 #[cfg(feature = "log-config")]
 #[derive(Clone, Debug)]
-pub struct ByteSize {
+pub struct TomlLogFileSize {
     size: u64,
 }
 
 #[cfg(feature = "log-config")]
-impl From<ByteSize> for u64 {
-    fn from(bytes: ByteSize) -> Self {
+impl From<TomlLogFileSize> for u64 {
+    fn from(bytes: TomlLogFileSize) -> Self {
         bytes.size
     }
 }
 
 #[cfg(feature = "log-config")]
-impl<'de> DeserializeTrait<'de> for ByteSize {
+impl<'de> DeserializeTrait<'de> for TomlLogFileSize {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_string(ByteSizeVisitor)
+        deserializer.deserialize_string(TomlLogFileSizeVisitor)
     }
 }
 
 #[cfg(feature = "log-config")]
-struct ByteSizeVisitor;
+struct TomlLogFileSizeVisitor;
 
 #[cfg(feature = "log-config")]
-impl<'de> Visitor<'de> for ByteSizeVisitor {
-    type Value = ByteSize;
+impl<'de> Visitor<'de> for TomlLogFileSizeVisitor {
+    type Value = TomlLogFileSize;
     fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
@@ -153,7 +153,7 @@ impl<'de> Visitor<'de> for ByteSizeVisitor {
             _ => Err(E::custom("unit could not be parsed".to_string())),
         };
         match (numeric, multiple) {
-            (Ok(float), Ok(mult)) => Ok(ByteSize {
+            (Ok(float), Ok(mult)) => Ok(TomlLogFileSize {
                 size: (float * mult as f32).trunc() as u64,
             }),
             (Err(e), _) => Err(E::custom(format!("size could not be parsed: {}", e))),
