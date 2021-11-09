@@ -39,8 +39,12 @@ FLAGS
 
 SUBCOMMANDS
 ===========
-`default`
-: Manage default values for circuit creation.
+
+`abandon`
+: Abandon an existing circuit.
+
+`disband`
+: Propose to disband an existing circuit.
 
 `list`
 : List all circuits that have been accepted by all proposed members.
@@ -51,6 +55,12 @@ SUBCOMMANDS
 
 `propose`
 : Propose a new circuit to be created.
+
+`purge`
+: Purge an existing inactive circuit.
+
+`remove-proposal`
+: Remove a circuit proposal.
 
 `show`
 : Display a specific circuit or circuit proposal.
@@ -65,8 +75,17 @@ SUBCOMMANDS
 
 SEE ALSO
 ========
-| `splinter-circuit-propose(1)`
+| `splinter-circuit-abandon(1)`
+| `splinter-circuit-disband(1)`
+| `splinter-circuit-list(1)`
 | `splinter-circuit-proposals(1)`
+| `splinter-circuit-propose(1)`
+| `splinter-circuit-purge(1)`
+| `splinter-circuit-remove-proposal(1)`
 | `splinter-circuit-show(1)`
+| `splinter-circuit-template-arguments(1)`
+| `splinter-circuit-template-list(1)`
+| `splinter-circuit-template-show(1)`
+| `splinter-circuit-vote(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/0.5/
