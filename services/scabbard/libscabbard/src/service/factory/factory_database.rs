@@ -14,6 +14,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
+#[cfg(feature = "lmdb")]
 use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
@@ -28,6 +29,7 @@ use splinter::error::InvalidArgumentError;
 use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{FactoryCreateError, Service, ServiceFactory};
+#[cfg(feature = "lmdb")]
 use transact::database::Database;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use transact::state::merkle::sql;
@@ -40,12 +42,12 @@ use crate::service::{
     state::merkle_state::{MerkleState, MerkleStateConfig},
     Scabbard, ScabbardStatePurgeHandler, ScabbardVersion, SERVICE_TYPE,
 };
-use crate::store::{
-    diesel::DieselCommitHashStore,
-    transact::factory::{LmdbDatabaseFactory, LmdbDatabasePurgeHandle},
-    CommitHashStore,
-};
+use crate::store::diesel::DieselCommitHashStore;
+#[cfg(feature = "lmdb")]
+use crate::store::transact::factory::{LmdbDatabaseFactory, LmdbDatabasePurgeHandle};
+use crate::store::CommitHashStore;
 
+#[cfg(feature = "lmdb")]
 const DEFAULT_LMDB_DIR: &str = "/var/lib/splinter";
 
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
@@ -65,6 +67,7 @@ pub enum ConnectionUri {
     Unknown(Box<str>),
 }
 
+#[cfg(feature = "lmdb")]
 #[derive(Default)]
 pub struct ScabbardLmdbStateConfiguration {
     db_dir: Option<String>,
@@ -128,6 +131,7 @@ impl From<Pool<ConnectionManager<diesel::SqliteConnection>>> for ScabbardStorage
 /// Builds new ScabbardFactory instances.
 #[derive(Default)]
 pub struct ScabbardFactoryBuilder {
+    #[cfg(feature = "lmdb")]
     state_storage_configuration: Option<ScabbardLmdbStateConfiguration>,
     storage_configuration: Option<ScabbardStorageConfiguration>,
     signature_verifier_factory: Option<Arc<Mutex<Box<dyn VerifierFactory>>>>,
@@ -140,12 +144,14 @@ impl ScabbardFactoryBuilder {
     }
 
     /// Configures the services to be constructed using LMDB for storing transaction state.
+    #[cfg(feature = "lmdb")]
     pub fn with_lmdb_state_defaults(mut self) -> Self {
         self.state_storage_configuration = Some(ScabbardLmdbStateConfiguration::default());
         self
     }
 
     /// Sets the state db directory to be used by the resulting factory.
+    #[cfg(feature = "lmdb")]
     pub fn with_lmdb_state_db_dir(mut self, state_db_dir: String) -> Self {
         self.state_storage_configuration = self
             .state_storage_configuration
@@ -159,6 +165,7 @@ impl ScabbardFactoryBuilder {
     }
 
     /// Sets the state db size to be used by the resulting factory.
+    #[cfg(feature = "lmdb")]
     pub fn with_lmdb_state_db_size(mut self, state_db_size: usize) -> Self {
         self.state_storage_configuration = self
             .state_storage_configuration
@@ -175,6 +182,7 @@ impl ScabbardFactoryBuilder {
     ///
     /// While all other service state will be stored in a database, when this is enabled, the
     /// merkle state will be stored in LMDB database files.
+    #[cfg(feature = "lmdb")]
     pub fn with_lmdb_state_enabled(mut self, enable: bool) -> Self {
         self.state_storage_configuration = self
             .state_storage_configuration
@@ -223,7 +231,9 @@ impl ScabbardFactoryBuilder {
             InvalidStateError::with_message("A storage configuration must be provided".into())
         })?;
 
+        #[cfg(feature = "lmdb")]
         let state_storage_configuration = self.state_storage_configuration.unwrap_or_default();
+        #[cfg(feature = "lmdb")]
         let lmdb_path = Path::new(
             state_storage_configuration
                 .db_dir
@@ -254,10 +264,12 @@ impl ScabbardFactoryBuilder {
             }
         };
 
+        #[cfg(feature = "lmdb")]
         if !state_storage_configuration.enable_lmdb {
             check_for_lmdb_files(lmdb_path)?;
         }
 
+        #[cfg(feature = "lmdb")]
         let state_store_factory = LmdbDatabaseFactory::new_state_db_factory(
             lmdb_path,
             state_storage_configuration.db_size,
@@ -265,7 +277,9 @@ impl ScabbardFactoryBuilder {
 
         Ok(ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
+            #[cfg(feature = "lmdb")]
             state_store_factory,
+            #[cfg(feature = "lmdb")]
             enable_lmdb_state: state_storage_configuration.enable_lmdb,
             store_factory_config,
             signature_verifier_factory,
@@ -273,6 +287,7 @@ impl ScabbardFactoryBuilder {
     }
 }
 
+#[cfg(feature = "lmdb")]
 fn check_for_lmdb_files(lmdb_path: &Path) -> Result<(), InvalidStateError> {
     if !lmdb_path.is_dir() {
         return Err(InvalidStateError::with_message(format!(
@@ -329,7 +344,9 @@ enum ScabbardFactoryStorageConfig {
 
 pub struct ScabbardFactory {
     service_types: Vec<String>,
+    #[cfg(feature = "lmdb")]
     state_store_factory: LmdbDatabaseFactory,
+    #[cfg(feature = "lmdb")]
     enable_lmdb_state: bool,
     store_factory_config: ScabbardFactoryStorageConfig,
     signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
@@ -458,6 +475,7 @@ impl ServiceFactory for ScabbardFactory {
         let version = ScabbardVersion::try_from(args.get("version").map(String::as_str))
             .map_err(FactoryCreateError::InvalidArguments)?;
 
+        #[cfg(feature = "lmdb")]
         let (merkle_state, state_purge): (_, Box<dyn ScabbardStatePurgeHandler>) =
             if self.enable_lmdb_state {
                 self.sql_state_check(circuit_id, &service_id)?;
@@ -488,6 +506,13 @@ impl ServiceFactory for ScabbardFactory {
                     self.create_sql_merkle_state_purge_handle(circuit_id, &service_id),
                 )
             };
+
+        #[cfg(not(feature = "lmdb"))]
+        let (merkle_state, state_purge) = (
+            MerkleState::new(self.create_sql_merkle_state_config(circuit_id, &service_id))
+                .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
+            self.create_sql_merkle_state_purge_handle(circuit_id, &service_id),
+        );
 
         let (receipt_store, commit_hash_store): (ScabbardReceiptStore, Box<dyn CommitHashStore>) =
             match &self.store_factory_config {
@@ -580,6 +605,7 @@ impl ServiceFactory for ScabbardFactory {
 
 impl ScabbardFactory {
     /// Check that the LMDB files doesn't exist for the given service.
+    #[cfg(feature = "lmdb")]
     fn lmdb_state_check(
         &self,
         circuit_id: &str,
@@ -600,6 +626,7 @@ impl ScabbardFactory {
     }
 
     /// Check that the SQL state doesn't exist for the given service.
+    #[cfg(feature = "lmdb")]
     fn sql_state_check(&self, circuit_id: &str, service_id: &str) -> Result<(), InvalidStateError> {
         let exists = MerkleState::check_existence(
             &self.create_sql_merkle_state_config(circuit_id, service_id),
@@ -704,10 +731,12 @@ fn get_sqlite_pool(
     })
 }
 
+#[cfg(feature = "lmdb")]
 struct LmdbScabbardPurgeHandler {
     db_purge_handle: LmdbDatabasePurgeHandle,
 }
 
+#[cfg(feature = "lmdb")]
 impl ScabbardStatePurgeHandler for LmdbScabbardPurgeHandler {
     fn purge_state(&self) -> Result<(), InternalError> {
         self.db_purge_handle.purge()
