@@ -17,7 +17,7 @@ use std::collections::HashMap;
 #[cfg(feature = "diesel")]
 use diesel::r2d2::{ConnectionManager, Pool};
 use splinter::error::InternalError;
-#[cfg(any(feature = "postgres", feature = "sql"))]
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use transact::state::merkle::sql;
 use transact::{
     database::Database,
