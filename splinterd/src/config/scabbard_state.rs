@@ -12,36 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt::Display;
-use std::str::FromStr;
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ScabbardState {
     Database,
     Lmdb,
-}
-
-pub enum ScabbardStateError {
-    ParseError(String),
-}
-
-impl Display for ScabbardStateError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ScabbardStateError::ParseError(msg) => {
-                write!(f, "got {}, expected 'lmdb' or 'database'", msg)
-            }
-        }
-    }
-}
-
-impl FromStr for ScabbardState {
-    type Err = ScabbardStateError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "database" => Ok(Self::Database),
-            "lmdb" => Ok(Self::Lmdb),
-            _ => Err(ScabbardStateError::ParseError(s.to_string())),
-        }
-    }
 }

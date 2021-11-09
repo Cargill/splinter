@@ -18,9 +18,6 @@ use std::io;
 
 use toml::de::Error as TomlError;
 
-#[cfg(feature = "scabbard-database-support")]
-use super::scabbard_state::ScabbardStateError;
-
 #[derive(Debug)]
 /// General error type used during `Config` contruction.
 pub enum ConfigError {
@@ -41,15 +38,6 @@ impl From<TomlError> for ConfigError {
 impl From<clap::Error> for ConfigError {
     fn from(e: clap::Error) -> Self {
         ConfigError::InvalidArgument(e.to_string())
-    }
-}
-
-#[cfg(feature = "scabbard-database-support")]
-impl From<ScabbardStateError> for ConfigError {
-    fn from(err: ScabbardStateError) -> Self {
-        match err {
-            ScabbardStateError::ParseError(msg) => ConfigError::InvalidArgument(msg),
-        }
     }
 }
 
