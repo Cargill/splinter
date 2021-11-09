@@ -28,8 +28,6 @@ mod error;
 #[cfg(feature = "log-config")]
 mod logging;
 mod partial;
-#[cfg(feature = "scabbard-database-support")]
-mod scabbard_state;
 mod toml;
 
 use std::time::Duration;
@@ -41,8 +39,6 @@ pub use crate::config::toml::TomlPartialConfigBuilder;
 pub use builder::{ConfigBuilder, PartialConfigBuilder};
 pub use error::ConfigError;
 pub use partial::{ConfigSource, PartialConfig};
-#[cfg(feature = "scabbard-database-support")]
-pub use scabbard_state::ScabbardState;
 
 #[cfg(feature = "log-config")]
 pub use logging::{
@@ -920,6 +916,13 @@ impl Config {
             debug!("Config: whitelist: {:?} (source: {:?})", list, source,);
         }
     }
+}
+
+#[cfg(feature = "scabbard-database-support")]
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ScabbardState {
+    Database,
+    Lmdb,
 }
 
 #[cfg(test)]
