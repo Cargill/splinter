@@ -12,22 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+use std::collections::HashSet;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::convert::TryFrom;
+#[cfg(feature = "lmdb")]
 use std::path::Path;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::sync::{Arc, Mutex, RwLock};
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::time::Duration;
 
-use cylinder::VerifierFactory;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
+use cylinder::VerifierFactory;
+#[cfg(feature = "diesel")]
 use diesel::r2d2::{ConnectionManager, Pool};
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use sawtooth::receipt::store::diesel::DieselReceiptStore;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use sawtooth::receipt::store::ReceiptStore;
-use splinter::error::InvalidArgumentError;
-use splinter::error::{InternalError, InvalidStateError};
+#[cfg(any(feature = "lmdb", feature = "postgres", feature = "sqlite"))]
+use splinter::error::InternalError;
+use splinter::error::{InvalidArgumentError, InvalidStateError};
 use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{FactoryCreateError, Service, ServiceFactory};
+#[cfg(feature = "lmdb")]
 use transact::database::Database;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use transact::state::merkle::sql;
@@ -35,23 +45,26 @@ use transact::state::merkle::sql;
 use crate::hex::parse_hex;
 #[cfg(feature = "rest-api-actix")]
 use crate::service::rest_api::actix;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use crate::service::{
     error::ScabbardError,
     state::merkle_state::{MerkleState, MerkleStateConfig},
     Scabbard, ScabbardStatePurgeHandler, ScabbardVersion, SERVICE_TYPE,
 };
-use crate::store::{
-    diesel::DieselCommitHashStore,
-    transact::factory::{LmdbDatabaseFactory, LmdbDatabasePurgeHandle},
-    CommitHashStore,
-};
+#[cfg(feature = "diesel")]
+use crate::store::diesel::DieselCommitHashStore;
+#[cfg(feature = "lmdb")]
+use crate::store::transact::factory::{LmdbDatabaseFactory, LmdbDatabasePurgeHandle};
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+use crate::store::CommitHashStore;
 
+#[cfg(feature = "lmdb")]
 const DEFAULT_LMDB_DIR: &str = "/var/lib/splinter";
 
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
 
 /// A connection URI to a database instance.
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
 #[derive(Clone)]
 pub enum ConnectionUri {
     /// A Postgres connection URI.
@@ -65,6 +78,7 @@ pub enum ConnectionUri {
     Unknown(Box<str>),
 }
 
+#[cfg(feature = "lmdb")]
 #[derive(Default)]
 pub struct ScabbardLmdbStateConfiguration {
     db_dir: Option<String>,
@@ -74,7 +88,6 @@ pub struct ScabbardLmdbStateConfiguration {
 
 /// Configuration for underlying storage that will be enabled for each service produced by the
 /// resulting ScabbardFactory.
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
 #[derive(Clone)]
 pub enum ScabbardStorageConfiguration {
     /// Configure scabbard storage via a connection URI.
@@ -128,8 +141,10 @@ impl From<Pool<ConnectionManager<diesel::SqliteConnection>>> for ScabbardStorage
 /// Builds new ScabbardFactory instances.
 #[derive(Default)]
 pub struct ScabbardFactoryBuilder {
+    #[cfg(feature = "lmdb")]
     state_storage_configuration: Option<ScabbardLmdbStateConfiguration>,
     storage_configuration: Option<ScabbardStorageConfiguration>,
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     signature_verifier_factory: Option<Arc<Mutex<Box<dyn VerifierFactory>>>>,
 }
 
@@ -140,12 +155,14 @@ impl ScabbardFactoryBuilder {
     }
 
     /// Configures the services to be constructed using LMDB for storing transaction state.
+    #[cfg(feature = "lmdb")]
     pub fn with_lmdb_state_defaults(mut self) -> Self {
         self.state_storage_configuration = Some(ScabbardLmdbStateConfiguration::default());
         self
     }
 
     /// Sets the state db directory to be used by the resulting factory.
+    #[cfg(feature = "lmdb")]
     pub fn with_lmdb_state_db_dir(mut self, state_db_dir: String) -> Self {
         self.state_storage_configuration = self
             .state_storage_configuration
@@ -159,6 +176,7 @@ impl ScabbardFactoryBuilder {
     }
 
     /// Sets the state db size to be used by the resulting factory.
+    #[cfg(feature = "lmdb")]
     pub fn with_lmdb_state_db_size(mut self, state_db_size: usize) -> Self {
         self.state_storage_configuration = self
             .state_storage_configuration
@@ -175,6 +193,7 @@ impl ScabbardFactoryBuilder {
     ///
     /// While all other service state will be stored in a database, when this is enabled, the
     /// merkle state will be stored in LMDB database files.
+    #[cfg(feature = "lmdb")]
     pub fn with_lmdb_state_enabled(mut self, enable: bool) -> Self {
         self.state_storage_configuration = self
             .state_storage_configuration
@@ -198,6 +217,7 @@ impl ScabbardFactoryBuilder {
 
     /// Set the signature verifier factory to be used by the resulting factory.  This is a required
     /// value, and omitting it will result in an [splinter::error::InvalidStateError] at build-time.
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     pub fn with_signature_verifier_factory(
         mut self,
         signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
@@ -212,6 +232,7 @@ impl ScabbardFactoryBuilder {
     ///
     /// Returns an InvalidStateError if a signature_verifier_factory or a storage_configuration have
     /// not been set.
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     pub fn build(self) -> Result<ScabbardFactory, InvalidStateError> {
         let signature_verifier_factory = self.signature_verifier_factory.ok_or_else(|| {
             splinter::error::InvalidStateError::with_message(
@@ -223,7 +244,9 @@ impl ScabbardFactoryBuilder {
             InvalidStateError::with_message("A storage configuration must be provided".into())
         })?;
 
+        #[cfg(feature = "lmdb")]
         let state_storage_configuration = self.state_storage_configuration.unwrap_or_default();
+        #[cfg(feature = "lmdb")]
         let lmdb_path = Path::new(
             state_storage_configuration
                 .db_dir
@@ -254,10 +277,12 @@ impl ScabbardFactoryBuilder {
             }
         };
 
+        #[cfg(feature = "lmdb")]
         if !state_storage_configuration.enable_lmdb {
             check_for_lmdb_files(lmdb_path)?;
         }
 
+        #[cfg(feature = "lmdb")]
         let state_store_factory = LmdbDatabaseFactory::new_state_db_factory(
             lmdb_path,
             state_storage_configuration.db_size,
@@ -265,14 +290,28 @@ impl ScabbardFactoryBuilder {
 
         Ok(ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
+            #[cfg(feature = "lmdb")]
             state_store_factory,
+            #[cfg(feature = "lmdb")]
             enable_lmdb_state: state_storage_configuration.enable_lmdb,
             store_factory_config,
             signature_verifier_factory,
         })
     }
+
+    /// This builder will fail as it has been configured without any database storage.
+    #[cfg(not(any(feature = "postgres", feature = "sqlite")))]
+    pub fn build(self) -> Result<ScabbardFactory, InvalidStateError> {
+        Err(InvalidStateError::with_message(
+            "This instance of the ScabbardFactory has not been constructed with any database \
+             support. Please compile with either \"postgres\" and/or \"sqlite\" \
+             features enabled."
+                .into(),
+        ))
+    }
 }
 
+#[cfg(feature = "lmdb")]
 fn check_for_lmdb_files(lmdb_path: &Path) -> Result<(), InvalidStateError> {
     if !lmdb_path.is_dir() {
         return Err(InvalidStateError::with_message(format!(
@@ -316,6 +355,7 @@ fn check_for_lmdb_files(lmdb_path: &Path) -> Result<(), InvalidStateError> {
 }
 
 /// Internal Factory storage configuration.
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 enum ScabbardFactoryStorageConfig {
     #[cfg(feature = "postgres")]
     Postgres {
@@ -329,9 +369,13 @@ enum ScabbardFactoryStorageConfig {
 
 pub struct ScabbardFactory {
     service_types: Vec<String>,
+    #[cfg(feature = "lmdb")]
     state_store_factory: LmdbDatabaseFactory,
+    #[cfg(feature = "lmdb")]
     enable_lmdb_state: bool,
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     store_factory_config: ScabbardFactoryStorageConfig,
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
@@ -413,6 +457,7 @@ impl ServiceFactory for ScabbardFactory {
     ///   commit a proposal before the coordinator rejects it (if not provided, default is 30
     ///   seconds)
     /// - `version`: the protocol version for scabbard (possible values: "1", "2") (default: "1")
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     fn create(
         &self,
         service_id: String,
@@ -458,6 +503,7 @@ impl ServiceFactory for ScabbardFactory {
         let version = ScabbardVersion::try_from(args.get("version").map(String::as_str))
             .map_err(FactoryCreateError::InvalidArguments)?;
 
+        #[cfg(feature = "lmdb")]
         let (merkle_state, state_purge): (_, Box<dyn ScabbardStatePurgeHandler>) =
             if self.enable_lmdb_state {
                 self.sql_state_check(circuit_id, &service_id)?;
@@ -488,6 +534,13 @@ impl ServiceFactory for ScabbardFactory {
                     self.create_sql_merkle_state_purge_handle(circuit_id, &service_id),
                 )
             };
+
+        #[cfg(not(feature = "lmdb"))]
+        let (merkle_state, state_purge) = (
+            MerkleState::new(self.create_sql_merkle_state_config(circuit_id, &service_id))
+                .map_err(|e| FactoryCreateError::Internal(e.to_string()))?,
+            self.create_sql_merkle_state_purge_handle(circuit_id, &service_id),
+        );
 
         let (receipt_store, commit_hash_store): (ScabbardReceiptStore, Box<dyn CommitHashStore>) =
             match &self.store_factory_config {
@@ -540,6 +593,18 @@ impl ServiceFactory for ScabbardFactory {
         Ok(Box::new(service))
     }
 
+    #[cfg(not(any(feature = "postgres", feature = "sqlite")))]
+    fn create(
+        &self,
+        _service_id: String,
+        _service_type: &str,
+        _circuit_id: &str,
+        _args: HashMap<String, String>,
+    ) -> Result<Box<dyn Service>, FactoryCreateError> {
+        // As the factory cannot be created under these conditions, this function is not reachable.
+        unreachable!()
+    }
+
     #[cfg(feature = "rest-api")]
     /// The `Scabbard` services created by the `ScabbardFactory` provide the following REST API
     /// endpoints as [`ServiceEndpoint`]s:
@@ -580,6 +645,7 @@ impl ServiceFactory for ScabbardFactory {
 
 impl ScabbardFactory {
     /// Check that the LMDB files doesn't exist for the given service.
+    #[cfg(feature = "lmdb")]
     fn lmdb_state_check(
         &self,
         circuit_id: &str,
@@ -600,6 +666,7 @@ impl ScabbardFactory {
     }
 
     /// Check that the SQL state doesn't exist for the given service.
+    #[cfg(feature = "lmdb")]
     fn sql_state_check(&self, circuit_id: &str, service_id: &str) -> Result<(), InvalidStateError> {
         let exists = MerkleState::check_existence(
             &self.create_sql_merkle_state_config(circuit_id, service_id),
@@ -615,6 +682,7 @@ impl ScabbardFactory {
         Ok(())
     }
 
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     fn create_sql_merkle_state_config(
         &self,
         circuit_id: &str,
@@ -634,6 +702,7 @@ impl ScabbardFactory {
         }
     }
 
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     fn create_sql_merkle_state_purge_handle(
         &self,
         circuit_id: &str,
@@ -704,10 +773,12 @@ fn get_sqlite_pool(
     })
 }
 
+#[cfg(feature = "lmdb")]
 struct LmdbScabbardPurgeHandler {
     db_purge_handle: LmdbDatabasePurgeHandle,
 }
 
+#[cfg(feature = "lmdb")]
 impl ScabbardStatePurgeHandler for LmdbScabbardPurgeHandler {
     fn purge_state(&self) -> Result<(), InternalError> {
         self.db_purge_handle.purge()
