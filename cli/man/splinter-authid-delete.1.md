@@ -21,6 +21,9 @@ API.
 
 FLAGS
 =====
+`-n`, `--dry-run`
+: Validate the command without deleting the identity's authorizations
+
 `-h`, `--help`
 : Prints help information
 

@@ -21,6 +21,9 @@ API. This command allows the user to change the identity's set of roles.
 
 FLAGS
 =====
+`-n`, `--dry-run`
+: Validate the command without updating the identity's authorizations
+
 `-h`, `--help`
 : Prints help information
 

@@ -50,6 +50,11 @@ OPTIONS
 : Specifies the URL for the `splinterd` REST API. The URL is required unless
   `$SPLINTER_REST_API_URL` is set.
 
+`--id-user` USER-ID
+: A public key identity to show
+
+`--id-key` PUBLIC-KEY
+: A public key identity to show
 
 EXAMPLES
 ========
