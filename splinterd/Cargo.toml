@@ -62,6 +62,7 @@ path = "../services/scabbard/libscabbard"
 features = [
   "rest-api",
   "rest-api-actix",
+  "splinter-service",
 ]
 
 [dependencies.splinter]
