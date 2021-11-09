@@ -64,11 +64,12 @@ ENVIRONMENT VARIABLES
 
 EXAMPLES
 ========
-The following command shows the arguments for the `scabbard` circuit template,
-which is available by default (packaged with the Splinter CLI).
+The following command shows the arguments for the `scabbard_circuit_template`
+circuit template, which is available by default (packaged with the Splinter
+CLI).
 
 ```
-$ splinter circuit template arguments scabbard
+$ splinter circuit template arguments scabbard_circuit_template
 
 name: admin_keys
 required: false
