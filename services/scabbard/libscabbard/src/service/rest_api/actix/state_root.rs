@@ -78,9 +78,6 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use sawtooth::migrations::run_sqlite_migrations;
     use sawtooth::receipt::store::diesel::DieselReceiptStore;
-    #[cfg(not(feature = "database-support"))]
-    use tempdir::TempDir;
-    #[cfg(feature = "database-support")]
     use transact::{
         database::{btree::BTreeDatabase, Database},
         state::merkle::INDEXES,
@@ -109,14 +106,10 @@ mod tests {
         service::Service,
     };
 
-    #[cfg(not(feature = "database-support"))]
-    use crate::service::factory::compute_db_path;
-    #[cfg(feature = "database-support")]
     use crate::service::state::merkle_state::{MerkleState, MerkleStateConfig};
     use crate::service::{
         state::ScabbardState, Scabbard, ScabbardStatePurgeHandler, ScabbardVersion,
     };
-    #[cfg(feature = "database-support")]
     use crate::store::{
         transact::{TransactCommitHashStore, CURRENT_STATE_ROOT_INDEX},
         CommitHashStore,
@@ -124,8 +117,6 @@ mod tests {
 
     const MOCK_CIRCUIT_ID: &str = "abcde-01234";
     const MOCK_SERVICE_ID: &str = "ABCD";
-    #[cfg(not(feature = "database-support"))]
-    const TEMP_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
     /// Verify that the `GET /state_root` endpoint works properly.
     ///
@@ -138,10 +129,6 @@ mod tests {
     ///    body of the response contains the same state root hash that was reported in step (1).
     #[test]
     fn state_root() {
-        #[cfg(not(feature = "database-support"))]
-        let paths = StatePaths::new("state_root");
-
-        #[cfg(feature = "database-support")]
         let (merkle_state, commit_hash_store) = create_merkle_state_and_commit_hash_store();
 
         let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
@@ -152,19 +139,6 @@ mod tests {
         // Initialize a temporary scabbard state and set some values to pre-populate the DBs, then
         // get the resulting state root hash.
         let expected_state_root = {
-            #[cfg(not(feature = "database-support"))]
-            let mut state = ScabbardState::new(
-                &paths.state_db_path,
-                TEMP_DB_SIZE,
-                #[cfg(feature = "metrics")]
-                "svc0".to_string(),
-                #[cfg(feature = "metrics")]
-                "vzrQS-rvwf4".to_string(),
-                receipt_store.clone(),
-                vec![],
-            )
-            .expect("Failed to initialize state");
-            #[cfg(feature = "database-support")]
             let mut state = ScabbardState::new(
                 merkle_state.clone(),
                 commit_hash_store.clone(),
@@ -206,13 +180,7 @@ mod tests {
             MOCK_CIRCUIT_ID,
             ScabbardVersion::V1,
             Default::default(),
-            #[cfg(not(feature = "database-support"))]
-            paths.state_db_path.as_path(),
-            #[cfg(not(feature = "database-support"))]
-            TEMP_DB_SIZE,
-            #[cfg(feature = "database-support")]
             merkle_state,
-            #[cfg(feature = "database-support")]
             commit_hash_store,
             receipt_store,
             Box::new(NoOpScabbardStatePurgeHandlerHandler),
@@ -249,29 +217,6 @@ mod tests {
             .shutdown()
             .expect("Unable to shutdown rest api");
         join_handle.join().expect("Unable to join rest api thread");
-    }
-
-    #[cfg(not(feature = "database-support"))]
-    struct StatePaths {
-        // The temp dir is deleted on drop
-        _temp_dir: TempDir,
-        pub state_db_path: std::path::PathBuf,
-    }
-
-    #[cfg(not(feature = "database-support"))]
-    impl StatePaths {
-        fn new(prefix: &str) -> Self {
-            let temp_dir = TempDir::new(prefix).expect("Failed to create temp dir");
-            // This computes the paths such that they're the same ones that will be used by
-            // scabbard when it's initialized
-            let state_db_path =
-                compute_db_path(MOCK_SERVICE_ID, MOCK_CIRCUIT_ID, temp_dir.path(), "-state")
-                    .expect("Failed to compute DB paths");
-            Self {
-                _temp_dir: temp_dir,
-                state_db_path,
-            }
-        }
     }
 
     fn resource_from_service_endpoint(
@@ -400,7 +345,6 @@ mod tests {
         pool
     }
 
-    #[cfg(feature = "database-support")]
     fn create_merkle_state_and_commit_hash_store() -> (MerkleState, Box<dyn CommitHashStore>) {
         let mut indexes = INDEXES.to_vec();
         indexes.push(CURRENT_STATE_ROOT_INDEX);

@@ -12,12 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "database-support")]
 mod state_database;
-#[cfg(not(feature = "database-support"))]
-mod state_static_configuration;
 
-#[cfg(feature = "database-support")]
 pub use state_database::*;
-#[cfg(not(feature = "database-support"))]
-pub use state_static_configuration::*;

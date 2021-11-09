@@ -45,19 +45,16 @@ use transact::{
     protos::{FromBytes, IntoBytes},
 };
 
-#[cfg(feature = "database-support")]
 use crate::store::CommitHashStore;
 
 use super::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
 
 use consensus::ScabbardConsensusManager;
 use error::ScabbardError;
-#[cfg(feature = "database-support")]
 pub use factory::ConnectionUri;
 pub use factory::ScabbardArgValidator;
 pub use factory::{ScabbardFactory, ScabbardFactoryBuilder, ScabbardStorageConfiguration};
 use shared::ScabbardShared;
-#[cfg(feature = "database-support")]
 use state::merkle_state::MerkleState;
 pub use state::{
     BatchInfo, BatchInfoIter, BatchStatus, Events, StateChange, StateChangeEvent, StateIter,
@@ -120,14 +117,8 @@ impl Scabbard {
         version: ScabbardVersion,
         // List of other scabbard services on the same circuit that this service shares state with
         peer_services: HashSet<String>,
-        #[cfg(not(feature = "database-support"))]
-        // The directory in which to create sabre's LMDB database
-        state_db_path: &std::path::Path,
-        #[cfg(not(feature = "database-support"))]
-        // The size of sabre's LMDB database
-        state_db_size: usize,
-        #[cfg(feature = "database-support")] merkle_state: MerkleState,
-        #[cfg(feature = "database-support")] commit_hash_store: Box<dyn CommitHashStore>,
+        merkle_state: MerkleState,
+        commit_hash_store: Box<dyn CommitHashStore>,
         receipt_store: ScabbardReceiptStore,
         purge_handler: Box<dyn ScabbardStatePurgeHandler>,
         signature_verifier: Box<dyn SignatureVerifier>,
@@ -148,20 +139,6 @@ impl Scabbard {
             version,
         );
 
-        #[cfg(not(feature = "database-support"))]
-        let state = ScabbardState::new(
-            state_db_path,
-            state_db_size,
-            #[cfg(feature = "metrics")]
-            service_id.clone(),
-            #[cfg(feature = "metrics")]
-            circuit_id.to_string(),
-            receipt_store,
-            admin_keys,
-        )
-        .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
-
-        #[cfg(feature = "database-support")]
         let state = ScabbardState::new(
             merkle_state,
             commit_hash_store,
@@ -547,36 +524,18 @@ pub mod tests {
         ServiceConnectionError, ServiceDisconnectionError, ServiceMessageContext,
         ServiceNetworkSender, ServiceSendError,
     };
-    #[cfg(not(feature = "database-support"))]
-    use tempdir::TempDir;
     use transact::protocol::receipt::TransactionReceipt;
-    #[cfg(feature = "database-support")]
     use transact::{
         database::{btree::BTreeDatabase, Database},
         state::merkle::INDEXES,
     };
 
-    #[cfg(not(feature = "database-support"))]
-    use crate::service::factory::compute_db_path;
-    #[cfg(feature = "database-support")]
     use crate::service::state::merkle_state::MerkleStateConfig;
-    #[cfg(feature = "database-support")]
     use crate::store::transact::{TransactCommitHashStore, CURRENT_STATE_ROOT_INDEX};
-
-    #[cfg(not(feature = "database-support"))]
-    const MOCK_CIRCUIT_ID: &str = "abcde-01234";
-    #[cfg(not(feature = "database-support"))]
-    const MOCK_SERVICE_ID: &str = "ABCD";
-    #[cfg(not(feature = "database-support"))]
-    const TEMP_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
     /// Tests that a new scabbard service is properly instantiated.
     #[test]
     fn new_scabbard() {
-        #[cfg(not(feature = "database-support"))]
-        let paths = StatePaths::new("new_scabbard");
-
-        #[cfg(feature = "database-support")]
         let (merkle_state, commit_hash_store) = create_merkle_state_and_commit_hash_store();
 
         let service = Scabbard::new(
@@ -584,13 +543,7 @@ pub mod tests {
             "test_circuit",
             ScabbardVersion::V1,
             HashSet::new(),
-            #[cfg(not(feature = "database-support"))]
-            paths.state_db_path.as_path(),
-            #[cfg(not(feature = "database-support"))]
-            TEMP_DB_SIZE,
-            #[cfg(feature = "database-support")]
             merkle_state,
-            #[cfg(feature = "database-support")]
             commit_hash_store,
             Arc::new(RwLock::new(MockReceiptStore)),
             Box::new(NoOpScabbardStatePurgeHandler),
@@ -607,9 +560,6 @@ pub mod tests {
     /// will hang if the thread does not get shutdown correctly.
     #[test]
     fn thread_cleanup() {
-        #[cfg(not(feature = "database-support"))]
-        let paths = StatePaths::new("new_scabbard");
-        #[cfg(feature = "database-support")]
         let (merkle_state, commit_hash_store) = create_merkle_state_and_commit_hash_store();
 
         let mut service = Scabbard::new(
@@ -617,13 +567,7 @@ pub mod tests {
             "test_circuit",
             ScabbardVersion::V1,
             HashSet::new(),
-            #[cfg(not(feature = "database-support"))]
-            paths.state_db_path.as_path(),
-            #[cfg(not(feature = "database-support"))]
-            TEMP_DB_SIZE,
-            #[cfg(feature = "database-support")]
             merkle_state,
-            #[cfg(feature = "database-support")]
             commit_hash_store,
             Arc::new(RwLock::new(MockReceiptStore)),
             Box::new(NoOpScabbardStatePurgeHandler),
@@ -640,23 +584,13 @@ pub mod tests {
     /// Tests that the service properly connects and disconnects using the network registry.
     #[test]
     fn connect_and_disconnect() {
-        #[cfg(not(feature = "database-support"))]
-        let paths = StatePaths::new("new_scabbard");
-
-        #[cfg(feature = "database-support")]
         let (merkle_state, commit_hash_store) = create_merkle_state_and_commit_hash_store();
         let mut service = Scabbard::new(
             "connect_and_disconnect".into(),
             "test_circuit",
             ScabbardVersion::V1,
             HashSet::new(),
-            #[cfg(not(feature = "database-support"))]
-            paths.state_db_path.as_path(),
-            #[cfg(not(feature = "database-support"))]
-            TEMP_DB_SIZE,
-            #[cfg(feature = "database-support")]
             merkle_state,
-            #[cfg(feature = "database-support")]
             commit_hash_store,
             Arc::new(RwLock::new(MockReceiptStore)),
             Box::new(NoOpScabbardStatePurgeHandler),
@@ -668,7 +602,6 @@ pub mod tests {
         test_connect_and_disconnect(&mut service);
     }
 
-    #[cfg(feature = "database-support")]
     fn create_merkle_state_and_commit_hash_store(
     ) -> (MerkleState, Box<dyn CommitHashStore + Send + Sync>) {
         let mut indexes = INDEXES.to_vec();
@@ -678,29 +611,6 @@ pub mod tests {
             .expect("Unable to create merkle state");
         let commit_hash_store = TransactCommitHashStore::new(db);
         (merkle_state, Box::new(commit_hash_store))
-    }
-
-    #[cfg(not(feature = "database-support"))]
-    struct StatePaths {
-        // this is deleted when dropped
-        _temp_dir: TempDir,
-        pub state_db_path: std::path::PathBuf,
-    }
-
-    #[cfg(not(feature = "database-support"))]
-    impl StatePaths {
-        fn new(prefix: &str) -> Self {
-            let temp_dir = TempDir::new(prefix).expect("Failed to create temp dir");
-            // This computes the paths such that they're the same ones that will be used by
-            // scabbard when it's initialized
-            let state_db_path =
-                compute_db_path(MOCK_SERVICE_ID, MOCK_CIRCUIT_ID, temp_dir.path(), "-state")
-                    .expect("Failed to compute DB paths");
-            Self {
-                _temp_dir: temp_dir,
-                state_db_path,
-            }
-        }
     }
 
     #[derive(Debug)]
