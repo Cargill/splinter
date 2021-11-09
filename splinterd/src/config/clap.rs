@@ -14,9 +14,6 @@
 
 //! `PartialConfig` builder using values from splinterd command line arguments.
 
-#[cfg(feature = "scabbard-database-support")]
-use std::str::FromStr;
-
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 use clap::{ArgMatches, ErrorKind};
 
@@ -199,11 +196,13 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
         #[cfg(feature = "scabbard-database-support")]
         {
             partial_config = partial_config.with_scabbard_state(
-                self.matches
-                    .value_of("scabbard_state")
-                    .map(ScabbardState::from_str)
-                    .transpose()?,
-            )
+                self.matches.value_of("scabbard_state").map(|s| match s {
+                    "lmdb" => ScabbardState::Lmdb,
+                    "database" => ScabbardState::Database,
+                    // Clap is configured to only accept these two values.
+                    _ => unreachable!(),
+                }),
+            );
         }
 
         Ok(partial_config)
