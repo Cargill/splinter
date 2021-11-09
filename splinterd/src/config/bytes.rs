@@ -13,49 +13,18 @@
 // limitations under the License.
 
 use std::convert::From;
-use std::str::FromStr;
 
 use serde::de::Visitor;
 use serde::Deserialize;
 
 #[derive(Clone, Debug)]
 pub struct ByteSize {
-    size: f32,
-    unit: MemoryUnitSize,
-}
-
-#[derive(Clone, Debug)]
-enum MemoryUnitSize {
-    Kilobyte,
-    Megabyte,
-    Gigabyte,
-}
-
-impl FromStr for MemoryUnitSize {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "M" => Ok(Self::Megabyte),
-            "K" => Ok(Self::Kilobyte),
-            "G" => Ok(Self::Gigabyte),
-            _ => Err(()),
-        }
-    }
-}
-
-impl MemoryUnitSize {
-    fn byte_count(&self) -> u64 {
-        match self {
-            Self::Kilobyte => 1_000,
-            Self::Megabyte => 1_000_000,
-            Self::Gigabyte => 1_000_000_000,
-        }
-    }
+    size: u64,
 }
 
 impl From<ByteSize> for u64 {
     fn from(bytes: ByteSize) -> Self {
-        (bytes.size * bytes.unit.byte_count() as f32).trunc() as u64
+        bytes.size
     }
 }
 
@@ -91,16 +60,23 @@ impl<'de> Visitor<'de> for ByteSizeVisitor {
             .collect::<String>()
             .parse();
         // Units can be K,M,G for kilo, mega, giga bytes.
-        let units: Result<MemoryUnitSize, _> = v
+        let multiple = v
             .chars()
             .skip_while(|x| x.is_digit(10) || *x == '.')
             .take_while(|c| c.is_alphabetic())
-            .collect::<String>()
-            .parse();
-        match (numeric, units) {
-            (Ok(size), Ok(unit)) => Ok(ByteSize { size, unit }),
+            .collect::<String>();
+        let multiple = match multiple.as_str() {
+            "M" => Ok(1_000_000),
+            "K" => Ok(1_000),
+            "G" => Ok(1_000_000_000),
+            _ => Err(E::custom("unit could not be parsed".to_string())),
+        };
+        match (numeric, multiple) {
+            (Ok(float), Ok(mult)) => Ok(ByteSize {
+                size: (float * mult as f32).trunc() as u64,
+            }),
             (Err(e), _) => Err(E::custom(format!("size could not be parsed: {}", e))),
-            (_, Err(_)) => Err(E::custom("unit could not be parsed".to_string())),
+            (_, Err(e)) => Err(e),
         }
     }
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
