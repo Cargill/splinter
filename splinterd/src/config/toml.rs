@@ -30,7 +30,7 @@ use super::bytes::ByteSize;
 #[cfg(feature = "log-config")]
 use super::logging::{default_pattern, UnnamedAppenderConfig, UnnamedLoggerConfig};
 #[cfg(feature = "scabbard-database-support")]
-use super::scabbard_state::ScabbardState;
+use super::ScabbardState;
 
 /// `TOML_VERSION` represents the version of the toml config file.
 /// The version determines the most current valid toml config entries.
