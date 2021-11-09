@@ -18,12 +18,12 @@ DESCRIPTION
 ===========
 This command lists all or some of the circuits the local node is a member of.
 This command displays abbreviated information pertaining to circuits in columns,
-with the headers `ID`, `MANAGEMENT` and `MEMBERS`. This makes it possible to
-verify that circuits have been successfully created as well as being able to
-access the generated circuit ID assigned to a circuit. The information displayed
-will be the same for all member nodes. The circuits listed have been accepted by
-all members and are currently active, meaning their `circuit_status` is
-`Active`.
+with the headers `ID`, `NAME`, `MANAGEMENT` and `MEMBERS`. This makes it
+possible to verify that circuits have been successfully created as well as being
+able to access the generated circuit ID assigned to a circuit. The information
+displayed will be the same for all member nodes. The circuits listed have been
+accepted by all members and are currently active, meaning their `circuit_status`
+is `Active`.
 
 FLAGS
 =====
