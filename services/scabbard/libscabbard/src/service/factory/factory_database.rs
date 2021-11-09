@@ -12,21 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+use std::collections::HashSet;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::convert::TryFrom;
 #[cfg(feature = "lmdb")]
 use std::path::Path;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::sync::{Arc, Mutex, RwLock};
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::time::Duration;
 
-use cylinder::VerifierFactory;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
+use cylinder::VerifierFactory;
+#[cfg(feature = "diesel")]
 use diesel::r2d2::{ConnectionManager, Pool};
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use sawtooth::receipt::store::diesel::DieselReceiptStore;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use sawtooth::receipt::store::ReceiptStore;
-use splinter::error::InvalidArgumentError;
-use splinter::error::{InternalError, InvalidStateError};
+#[cfg(any(feature = "lmdb", feature = "postgres", feature = "sqlite"))]
+use splinter::error::InternalError;
+use splinter::error::{InvalidArgumentError, InvalidStateError};
 use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 #[cfg(feature = "lmdb")]
@@ -37,23 +45,26 @@ use transact::state::merkle::sql;
 use crate::hex::parse_hex;
 #[cfg(feature = "rest-api-actix")]
 use crate::service::rest_api::actix;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use crate::service::{
     error::ScabbardError,
     state::merkle_state::{MerkleState, MerkleStateConfig},
     Scabbard, ScabbardStatePurgeHandler, ScabbardVersion, SERVICE_TYPE,
 };
+#[cfg(feature = "diesel")]
 use crate::store::diesel::DieselCommitHashStore;
 #[cfg(feature = "lmdb")]
 use crate::store::transact::factory::{LmdbDatabaseFactory, LmdbDatabasePurgeHandle};
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use crate::store::CommitHashStore;
 
 #[cfg(feature = "lmdb")]
 const DEFAULT_LMDB_DIR: &str = "/var/lib/splinter";
 
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
 
 /// A connection URI to a database instance.
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
 #[derive(Clone)]
 pub enum ConnectionUri {
     /// A Postgres connection URI.
@@ -77,7 +88,6 @@ pub struct ScabbardLmdbStateConfiguration {
 
 /// Configuration for underlying storage that will be enabled for each service produced by the
 /// resulting ScabbardFactory.
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
 #[derive(Clone)]
 pub enum ScabbardStorageConfiguration {
     /// Configure scabbard storage via a connection URI.
@@ -134,6 +144,7 @@ pub struct ScabbardFactoryBuilder {
     #[cfg(feature = "lmdb")]
     state_storage_configuration: Option<ScabbardLmdbStateConfiguration>,
     storage_configuration: Option<ScabbardStorageConfiguration>,
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     signature_verifier_factory: Option<Arc<Mutex<Box<dyn VerifierFactory>>>>,
 }
 
@@ -206,6 +217,7 @@ impl ScabbardFactoryBuilder {
 
     /// Set the signature verifier factory to be used by the resulting factory.  This is a required
     /// value, and omitting it will result in an [splinter::error::InvalidStateError] at build-time.
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     pub fn with_signature_verifier_factory(
         mut self,
         signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
@@ -220,6 +232,7 @@ impl ScabbardFactoryBuilder {
     ///
     /// Returns an InvalidStateError if a signature_verifier_factory or a storage_configuration have
     /// not been set.
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     pub fn build(self) -> Result<ScabbardFactory, InvalidStateError> {
         let signature_verifier_factory = self.signature_verifier_factory.ok_or_else(|| {
             splinter::error::InvalidStateError::with_message(
@@ -285,6 +298,17 @@ impl ScabbardFactoryBuilder {
             signature_verifier_factory,
         })
     }
+
+    /// This builder will fail as it has been configured without any database storage.
+    #[cfg(not(any(feature = "postgres", feature = "sqlite")))]
+    pub fn build(self) -> Result<ScabbardFactory, InvalidStateError> {
+        Err(InvalidStateError::with_message(
+            "This instance of the ScabbardFactory has not been constructed with any database \
+             support. Please compile with either \"postgres\" and/or \"sqlite\" \
+             features enabled."
+                .into(),
+        ))
+    }
 }
 
 #[cfg(feature = "lmdb")]
@@ -331,6 +355,7 @@ fn check_for_lmdb_files(lmdb_path: &Path) -> Result<(), InvalidStateError> {
 }
 
 /// Internal Factory storage configuration.
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 enum ScabbardFactoryStorageConfig {
     #[cfg(feature = "postgres")]
     Postgres {
@@ -348,7 +373,9 @@ pub struct ScabbardFactory {
     state_store_factory: LmdbDatabaseFactory,
     #[cfg(feature = "lmdb")]
     enable_lmdb_state: bool,
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     store_factory_config: ScabbardFactoryStorageConfig,
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
 
@@ -430,6 +457,7 @@ impl ServiceFactory for ScabbardFactory {
     ///   commit a proposal before the coordinator rejects it (if not provided, default is 30
     ///   seconds)
     /// - `version`: the protocol version for scabbard (possible values: "1", "2") (default: "1")
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     fn create(
         &self,
         service_id: String,
@@ -565,6 +593,18 @@ impl ServiceFactory for ScabbardFactory {
         Ok(Box::new(service))
     }
 
+    #[cfg(not(any(feature = "postgres", feature = "sqlite")))]
+    fn create(
+        &self,
+        _service_id: String,
+        _service_type: &str,
+        _circuit_id: &str,
+        _args: HashMap<String, String>,
+    ) -> Result<Box<dyn Service>, FactoryCreateError> {
+        // As the factory cannot be created under these conditions, this function is not reachable.
+        unreachable!()
+    }
+
     #[cfg(feature = "rest-api")]
     /// The `Scabbard` services created by the `ScabbardFactory` provide the following REST API
     /// endpoints as [`ServiceEndpoint`]s:
@@ -642,6 +682,7 @@ impl ScabbardFactory {
         Ok(())
     }
 
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     fn create_sql_merkle_state_config(
         &self,
         circuit_id: &str,
@@ -661,6 +702,7 @@ impl ScabbardFactory {
         }
     }
 
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     fn create_sql_merkle_state_purge_handle(
         &self,
         circuit_id: &str,
