@@ -934,6 +934,7 @@ mod tests {
 
     use ::clap::ArgMatches;
     use ::toml::{map::Map, to_string, Value};
+    use log::Level;
 
     use crate::config::{
         ClapPartialConfigBuilder, DefaultPartialConfigBuilder, EnvPartialConfigBuilder,
@@ -1572,5 +1573,55 @@ mod tests {
                 &ConfigSource::Default,
             )
         );
+    }
+
+    #[test]
+    #[cfg(feature = "log-config")]
+    /// This tests verifies that the log options take the right order of precedence and that you
+    /// are able to override values where appropriate.
+    fn test_log_config_default_overrides() {
+        let toml_string = r#"
+        version = "1"
+       [loggers.tokio]
+       appenders = ["fake_appender_name"]
+       level = "Trace"
+       [appenders.stdout]
+       level = "Trace"
+       kind = "stderr"
+           "#;
+        let toml = TomlPartialConfigBuilder::new(toml_string.to_string(), TEST_TOML.to_string())
+            .expect("Could not deserialize full toml")
+            .build()
+            .expect("A config error has occured");
+        let default = DefaultPartialConfigBuilder::new()
+            .build()
+            .expect("Could not build default partial config");
+        let config = ConfigBuilder::new()
+            .with_partial_config(toml)
+            .with_partial_config(default)
+            .build()
+            .expect("Could not build final Config");
+        let loggers = config.loggers();
+        assert!(loggers.is_some());
+        let loggers = loggers.unwrap();
+        let tokio_logger = loggers.iter().find(|a| a.name == "tokio");
+        assert!(tokio_logger.is_some());
+        let tokio_logger = tokio_logger.unwrap();
+        assert!(matches!(tokio_logger.level, Some(Level::Trace)));
+        let appenders = tokio_logger.appenders.clone();
+        assert!(appenders.is_some());
+        let appenders = appenders.unwrap();
+        assert!(appenders.len() == 1);
+        let first = appenders.get(0).unwrap();
+        assert!(first == "fake_appender_name");
+
+        let appenders = config.appenders();
+        assert!(appenders.is_some());
+        let appenders = appenders.unwrap();
+        let stdout_appender = appenders.iter().find(|a| a.name == "stdout");
+        assert!(stdout_appender.is_some());
+        let stdout_appender = stdout_appender.unwrap();
+        assert!(matches!(stdout_appender.level, Some(Level::Trace)));
+        assert!(matches!(stdout_appender.kind, LogTarget::Stderr))
     }
 }
