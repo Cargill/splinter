@@ -56,7 +56,7 @@ OPTIONS
 EXAMPLES
 ========
 This command displays information about roles with a default `human`
-formatting, meaning the information is displayed in a table. 
+formatting, meaning the information is displayed in a table.
 
 ```
 $ splinter role list \
