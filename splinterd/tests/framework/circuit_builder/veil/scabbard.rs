@@ -133,7 +133,7 @@ mod tests {
     /// Verify that the scabbard builder correctly errors and does not fatal on invalid nodes
     #[test]
     fn scabbard_builder_add_service_group_invalid_nodes() -> Result<(), CircuitTestError> {
-        let network = Network::new()
+        let mut network = Network::new()
             .add_nodes_with_defaults(2)
             .map_err(CircuitTestError::Internal)?;
 
@@ -145,16 +145,18 @@ mod tests {
         if let Err(AddScabbardServiceError::InvalidArgument(_)) =
             builder.add_service_group(&[10, 20])
         {
+            shutdown!(network).expect("Unable to shutdown network");
             return Ok(());
         }
 
+        shutdown!(network).expect("Unable to shutdown network");
         panic!("did not receive expected error");
     }
 
     /// Verify scabbard builder with 4 paired service groups
     #[test]
     fn scabbard_builder_add_service_4_paired_service_groups() -> Result<(), CircuitTestError> {
-        let network = Network::new()
+        let mut network = Network::new()
             .add_nodes_with_defaults(4)
             .map_err(CircuitTestError::Internal)?;
 
@@ -174,14 +176,14 @@ mod tests {
             .map_err(CircuitTestError::CircuitBuildError)?;
 
         assert_eq!(result.roster.len(), 8);
-
+        shutdown!(network).expect("Unable to shutdown network");
         Ok(())
     }
 
     /// Verify scabbard builder with 1 group of 4
     #[test]
     fn scabbard_builder_add_service_group_of_4() -> Result<(), CircuitTestError> {
-        let network = Network::new()
+        let mut network = Network::new()
             .add_nodes_with_defaults(4)
             .map_err(CircuitTestError::Internal)?;
 
@@ -196,7 +198,7 @@ mod tests {
             .map_err(CircuitTestError::CircuitBuildError)?;
 
         assert_eq!(result.roster.len(), 4);
-
+        shutdown!(network).expect("Unable to shutdown network");
         Ok(())
     }
 }
