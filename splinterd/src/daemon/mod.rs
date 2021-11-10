@@ -493,9 +493,10 @@ impl SplinterDaemon {
                     scabbard_factory_builder =
                         scabbard_factory_builder.with_storage_configuration(pool.into());
                 }
-                // This will have failed in create_store_factory above
+                // This will have failed in create_store_factory above, but we return () to make
+                // the compiler/linter happy under the following conditions
                 #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
-                store::ConnectionPool::Unknown => unreachable!(),
+                store::ConnectionPool::Unsupported => (),
             }
 
             scabbard_factory_builder = scabbard_factory_builder
