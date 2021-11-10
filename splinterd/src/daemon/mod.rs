@@ -450,28 +450,26 @@ impl SplinterDaemon {
         let mut scabbard_factory_builder =
             ScabbardFactoryBuilder::new().with_signature_verifier_factory(signing_context);
 
-        {
-            match connection_pool {
-                #[cfg(feature = "database-postgres")]
-                store::ConnectionPool::Postgres { pool } => {
-                    scabbard_factory_builder =
-                        scabbard_factory_builder.with_storage_configuration(pool.into());
-                }
-                #[cfg(feature = "database-sqlite")]
-                store::ConnectionPool::Sqlite { pool } => {
-                    scabbard_factory_builder =
-                        scabbard_factory_builder.with_storage_configuration(pool.into());
-                }
-                // This will have failed in create_store_factory above, but we return () to make
-                // the compiler/linter happy under the following conditions
-                #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
-                store::ConnectionPool::Unsupported => (),
+        match connection_pool {
+            #[cfg(feature = "database-postgres")]
+            store::ConnectionPool::Postgres { pool } => {
+                scabbard_factory_builder =
+                    scabbard_factory_builder.with_storage_configuration(pool.into());
             }
-
-            scabbard_factory_builder = scabbard_factory_builder
-                .with_lmdb_state_db_dir(self.state_dir.to_string())
-                .with_lmdb_state_enabled(self.enable_lmdb_state);
+            #[cfg(feature = "database-sqlite")]
+            store::ConnectionPool::Sqlite { pool } => {
+                scabbard_factory_builder =
+                    scabbard_factory_builder.with_storage_configuration(pool.into());
+            }
+            // This will have failed in create_store_factory above, but we return () to make
+            // the compiler/linter happy under the following conditions
+            #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
+            store::ConnectionPool::Unsupported => (),
         }
+
+        scabbard_factory_builder = scabbard_factory_builder
+            .with_lmdb_state_db_dir(self.state_dir.to_string())
+            .with_lmdb_state_enabled(self.enable_lmdb_state);
 
         let scabbard_factory = scabbard_factory_builder
             .build()

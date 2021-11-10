@@ -897,13 +897,11 @@ impl Config {
             );
         }
 
-        {
-            debug!(
-                "Config: scabbard_state: {:?}, (source: {:?})",
-                self.scabbard_state(),
-                self.scabbard_state_source()
-            );
-        }
+        debug!(
+            "Config: scabbard_state: {:?}, (source: {:?})",
+            self.scabbard_state(),
+            self.scabbard_state_source()
+        );
     }
 
     #[cfg(feature = "rest-api-cors")]

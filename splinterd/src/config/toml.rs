@@ -234,7 +234,8 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_admin_timeout(self.toml_config.admin_timeout)
             .with_peering_key(self.toml_config.peering_key)
             .with_config_dir(self.toml_config.config_dir)
-            .with_state_dir(self.toml_config.state_dir);
+            .with_state_dir(self.toml_config.state_dir)
+            .with_scabbard_state(self.toml_config.scabbard_state.map(|inner| inner.into()));
 
         #[cfg(feature = "https-bind")]
         {
@@ -304,11 +305,6 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                         .collect::<HashMap<String, UnnamedAppenderConfig>>(),
                 ));
             }
-        }
-
-        {
-            partial_config = partial_config
-                .with_scabbard_state(self.toml_config.scabbard_state.map(|inner| inner.into()));
         }
 
         // deprecated values, only set if the current value was not set

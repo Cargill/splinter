@@ -92,7 +92,8 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_tls_insecure(Some(false))
             .with_no_tls(Some(false))
             .with_strict_ref_counts(Some(false))
-            .with_peering_key(Some(String::from(PEERING_KEY_NAME)));
+            .with_peering_key(Some(String::from(PEERING_KEY_NAME)))
+            .with_scabbard_state(Some(ScabbardState::Database));
 
         #[cfg(feature = "https-bind")]
         {
@@ -162,10 +163,6 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         {
             partial_config =
                 partial_config.with_allow_keys_file(Some(String::from(ALLOW_KEYS_FILE)))
-        }
-
-        {
-            partial_config = partial_config.with_scabbard_state(Some(ScabbardState::Database));
         }
 
         Ok(partial_config)

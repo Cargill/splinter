@@ -192,16 +192,15 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 });
         }
 
-        {
-            partial_config = partial_config.with_scabbard_state(
-                self.matches.value_of("scabbard_state").map(|s| match s {
+        partial_config =
+            partial_config.with_scabbard_state(self.matches.value_of("scabbard_state").map(|s| {
+                match s {
                     "lmdb" => ScabbardState::Lmdb,
                     "database" => ScabbardState::Database,
                     // Clap is configured to only accept these two values.
                     _ => unreachable!(),
-                }),
-            );
-        }
+                }
+            }));
 
         Ok(partial_config)
     }
