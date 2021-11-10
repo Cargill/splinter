@@ -51,6 +51,7 @@ features = ["admin-service", "registry", "node-id-store"]
 
 [dependencies.scabbard]
 path = "../services/scabbard/libscabbard"
+default-features = false
 optional = true
 
 [dev-dependencies]

@@ -837,6 +837,7 @@ impl Iterator for ChannelBatchInfoIter {
     }
 }
 
+#[cfg(feature = "sqlite")]
 #[cfg(test)]
 mod tests {
     use super::*;
