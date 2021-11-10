@@ -21,6 +21,9 @@ allows the user to change the role's display name or set of permissions.
 
 FLAGS
 =====
+`-n`, `--dry-run`
+: Validate the command without performing the role update
+
 `-h`, `--help`
 : Prints help information
 

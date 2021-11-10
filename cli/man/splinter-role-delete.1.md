@@ -21,6 +21,9 @@ itself and not the wider network.
 
 FLAGS
 =====
+`-n`, `--dry-run`
+: Validate the command without performing the role deletion
+
 `-h`, `--help`
 : Prints help information
 

@@ -22,6 +22,9 @@ wider network.
 
 FLAGS
 =====
+`-n`, `--dry-run`
+: Validate the command without performing the role creation
+
 `-h`, `--help`
 : Prints help information
 
