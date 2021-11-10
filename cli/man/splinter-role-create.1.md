@@ -100,6 +100,8 @@ ENVIRONMENT VARIABLES
 
 SEE ALSO
 ========
+| `splinter-role-update(1)`
+| `splinter-role-delete(1)`
 | `splinter-role-list(1)`
 | `splinter-role-show(1)`
 |

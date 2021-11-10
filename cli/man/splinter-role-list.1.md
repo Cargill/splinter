@@ -73,4 +73,9 @@ ENVIRONMENT VARIABLES
 
 SEE ALSO
 ========
+| `splinter-role-create(1)`
+| `splinter-role-update(1)`
+| `splinter-role-delete(1)`
+| `splinter-role-show(1)`
+|
 | Splinter documentation: https://www.splinter.dev/docs/0.5/
