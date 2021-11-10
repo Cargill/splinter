@@ -28,6 +28,8 @@ use crate::config::{Config, ConfigSource, PartialConfig};
 
 #[cfg(feature = "log-config")]
 use super::logging::AppenderConfig;
+#[cfg(feature = "log-config")]
+use super::LoggerConfig;
 
 pub trait PartialConfigBuilder {
     /// Takes all values set in a config object to create a `PartialConfig` object.
@@ -394,8 +396,9 @@ impl ConfigBuilder {
                     .collect()
             }),
             #[cfg(feature = "log-config")]
-            loggers: Some(
-                self.partial_configs
+            loggers: Some({
+                let loggers = self
+                    .partial_configs
                     .iter()
                     .filter_map(|partial| {
                         partial.loggers().map(|vector| {
@@ -407,12 +410,19 @@ impl ConfigBuilder {
                                         partial.source(),
                                     )
                                 })
-                                .collect::<Vec<_>>()
+                                .collect::<Vec<(LoggerConfig, ConfigSource)>>()
                         })
                     })
                     .flatten()
-                    .collect(),
-            ),
+                    .collect::<Vec<(LoggerConfig, ConfigSource)>>();
+                let mut map: HashMap<String, &(LoggerConfig, ConfigSource)> = HashMap::new();
+                for logger in loggers.iter().rev() {
+                    map.insert(logger.0.name.to_owned(), logger);
+                }
+                map.values()
+                    .map(|item| (item.0.to_owned(), item.1.to_owned()))
+                    .collect()
+            }),
             #[cfg(feature = "log-config")]
             root_logger: self
                 .partial_configs
