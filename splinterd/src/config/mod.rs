@@ -19,8 +19,6 @@
 //! sources to be combined into a final `Config` object.
 
 mod builder;
-#[cfg(feature = "log-config")]
-mod bytes;
 mod clap;
 mod default;
 mod env;

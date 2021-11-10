@@ -19,14 +19,16 @@ use crate::config::{ConfigError, ConfigSource, PartialConfig};
 #[cfg(feature = "log-config")]
 use log::Level;
 #[cfg(feature = "log-config")]
+use serde::de::Visitor;
+#[cfg(feature = "log-config")]
+use serde::Deserialize as DeserializeTrait;
+#[cfg(feature = "log-config")]
 use serde_derive::Deserialize;
 #[cfg(feature = "log-config")]
 use std::collections::HashMap;
 #[cfg(feature = "log-config")]
 use std::convert::TryInto;
 
-#[cfg(feature = "log-config")]
-use super::bytes::ByteSize;
 #[cfg(feature = "log-config")]
 use super::logging::{default_pattern, UnnamedAppenderConfig, UnnamedLoggerConfig};
 #[cfg(feature = "scabbard-database-support")]
@@ -57,7 +59,7 @@ pub struct TomlUnnamedAppenderConfig {
     pub encoder: String,
     pub kind: TomlRawLogTarget,
     pub filename: Option<String>,
-    pub size: Option<ByteSize>,
+    pub size: Option<TomlLogFileSize>,
     pub level: Option<TomlLogLevel>,
 }
 
@@ -88,6 +90,78 @@ impl From<TomlLogLevel> for Level {
             TomlLogLevel::Debug => Level::Debug,
             TomlLogLevel::Trace => Level::Trace,
         }
+    }
+}
+
+#[cfg(feature = "log-config")]
+#[derive(Clone, Debug)]
+pub struct TomlLogFileSize {
+    size: u64,
+}
+
+#[cfg(feature = "log-config")]
+impl From<TomlLogFileSize> for u64 {
+    fn from(bytes: TomlLogFileSize) -> Self {
+        bytes.size
+    }
+}
+
+#[cfg(feature = "log-config")]
+impl<'de> DeserializeTrait<'de> for TomlLogFileSize {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_string(TomlLogFileSizeVisitor)
+    }
+}
+
+#[cfg(feature = "log-config")]
+struct TomlLogFileSizeVisitor;
+
+#[cfg(feature = "log-config")]
+impl<'de> Visitor<'de> for TomlLogFileSizeVisitor {
+    type Value = TomlLogFileSize;
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        // serde calls these methods hints and its not always clear which method gets used. Hence
+        // the visit_string and visitr_str methods both being defined.
+        self.visit_str(&v)
+    }
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        //floats support a bunch of different formats, this supports <digit[s]>.<digit[s]>
+        let numeric: Result<f32, _> = v
+            .chars()
+            .take_while(|x| x.is_digit(10) || *x == '.')
+            .collect::<String>()
+            .parse();
+        // Units can be K,M,G for kilo, mega, giga bytes.
+        let multiple = v
+            .chars()
+            .skip_while(|x| x.is_digit(10) || *x == '.')
+            .take_while(|c| c.is_alphabetic())
+            .collect::<String>();
+        let multiple = match multiple.as_str() {
+            "M" => Ok(1_000_000),
+            "K" => Ok(1_000),
+            "G" => Ok(1_000_000_000),
+            _ => Err(E::custom("unit could not be parsed".to_string())),
+        };
+        match (numeric, multiple) {
+            (Ok(float), Ok(mult)) => Ok(TomlLogFileSize {
+                size: (float * mult as f32).trunc() as u64,
+            }),
+            (Err(e), _) => Err(E::custom(format!("size could not be parsed: {}", e))),
+            (_, Err(e)) => Err(e),
+        }
+    }
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "<float><K|M|G>")
     }
 }
 
