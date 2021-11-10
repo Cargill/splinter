@@ -65,7 +65,6 @@ pub struct SplinterDaemonBuilder {
     strict_ref_counts: Option<bool>,
     signers: Option<Vec<Box<dyn Signer>>>,
     peering_token: Option<PeerAuthorizationToken>,
-    #[cfg(feature = "scabbard-database-support")]
     enable_lmdb_state: bool,
 }
 
@@ -232,7 +231,6 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    #[cfg(feature = "scabbard-database-support")]
     pub fn with_lmdb_state_enabled(mut self) -> Self {
         self.enable_lmdb_state = true;
         self
@@ -384,7 +382,6 @@ impl SplinterDaemonBuilder {
             strict_ref_counts,
             signers,
             peering_token,
-            #[cfg(feature = "scabbard-database-support")]
             enable_lmdb_state: self.enable_lmdb_state,
         })
     }

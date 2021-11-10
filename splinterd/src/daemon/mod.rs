@@ -155,7 +155,6 @@ pub struct SplinterDaemon {
     peering_token: PeerAuthorizationToken,
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: String,
-    #[cfg(feature = "scabbard-database-support")]
     enable_lmdb_state: bool,
 }
 
@@ -451,36 +450,6 @@ impl SplinterDaemon {
         let mut scabbard_factory_builder =
             ScabbardFactoryBuilder::new().with_signature_verifier_factory(signing_context);
 
-        #[cfg(not(feature = "scabbard-database-support"))]
-        {
-            scabbard_factory_builder =
-                scabbard_factory_builder.with_state_db_dir(self.state_dir.to_string());
-
-            #[cfg(not(all(feature = "database-postgres", feature = "database-sqlite")))]
-            {
-                scabbard_factory_builder =
-                    scabbard_factory_builder.with_receipt_db_dir(self.state_dir.to_string());
-            }
-            #[cfg(any(feature = "database-postgres", feature = "database-sqlite"))]
-            {
-                match connection_pool {
-                    #[cfg(feature = "database-postgres")]
-                    store::ConnectionPool::Postgres { pool } => {
-                        scabbard_factory_builder =
-                            scabbard_factory_builder.with_receipt_postgres_connection_pool(pool);
-                    }
-                    #[cfg(feature = "database-sqlite")]
-                    store::ConnectionPool::Sqlite { pool } => {
-                        scabbard_factory_builder =
-                            scabbard_factory_builder.with_receipt_sqlite_connection_pool(pool);
-                    }
-                    // This will have failed in create_store_factory above
-                    #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
-                    store::ConnectionPool::Unknown => unreachable!(),
-                }
-            }
-        }
-        #[cfg(feature = "scabbard-database-support")]
         {
             match connection_pool {
                 #[cfg(feature = "database-postgres")]

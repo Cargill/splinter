@@ -21,7 +21,6 @@ use std::time::Duration;
 
 #[cfg(feature = "log-config")]
 use super::logging::{RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig};
-#[cfg(feature = "scabbard-database-support")]
 use super::ScabbardState;
 
 /// `ConfigSource` displays the source of configuration values, used to identify which of the various
@@ -106,7 +105,6 @@ pub struct PartialConfig {
     verbosity: Option<log::Level>,
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: Option<String>,
-    #[cfg(feature = "scabbard-database-support")]
     scabbard_state: Option<ScabbardState>,
 }
 
@@ -181,7 +179,6 @@ impl PartialConfig {
             verbosity: None,
             #[cfg(feature = "config-allow-keys")]
             allow_keys_file: None,
-            #[cfg(feature = "scabbard-database-support")]
             scabbard_state: None,
         }
     }
@@ -388,7 +385,6 @@ impl PartialConfig {
         self.allow_keys_file.clone()
     }
 
-    #[cfg(feature = "scabbard-database-support")]
     pub fn scabbard_state(&self) -> Option<ScabbardState> {
         self.scabbard_state
     }
@@ -921,7 +917,6 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "scabbard-database-support")]
     /// Adds a `scabbard_state` value to the  `PartialConfig` object.
     ///
     /// # Arguments

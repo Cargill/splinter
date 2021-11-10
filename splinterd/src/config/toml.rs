@@ -29,7 +29,6 @@ use std::convert::TryInto;
 use super::bytes::ByteSize;
 #[cfg(feature = "log-config")]
 use super::logging::{default_pattern, UnnamedAppenderConfig, UnnamedLoggerConfig};
-#[cfg(feature = "scabbard-database-support")]
 use super::ScabbardState;
 
 /// `TOML_VERSION` represents the version of the toml config file.
@@ -150,7 +149,6 @@ struct TomlConfig {
     appenders: Option<HashMap<String, TomlUnnamedAppenderConfig>>,
     #[cfg(feature = "log-config")]
     loggers: Option<HashMap<String, TomlUnnamedLoggerConfig>>,
-    #[cfg(feature = "scabbard-database-support")]
     scabbard_state: Option<ScabbardStateToml>,
     config_dir: Option<String>,
     state_dir: Option<String>,
@@ -308,7 +306,6 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             }
         }
 
-        #[cfg(feature = "scabbard-database-support")]
         {
             partial_config = partial_config
                 .with_scabbard_state(self.toml_config.scabbard_state.map(|inner| inner.into()));
@@ -356,7 +353,6 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
     }
 }
 
-#[cfg(feature = "scabbard-database-support")]
 #[derive(Deserialize, Debug)]
 pub enum ScabbardStateToml {
     #[serde(rename = "database")]
@@ -365,7 +361,6 @@ pub enum ScabbardStateToml {
     Lmdb,
 }
 
-#[cfg(feature = "scabbard-database-support")]
 impl From<ScabbardStateToml> for ScabbardState {
     fn from(other: ScabbardStateToml) -> Self {
         match other {
