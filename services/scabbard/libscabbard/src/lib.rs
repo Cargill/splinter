@@ -36,7 +36,6 @@ extern crate splinter;
 
 #[cfg(feature = "client")]
 pub mod client;
-#[cfg(any(feature = "client-reqwest", feature = "splinter-service"))]
 mod hex;
 #[cfg(feature = "diesel_migrations")]
 pub mod migrations;

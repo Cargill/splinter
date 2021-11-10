@@ -17,7 +17,6 @@
 #[cfg(feature = "diesel")]
 pub mod diesel;
 mod error;
-#[cfg(any(feature = "lmdb", feature = "transact"))]
 pub mod transact;
 
 pub use error::CommitHashStoreError;
