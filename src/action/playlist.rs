@@ -25,7 +25,7 @@ use transact::families::smallbank::workload::playlist::{
     generate_smallbank_playlist, process_smallbank_playlist,
 };
 use transact::protos::IntoBytes;
-use transact::workload::batch_gen::{generate_signed_batches, BatchListFeeder};
+use transact::workload::batch_gen::{BatchListFeeder, SignedBatchProducer};
 use transact::workload::HttpRequestCounter;
 
 use crate::action::time::Time;
@@ -194,9 +194,11 @@ impl Action for BatchPlaylistAction {
             .ok_or_else(|| CliError::ActionError("'key' is required".into()))?;
         let signer = load_cylinder_signer_key(key_path)?;
 
-        generate_signed_batches(&mut in_file, &mut out_file, max_txns, &*signer).map_err(
-            |err| CliError::ActionError(format!("Unable to generate signed batches: {}", err)),
-        )?;
+        SignedBatchProducer::new(&mut in_file, max_txns, &*signer)
+            .write_to(&mut out_file)
+            .map_err(|err| {
+                CliError::ActionError(format!("Unable to generate signed batches: {}", err))
+            })?;
 
         Ok(())
     }
