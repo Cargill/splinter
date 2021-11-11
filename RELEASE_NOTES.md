@@ -1,5 +1,122 @@
 # Release Notes
 
+## Changes in Splinter 0.5.25
+
+### Highlights
+
+* Stabilized the `"scabbard/database-support", `"cli/scabbard-migrations"`, and
+  `"splinterd/scabbard-database-support"` features. These features now allow all
+  scabbard state, including merkle state, to be stored in the database instead
+  of being spread across multiple LMDB files. LMDB may be enabled for merkle
+  state storage with the optional flag `--scabbard-state lmdb` or by its
+  analogous setting in the TOML config file.
+
+### libsplinter
+
+* Save replaced connection ids for peers in the PeerManager so that old
+  messages can still be routed.
+
+* Check for inbound unreferenced peer when upgrading an outbound unreferenced
+  peer to peers. If one is found, check whether the outbound or inbound
+  connection should be used. Fixes an issue where a duplicate connection would
+  be kept around.
+
+* Bump the version of jsonwebtoken to 7 to resolve a build issue with the
+  dependent ring crate.
+
+* Fix the no-op tap macros such that they can properly accept multiple tags.
+
+### splinter CLI
+
+* Modify the `upgrade_scabbard_receipt_store` function to skip the receipt store
+  upgrade process if there are no local circuits found. This fixes a bug where
+  running upgrade with no existing circuits would return an error.
+
+* Stabilize `scabbard-migrations` by removing it.
+
+### splinterd
+
+* Change loggers to expect an stdout appender. The default loggers expected a
+  "default" named appender, but the name was changed to "stdout".
+
+* Fix a bug in logging where the verbosity flag was altering the root loggers.
+  The flag now correctly alters the stdout appenders level.
+
+* Enable `Appender` log level filtering.
+
+* Log all config values after logging configuration so they get recorded in log
+  files.
+
+* Fix the `ConnectionPool` feature guards around "database-postgres" and
+  "database-sqlite" features, for the case where neither are enabled.
+
+* Simplify the `ByteSize` type and move it into the toml module.
+
+* Stabilize `scabbard-database-support` by removing it.
+
+* Update the root logger to allow levels below `info`. The default root logger
+  had a preset level filter of `info`, the value is now `trace` so all logs will
+  get forwarded to appenders.
+
+### scabbard
+
+* Replace the boxed function for handling state purge with a trait for the
+  specific operation.
+
+* Rename the clap value for `scabbard_storage` to be `scabbard_state`.
+
+* Move the conversion of the TOML version of `ScabbardState` to the config value
+  to the `config::toml` module. This ensures the `config::scabbard_state` module
+  should not have any dependencies on specific formats.
+
+* Add a circuit_tag to the committed_batches, such that the metrics can be
+  correlated for a complete circuit.
+
+* Update transact dependency to min 0.3.13.
+
+* Delete the scabbard SQL merkle state on service purge. Replace the
+  `NoOpScabbardPurgeHandler` with DB-specific handlers. These handlers delete
+  the entire merkle state tree on purge.
+
+* Move the to_hex function out of the hex module and localize it to the modules
+  where it will be used. This removes any feature-guard complexity around the
+  function.
+
+* Make the scabbard CLI only depend on the `client-reqwest` feature, removing
+  the dependency on the service during compilation time.
+
+* Move the `ScabbardState` parsing to the config::clap module.
+
+* Add missing guards for `lmdb` usage to ensure this functionality is not
+  available if the feature is disabled.
+
+* Update all of the factory guards such that the code correctly compiles and
+  lints when no database features are enabled.
+
+* Remove the use of scabbard default feature in the CLI.
+
+* Stabilize `database-support` by removing it.
+
+* Collapse the `state_database` and `factory_database` module up into the
+  respective root state and factory modules.
+
+* Remove smart permissions from scabbard CLI. Because Smart permissions has been
+  removed from the new version of sabre, the unused commands are removed to make
+  way for the upgrading to a new version of sabre. Smart permissions were
+  experimental so this does not change the stable API.
+
+### gameroom
+
+* Gameroom was setting SplinterProtocolVersion to 1. This is correct for
+  gameroom but changes had been made to make gameroom handle v2 versions of
+  admin events. Now that admin events version is guarded by protocol version,
+  the v1 messages can be used instead.
+
+### build
+
+* Add an OpenAPI lint step to just and GitHub CI to verify that the OpenAPI
+  files are formatted correctly and follow best practices.
+
 ## Changes in Splinter 0.5.24
 
 ### libsplinter
