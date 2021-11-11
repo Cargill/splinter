@@ -64,7 +64,7 @@ RUN USER=root cargo new --bin cli \
 # Create empty Cargo projects for gameroom
  && USER=root cargo new --bin examples/gameroom/cli \
  && USER=root cargo new --bin examples/gameroom/daemon \
- && USER=root cargo new --bin examples/gameroom/database \
+ && USER=root cargo new --lib examples/gameroom/database \
 # Create empty Cargo projects for splinter services
  && USER=root cargo new --bin services/health \
  && USER=root cargo new --bin services/scabbard/cli \
