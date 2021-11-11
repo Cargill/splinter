@@ -51,10 +51,7 @@ experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
-  "smart-permissions",
 ]
-
-smart-permissions = []
 
 [package.metadata.deb]
 maintainer = "The Splinter Team"

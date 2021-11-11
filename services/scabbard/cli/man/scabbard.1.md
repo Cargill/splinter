@@ -56,9 +56,6 @@ SUBCOMMANDS
 `perm`
 : Sets or deletes a Sabre namespace permission.
 
-`sp`
-: Provides commands to create, update, and delete Sabre smart permissions.
-
 SEE ALSO
 ========
 | `scabbard-contract-list(1)`
@@ -72,8 +69,5 @@ SEE ALSO
 | `scabbard-ns-delete(1)`
 | `scabbard-ns-update(1)`
 | `scabbard-perm(1)`
-| `scabbard-sp-create(1)`
-| `scabbard-sp-delete(1)`
-| `scabbard-sp-update(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/
