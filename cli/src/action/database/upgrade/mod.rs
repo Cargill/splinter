@@ -14,11 +14,9 @@
 
 //! Provides database upgrade functionality
 
-#[cfg(feature = "scabbard-migrations")]
 mod error;
 mod node_id;
 mod receipt_store;
-#[cfg(feature = "scabbard-migrations")]
 mod scabbard;
 mod yaml;
 
@@ -71,7 +69,6 @@ impl Action for UpgradeAction {
         let db_store = store_factory.get_admin_service_store();
         yaml::import_yaml_state_to_database(state_dir.as_path(), &*db_store)?;
 
-        #[cfg(feature = "scabbard-migrations")]
         {
             scabbard::upgrade_scabbard_commit_hash_state(state_dir.as_path(), &database_uri)
                 .map_err(|err| {
