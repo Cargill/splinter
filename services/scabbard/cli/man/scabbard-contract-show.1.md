@@ -30,6 +30,11 @@ FLAGS
 
 OPTIONS
 =======
+`-k`, `--key` PRIVATE-KEY-FILE
+: Specifies the private signing key (either a file path or the name of a
+  .priv file in $HOME/.splinter/keys) for authenticating with the Splinter REST
+  API.
+
 `--service-id` ID
 : Specifies the fully-qualified service ID of the targeted scabbard service,
   using the format `CIRCUIT_ID::SERVICE_ID`. This option is required.
