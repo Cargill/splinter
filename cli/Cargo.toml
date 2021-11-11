@@ -82,7 +82,6 @@ experimental = [
     "health",
     "https-certs",
     "registry",
-    "scabbard-migrations",
 ]
 
 authorization-handler-maintenance = []
@@ -97,9 +96,6 @@ postgres = [
     "scabbard/postgres"
 ]
 registry = []
-scabbard-migrations = [
-  "scabbard/lmdb"
-]
 sqlite = [
     "diesel/sqlite",
     "splinter/sqlite",
@@ -107,6 +103,7 @@ sqlite = [
 ]
 upgrade = [
     "database",
+    "scabbard/lmdb",
     "splinter/store-factory"
 ]
 user = []
