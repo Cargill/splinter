@@ -69,15 +69,14 @@ impl Action for UpgradeAction {
         let db_store = store_factory.get_admin_service_store();
         yaml::import_yaml_state_to_database(state_dir.as_path(), &*db_store)?;
 
-        {
-            scabbard::upgrade_scabbard_commit_hash_state(state_dir.as_path(), &database_uri)
-                .map_err(|err| {
-                    CliError::ActionError(format!(
-                        "failed to upgrade scabbard commit hash state: {}",
-                        err
-                    ))
-                })?;
-        }
+        scabbard::upgrade_scabbard_commit_hash_state(state_dir.as_path(), &database_uri).map_err(
+            |err| {
+                CliError::ActionError(format!(
+                    "failed to upgrade scabbard commit hash state: {}",
+                    err
+                ))
+            },
+        )?;
 
         receipt_store::upgrade_scabbard_receipt_store(state_dir.as_path(), &database_uri)?;
 
