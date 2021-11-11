@@ -116,7 +116,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         {
             let root_logger: Option<RootConfig> = Some(RootConfig {
                 appenders: vec!["stdout".to_string()],
-                level: log::Level::Info,
+                level: log::Level::Trace,
             });
             let stdout = UnnamedAppenderConfig {
                 encoder: String::from(DEFAULT_LOGGING_PATTERN),
