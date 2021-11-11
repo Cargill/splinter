@@ -114,7 +114,6 @@ pub struct Config {
     verbosity: (log::Level, ConfigSource),
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: (String, ConfigSource),
-    #[cfg(feature = "scabbard-database-support")]
     scabbard_state: (ScabbardState, ConfigSource),
 }
 
@@ -627,12 +626,10 @@ impl Config {
         &self.allow_keys_file.1
     }
 
-    #[cfg(feature = "scabbard-database-support")]
     pub fn scabbard_state(&self) -> &ScabbardState {
         &self.scabbard_state.0
     }
 
-    #[cfg(feature = "scabbard-database-support")]
     pub fn scabbard_state_source(&self) -> &ConfigSource {
         &self.scabbard_state.1
     }
@@ -898,14 +895,11 @@ impl Config {
             );
         }
 
-        #[cfg(feature = "scabbard-database-support")]
-        {
-            debug!(
-                "Config: scabbard_state: {:?}, (source: {:?})",
-                self.scabbard_state(),
-                self.scabbard_state_source()
-            );
-        }
+        debug!(
+            "Config: scabbard_state: {:?}, (source: {:?})",
+            self.scabbard_state(),
+            self.scabbard_state_source()
+        );
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -916,7 +910,6 @@ impl Config {
     }
 }
 
-#[cfg(feature = "scabbard-database-support")]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ScabbardState {
     Database,

@@ -31,7 +31,6 @@ use std::convert::TryInto;
 
 #[cfg(feature = "log-config")]
 use super::logging::{default_pattern, UnnamedAppenderConfig, UnnamedLoggerConfig};
-#[cfg(feature = "scabbard-database-support")]
 use super::ScabbardState;
 
 /// `TOML_VERSION` represents the version of the toml config file.
@@ -224,7 +223,6 @@ struct TomlConfig {
     appenders: Option<HashMap<String, TomlUnnamedAppenderConfig>>,
     #[cfg(feature = "log-config")]
     loggers: Option<HashMap<String, TomlUnnamedLoggerConfig>>,
-    #[cfg(feature = "scabbard-database-support")]
     scabbard_state: Option<ScabbardStateToml>,
     config_dir: Option<String>,
     state_dir: Option<String>,
@@ -310,7 +308,8 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_admin_timeout(self.toml_config.admin_timeout)
             .with_peering_key(self.toml_config.peering_key)
             .with_config_dir(self.toml_config.config_dir)
-            .with_state_dir(self.toml_config.state_dir);
+            .with_state_dir(self.toml_config.state_dir)
+            .with_scabbard_state(self.toml_config.scabbard_state.map(|inner| inner.into()));
 
         #[cfg(feature = "https-bind")]
         {
@@ -382,12 +381,6 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             }
         }
 
-        #[cfg(feature = "scabbard-database-support")]
-        {
-            partial_config = partial_config
-                .with_scabbard_state(self.toml_config.scabbard_state.map(|inner| inner.into()));
-        }
-
         // deprecated values, only set if the current value was not set
         if partial_config.tls_cert_dir().is_none() {
             partial_config = partial_config.with_tls_cert_dir(self.toml_config.cert_dir)
@@ -430,7 +423,6 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
     }
 }
 
-#[cfg(feature = "scabbard-database-support")]
 #[derive(Deserialize, Debug)]
 pub enum ScabbardStateToml {
     #[serde(rename = "database")]
@@ -439,7 +431,6 @@ pub enum ScabbardStateToml {
     Lmdb,
 }
 
-#[cfg(feature = "scabbard-database-support")]
 impl From<ScabbardStateToml> for ScabbardState {
     fn from(other: ScabbardStateToml) -> Self {
         match other {

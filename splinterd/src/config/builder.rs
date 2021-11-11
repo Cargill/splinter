@@ -425,7 +425,6 @@ impl ConfigBuilder {
                 .iter()
                 .find_map(|p| p.verbosity().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("verbosity".to_string()))?,
-            #[cfg(feature = "scabbard-database-support")]
             scabbard_state: self
                 .partial_configs
                 .iter()

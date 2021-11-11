@@ -60,6 +60,7 @@ transact = { version = "0.3" }
 [dependencies.scabbard]
 path = "../services/scabbard/libscabbard"
 features = [
+  "lmdb",
   "rest-api",
   "rest-api-actix",
   "splinter-service",
@@ -109,7 +110,6 @@ experimental = [
     "https-bind",
     "log-config",
     "node",
-    "scabbard-database-support",
     "service-endpoint",
     "ws-transport",
 ]
@@ -131,7 +131,6 @@ biome-profile = ["splinter/biome-profile"]
 config-allow-keys = ["authorization-handler-allow-keys"]
 database-postgres = ["diesel", "diesel/postgres", "scabbard/postgres", "splinter/postgres"]
 database-sqlite = ["diesel", "diesel/sqlite", "scabbard/sqlite", "splinter/sqlite"]
-scabbard-database-support = ["scabbard/database-support", "scabbard/lmdb"]
 health-service = ["health", "health/authorization"]
 https-bind = ["splinter/https-bind"]
 log-config = []
@@ -145,7 +144,6 @@ node = [
     "diesel",
     "sawtooth",
     "scabbard/client-reqwest",
-    "scabbard-database-support",
     "splinter/admin-service-client",
     "splinter/admin-service-event-client",
     "splinter/admin-service-event-client-actix-web-client",

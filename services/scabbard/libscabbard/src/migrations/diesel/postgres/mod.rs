@@ -22,7 +22,6 @@ use diesel_migrations::MigrationConnection;
 
 use sawtooth::migrations::run_postgres_migrations as run_sawtooth_postgres_migrations;
 use splinter::error::InternalError;
-#[cfg(feature = "database-support")]
 use transact::state::merkle::sql::migration::run_postgres_migrations as run_transact_postgres_migrations;
 
 /// Run all pending database migrations.
@@ -34,7 +33,6 @@ use transact::state::merkle::sql::migration::run_postgres_migrations as run_tran
 pub fn run_migrations(conn: &PgConnection) -> Result<(), InternalError> {
     embedded_migrations::run(conn).map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-    #[cfg(feature = "database-support")]
     run_transact_postgres_migrations(conn)
         .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
