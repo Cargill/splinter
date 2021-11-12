@@ -14,6 +14,7 @@
 
 use std::fs::File;
 use std::io::Write;
+use std::sync::Arc;
 use std::time::Duration;
 
 use clap::ArgMatches;
@@ -21,10 +22,11 @@ use transact::families::smallbank::workload::playlist::{
     generate_smallbank_playlist, process_smallbank_playlist,
 };
 use transact::workload::batch_gen::generate_signed_batches;
-use transact::workload::submit_batches_from_source;
+use transact::workload::{submit_batches_from_source, HttpRequestCounter};
 
 use crate::action::time::Time;
 use crate::error::CliError;
+use crate::request_logger::RequestLogger;
 
 use super::{
     create_cylinder_jwt_auth_signer_key, load_cylinder_signer_key, Action, DEFAULT_LOG_TIME_SECS,
@@ -248,14 +250,27 @@ impl Action for SubmitPlaylistAction {
             .map_err(|_| CliError::ActionError("Unable to parse provided update time".into()))?;
 
         let target_vec: Vec<String> = target.split(';').map(String::from).collect();
-        submit_batches_from_source(
-            &mut in_file,
-            input.to_string(),
-            target_vec,
-            rate,
-            auth,
-            update,
-        );
+
+        let mut request_counters = Vec::new();
+        for _ in 0..target_vec.len() {
+            request_counters.push(Arc::new(HttpRequestCounter::new(format!(
+                "File: {}",
+                input
+            ))));
+        }
+
+        let request_logger = RequestLogger::new(
+            request_counters.clone(),
+            Duration::new(update.into(), 0),
+            None,
+        )
+        .map_err(|err| CliError::ActionError(format!("Unable to start request logger: {}", err)))?;
+
+        let request_logger_shutdown_signaler = request_logger.shutdown_signaler();
+        submit_batches_from_source(&mut in_file, target_vec, rate, auth, request_counters);
+        if let Err(err) = request_logger_shutdown_signaler.signal_shutdown() {
+            error!("Unable to cleanly shutdown request logger: {}", err);
+        }
 
         Ok(())
     }
