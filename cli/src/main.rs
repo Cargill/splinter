@@ -950,7 +950,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     {
         app = app.subcommand(
             SubCommand::with_name("upgrade")
-                .about("Upgrade splinter by importing YAML state files to a database")
+                .about("Upgrade splinter by importing file system state files to a database")
                 .arg(
                     Arg::with_name("state_dir")
                         .value_name("state-dir")

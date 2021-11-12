@@ -128,6 +128,7 @@ SEE ALSO
 | `splinter-maintenance-disable(1)`
 | `splinter-permissions(1)`
 | `splinter-registry-add(1)`
+| `splinter-registry-build(1)`
 | `splinter-role-create(1)`
 | `splinter-role-delete(1)`
 | `splinter-role-list(1)`

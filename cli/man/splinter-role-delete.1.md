@@ -21,6 +21,9 @@ itself and not the wider network.
 
 FLAGS
 =====
+`-n`, `--dry-run`
+: Validate the command without performing the role deletion
+
 `-h`, `--help`
 : Prints help information
 
@@ -70,6 +73,9 @@ ENVIRONMENT VARIABLES
 
 SEE ALSO
 ========
+| `splinter-role-create(1)`
+| `splinter-role-update(1)`
 | `splinter-role-list(1)`
+| `splinter-role-show(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/0.5/

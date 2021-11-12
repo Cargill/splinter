@@ -8,7 +8,7 @@
 NAME
 ====
 
-**splinter-upgrade** — Upgrades splinter YAML state to database state
+**splinter-upgrade** — Upgrades splinter file system state to database state
 
 SYNOPSIS
 ========
@@ -23,6 +23,9 @@ files to a database. This tool searches for data in the `circuits.yaml`,
 upgrade is complete, the YAML state definitions will be renamed to
 `circuits.yaml.old` and `circuit-proposals.yaml.old` respectively. The `node_id`
 file will be renamed to `node_id.old`.
+
+This command will also import data from `LMDB` files for transaction receipts
+and commit hashes.
 
 OPTIONS
 =======

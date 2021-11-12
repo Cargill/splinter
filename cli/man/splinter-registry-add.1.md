@@ -31,7 +31,7 @@ FLAGS
 : Shows the expected changes without submitting the node.
 
 `--from-remote`
-: Copies an existing node definition from the remote registries. 
+: Copies an existing node definition from the remote registries.
 
 `-h`, `--help`
 : Prints help information
@@ -129,5 +129,6 @@ ENVIRONMENT VARIABLES
 
 SEE ALSO
 ========
-
+| `splinter-registry-build(1)`
+|
 | Splinter documentation: https://www.splinter.dev/docs/0.5/

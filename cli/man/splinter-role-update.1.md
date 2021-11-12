@@ -21,6 +21,9 @@ allows the user to change the role's display name or set of permissions.
 
 FLAGS
 =====
+`-n`, `--dry-run`
+: Validate the command without performing the role update
+
 `-h`, `--help`
 : Prints help information
 
@@ -106,8 +109,9 @@ ENVIRONMENT VARIABLES
 
 SEE ALSO
 ========
+| `splinter-role-create(1)`
+| `splinter-role-delete(1)`
 | `splinter-role-list(1)`
 | `splinter-role-show(1)`
-| `splinter-role-create(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/0.5/
