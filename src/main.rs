@@ -16,6 +16,8 @@ extern crate log;
 
 mod action;
 pub mod error;
+#[cfg(any(feature = "workload", feature = "playlist"))]
+mod request_logger;
 
 use clap::clap_app;
 #[cfg(any(feature = "workload", feature = "playlist", feature = "command"))]
