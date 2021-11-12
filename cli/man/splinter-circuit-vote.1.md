@@ -91,8 +91,13 @@ ENVIRONMENT VARIABLES
 
 SEE ALSO
 ========
-| `splinter-circuit-propose(1)`
+| `splinter-circuit-abandon(1)`
+| `splinter-circuit-disband(1)`
+| `splinter-circuit-list(1)`
 | `splinter-circuit-proposals(1)`
+| `splinter-circuit-propose(1)`
+| `splinter-circuit-purge(1)`
+| `splinter-circuit-remove-proposal(1)`
 | `splinter-circuit-show(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/0.5/

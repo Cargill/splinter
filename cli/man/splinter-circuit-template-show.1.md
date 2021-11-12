@@ -64,23 +64,24 @@ ENVIRONMENT VARIABLES
 
 EXAMPLES
 ========
-The following command shows the details of the `scabbard` circuit template,
-which is available by default (packaged with the Splinter CLI) in the default
-circuit template directory, `/usr/share/splinter/circuit-templates`.
+The following command shows the details of the `scabbard_circuit_template`
+circuit template, which is available by default (packaged with the Splinter CLI)
+in the default circuit template directory,
+`/usr/share/splinter/circuit-templates`.
 
 ```
-$ splinter circuit template show scabbard
+$ splinter circuit template show scabbard_circuit_template
 ---
 version: v1
 args:
-  - name: “$(a:ADMIN_KEYS)”
+  - name: ADMIN_KEYS
     required: false
-    default: “$(a:SIGNER_PUB_KEY)”
+    default: $(SIGNER_PUB_KEY)
     description: Public keys used to verify transactions in the scabbard service
-  - name: “$(a:NODES)”
+  - name: NODES
     required: true
     description: List of node IDs
-  - name: “$(a:SIGNER_PUB_KEY)”
+  - name: SIGNER_PUB_KEY
     required: false
     description: Public key of the signer
 rules:
@@ -89,9 +90,11 @@ rules:
     service-args:
       - key: admin_keys
         value:
-          - "$(a:ADMIN_KEYS)"
+          - $(ADMIN_KEYS)
       - key: peer_services
-        value: "$(r:ALL_OTHER_SERVICES)"
+        value: $(ALL_OTHER_SERVICES)
+      - key: version
+        value: "2"
     first-service: a000
 ```
 

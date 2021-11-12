@@ -18,7 +18,7 @@ DESCRIPTION
 ===========
 Lists all of the circuit proposals that the local node is a proposed member of.
 This command displays abbreviated information pertaining to proposed circuits in
-columns, with the headers `ID`, `NAME`, `MANAGEMENT`, `MEMBERS`, and
+columns, with the headers `ID`, `NAME`, `MANAGEMENT`, `MEMBERS`, `COMMENTS`, and
 `PROPOSAL_TYPE`. This makes it possible to verify that circuit proposals have
 been successfully proposed as well as being able to access the generated
 circuit ID assigned to a proposal. This also makes it possible to verify the
@@ -71,51 +71,51 @@ formatting, meaning the information is displayed in a table. The `--member` and
 `--management-type` options allow for filtering the circuit proposals.
 
 The following command does not specify any filters, therefore all circuit
-proposals the local node, `alpha-node-000` is a part of are displayed.
+proposals the local node, `node-000` is a part of are displayed.
 ```
 $ splinter circuit proposals \
-  --url URL-of-alpha-node-splinterd-REST-API
-ID           NAME      MANAGEMENT    MEMBERS                       PROPOSAL_TYPE
-01234-ABCDE  -         mgmt001       alpha-node-000;beta-node-000  Create
-43210-ABCDE  circuit1  mgmt001       alpha-node-000;gamma-node-000 Create
-56789-ABCDE  -         mgmt002       alpha-node-000;gamma-node-000 Create
+  --url URL-of-node-000-splinterd-REST-API
+ID           NAME      MANAGEMENT    MEMBERS            COMMENTS  PROPOSAL_TYPE
+01234-ABCDE  -         mgmt001       node-000;node-001  -         Create
+43210-ABCDE  circuit1  mgmt001       node-000;node-002  -         Create
+56789-ABCDE  -         mgmt002       node-000;node-002  -         Create
 ```
 
 The next command specifies a `--management-type` filter, therefore all circuit
-proposals the local node, `alpha-node-000` is a part of with a
+proposals the local node, `node-000` is a part of with a
 `circuit_management_type` of `mgmt001` will be listed.
 ```
 $ splinter circuit proposals \
   --management-type mgmt001 \
-  --url URL-of-alpha-node-splinterd-REST-API
-ID           NAME      MANAGEMENT    MEMBERS                       PROPOSAL_TYPE
-01234-ABCDE  -         mgmt001       alpha-node-000;beta-node-000  Create
-43210-ABCDE  circuit1  mgmt001       alpha-node-000;gamma-node-000 Create
+  --url URL-of-node-000-splinterd-REST-API
+ID           NAME      MANAGEMENT    MEMBERS            COMMENTS  PROPOSAL_TYPE
+01234-ABCDE  -         mgmt001       node-000;node-001  -         Create
+43210-ABCDE  circuit1  mgmt001       node-000;node-002  -         Create
 ```
 
 The next command specifies a `--member` filter, therefore all circuit proposals
-the local node, `alpha-node-000` is a part of including the `gamma-node-000`
+the local node, `node-000` is a part of including the `node-002`
 node ID will be listed.
 ```
 $ splinter circuit proposals \
-  member gamma-node-000 \
-  --url URL-of-alpha-node-splinterd-REST-API
-ID            NAME      MANAGEMENT    MEMBERS                       PROPOSAL_TYPE
-43210-ABCDE   circuit1  mgmt001       alpha-node-000;gamma-node-000 Create
-56789-ABCDE   -         mgmt002       alpha-node-000;gamma-node-000 Create
+  member node-002 \
+  --url URL-of-node-000-splinterd-REST-API
+ID            NAME      MANAGEMENT    MEMBERS            COMMENTS  PROPOSAL_TYPE
+43210-ABCDE   circuit1  mgmt001       node-000;node-002  -         Create
+56789-ABCDE   -         mgmt002       node-000;node-002  -         Create
 ```
 
 The next command does not specify any filters, therefore all circuit
-proposals the local node, `alpha-node-000` is a part of are displayed. This
+proposals the local node, `node-000` is a part of are displayed. This
 includes a circuit proposal to disband an existing circuit, `01234-FGHIJ`.
 ```
 $ splinter circuit proposals \
-  --url URL-of-alpha-node-splinterd-REST-API
-ID           NAME      MANAGEMENT    MEMBERS                       PROPOSAL_TYPE
-01234-ABCDE  -         mgmt001       alpha-node-000;beta-node-000  Create
-43210-ABCDE  circuit1  mgmt001       alpha-node-000;gamma-node-000 Create
-56789-ABCDE  -         mgmt002       alpha-node-000;gamma-node-000 Create
-01234-FGHIJ  circuit0  mgmt002       alpha-node-000;gamma-node-000 Disband
+  --url URL-of-node-000-splinterd-REST-API
+ID           NAME      MANAGEMENT    MEMBERS            COMMENTS  PROPOSAL_TYPE
+01234-ABCDE  -         mgmt001       node-000;node-001  -         Create
+43210-ABCDE  circuit1  mgmt001       node-000;node-002  -         Create
+56789-ABCDE  -         mgmt002       node-000;node-002  -         Create
+01234-FGHIJ  circuit0  mgmt002       node-000;node-002  -         Disband
 ```
 
 ENVIRONMENT VARIABLES
@@ -125,8 +125,13 @@ ENVIRONMENT VARIABLES
 
 SEE ALSO
 ========
-| `splinter-circuit-propose(1)`
+| `splinter-circuit-abandon(1)`
+| `splinter-circuit-disband(1)`
 | `splinter-circuit-list(1)`
+| `splinter-circuit-propose(1)`
+| `splinter-circuit-purge(1)`
+| `splinter-circuit-remove-proposal(1)`
+| `splinter-circuit-show(1)`
 | `splinter-circuit-vote(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/0.5/

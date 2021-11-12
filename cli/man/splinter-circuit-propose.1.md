@@ -56,7 +56,7 @@ OPTIONS
 =======
 `--auth-type AUTHORIZATION_TYPE`
 : Authorization type for the circuit. Possible values `trust` or `challenge`.
-  Defaults to `trust`. If using `challenge`, node public keys are required.
+  Defaults to `challenge`. If using `challenge`, node public keys are required.
 
 `--comments COMMENTS`
 : Adds human-readable comments to the circuit proposal.
@@ -162,6 +162,7 @@ $ splinter circuit propose \
   --service AA01::alpha001 \
   --key PRIVATE-KEY-FILE
   --url URL-of-splinterd-REST-API
+  --auth-type trust
 ```
 
 The next command proposes a circuit with one other node, with multiple services
@@ -189,6 +190,7 @@ splinter circuit propose \
   --service-arg AA01::admin_keys=NODE-PUBLIC-KEY \
   --service-arg BB01::admin_keys=NODE-PUBLIC-KEY \
   --service-peer-group AA01,BB01
+  --auth-type trust
 ```
 
 The glob operator, `*` may be used to match SERVICE-ID for the `--service-type`
@@ -209,9 +211,13 @@ becomes the following using the glob operator:
 
 SEE ALSO
 ========
+| `splinter-circuit-abandon(1)`
+| `splinter-circuit-disband(1)`
+| `splinter-circuit-list(1)`
 | `splinter-circuit-proposals(1)`
-| `splinter-circuit-template(1)`
-| `splinter-circuit-vote(1)`
+| `splinter-circuit-purge(1)`
 | `splinter-circuit-remove-proposal(1)`
+| `splinter-circuit-show(1)`
+| `splinter-circuit-vote(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/0.5/

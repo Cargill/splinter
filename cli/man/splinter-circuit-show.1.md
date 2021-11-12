@@ -87,17 +87,25 @@ Proposal to create: 01234-ABCDE
     Schema Version: 2
     Management Type: mgmt001
 
-    alpha-001 (tcps://splinterd-node-alpha001:8044)
+    alpha-001
+        Public Key: ALPHA-NODE-PUBLIC-KEY
         Vote: ACCEPT (implied as requester):
             ALPHA-PUBLIC-KEY
+        Endpoints:
+            tcps://splinterd-node-alpha001:8044
         Service: AA01
             admin_keys:
                 ALPHA-PUBLIC-KEY
+            version:
+                2
             peer_services:
                 BB01
 
-    beta-001 (tcps://splinterd-node-beta001:8044)
+    beta-001
+        Public Key: BETA-NODE-PUBLIC-KEY
         Vote: PENDING
+        Endpoints:
+            tcps://splinterd-node-beta001:8044
         Service: AA01
             admin_keys:
                 ALPHA-PUBLIC-KEY
@@ -122,17 +130,25 @@ Proposal to disband: 56789-ABCDE
     Schema Version: 2
     Management Type: mgmt001
 
-    alpha-001 (tcps://splinterd-node-alpha001:8044)
+    alpha-001
+        Public Key: ALPHA-NODE-PUBLIC-KEY
         Vote: ACCEPT (implied as requester):
             ALPHA-PUBLIC-KEY
+        Endpoints:
+            tcps://splinterd-node-alpha001:8044
         Service: AA01
             admin_keys:
                 ALPHA-PUBLIC-KEY
+            version:
+                2
             peer_services:
                 BB01
 
-    beta-001 (tcps://splinterd-node-beta001:8044)
+    beta-001
+        Public Key: BETA-NODE-PUBLIC-KEY
         Vote: PENDING
+        Endpoints:
+            tcps://splinterd-node-beta001:8044
         Service: AA01
             admin_keys:
                 ALPHA-PUBLIC-KEY
@@ -148,8 +164,13 @@ ENVIRONMENT VARIABLES
 
 SEE ALSO
 ========
-| `splinter-circuit-propose(1)`
+| `splinter-circuit-abandon(1)`
+| `splinter-circuit-disband(1)`
 | `splinter-circuit-list(1)`
 | `splinter-circuit-proposals(1)`
+| `splinter-circuit-propose(1)`
+| `splinter-circuit-purge(1)`
+| `splinter-circuit-remove-proposal(1)`
+| `splinter-circuit-vote(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/0.5/

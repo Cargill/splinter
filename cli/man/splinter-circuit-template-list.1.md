@@ -68,13 +68,15 @@ ENVIRONMENT VARIABLES
 EXAMPLES
 ========
 The following example lists the circuit templates on a system that has only the
-`scabbard` template, which is available by default (packaged with the Splinter CLI)
-in the circuit template directory, `/usr/share/splinter/circuit-templates`.
+`scabbard_circuit_template` template, which is available by default (packaged
+with the Splinter CLI) in the circuit template directory,
+`/usr/share/splinter/circuit-templates`.
 
 ```
 $ splinter circuit template list
-TEMPLATE PATH
-scabbard /usr/share/splinter/circuit-templates/scabbard.yaml
+TEMPLATE                  PATH
+scabbard_circuit_template /usr/share/splinter/circuit-templates/
+scabbard_circuit_template.yaml
 ```
 
 If the `SPLINTER_CIRCUIT_TEMPLATE_PATH` is set with multiple directories, all
@@ -84,12 +86,13 @@ template files with the same file names.
 ```
 $ export SPLINTER_CIRCUIT_TEMPLATE_PATH='/foo:/bar'
 $ splinter circuit template list
-TEMPLATE PATH
-foo      /foo/foo.yaml
-bar      /foo/bar.yaml
-foo      /bar/foo.yaml
-bar      /bar/bar.yaml
-scabbard /usr/share/splinter/circuit-templates/scabbard.yaml
+TEMPLATE                  PATH
+foo                       /foo/foo.yaml
+bar                       /foo/bar.yaml
+foo                       /bar/foo.yaml
+bar                       /bar/bar.yaml
+scabbard_circuit_template /usr/share/splinter/circuit-templates/
+scabbard_circuit_template.yaml
 ```
 
 SEE ALSO

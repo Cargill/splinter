@@ -114,6 +114,7 @@ SEE ALSO
 | `splinter-circuit-proposals(1)`
 | `splinter-circuit-propose(1)`
 | `splinter-circuit-purge(1)`
+| `splinter-circuit-remove-proposal(1)`
 | `splinter-circuit-show(1)`
 | `splinter-circuit-template-arguments(1)`
 | `splinter-circuit-template-list(1)`
