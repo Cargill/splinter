@@ -171,6 +171,7 @@ impl Action for WorkloadAction {
                     seed,
                     num_accounts,
                     duration,
+                    request_counters,
                 )?;
             }
             "command" => {
@@ -184,6 +185,7 @@ impl Action for WorkloadAction {
                     update,
                     seed,
                     duration,
+                    request_counters,
                 )?;
             }
             _ => {
@@ -233,6 +235,7 @@ fn start_smallbank_workloads(
     seed: u64,
     num_accounts: usize,
     total_duration: Option<Time>,
+    request_counters: Vec<Arc<HttpRequestCounter>>,
 ) -> Result<(), CliError> {
     let mut rng = rand::thread_rng();
 
@@ -295,6 +298,7 @@ fn start_command_workloads(
     update: u32,
     seed: u64,
     total_duration: Option<Time>,
+    request_counters: Vec<Arc<HttpRequestCounter>>,
 ) -> Result<(), CliError> {
     let mut rng = rand::thread_rng();
 
