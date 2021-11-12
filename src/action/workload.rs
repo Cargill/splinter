@@ -280,6 +280,7 @@ fn start_smallbank_workloads(
                 update,
                 false,
                 duration,
+                request_counters[i].clone(),
             )
             .map_err(|err| CliError::ActionError(format!("Unable to start workload: {}", err)))?
     }
@@ -343,6 +344,7 @@ fn start_command_workloads(
                 update,
                 true,
                 duration,
+                request_counters[i].clone(),
             )
             .map_err(|err| CliError::ActionError(format!("Unable to start workload: {}", err)))?
     }
