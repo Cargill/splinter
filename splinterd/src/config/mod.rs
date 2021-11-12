@@ -925,6 +925,7 @@ mod tests {
 
     use ::clap::ArgMatches;
     use ::toml::{map::Map, to_string, Value};
+    #[cfg(feature = "log-config")]
     use log::Level;
 
     use crate::config::{
