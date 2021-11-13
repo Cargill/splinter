@@ -64,7 +64,7 @@ experimental = [
 ]
 
 command = ["cylinder", "hex", "protobuf", "reqwest", "serde", "serde_json"]
-playlist = ["cylinder"]
+playlist = ["cylinder", "serde_json"]
 workload = ["ctrlc", "cylinder", "rand", "transact/family-command-workload", "transact/family-smallbank-workload"]
 
 [package.metadata.docs.rs]

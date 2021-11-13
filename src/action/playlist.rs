@@ -13,16 +13,20 @@
 // limitations under the License
 
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::sync::Arc;
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use clap::ArgMatches;
+use reqwest::{blocking::Client, header, StatusCode};
+use serde::Deserialize;
 use transact::families::smallbank::workload::playlist::{
     generate_smallbank_playlist, process_smallbank_playlist,
 };
-use transact::workload::batch_gen::generate_signed_batches;
-use transact::workload::{submit_batches_from_source, HttpRequestCounter};
+use transact::protos::IntoBytes;
+use transact::workload::batch_gen::{generate_signed_batches, BatchListFeeder};
+use transact::workload::HttpRequestCounter;
 
 use crate::action::time::Time;
 use crate::error::CliError;
@@ -274,4 +278,112 @@ impl Action for SubmitPlaylistAction {
 
         Ok(())
     }
+}
+
+/// Helper function that takes a list of pre-generated batches that have already been written to
+/// `source` and submits them to the given targets, waiting a specified amount of time between
+/// submissions.
+///
+/// # Arguments
+///
+/// * `source` - Contains the list of batches that will be submitted to the given targets
+/// * `targets` - A list of URL for submitting the batches. The URL provided must be the full URL
+///   before adding `/batches` for submission.
+/// * `time_to_wait` - The amount of time to wait between batch submissions
+/// * `auth` - The string sent in the authorization header when sending batches to the targets
+/// * `request_counter`
+pub fn submit_batches_from_source(
+    source: &mut dyn Read,
+    targets: Vec<String>,
+    time_to_wait: Duration,
+    auth: String,
+    request_counters: Vec<Arc<HttpRequestCounter>>,
+) {
+    let mut workload = BatchListFeeder::new(source);
+    // set first target
+    let mut next_target = 0;
+    let mut submission_start = Instant::now();
+    let mut submission_avg: Option<Duration> = None;
+    loop {
+        let http_counter = request_counters[next_target].clone();
+        let target = match targets.get(next_target) {
+            Some(target) => target,
+            None => {
+                error!("No targets provided");
+                break;
+            }
+        };
+
+        // get next batch
+        let batch = match workload.next() {
+            Some(Ok(batch)) => batch,
+            Some(Err(err)) => {
+                error!("Unable to get batch: {}", err);
+                break;
+            }
+            None => {
+                info!("All batches submitted");
+                break;
+            }
+        };
+
+        let batch_bytes = match vec![batch.batch().clone()].into_bytes() {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                error!("Unable to get batch bytes {}", err);
+                break;
+            }
+        };
+
+        // submit batch to the target
+        match Client::new()
+            .post(&format!("{}/batches", target))
+            .header(header::CONTENT_TYPE, "octet-stream")
+            .header("Authorization", &auth)
+            .body(batch_bytes)
+            .send()
+        {
+            Ok(res) => {
+                let status = res.status();
+                if status.is_success() {
+                    http_counter.increment_sent();
+                } else if status == StatusCode::TOO_MANY_REQUESTS {
+                    http_counter.increment_queue_full();
+                } else {
+                    let message = match res.json::<ServerError>() {
+                        Ok(e) => e.message,
+                        Err(err) => format!(
+                            "Batch submit request failed with status \
+                                code '{}', but error response was not valid",
+                            err
+                        ),
+                    };
+                    error!("Failed to submit batch: {}", message);
+                }
+            }
+            Err(err) => {
+                error!("Failed to send request to target: {}", err);
+                break;
+            }
+        }
+
+        // get next target, round robin
+        next_target = (next_target + 1) % targets.len();
+        let diff = Instant::now() - submission_start;
+        let submission_time = match submission_avg {
+            Some(val) => (diff + val) / 2,
+            None => diff,
+        };
+        submission_avg = Some(submission_time);
+
+        let wait_time = time_to_wait.saturating_sub(submission_time);
+
+        thread::sleep(wait_time);
+        submission_start = Instant::now();
+    }
+}
+
+#[derive(Deserialize)]
+struct ServerError {
+    pub message: String,
 }
