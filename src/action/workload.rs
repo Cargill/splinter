@@ -19,9 +19,7 @@ use clap::ArgMatches;
 use cylinder::Signer;
 use rand::Rng;
 use transact::families::{
-    command::workload::{
-        playlist::CommandGeneratingIter, CommandBatchWorkload, CommandTransactionWorkload,
-    },
+    command::workload::{CommandBatchWorkload, CommandGeneratingIter, CommandTransactionWorkload},
     smallbank::workload::{
         playlist::SmallbankGeneratingIter, SmallbankBatchWorkload, SmallbankTransactionWorkload,
     },
