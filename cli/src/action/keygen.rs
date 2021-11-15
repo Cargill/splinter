@@ -17,6 +17,7 @@ use std::fs::{create_dir_all, metadata, OpenOptions};
 use std::io::prelude::*;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 #[cfg(target_os = "linux")]
 use std::os::linux::fs::MetadataExt;
@@ -26,6 +27,7 @@ use std::os::unix::fs::MetadataExt;
 use clap::ArgMatches;
 use cylinder::{secp256k1::Secp256k1Context, Context};
 use cylinder::{PrivateKey, PublicKey};
+use users::{get_group_by_gid, get_group_by_name};
 
 use crate::error::CliError;
 
@@ -38,9 +40,73 @@ const DEFAULT_SYSTEM_KEY_NAME: &str = "splinterd";
 
 pub struct KeyGenAction;
 
+#[derive(Debug)]
+pub enum GroupOptions {
+    Auto,
+    Named(String),
+    GroupID(u32),
+}
+
+enum ValidatedGroupOptions {
+    Auto,
+    GroupID(u32),
+}
+
+impl GroupOptions {
+    fn validate(self) -> Result<ValidatedGroupOptions, CliError> {
+        match self {
+            GroupOptions::Auto => Ok(ValidatedGroupOptions::Auto),
+            GroupOptions::Named(ref name) => {
+                if let Some(g) = get_group_by_name(&name) {
+                    Ok(ValidatedGroupOptions::GroupID(g.gid()))
+                } else {
+                    Err(CliError::EnvironmentError(format!(
+                        "No group with the name: {}",
+                        name
+                    )))
+                }
+            }
+            GroupOptions::GroupID(id) => {
+                if get_group_by_gid(id).is_some() {
+                    Ok(ValidatedGroupOptions::GroupID(id))
+                } else {
+                    Err(CliError::EnvironmentError(format!(
+                        "No group with the id: {}",
+                        id
+                    )))
+                }
+            }
+        }
+    }
+}
+
 impl Action for KeyGenAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
+        let group: Option<ValidatedGroupOptions> = args
+            .value_of("group")
+            .map(|s| -> Result<GroupOptions, CliError> {
+                match s {
+                    "auto" => Ok(GroupOptions::Auto),
+                    val => {
+                        if let Ok(num) = u32::from_str(val) {
+                            Ok(GroupOptions::GroupID(num))
+                        } else {
+                            Ok(GroupOptions::Named(val.to_string()))
+                        }
+                    }
+                }
+            })
+            .or_else(|| {
+                if args.is_present("system") {
+                    Some(Ok(GroupOptions::Auto))
+                } else {
+                    None
+                }
+            })
+            .transpose()?
+            .map(|g| g.validate())
+            .transpose()?;
 
         let key_name = args
             .value_of("key-name")
@@ -104,7 +170,7 @@ impl Action for KeyGenAction {
             public_key_path,
             args.is_present("force"),
             args.is_present("skip"),
-            true,
+            group,
         )?;
 
         Ok(())
@@ -118,7 +184,7 @@ fn write_keys(
     public_key_path: PathBuf,
     force_create: bool,
     skip_create: bool,
-    change_permissions: bool,
+    group: Option<ValidatedGroupOptions>,
 ) -> Result<(), CliError> {
     let (private_key, public_key) = keys;
     if !force_create {
@@ -175,9 +241,9 @@ fn write_keys(
     })?;
 
     #[cfg(not(target_os = "linux"))]
-    let (key_dir_uid, key_dir_gid) = (key_dir_info.uid(), key_dir_info.gid());
+    let key_dir_uid = key_dir_info.uid();
     #[cfg(target_os = "linux")]
-    let (key_dir_uid, key_dir_gid) = (key_dir_info.st_uid(), key_dir_info.st_gid());
+    let key_dir_uid = key_dir_info.st_uid();
 
     {
         if private_key_path.exists() {
@@ -239,9 +305,16 @@ fn write_keys(
             ))
         })?;
     }
-    if change_permissions {
-        chown(private_key_path.as_path(), key_dir_uid, key_dir_gid)?;
-        chown(public_key_path.as_path(), key_dir_uid, key_dir_gid)?;
+    if let Some(group_option) = group {
+        let group_id = match group_option {
+            ValidatedGroupOptions::GroupID(id) => id,
+            #[cfg(target_os = "linux")]
+            ValidatedGroupOptions::Auto => key_dir_info.st_gid(),
+            #[cfg(not(target_os = "linux"))]
+            ValidatedGroupOptions::Auto => key_dir_info.gid(),
+        };
+        chown(private_key_path.as_path(), key_dir_uid, group_id)?;
+        chown(public_key_path.as_path(), key_dir_uid, group_id)?;
     }
 
     Ok(())
