@@ -219,7 +219,7 @@ version = "1"
 #
 #[appenders.warnlog]
 #
-#kind = "rolling_file"
+#kind = "file"
 #
 # Pattern controls the formatting of each log message.
 #pattern = "[ {d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n"
@@ -227,10 +227,6 @@ version = "1"
 # Filename is specific to rolling_file and file appenders and is simply a path
 # to a file.  Must be specified.
 #filename = "/var/log/splinter/splinterd-warn.log"
-#
-# Size is specific to rolling_file and specifies when the file should be
-# rolled/overwritten.  Must be specified.
-#size = "16.0M"
 #
 # All messages "Warn" and higher will be sent this appender.
 #level = "Warn"
