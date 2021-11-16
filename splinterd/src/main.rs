@@ -28,7 +28,7 @@ mod routes;
 mod transport;
 
 use cylinder::{load_key_from_path, secp256k1::Secp256k1Context, Context, Signer};
-use log4rs::{Config as LogConfig, Handle};
+use log4rs::Handle;
 use logging::{configure_logging, default_log_settings};
 
 use splinter::error::InternalError;
@@ -494,7 +494,7 @@ fn main() {
 
     let matches = app.get_matches();
 
-    let log_handle = log4rs::init_config(default_log_config(&matches));
+    let log_handle = log4rs::init_config(default_log_settings());
     let log_handle = match log_handle {
         Err(e) => {
             eprintln!("Could not start logging, {}", e);
@@ -569,10 +569,6 @@ fn get_config_file(matches: &'_ ArgMatches) -> Result<String, UserError> {
     }
 
     Ok("/etc/splinter/splinterd.toml".to_string())
-}
-
-fn default_log_config(_matches: &ArgMatches) -> LogConfig {
-    default_log_settings()
 }
 
 fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserError> {
