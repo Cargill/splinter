@@ -56,7 +56,7 @@ default-features = false
 optional = true
 
 [dev-dependencies]
-gag = "0.1"
+gag = "1"
 serial_test = "0.3"
 tempdir = "0.3"
 
