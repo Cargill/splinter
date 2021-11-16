@@ -33,7 +33,7 @@ path = "src/main.rs"
 clap = "2"
 diesel = { version = "1.0", features = ["postgres"] }
 diesel_migrations = "1.4"
-flexi_logger = "0.14"
+flexi_logger = { version = "0.20", features = ["use_chrono_for_offset"] }
 log = "0.4"
 
 [features]

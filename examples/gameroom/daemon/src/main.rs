@@ -28,12 +28,10 @@ mod error;
 mod rest_api;
 
 use std::path::PathBuf;
-use std::thread;
 
 use cylinder::{jwt::JsonWebTokenBuilder, load_key, secp256k1::Secp256k1Context, Context};
-use flexi_logger::{style, DeferredNow, LogSpecBuilder, Logger};
+use flexi_logger::{with_thread, LogSpecBuilder, Logger};
 use gameroom_database::ConnectionPool;
-use log::Record;
 use splinter::events::Reactor;
 
 use crate::config::{get_node, GameroomConfigBuilder};
@@ -41,24 +39,6 @@ use crate::error::GameroomDaemonError;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-// format for logs
-pub fn log_format(
-    w: &mut dyn std::io::Write,
-    now: &mut DeferredNow,
-    record: &Record,
-) -> Result<(), std::io::Error> {
-    let level = record.level();
-    write!(
-        w,
-        "[{}] T[{:?}] {} [{}] {}",
-        now.now().format("%Y-%m-%d %H:%M:%S%.3f"),
-        thread::current().name().unwrap_or("<unnamed>"),
-        record.level(),
-        record.module_path().unwrap_or("<unnamed>"),
-        style(level, &record.args()),
-    )
-}
 
 fn run() -> Result<(), GameroomDaemonError> {
     let matches = clap_app!(myapp =>
@@ -88,8 +68,8 @@ fn run() -> Result<(), GameroomDaemonError> {
     log_spec_builder.module("trust_dns", log::LevelFilter::Warn);
 
     Logger::with(log_spec_builder.build())
-        .format(log_format)
-        .log_target(flexi_logger::LogTarget::StdOut)
+        .format(with_thread)
+        .log_to_stdout()
         .start()?;
 
     let config = GameroomConfigBuilder::default()

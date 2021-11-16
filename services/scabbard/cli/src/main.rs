@@ -1193,7 +1193,7 @@ fn setup_logging(log_level: log::LevelFilter) -> Result<(), CliError> {
 
     Logger::with(log_spec_builder.build())
         .format(log_format)
-        .log_target(flexi_logger::LogTarget::StdOut)
+        .log_to_stdout()
         .start()?;
 
     Ok(())
