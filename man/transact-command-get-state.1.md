@@ -18,7 +18,9 @@ SYNOPSIS
 DESCRIPTION
 ===========
 This command submits a Sabre transaction to request a state read of the
-addresses given.
+addresses given. Nothing will be displayed after running this command. This
+command submits a state read request but does not return the data that is set
+for the given address.
 
 This command assumes the distributed ledger's REST API supports Cylinder
 JWT authentication.
@@ -63,8 +65,8 @@ scabbard.
 
 ```
 transact command get-state \
-  --key /alice.priv
-  --target "http://0.0.0.0:8080/scabbard/vpENT-eSfFZ/gsAA"
+  --key /alice.priv \
+  --target "http://0.0.0.0:8080/scabbard/vpENT-eSfFZ/gsAA" \
   --address \
   06abbcb16ed7d24b3ecbd4164dcdad374e08c0ab7518aa07f9d3683f34c2b3c67a1583
 ```
@@ -75,11 +77,11 @@ transaction handler. The command smart contract must already be uploaded to
 scabbard.
 
 ```
-transact command set-state \
-  --key /alice.priv
-  --target "http://0.0.0.0:8080/scabbard/kpHVT-sjpQM/gsAA"
+transact command get-state \
+  --key /alice.priv \
+  --target "http://0.0.0.0:8080/scabbard/kpHVT-sjpQM/gsAA" \
   --address \
-  06abbcb16ed7d24b3ecbd4164dcdad374e08c0ab7518aa07f9d3683f34c2b3c67a1583
+  06abbcb16ed7d24b3ecbd4164dcdad374e08c0ab7518aa07f9d3683f34c2b3c67a1583 \
   --address \
   06abbc6d201beeefb589b08ef0672dac82353d0cbd9ad99e1642c83a1601f3d647bcca
 ```

@@ -63,8 +63,8 @@ contract must already be uploaded to scabbard.
 
 ```
 transact command show-state \
-  --key /alice.priv
-  --target "http://0.0.0.0:8080/scabbard/vpENT-eSfFZ/gsAA"
+  --key /alice.priv \
+  --target "http://0.0.0.0:8080/scabbard/vpENT-eSfFZ/gsAA" \
   --address \
   06abbcb16ed7d24b3ecbd4164dcdad374e08c0ab7518aa07f9d3683f34c2b3c67a1583
 ```
