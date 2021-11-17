@@ -22,19 +22,13 @@ extern crate clap;
 mod config;
 mod daemon;
 mod error;
-#[cfg(feature = "log-config")]
 mod logging;
 pub mod node_id;
 mod routes;
 mod transport;
 
 use cylinder::{load_key_from_path, secp256k1::Secp256k1Context, Context, Signer};
-#[cfg(not(feature = "log-config"))]
-use log4rs::config::{Appender, Logger, Root};
-#[cfg(not(feature = "log-config"))]
-use log4rs::encode::pattern::PatternEncoder;
-use log4rs::{Config as LogConfig, Handle};
-#[cfg(feature = "log-config")]
+use log4rs::Handle;
 use logging::{configure_logging, default_log_settings};
 
 use splinter::error::InternalError;
@@ -500,7 +494,7 @@ fn main() {
 
     let matches = app.get_matches();
 
-    let log_handle = log4rs::init_config(default_log_config(&matches));
+    let log_handle = log4rs::init_config(default_log_settings());
     let log_handle = match log_handle {
         Err(e) => {
             eprintln!("Could not start logging, {}", e);
@@ -577,48 +571,6 @@ fn get_config_file(matches: &'_ ArgMatches) -> Result<String, UserError> {
     Ok("/etc/splinter/splinterd.toml".to_string())
 }
 
-#[cfg(not(feature = "log-config"))]
-fn get_log_filter_level(matches: &ArgMatches) -> log::LevelFilter {
-    match matches.occurrences_of("verbose") {
-        0 => log::LevelFilter::Warn,
-        1 => log::LevelFilter::Info,
-        2 => log::LevelFilter::Debug,
-        _ => log::LevelFilter::Trace,
-    }
-}
-
-fn default_log_config(_matches: &ArgMatches) -> LogConfig {
-    #[cfg(feature = "log-config")]
-    {
-        default_log_settings()
-    }
-    #[cfg(not(feature = "log-config"))]
-    {
-        let encoder = PatternEncoder::new("[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n");
-        let stdout = log4rs::append::console::ConsoleAppender::builder()
-            .encoder(Box::new(encoder))
-            .build();
-        let config = log4rs::Config::builder()
-            .appender(Appender::builder().build("stdout", Box::new(stdout)))
-            .logger(Logger::builder().build("hyper", log::LevelFilter::Warn))
-            .logger(Logger::builder().build("tokio", log::LevelFilter::Warn));
-        #[cfg(feature = "https-bind")]
-        let config = config.logger(Logger::builder().build("h2", log::LevelFilter::Warn));
-        let conf = config.build(
-            Root::builder()
-                .appender("stdout")
-                .build(get_log_filter_level(_matches)),
-        );
-
-        if let Ok(lc) = conf {
-            lc
-        } else {
-            unreachable!();
-            //the basic config should always be valid
-        }
-    }
-}
-
 fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserError> {
     // get provided config file or search default location
     let config_file = get_config_file(&matches)?;
@@ -631,13 +583,10 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
 
     let config = create_config(config_file_path, matches.clone())?;
 
-    #[cfg(feature = "log-config")]
-    {
-        if let Err(e) = configure_logging(&config, &_log_handle) {
-            _log_handle.set_config(default_log_settings());
-            config.log_as_debug();
-            return Err(e);
-        }
+    if let Err(e) = configure_logging(&config, &_log_handle) {
+        _log_handle.set_config(default_log_settings());
+        config.log_as_debug();
+        return Err(e);
     }
 
     let state_dir = config.state_dir();

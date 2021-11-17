@@ -17,18 +17,14 @@
 //! Takes various `PartialConfig` objects and finalizes the config values sourced from the
 //! `PartialConfigs` to construct a `Config` object to be used to start up the Splinter daemon.
 
-#[cfg(feature = "log-config")]
 use std::collections::HashMap;
-#[cfg(feature = "log-config")]
 use std::convert::TryInto;
 use std::path::Path;
 
 use crate::config::error::ConfigError;
 use crate::config::{Config, ConfigSource, PartialConfig};
 
-#[cfg(feature = "log-config")]
 use super::logging::AppenderConfig;
-#[cfg(feature = "log-config")]
 use super::LoggerConfig;
 
 pub trait PartialConfigBuilder {
@@ -366,7 +362,6 @@ impl ConfigBuilder {
                 .iter()
                 .find_map(|p| p.peering_key().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("peering_key".to_string()))?,
-            #[cfg(feature = "log-config")]
             appenders: Some({
                 let appenders = self
                     .partial_configs
@@ -395,7 +390,6 @@ impl ConfigBuilder {
                     .map(|item| (item.0.to_owned(), item.1.to_owned()))
                     .collect()
             }),
-            #[cfg(feature = "log-config")]
             loggers: Some({
                 let loggers = self
                     .partial_configs
@@ -423,13 +417,11 @@ impl ConfigBuilder {
                     .map(|item| (item.0.to_owned(), item.1.to_owned()))
                     .collect()
             }),
-            #[cfg(feature = "log-config")]
             root_logger: self
                 .partial_configs
                 .iter()
                 .find_map(|p| p.root_logger().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("root_logger".to_string()))?,
-            #[cfg(feature = "log-config")]
             verbosity: self
                 .partial_configs
                 .iter()

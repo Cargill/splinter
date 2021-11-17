@@ -14,14 +14,11 @@
 
 //! `PartialConfig` builder using default values.
 
-#[cfg(feature = "log-config")]
 use std::collections::HashMap;
 
-#[cfg(feature = "log-config")]
 use crate::config::logging::UnnamedLoggerConfig;
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
-#[cfg(feature = "log-config")]
 use super::logging::{RootConfig, UnnamedAppenderConfig, DEFAULT_LOGGING_PATTERN};
 use super::ScabbardState;
 
@@ -112,52 +109,50 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         {
             partial_config = partial_config.with_enable_biome_credentials(Some(false))
         }
-        #[cfg(feature = "log-config")]
-        {
-            let root_logger: Option<RootConfig> = Some(RootConfig {
-                appenders: vec!["stdout".to_string()],
-                level: log::Level::Trace,
-            });
-            let stdout = UnnamedAppenderConfig {
-                encoder: String::from(DEFAULT_LOGGING_PATTERN),
-                kind: super::logging::RawLogTarget::Stdout,
-                size: None,
-                filename: None,
-                level: None,
-            };
-            let loggers = vec![
-                (
-                    "tokio".to_string(),
-                    UnnamedLoggerConfig {
-                        appenders: Some(vec!["stdout".into()]),
-                        level: Some(log::Level::Warn),
-                    },
-                ),
-                (
-                    "tokio_reactor".to_string(),
-                    UnnamedLoggerConfig {
-                        appenders: Some(vec!["stdout".into()]),
-                        level: Some(log::Level::Warn),
-                    },
-                ),
-                (
-                    "hyper".to_string(),
-                    UnnamedLoggerConfig {
-                        appenders: Some(vec!["stdout".into()]),
-                        level: Some(log::Level::Warn),
-                    },
-                ),
-            ]
-            .into_iter()
-            .collect::<HashMap<String, UnnamedLoggerConfig>>();
-            let mut appenders = HashMap::new();
-            appenders.insert("stdout".to_string(), stdout);
-            partial_config = partial_config
-                .with_root_logger(root_logger)
-                .with_appenders(Some(appenders))
-                .with_loggers(Some(loggers))
-                .with_verbosity(Some(log::Level::Info));
-        }
+
+        let root_logger: Option<RootConfig> = Some(RootConfig {
+            appenders: vec!["stdout".to_string()],
+            level: log::Level::Trace,
+        });
+        let stdout = UnnamedAppenderConfig {
+            encoder: String::from(DEFAULT_LOGGING_PATTERN),
+            kind: super::logging::RawLogTarget::Stdout,
+            size: None,
+            filename: None,
+            level: None,
+        };
+        let loggers = vec![
+            (
+                "tokio".to_string(),
+                UnnamedLoggerConfig {
+                    appenders: Some(vec!["stdout".into()]),
+                    level: Some(log::Level::Warn),
+                },
+            ),
+            (
+                "tokio_reactor".to_string(),
+                UnnamedLoggerConfig {
+                    appenders: Some(vec!["stdout".into()]),
+                    level: Some(log::Level::Warn),
+                },
+            ),
+            (
+                "hyper".to_string(),
+                UnnamedLoggerConfig {
+                    appenders: Some(vec!["stdout".into()]),
+                    level: Some(log::Level::Warn),
+                },
+            ),
+        ]
+        .into_iter()
+        .collect::<HashMap<String, UnnamedLoggerConfig>>();
+        let mut appenders = HashMap::new();
+        appenders.insert("stdout".to_string(), stdout);
+        partial_config = partial_config
+            .with_root_logger(root_logger)
+            .with_appenders(Some(appenders))
+            .with_loggers(Some(loggers))
+            .with_verbosity(Some(log::Level::Info));
 
         #[cfg(feature = "config-allow-keys")]
         {

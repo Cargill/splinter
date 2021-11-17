@@ -15,11 +15,9 @@
 //! An intermediate representation of the configuration values, used to take the
 //! configuration values from different sources into a common representation.
 
-#[cfg(feature = "log-config")]
 use std::collections::HashMap;
 use std::time::Duration;
 
-#[cfg(feature = "log-config")]
 use super::logging::{RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig};
 use super::ScabbardState;
 
@@ -95,13 +93,9 @@ pub struct PartialConfig {
     #[cfg(feature = "tap")]
     influx_password: Option<String>,
     peering_key: Option<String>,
-    #[cfg(feature = "log-config")]
     root_logger: Option<RootConfig>,
-    #[cfg(feature = "log-config")]
     appenders: Option<HashMap<String, UnnamedAppenderConfig>>,
-    #[cfg(feature = "log-config")]
     loggers: Option<HashMap<String, UnnamedLoggerConfig>>,
-    #[cfg(feature = "log-config")]
     verbosity: Option<log::Level>,
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: Option<String>,
@@ -169,13 +163,9 @@ impl PartialConfig {
             #[cfg(feature = "tap")]
             influx_password: None,
             peering_key: None,
-            #[cfg(feature = "log-config")]
             appenders: None,
-            #[cfg(feature = "log-config")]
             loggers: None,
-            #[cfg(feature = "log-config")]
             root_logger: None,
-            #[cfg(feature = "log-config")]
             verbosity: None,
             #[cfg(feature = "config-allow-keys")]
             allow_keys_file: None,
@@ -363,19 +353,18 @@ impl PartialConfig {
         self.peering_key.clone()
     }
 
-    #[cfg(feature = "log-config")]
     pub fn appenders(&self) -> Option<HashMap<String, UnnamedAppenderConfig>> {
         self.appenders.clone()
     }
-    #[cfg(feature = "log-config")]
+
     pub fn loggers(&self) -> Option<HashMap<String, UnnamedLoggerConfig>> {
         self.loggers.clone()
     }
-    #[cfg(feature = "log-config")]
+
     pub fn root_logger(&self) -> Option<RootConfig> {
         self.root_logger.clone()
     }
-    #[cfg(feature = "log-config")]
+
     pub fn verbosity(&self) -> Option<log::Level> {
         self.verbosity
     }
@@ -858,7 +847,6 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "log-config")]
     /// Adds a `verbosity` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -869,7 +857,6 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "log-config")]
     ///Adds a `root_logger` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -880,7 +867,6 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "log-config")]
     ///Adds `appenders` values to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -894,7 +880,6 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "log-config")]
     ///Adds `loggers` values to the `PartialConfig` object.
     ///
     /// # Arguments

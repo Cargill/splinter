@@ -23,7 +23,6 @@ mod clap;
 mod default;
 mod env;
 mod error;
-#[cfg(feature = "log-config")]
 mod logging;
 mod partial;
 mod toml;
@@ -38,7 +37,6 @@ pub use builder::{ConfigBuilder, PartialConfigBuilder};
 pub use error::ConfigError;
 pub use partial::{ConfigSource, PartialConfig};
 
-#[cfg(feature = "log-config")]
 pub use logging::{
     AppenderConfig, LogConfig, LogTarget, LoggerConfig, RawLogTarget, RootConfig,
     DEFAULT_LOGGING_PATTERN,
@@ -104,13 +102,9 @@ pub struct Config {
     #[cfg(feature = "tap")]
     influx_password: Option<(String, ConfigSource)>,
     peering_key: (String, ConfigSource),
-    #[cfg(feature = "log-config")]
     root_logger: (RootConfig, ConfigSource),
-    #[cfg(feature = "log-config")]
     appenders: Option<Vec<(AppenderConfig, ConfigSource)>>,
-    #[cfg(feature = "log-config")]
     loggers: Option<Vec<(LoggerConfig, ConfigSource)>>,
-    #[cfg(feature = "log-config")]
     verbosity: (log::Level, ConfigSource),
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: (String, ConfigSource),
@@ -582,36 +576,30 @@ impl Config {
         &self.peering_key.1
     }
 
-    #[cfg(feature = "log-config")]
     pub fn root_logger(&self) -> &RootConfig {
         &self.root_logger.0
     }
 
-    #[cfg(feature = "log-config")]
     pub fn root_logger_source(&self) -> &ConfigSource {
         &self.root_logger.1
     }
 
-    #[cfg(feature = "log-config")]
     pub fn appenders(&self) -> Option<Vec<AppenderConfig>> {
         self.appenders
             .as_ref()
             .map(|configs| configs.iter().map(|c| c.0.clone()).collect())
     }
 
-    #[cfg(feature = "log-config")]
     pub fn loggers(&self) -> Option<Vec<LoggerConfig>> {
         self.loggers
             .as_ref()
             .map(|configs| configs.iter().map(|c| c.0.clone()).collect())
     }
 
-    #[cfg(feature = "log-config")]
     pub fn verbosity(&self) -> log::Level {
         self.verbosity.0
     }
 
-    #[cfg(feature = "log-config")]
     pub fn verbosity_source(&self) -> &ConfigSource {
         &self.verbosity.1
     }
@@ -863,29 +851,26 @@ impl Config {
                 debug!("Config: influx_password: <HIDDEN> (source: {:?})", source,);
             }
         }
-        #[cfg(feature = "log-config")]
-        {
-            let loggers = self.loggers.as_ref().unwrap_or(&vec![]).to_owned();
-            for logger in loggers {
-                debug!("Config: logger: {:?} (source: {:?})", logger.0, logger.1);
-            }
-            for appender in self.appenders.as_ref().unwrap_or(&vec![]).to_owned() {
-                debug!(
-                    "Config: appender: {:?} (source: {:?})",
-                    appender.0, appender.1
-                );
-            }
+        let loggers = self.loggers.as_ref().unwrap_or(&vec![]).to_owned();
+        for logger in loggers {
+            debug!("Config: logger: {:?} (source: {:?})", logger.0, logger.1);
+        }
+        for appender in self.appenders.as_ref().unwrap_or(&vec![]).to_owned() {
             debug!(
-                "Config: root_logger: {:?} (source: {:?})",
-                self.root_logger(),
-                self.root_logger_source()
-            );
-            debug!(
-                "Config: verbosity: {:?} (source: {:?})",
-                self.verbosity(),
-                self.verbosity_source()
+                "Config: appender: {:?} (source: {:?})",
+                appender.0, appender.1
             );
         }
+        debug!(
+            "Config: root_logger: {:?} (source: {:?})",
+            self.root_logger(),
+            self.root_logger_source()
+        );
+        debug!(
+            "Config: verbosity: {:?} (source: {:?})",
+            self.verbosity(),
+            self.verbosity_source()
+        );
         #[cfg(feature = "config-allow-keys")]
         {
             debug!(
@@ -925,7 +910,6 @@ mod tests {
 
     use ::clap::ArgMatches;
     use ::toml::{map::Map, to_string, Value};
-    #[cfg(feature = "log-config")]
     use log::Level;
 
     use crate::config::{
@@ -1568,7 +1552,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "log-config")]
     /// This tests verifies that the log options take the right order of precedence and that you
     /// are able to override values where appropriate.
     fn test_log_config_default_overrides() {

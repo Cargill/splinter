@@ -108,7 +108,6 @@ experimental = [
     "authorization-handler-maintenance",
     "health-service",
     "https-bind",
-    "log-config",
     "node",
     "service-endpoint",
     "ws-transport",
@@ -133,7 +132,6 @@ database-postgres = ["diesel", "diesel/postgres", "scabbard/postgres", "splinter
 database-sqlite = ["diesel", "diesel/sqlite", "scabbard/sqlite", "splinter/sqlite"]
 health-service = ["health", "health/authorization"]
 https-bind = ["splinter/https-bind"]
-log-config = []
 tap = [
   "splinter/tap",
   "scabbard/metrics",
