@@ -69,8 +69,8 @@ transaction handler. The smallbank smart contract must already be submitted to
 scabbard.
 
 ```
-transact playlist submit\
-  --input batches.txt \
+transact playlist submit \
+  --input batches.dat \
   --key ./alice.priv \
   --rate 1/s  \
   --target "http://0.0.0.0:8089/scabbard/XOHZe-GE1oY/a001"

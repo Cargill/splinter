@@ -59,10 +59,10 @@ The following shows providing a transaction file `txns.txt` and creating
 `batches.txt` file of length-delimited protobuf batches.
 
 ```
-transact playlist batch
-  --input txns.txt \
-  --key ./alice.priv
-  --output batches.txt
+transact playlist batch \
+  --input txns.dat \
+  --key ./alice.priv \
+  --output batches.dat
 ```
 
 

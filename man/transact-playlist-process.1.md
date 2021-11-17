@@ -62,7 +62,7 @@ The following shows creating a file, `txns.text`
 transact playlist process \
   -i smallbank.yaml \
   --key ./alice.priv \
-  --output txns.text \
+  --output txns.dat \
   --workload smallbank
 ```
 

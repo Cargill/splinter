@@ -66,7 +66,7 @@ transactions.
 
 ```
 transact playlist create \
-  --smallbank-num-accounts 10\
+  --smallbank-num-accounts 10 \
   --output smallbank.yaml  \
   --smallbank-seed 10 \
   --transactions 20  \
