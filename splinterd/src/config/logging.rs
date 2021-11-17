@@ -24,10 +24,6 @@ use super::toml::{TomlRawLogTarget, TomlUnnamedAppenderConfig, TomlUnnamedLogger
 pub const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
 const DEFAULT_LOG_SIZE: u64 = 100_000_000;
 
-pub(super) fn default_pattern() -> String {
-    String::from(DEFAULT_LOGGING_PATTERN)
-}
-
 #[derive(Clone, Debug)]
 pub struct LogConfig {
     pub root: RootConfig,
@@ -155,7 +151,9 @@ impl TryFrom<(String, TomlUnnamedAppenderConfig)> for AppenderConfig {
 impl From<TomlUnnamedAppenderConfig> for UnnamedAppenderConfig {
     fn from(unnamed: TomlUnnamedAppenderConfig) -> Self {
         Self {
-            encoder: unnamed.encoder,
+            encoder: unnamed
+                .encoder
+                .unwrap_or_else(|| DEFAULT_LOGGING_PATTERN.to_string()),
             kind: unnamed.kind.into(),
             filename: unnamed.filename,
             size: unnamed.size.map(|s| s.into()),

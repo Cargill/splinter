@@ -25,7 +25,7 @@ use std::convert::TryInto;
 #[cfg(feature = "service2")]
 use std::time::Duration;
 
-use super::logging::{default_pattern, UnnamedAppenderConfig, UnnamedLoggerConfig};
+use super::logging::{UnnamedAppenderConfig, UnnamedLoggerConfig};
 use super::ScabbardState;
 
 /// `TOML_VERSION` represents the version of the toml config file.
@@ -46,9 +46,8 @@ pub enum TomlRawLogTarget {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct TomlUnnamedAppenderConfig {
-    #[serde(default = "default_pattern")]
     #[serde(alias = "pattern")]
-    pub encoder: String,
+    pub encoder: Option<String>,
     pub kind: TomlRawLogTarget,
     pub filename: Option<String>,
     pub size: Option<TomlLogFileSize>,
