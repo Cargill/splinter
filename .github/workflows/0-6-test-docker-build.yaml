@@ -1,4 +1,4 @@
-name: Lint Splinter Dockerfiles
+name: 0-6 Build Docker
 
 on:
   pull_request:
@@ -11,10 +11,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  shellcheck_splinter:
+  build_docker:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Display envvars
         run: env
@@ -22,5 +24,5 @@ jobs:
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
-      - name: Run hadolint on Splinter Dockerfiles
-        run: just ci-lint-dockerfiles
+      - name: Test Docker Build
+        run: just docker-build

@@ -1,15 +1,18 @@
-name: Lint OpenAPI spec
+name: 0-6 Lint Gameroom Client
 
 on:
   pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
 
 concurrency:
   group: "${{ github.ref }}-${{ github.workflow }}"
   cancel-in-progress: true
 
 jobs:
-  lint_openapi:
-    runs-on: ubuntu-latest
+  lint_gameroom_client:
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
 
@@ -19,5 +22,5 @@ jobs:
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
-      - name: Lint OpenAPI files
-        run: just ci-lint-openapi
+      - name: Lint Gameroom Client
+        run: just ci-lint-client

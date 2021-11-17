@@ -1,4 +1,4 @@
-name: Lint Gameroom Client
+name: 0-6 Unit Test Splinter
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint_gameroom_client:
+  unit_test_splinter:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
@@ -22,5 +22,5 @@ jobs:
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
-      - name: Lint Gameroom Client
-        run: just ci-lint-client
+      - name: Unit Test Splinter
+        run: just ci-test

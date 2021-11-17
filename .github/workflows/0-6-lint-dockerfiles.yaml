@@ -1,4 +1,4 @@
-name: Lint Splinter
+name: 0-6 Lint Splinter Dockerfiles
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint_splinter:
+  shellcheck_splinter:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
@@ -22,5 +22,5 @@ jobs:
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
-      - name: Run Lint/Clippy on Splinter
-        run: just ci-lint-splinter
+      - name: Run hadolint on Splinter Dockerfiles
+        run: just ci-lint-dockerfiles
