@@ -17,7 +17,6 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 
 use log::Level;
-use serde::Deserialize;
 
 use super::error::ConfigError;
 use super::toml::TomlRawLogTarget;
@@ -44,14 +43,13 @@ pub struct LoggerConfig {
     pub level: Option<Level>,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct UnnamedLoggerConfig {
     pub appenders: Option<Vec<String>>,
-    #[serde(alias = "filter")]
     pub level: Option<Level>,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct RootConfig {
     pub appenders: Vec<String>,
     pub level: Level,
@@ -65,10 +63,8 @@ pub struct AppenderConfig {
     pub level: Option<Level>,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct UnnamedAppenderConfig {
-    #[serde(default = "default_pattern")]
-    #[serde(alias = "pattern")]
     pub encoder: String,
     pub kind: RawLogTarget,
     pub filename: Option<String>,
@@ -84,15 +80,11 @@ pub enum LogTarget {
     RollingFile { filename: String, size: u64 },
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum RawLogTarget {
-    #[serde(alias = "stdout")]
     Stdout,
-    #[serde(alias = "stderr")]
     Stderr,
-    #[serde(alias = "file")]
     File,
-    #[serde(alias = "rolling_file")]
     RollingFile,
 }
 
