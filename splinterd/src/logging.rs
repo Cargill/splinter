@@ -39,8 +39,8 @@ use log4rs::{
 use splinter::error::InternalError;
 
 use crate::config::{
-    AppenderConfig, Config as InternalConfig, LogConfig, LogTarget, LoggerConfig, RootConfig,
-    DEFAULT_LOGGING_PATTERN,
+    AppenderConfig, Config as InternalConfig, LogConfig, LogEncoder, LogTarget, LoggerConfig,
+    RootConfig,
 };
 use crate::error::UserError;
 
@@ -212,7 +212,7 @@ pub fn default_log_settings() -> Config {
         },
         appenders: vec![AppenderConfig {
             name: String::from("default"),
-            encoder: String::from(DEFAULT_LOGGING_PATTERN),
+            encoder: LogEncoder::default(),
             kind: LogTarget::Stdout,
             level: None,
         }],

@@ -18,9 +18,7 @@ use std::collections::HashMap;
 
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
-use super::logging::{
-    RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig, DEFAULT_LOGGING_PATTERN,
-};
+use super::logging::{LogEncoder, RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig};
 use super::ScabbardState;
 
 const CONFIG_DIR: &str = "/etc/splinter";
@@ -123,7 +121,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             level: log::Level::Warn,
         });
         let stdout = UnnamedAppenderConfig {
-            encoder: String::from(DEFAULT_LOGGING_PATTERN),
+            encoder: LogEncoder::default(),
             kind: super::logging::RawLogTarget::Stdout,
             size: None,
             filename: None,

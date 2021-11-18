@@ -22,7 +22,7 @@ use log::Level;
 use super::error::ConfigError;
 use super::toml::{TomlRawLogTarget, TomlUnnamedAppenderConfig, TomlUnnamedLoggerConfig};
 
-pub const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
+const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
 const DEFAULT_LOG_SIZE: u64 = 100_000_000;
 
 #[derive(Clone, Debug)]
@@ -54,14 +54,14 @@ pub struct RootConfig {
 #[derive(Clone, Debug)]
 pub struct AppenderConfig {
     pub name: String,
-    pub encoder: String,
+    pub encoder: LogEncoder,
     pub kind: LogTarget,
     pub level: Option<Level>,
 }
 
 #[derive(Clone, Debug)]
 pub struct UnnamedAppenderConfig {
-    pub encoder: String,
+    pub encoder: LogEncoder,
     pub kind: RawLogTarget,
     pub filename: Option<String>,
     pub size: Option<u64>,
@@ -180,7 +180,7 @@ impl From<TomlUnnamedAppenderConfig> for UnnamedAppenderConfig {
         Self {
             encoder: unnamed
                 .encoder
-                .unwrap_or_else(|| DEFAULT_LOGGING_PATTERN.to_string()),
+                .map_or_else(LogEncoder::default, |f| f.into()),
             kind: unnamed.kind.into(),
             filename: unnamed.filename,
             size: unnamed.size.map(|s| s.into()),
