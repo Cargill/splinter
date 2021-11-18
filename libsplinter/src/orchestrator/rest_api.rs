@@ -12,11 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 use crate::actix_web::HttpResponse;
 use crate::futures::IntoFuture;
+use crate::orchestrator::OrchestratableService;
 use crate::rest_api::{Resource, RestResourceProvider};
 
-use super::ServiceOrchestrator;
+use super::{ManagedService, ServiceDefinition, ServiceOrchestrator};
 
 /// The `ServiceOrchestrator` exposes REST API resources provided by the
 /// [`ServiceFactory::get_rest_endpoints`] methods of its factories. Each factory defines the
@@ -62,10 +66,29 @@ impl RestResourceProvider for ServiceOrchestrator {
                                 .unwrap_or("")
                                 .to_string();
 
-                            let services = match services.lock() {
-                                Ok(s) => s,
+                            let service = match lookup_service(
+                                &*services,
+                                &circuit,
+                                &service_id,
+                                &service_type,
+                            ) {
+                                Ok(Some(s)) => s,
+                                Ok(None) => {
+                                    return Box::new(
+                                        HttpResponse::NotFound()
+                                            .json(json!({
+                                                "message":
+                                                    format!(
+                                                        "{} service {} on circuit {} not found",
+                                                        service_type, service_id, circuit
+                                                    )
+                                            }))
+                                            .into_future(),
+                                    )
+                                    .into_future();
+                                }
                                 Err(err) => {
-                                    error!("Orchestrator's service lock is poisoned: {}", err);
+                                    error!("{}", err);
                                     return Box::new(
                                         HttpResponse::InternalServerError()
                                             .json(json!({
@@ -77,34 +100,6 @@ impl RestResourceProvider for ServiceOrchestrator {
                                 }
                             };
 
-                            let service =
-                                match services.iter().find_map(|(service_def, managed_service)| {
-                                    if service_def.service_type == service_type
-                                        && service_def.circuit == circuit
-                                        && service_def.service_id == service_id
-                                    {
-                                        Some(&*managed_service.service)
-                                    } else {
-                                        None
-                                    }
-                                }) {
-                                    Some(s) => s,
-                                    None => {
-                                        return Box::new(
-                                            HttpResponse::NotFound()
-                                                .json(json!({
-                                                    "message":
-                                                        format!(
-                                                            "{} service {} on circuit {} not found",
-                                                            service_type, service_id, circuit
-                                                        )
-                                                }))
-                                                .into_future(),
-                                        )
-                                        .into_future();
-                                    }
-                                };
-
                             handler(request, payload, service.as_service())
                         })
                     })
@@ -114,4 +109,26 @@ impl RestResourceProvider for ServiceOrchestrator {
                 acc
             })
     }
+}
+
+fn lookup_service(
+    services: &Mutex<HashMap<ServiceDefinition, ManagedService>>,
+    circuit: &str,
+    service_id: &str,
+    service_type: &str,
+) -> Result<Option<Box<dyn OrchestratableService>>, String> {
+    let services = services
+        .lock()
+        .map_err(|_| "Orchestrator's service lock is poisoned".to_string())?;
+
+    Ok(services.iter().find_map(|(service_def, managed_service)| {
+        if service_def.service_type == service_type
+            && service_def.circuit == circuit
+            && service_def.service_id == service_id
+        {
+            Some(managed_service.service.clone())
+        } else {
+            None
+        }
+    }))
 }
