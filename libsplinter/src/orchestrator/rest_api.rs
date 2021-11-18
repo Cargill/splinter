@@ -110,7 +110,7 @@ impl RestResourceProvider for ServiceOrchestrator {
                                     }
                                 };
 
-                                handler(request, payload, service)
+                                handler(request, payload, service.as_service())
                             },
                         )
                     })

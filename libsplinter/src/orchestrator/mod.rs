@@ -38,7 +38,8 @@ use crate::protos::circuit::{
 };
 use crate::protos::prelude::*;
 use crate::service::{
-    Service, ServiceFactory, ServiceMessageContext, StandardServiceNetworkRegistry,
+    FactoryCreateError, Service, ServiceFactory, ServiceMessageContext,
+    StandardServiceNetworkRegistry,
 };
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;
@@ -102,7 +103,7 @@ pub trait OrchestratableServiceFactory: ServiceFactory {
 
 /// Stores a service and other structures that are used to manage it
 struct ManagedService {
-    pub service: Box<dyn Service>,
+    pub service: Box<dyn OrchestratableService>,
     pub registry: StandardServiceNetworkRegistry,
 }
 
@@ -111,14 +112,14 @@ pub struct ServiceOrchestrator {
     /// A (ServiceDefinition, ManagedService) map
     services: Arc<Mutex<HashMap<ServiceDefinition, ManagedService>>>,
     /// Factories used to create new services.
-    service_factories: Vec<Box<dyn ServiceFactory>>,
+    service_factories: Vec<Box<dyn OrchestratableServiceFactory>>,
     supported_service_types: Vec<String>,
     /// `network_sender` and `inbound_router` are used to create services' senders.
     network_sender: Sender<Vec<u8>>,
     inbound_router: InboundRouter<CircuitMessageType>,
     /// A (ServiceDefinition, ManagedService) map of services that have been stopped, but yet to
     /// be completely destroyed
-    stopped_services: Arc<Mutex<HashMap<ServiceDefinition, Box<dyn Service>>>>,
+    stopped_services: Arc<Mutex<HashMap<ServiceDefinition, Box<dyn OrchestratableService>>>>,
 
     /// `running` and `join_handles` are used to shutdown the orchestrator's background threads
     running: Arc<AtomicBool>,
@@ -133,7 +134,7 @@ impl ServiceOrchestrator {
         note = "please use `ServiceOrchestratorBuilder` instead"
     )]
     pub fn new(
-        service_factories: Vec<Box<dyn ServiceFactory>>,
+        service_factories: Vec<Box<dyn OrchestratableServiceFactory>>,
         connection: Box<dyn Connection>,
         incoming_capacity: usize,
         outgoing_capacity: usize,
@@ -184,7 +185,7 @@ impl ServiceOrchestrator {
             .ok_or(InitializeServiceError::UnknownType)?;
 
         // Create the service.
-        let mut service = factory.create(
+        let mut service = factory.create_orchestratable_service(
             service_definition.service_id.clone(),
             service_definition.service_type.as_str(),
             service_definition.circuit.as_str(),
@@ -326,7 +327,7 @@ impl ServiceOrchestrator {
             .ok_or(AddServiceError::UnknownType)?;
 
         // Create the previously stopped service.
-        let service = factory.create(
+        let service = factory.create_orchestratable_service(
             service_definition.service_id.clone(),
             service_definition.service_type.as_str(),
             service_definition.circuit.as_str(),

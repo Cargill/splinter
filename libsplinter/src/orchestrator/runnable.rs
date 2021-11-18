@@ -24,10 +24,9 @@ use uuid::Uuid;
 use crate::error::InternalError;
 use crate::mesh::Mesh;
 use crate::network::reply::InboundRouter;
-use crate::service::ServiceFactory;
 use crate::transport::Connection;
 
-use super::{JoinHandles, ServiceOrchestrator};
+use super::{JoinHandles, OrchestratableServiceFactory, ServiceOrchestrator};
 
 /// A runnable service orchestrator is configured, but not started ServiceOrchestrator. It may only
 /// be used for operations that can be done during that state, such as starting the orchestrator.
@@ -36,7 +35,7 @@ pub struct RunnableServiceOrchestrator {
     pub(super) incoming_capacity: usize,
     pub(super) outgoing_capacity: usize,
     pub(super) channel_capacity: usize,
-    pub(super) service_factories: Vec<Box<dyn ServiceFactory>>,
+    pub(super) service_factories: Vec<Box<dyn OrchestratableServiceFactory>>,
     pub(super) supported_service_types: Vec<String>,
 }
 
