@@ -67,6 +67,15 @@ command = ["cylinder", "hex", "protobuf", "reqwest", "serde", "serde_json"]
 playlist = ["cylinder", "serde_json"]
 workload = ["ctrlc", "cylinder", "rand", "transact/family-command-workload", "transact/family-smallbank-workload"]
 
+[package.metadata.deb]
+maintainer = "The Transact Team"
+depends = "$auto, man"
+assets = [
+    ["packaging/man/*.1", "/usr/share/man/man1", "644"],
+    ["target/release/transact", "/usr/bin/transact", "755"]
+]
+
+
 [package.metadata.docs.rs]
 features = [
   "default",

@@ -14,6 +14,8 @@
 
 FROM ubuntu:bionic as builder
 
+ENV TRANSACT_FORCE_PANDOC=true
+
 RUN apt-get update && \
     apt-get install -y \
     curl \
@@ -22,6 +24,7 @@ RUN apt-get update && \
     libsqlite3-dev \
     libssl-dev \
     libzmq3-dev \
+    pandoc \
     pkg-config \
     protobuf-compiler \
     sqlite3 \
