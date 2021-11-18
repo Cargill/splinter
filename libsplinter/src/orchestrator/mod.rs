@@ -87,7 +87,7 @@ pub trait OrchestratableServiceFactory: ServiceFactory {
 
 /// Stores a service and other structures that are used to manage it
 struct ManagedService {
-    pub service: Box<dyn Service>,
+    pub service: Box<dyn OrchestratableService>,
     pub registry: StandardServiceNetworkRegistry,
 }
 
@@ -96,7 +96,7 @@ pub struct ServiceOrchestrator {
     /// A (ServiceDefinition, ManagedService) map
     services: Arc<Mutex<HashMap<ServiceDefinition, ManagedService>>>,
     /// Factories used to create new services.
-    service_factories: Vec<Box<dyn ServiceFactory>>,
+    service_factories: Vec<Box<dyn OrchestratableServiceFactory>>,
     supported_service_types: Vec<String>,
     /// `network_sender` and `inbound_router` are used to create services' senders.
     network_sender: Sender<Vec<u8>>,
@@ -109,7 +109,7 @@ impl ServiceOrchestrator {
     /// Create a new `ServiceOrchestrator`. This starts up 3 threads for relaying messages to and
     /// from services. Returns the `ServiceOrchestrator` and the threads `JoinHandles`
     pub fn new(
-        service_factories: Vec<Box<dyn ServiceFactory>>,
+        service_factories: Vec<Box<dyn OrchestratableServiceFactory>>,
         connection: Box<dyn Connection>,
         incoming_capacity: usize,
         outgoing_capacity: usize,
@@ -233,7 +233,7 @@ impl ServiceOrchestrator {
             .ok_or(InitializeServiceError::UnknownType)?;
 
         // Create the service.
-        let mut service = factory.create(
+        let mut service = factory.create_orchestratable_service(
             service_definition.service_id.clone(),
             service_definition.service_type.as_str(),
             service_definition.circuit.as_str(),
