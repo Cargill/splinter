@@ -15,6 +15,7 @@
 use std::convert::From;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::ops::Deref;
 
 use log::Level;
 
@@ -81,6 +82,32 @@ pub enum RawLogTarget {
     Stderr,
     File,
     RollingFile,
+}
+
+#[derive(Clone, Debug)]
+pub struct LogEncoder {
+    value: String,
+}
+
+impl From<String> for LogEncoder {
+    fn from(value: String) -> Self {
+        LogEncoder { value }
+    }
+}
+
+impl Default for LogEncoder {
+    fn default() -> Self {
+        Self {
+            value: DEFAULT_LOGGING_PATTERN.to_string(),
+        }
+    }
+}
+
+impl Deref for LogEncoder {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
 }
 
 impl AppenderConfig {
