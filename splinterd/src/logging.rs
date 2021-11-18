@@ -47,7 +47,7 @@ use crate::error::UserError;
 impl TryInto<Appender> for AppenderConfig {
     type Error = std::io::Error;
     fn try_into(self) -> Result<Appender, Self::Error> {
-        let encoder: Box<dyn Encode> = Box::new(PatternEncoder::new(&self.encoder));
+        let encoder: Box<dyn Encode> = self.encoder.into();
         let boxed: Box<dyn Append> = match &self.kind {
             LogTarget::Stdout => Box::new(
                 ConsoleAppender::builder()
@@ -201,6 +201,12 @@ pub fn configure_logging(
         Err(e) => Err(UserError::InternalError(InternalError::from_source(
             Box::new(e),
         ))),
+    }
+}
+
+impl From<LogEncoder> for Box<dyn log4rs::encode::Encode> {
+    fn from(log_encoder: LogEncoder) -> Self {
+        Box::new(PatternEncoder::new(&*log_encoder))
     }
 }
 
