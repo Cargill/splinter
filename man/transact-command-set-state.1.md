@@ -77,10 +77,10 @@ scabbard.
 
 ```
 transact command set-state \
-  --key /alice.priv
-  --target "http://0.0.0.0:8080/scabbard/kpHVT-sjpQM/gsAA"
+  --key /alice.priv \
+  --target "http://0.0.0.0:8080/scabbard/kpHVT-sjpQM/gsAA" \
   --state-entry \
-  06abbcb16ed7d24b3ecbd4164dcdad374e08c0ab7518aa07f9d3683f34c2b3c67a1583:value1
+  06abbcb16ed7d24b3ecbd4164dcdad374e08c0ab7518aa07f9d3683f34c2b3c67a1583:value1 \
   --state-entry \
   06abbc6d201beeefb589b08ef0672dac82353d0cbd9ad99e1642c83a1601f3d647bcca:value2
 ```
