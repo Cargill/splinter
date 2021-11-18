@@ -634,7 +634,7 @@ impl BatchHistory {
         let batch_info = self.upsert_batch(signature.into(), status);
 
         match batch_info.status {
-            BatchStatus::Invalid(_) | BatchStatus::Valid(_) => {
+            BatchStatus::Invalid(_) | BatchStatus::Committed(_) => {
                 self.send_completed_batch_info_to_subscribers(batch_info)
             }
             _ => {}
@@ -645,7 +645,7 @@ impl BatchHistory {
         match self.history.get_mut(signature) {
             Some(info) => match info.status.clone() {
                 BatchStatus::Valid(txns) => {
-                    info.set_status(BatchStatus::Committed(txns));
+                    self.update_batch_status(signature, BatchStatus::Committed(txns));
                 }
                 _ => {
                     error!(
@@ -756,9 +756,15 @@ impl BatchHistory {
             .batch_subscribers
             .drain(..)
             .filter_map(|(mut pending_signatures, sender)| {
-                if pending_signatures.remove(&info.id) && sender.send(info.clone()).is_err() {
-                    // Receiver has been dropped
-                    return None;
+                match info.status {
+                    BatchStatus::Invalid(_) | BatchStatus::Committed(_) => {
+                        if pending_signatures.remove(&info.id) && sender.send(info.clone()).is_err()
+                        {
+                            // Receiver has been dropped
+                            return None;
+                        }
+                    }
+                    _ => (),
                 }
 
                 if pending_signatures.is_empty() {
@@ -818,10 +824,13 @@ impl Iterator for ChannelBatchInfoIter {
             }
 
             match self.receiver.try_recv() {
-                Ok(batch_info) => {
-                    self.pending_ids.remove(&batch_info.id);
-                    return Some(Ok(batch_info));
-                }
+                Ok(batch_info) => match batch_info.status {
+                    BatchStatus::Invalid(_) | BatchStatus::Committed(_) => {
+                        self.pending_ids.remove(&batch_info.id);
+                        return Some(Ok(batch_info));
+                    }
+                    _ => {}
+                },
                 Err(TryRecvError::Empty) => {
                     // Check if the timeout has expired
                     if Instant::now() >= self.timeout {
