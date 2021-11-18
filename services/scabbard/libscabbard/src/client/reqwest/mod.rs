@@ -294,7 +294,7 @@ fn wait_for_batches(
 
         debug!("Checking batches via {}", url);
         let request = Client::new()
-            .get(url.clone())
+            .get(url_with_query.clone())
             .header("Authorization", auth.to_string());
         let response = perform_request(request)?;
 
