@@ -19,9 +19,7 @@ use std::convert::TryInto;
 use log::Level;
 
 use super::error::ConfigError;
-use super::toml::TomlRawLogTarget;
-use super::toml::TomlUnnamedAppenderConfig;
-use super::toml::TomlUnnamedLoggerConfig;
+use super::toml::{TomlRawLogTarget, TomlUnnamedAppenderConfig, TomlUnnamedLoggerConfig};
 
 pub const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
 
