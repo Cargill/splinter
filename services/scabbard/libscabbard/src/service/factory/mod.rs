@@ -35,6 +35,7 @@ use sawtooth::receipt::store::ReceiptStore;
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 use splinter::error::InternalError;
 use splinter::error::{InvalidArgumentError, InvalidStateError};
+use splinter::orchestrator::{OrchestratableService, OrchestratableServiceFactory};
 use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
@@ -476,6 +477,96 @@ impl ServiceFactory for ScabbardFactory {
         circuit_id: &str,
         args: HashMap<String, String>,
     ) -> Result<Box<dyn Service>, FactoryCreateError> {
+        Ok(Box::new(
+            self.create_scabbard(service_id, circuit_id, args)?,
+        ))
+    }
+
+    #[cfg(not(any(feature = "postgres", feature = "sqlite")))]
+    fn create(
+        &self,
+        _service_id: String,
+        _service_type: &str,
+        _circuit_id: &str,
+        _args: HashMap<String, String>,
+    ) -> Result<Box<dyn Service>, FactoryCreateError> {
+        // As the factory cannot be created under these conditions, this function is not reachable.
+        unreachable!()
+    }
+
+    #[cfg(feature = "rest-api")]
+    /// The `Scabbard` services created by the `ScabbardFactory` provide the following REST API
+    /// endpoints as [`ServiceEndpoint`]s:
+    ///
+    /// * `POST /batches` - Add one or more batches to scabbard's queue
+    /// * `GET /batch_statuses` - Get the status of one or more batches
+    /// * `GET /ws/subscribe` - Subscribe to scabbard state-delta events
+    /// * `GET /state/{address}` - Get a value from scabbard's state
+    /// * `GET /state` - Get multiple scabbard state entries
+    /// * `GET /state_root` - Get the current state root hash of scabbard's state
+    ///
+    /// These endpoints are only available if the following REST API backend feature is enabled:
+    ///
+    /// * `rest-api-actix`
+    ///
+    /// [`ServiceEndpoint`]: ../rest_api/struct.ServiceEndpoint.html
+    fn get_rest_endpoints(&self) -> Vec<splinter::service::rest_api::ServiceEndpoint> {
+        // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
+        // enabled
+        #[allow(unused_mut)]
+        let mut endpoints = vec![];
+
+        #[cfg(feature = "rest-api-actix")]
+        {
+            endpoints.append(&mut vec![
+                actix::batches::make_add_batches_to_queue_endpoint(),
+                actix::ws_subscribe::make_subscribe_endpoint(),
+                actix::batch_statuses::make_get_batch_status_endpoint(),
+                actix::state_address::make_get_state_at_address_endpoint(),
+                actix::state::make_get_state_with_prefix_endpoint(),
+                actix::state_root::make_get_state_root_endpoint(),
+            ])
+        }
+
+        endpoints
+    }
+}
+
+impl OrchestratableServiceFactory for ScabbardFactory {
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
+    fn create_orchestratable_service(
+        &self,
+        service_id: String,
+        _service_type: &str,
+        circuit_id: &str,
+        args: HashMap<String, String>,
+    ) -> Result<Box<dyn OrchestratableService>, FactoryCreateError> {
+        Ok(Box::new(
+            self.create_scabbard(service_id, circuit_id, args)?,
+        ))
+    }
+
+    #[cfg(not(any(feature = "postgres", feature = "sqlite")))]
+    fn create_orchestratable_service(
+        &self,
+        _service_id: String,
+        _service_type: &str,
+        _circuit_id: &str,
+        _args: HashMap<String, String>,
+    ) -> Result<Box<dyn OrchestratableService>, FactoryCreateError> {
+        // As the factory cannot be created under these conditions, this function is not reachable.
+        unreachable!()
+    }
+}
+
+impl ScabbardFactory {
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
+    fn create_scabbard(
+        &self,
+        service_id: String,
+        circuit_id: &str,
+        args: HashMap<String, String>,
+    ) -> Result<Scabbard, FactoryCreateError> {
         let peer_services_str = args.get("peer_services").ok_or_else(|| {
             FactoryCreateError::InvalidArguments("peer_services argument not provided".into())
         })?;
@@ -581,7 +672,7 @@ impl ServiceFactory for ScabbardFactory {
                 ),
             };
 
-        let service = Scabbard::new(
+        Scabbard::new(
             service_id,
             circuit_id,
             version,
@@ -599,62 +690,9 @@ impl ServiceFactory for ScabbardFactory {
             admin_keys,
             coordinator_timeout,
         )
-        .map_err(|err| FactoryCreateError::CreationFailed(Box::new(err)))?;
-
-        Ok(Box::new(service))
+        .map_err(|err| FactoryCreateError::CreationFailed(Box::new(err)))
     }
 
-    #[cfg(not(any(feature = "postgres", feature = "sqlite")))]
-    fn create(
-        &self,
-        _service_id: String,
-        _service_type: &str,
-        _circuit_id: &str,
-        _args: HashMap<String, String>,
-    ) -> Result<Box<dyn Service>, FactoryCreateError> {
-        // As the factory cannot be created under these conditions, this function is not reachable.
-        unreachable!()
-    }
-
-    #[cfg(feature = "rest-api")]
-    /// The `Scabbard` services created by the `ScabbardFactory` provide the following REST API
-    /// endpoints as [`ServiceEndpoint`]s:
-    ///
-    /// * `POST /batches` - Add one or more batches to scabbard's queue
-    /// * `GET /batch_statuses` - Get the status of one or more batches
-    /// * `GET /ws/subscribe` - Subscribe to scabbard state-delta events
-    /// * `GET /state/{address}` - Get a value from scabbard's state
-    /// * `GET /state` - Get multiple scabbard state entries
-    /// * `GET /state_root` - Get the current state root hash of scabbard's state
-    ///
-    /// These endpoints are only available if the following REST API backend feature is enabled:
-    ///
-    /// * `rest-api-actix`
-    ///
-    /// [`ServiceEndpoint`]: ../rest_api/struct.ServiceEndpoint.html
-    fn get_rest_endpoints(&self) -> Vec<splinter::service::rest_api::ServiceEndpoint> {
-        // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
-        // enabled
-        #[allow(unused_mut)]
-        let mut endpoints = vec![];
-
-        #[cfg(feature = "rest-api-actix")]
-        {
-            endpoints.append(&mut vec![
-                actix::batches::make_add_batches_to_queue_endpoint(),
-                actix::ws_subscribe::make_subscribe_endpoint(),
-                actix::batch_statuses::make_get_batch_status_endpoint(),
-                actix::state_address::make_get_state_at_address_endpoint(),
-                actix::state::make_get_state_with_prefix_endpoint(),
-                actix::state_root::make_get_state_root_endpoint(),
-            ])
-        }
-
-        endpoints
-    }
-}
-
-impl ScabbardFactory {
     /// Check that the LMDB files doesn't exist for the given service.
     #[cfg(feature = "lmdb")]
     #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
