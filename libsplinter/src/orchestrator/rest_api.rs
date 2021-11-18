@@ -12,11 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 use crate::actix_web::HttpResponse;
+use crate::error::InternalError;
 use crate::futures::IntoFuture;
+use crate::orchestrator::OrchestratableService;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 
-use super::ServiceOrchestrator;
+use super::{ManagedService, ServiceDefinition, ServiceOrchestrator};
 
 /// The `ServiceOrchestrator` exposes REST API resources provided by the
 /// [`ServiceFactory::get_rest_endpoints`] methods of its factories. Each factory defines the
@@ -66,35 +71,14 @@ impl RestResourceProvider for ServiceOrchestrator {
                                     .unwrap_or("")
                                     .to_string();
 
-                                let services = match services.lock() {
-                                    Ok(s) => s,
-                                    Err(err) => {
-                                        error!("Orchestrator's service lock is poisoned: {}", err);
-                                        return Box::new(
-                                            HttpResponse::InternalServerError()
-                                                .json(json!({
-                                                    "message": "An internal error occurred"
-                                                }))
-                                                .into_future(),
-                                        )
-                                        .into_future();
-                                    }
-                                };
-
-                                let service = match services.iter().find_map(
-                                    |(service_def, managed_service)| {
-                                        if service_def.service_type == service_type
-                                            && service_def.circuit == circuit
-                                            && service_def.service_id == service_id
-                                        {
-                                            Some(&*managed_service.service)
-                                        } else {
-                                            None
-                                        }
-                                    },
+                                let service = match lookup_service(
+                                    &*services,
+                                    &circuit,
+                                    &service_id,
+                                    &service_type,
                                 ) {
-                                    Some(s) => s,
-                                    None => {
+                                    Ok(Some(s)) => s,
+                                    Ok(None) => {
                                         return Box::new(
                                             HttpResponse::NotFound()
                                                 .json(json!({
@@ -103,6 +87,17 @@ impl RestResourceProvider for ServiceOrchestrator {
                                                             "{} service {} on circuit {} not found",
                                                             service_type, service_id, circuit
                                                         )
+                                                }))
+                                                .into_future(),
+                                        )
+                                        .into_future();
+                                    }
+                                    Err(err) => {
+                                        error!("{}", err);
+                                        return Box::new(
+                                            HttpResponse::InternalServerError()
+                                                .json(json!({
+                                                    "message": "An internal error occurred"
                                                 }))
                                                 .into_future(),
                                         )
@@ -120,4 +115,26 @@ impl RestResourceProvider for ServiceOrchestrator {
                 acc
             })
     }
+}
+
+fn lookup_service(
+    services: &Mutex<HashMap<ServiceDefinition, ManagedService>>,
+    circuit: &str,
+    service_id: &str,
+    service_type: &str,
+) -> Result<Option<Box<dyn OrchestratableService>>, InternalError> {
+    let services = services.lock().map_err(|_| {
+        InternalError::with_message("Orchestrator's service lock is poisoned".into())
+    })?;
+
+    Ok(services.iter().find_map(|(service_def, managed_service)| {
+        if service_def.service_type == service_type
+            && service_def.circuit == circuit
+            && service_def.service_id == service_id
+        {
+            Some(managed_service.service.clone())
+        } else {
+            None
+        }
+    }))
 }
