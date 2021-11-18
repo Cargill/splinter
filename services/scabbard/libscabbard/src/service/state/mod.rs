@@ -54,7 +54,7 @@ use crate::store::CommitHashStore;
 
 const EXECUTION_TIMEOUT: u64 = 300; // five minutes
 const ITER_CACHE_SIZE: usize = 64;
-const COMPLETED_BATCH_INFO_ITER_RETRY_MILLIS: u64 = 100;
+const COMPLETED_BATCH_INFO_ITER_RETRY: Duration = Duration::from_millis(100);
 const DEFAULT_BATCH_HISTORY_SIZE: usize = 100;
 
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
@@ -795,14 +795,12 @@ impl ChannelBatchInfoIter {
         timeout: Duration,
         pending_ids: HashSet<String>,
     ) -> Result<Self, ScabbardStateError> {
-        let timeout = Instant::now()
-            .checked_add(timeout)
-            .ok_or_else(|| ScabbardStateError("failed to schedule timeout".into()))?;
-
         Ok(Self {
             receiver,
-            retry_interval: Duration::from_millis(COMPLETED_BATCH_INFO_ITER_RETRY_MILLIS),
-            timeout,
+            retry_interval: std::cmp::min(timeout, COMPLETED_BATCH_INFO_ITER_RETRY),
+            timeout: Instant::now()
+                .checked_add(timeout)
+                .ok_or_else(|| ScabbardStateError("failed to schedule timeout".into()))?,
             pending_ids,
         })
     }
