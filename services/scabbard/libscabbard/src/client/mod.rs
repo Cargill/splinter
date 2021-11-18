@@ -317,7 +317,7 @@ fn wait_for_batches(
 
         debug!("Checking batches via {}", url);
 
-        let mut request = Client::new().get(url.clone());
+        let mut request = Client::new().get(url_with_query);
 
         // If auth has been set add it to headers
         if let Some(auth) = auth {
