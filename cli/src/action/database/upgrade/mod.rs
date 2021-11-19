@@ -28,14 +28,11 @@ use clap::ArgMatches;
 use splinter::store::postgres;
 #[cfg(feature = "sqlite")]
 use splinter::store::sqlite;
-use splinter::{
-    error::{InternalError, InvalidArgumentError},
-    store::StoreFactory,
-};
+use splinter::{error::InternalError, store::StoreFactory};
 
 #[cfg(feature = "sqlite")]
 use crate::action::database::sqlite::{get_database_at_state_path, get_default_database};
-use crate::action::database::SplinterEnvironment;
+use crate::action::database::{ConnectionUri, SplinterEnvironment};
 use crate::diesel::{pg::PgConnection, Connection};
 use crate::error::CliError;
 
@@ -146,44 +143,6 @@ fn get_database_uri(arg_matches: Option<&ArgMatches>) -> Result<ConnectionUri, C
         })?;
     }
     Ok(parsed_uri)
-}
-
-/// The possible connection types and identifiers for the upgrade
-enum ConnectionUri {
-    #[cfg(feature = "postgres")]
-    Postgres(String),
-    #[cfg(feature = "sqlite")]
-    Sqlite(String),
-}
-
-impl std::fmt::Display for ConnectionUri {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = match self {
-            #[cfg(feature = "postgres")]
-            ConnectionUri::Postgres(pg) => pg,
-            #[cfg(feature = "sqlite")]
-            ConnectionUri::Sqlite(sqlite) => sqlite,
-        };
-        f.write_str(string)
-    }
-}
-
-impl FromStr for ConnectionUri {
-    type Err = InvalidArgumentError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            #[cfg(feature = "postgres")]
-            _ if s.starts_with("postgres://") => Ok(ConnectionUri::Postgres(s.into())),
-            #[cfg(feature = "sqlite")]
-            _ => Ok(ConnectionUri::Sqlite(s.into())),
-            #[cfg(not(feature = "sqlite"))]
-            _ => Err(InvalidArgumentError::new(
-                "s".to_string(),
-                format!("No compatible connection type: {}", s),
-            )),
-        }
-    }
 }
 
 fn create_store_factory(

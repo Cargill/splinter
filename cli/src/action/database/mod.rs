@@ -17,6 +17,7 @@ mod postgres;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
+mod stores;
 #[cfg(feature = "upgrade")]
 mod upgrade;
 
@@ -70,6 +71,18 @@ pub enum ConnectionUri {
     Postgres(String),
     #[cfg(feature = "sqlite")]
     Sqlite(String),
+}
+
+impl std::fmt::Display for ConnectionUri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            #[cfg(feature = "postgres")]
+            ConnectionUri::Postgres(pg) => pg,
+            #[cfg(feature = "sqlite")]
+            ConnectionUri::Sqlite(sqlite) => sqlite,
+        };
+        f.write_str(string)
+    }
 }
 
 impl FromStr for ConnectionUri {
