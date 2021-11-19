@@ -32,13 +32,21 @@ pub use error::ScabbardClientError;
 /// A client that can be used to interact with scabbard services on a Splinter node.
 pub struct ScabbardClient {
     url: String,
+    auth: Option<String>,
 }
 
 impl ScabbardClient {
     /// Create a new `ScabbardClient` with the given base `url`. The URL should be the bind endpoint
     /// of the Splinter REST API; it should not include the path to the scabbard service itself.
     pub fn new(url: &str) -> Self {
-        Self { url: url.into() }
+        Self {
+            url: url.into(),
+            auth: None,
+        }
+    }
+
+    pub fn set_auth(&mut self, auth: String) {
+        self.auth = Some(auth)
     }
 
     /// Submit the given `batches` to the scabbard service with the given `service_id`. If a `wait`
@@ -68,7 +76,13 @@ impl ScabbardClient {
         let body = batches.into_bytes()?;
 
         debug!("Submitting batches via {}", url);
-        let request = Client::new().post(url).body(body);
+        let mut request = Client::new().post(url).body(body);
+
+        // If auth has been set add it to headers
+        if let Some(auth) = &self.auth {
+            request = request.header("Authorization", auth);
+        }
+
         let response = perform_request(request)?;
 
         let batch_link: Link = response.json().map_err(|err| {
@@ -79,7 +93,7 @@ impl ScabbardClient {
         })?;
 
         if let Some(wait) = wait {
-            wait_for_batches(&self.url, &batch_link.link, wait)
+            wait_for_batches(&self.url, &batch_link.link, wait, &self.auth)
         } else {
             Ok(())
         }
@@ -112,7 +126,13 @@ impl ScabbardClient {
         ))
         .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
 
-        let request = Client::new().get(url);
+        let mut request = Client::new().get(url);
+
+        // If auth has been set add it to headers
+        if let Some(auth) = &self.auth {
+            request = request.header("Authorization", auth);
+        }
+
         let response = request
             .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
             .send()
@@ -176,7 +196,13 @@ impl ScabbardClient {
             url.set_query(Some(&format!("prefix={}", prefix)))
         }
 
-        let request = Client::new().get(url);
+        let mut request = Client::new().get(url);
+
+        // If auth has been set add it to headers
+        if let Some(auth) = &self.auth {
+            request = request.header("Authorization", auth);
+        }
+
         let response = request
             .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
             .send()
@@ -217,7 +243,13 @@ impl ScabbardClient {
         ))
         .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
 
-        let request = Client::new().get(url);
+        let mut request = Client::new().get(url);
+
+        // If auth has been set add it to headers
+        if let Some(auth) = &self.auth {
+            request = request.header("Authorization", auth);
+        }
+
         let response = request
             .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
             .send()
@@ -260,6 +292,7 @@ fn wait_for_batches(
     base_url: &str,
     batch_link: &str,
     wait: Duration,
+    auth: &Option<String>,
 ) -> Result<(), ScabbardClientError> {
     let url = if batch_link.starts_with("http") || batch_link.starts_with("https") {
         parse_http_url(batch_link)
@@ -283,7 +316,14 @@ fn wait_for_batches(
         url_with_query.set_query(Some(&query_string));
 
         debug!("Checking batches via {}", url);
-        let request = Client::new().get(url.clone());
+
+        let mut request = Client::new().get(url.clone());
+
+        // If auth has been set add it to headers
+        if let Some(auth) = auth {
+            request = request.header("Authorization", auth);
+        }
+
         let response = perform_request(request)?;
 
         let batch_infos: Vec<BatchInfo> = response.json().map_err(|err| {
