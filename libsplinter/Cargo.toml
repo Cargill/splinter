@@ -14,7 +14,7 @@
 
 [package]
 name = "splinter"
-version = "0.5.26"
+version = "0.5.27"
 authors = ["Cargill Incorporated"]
 edition = "2018"
 license = "Apache-2.0"
