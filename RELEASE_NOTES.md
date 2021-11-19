@@ -1,5 +1,24 @@
 # Release Notes
 
+## Changes in Splinter 0.5.26
+
+### Highlights
+
+* Stabilized the splinterd feature `"log-config"`.  This feature allows for
+  finer-grained configuration of the log output.
+
+### splinter CLI
+
+* Add `--group` option to the `splinter keygen` subcommand.  This option allows
+  the user to modify the group of the resulting key files, or automatically set
+  the group based on the target directory.  The group now defaults to the user's
+  group if this option is omitted.
+
+### splinterd
+
+* Stabilize `"log-config"` feature by removing it.  The fine-grained log
+  configuration is now available by default.
+
 ## Changes in Splinter 0.5.25
 
 ### Highlights
