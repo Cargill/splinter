@@ -50,7 +50,7 @@ glob = { version = "0.3", optional = true }
 hyper = { version = "0.12", optional = true }
 jsonwebtoken = { version = "7.0", optional = true }
 influxdb = { version = "0.4.0", features = ["derive"], optional = true }
-log = "0.3.0"
+log = "0.4"
 metrics = {version = "0.17", features = ["std"], optional = true}
 mio = { version = "0.6", default-features = false }
 mio-extras = "2"
@@ -59,7 +59,7 @@ openssl = "0.10"
 percent-encoding = { version = "2.0", optional = true }
 protobuf = "2.23"
 rand = "0.7"
-reqwest = { version = "0.10", optional = true, features = ["blocking", "json"] }
+reqwest = { version = "0.11", optional = true, features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -71,7 +71,7 @@ url = "1.7.1"
 uuid = { version = "0.8", features = ["v4", "v5"] }
 
 [dev-dependencies]
-reqwest = { version = "0.10", features = ["blocking", "json"] }
+reqwest = { version = "0.11", features = ["blocking", "json"] }
 serial_test = "0.3"
 tempdir = "0.3"
 
