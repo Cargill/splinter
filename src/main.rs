@@ -61,75 +61,89 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         (@setting SubcommandRequiredElseHelp));
 
     #[cfg(feature = "workload")]
+    // Allowing unused_mut because workload_command must be mutable if feature `workload-smallbank` is
+    // enabled
+    #[allow(unused_mut)]
+    let mut workload_command =
+        SubCommand::with_name("workload")
+            .about("Run a continuous workload against a set of targets")
+            .arg(
+                Arg::with_name("targets")
+                    .long("targets")
+                    .takes_value(true)
+                    .multiple(true)
+                    .required(true)
+                    .help("Node URLS to submit batches to, combine groups with ;"),
+            )
+            .arg(
+                Arg::with_name("target_rate")
+                    .long("target-rate")
+                    .takes_value(true)
+                    .long_help(
+                        "Rate of batch submit, either provide a float, a rate in form <float>/<h,m,s> or \
+                    a range with the min and max separated by '-' ex: 5.0-15.0, 1/m, 15/s-2/m, defaults to 1/s",
+                    ),
+            )
+            .arg(
+                Arg::with_name("key")
+                    .value_name("private-key-file")
+                    .short("k")
+                    .long("key")
+                    .takes_value(true)
+                    .help("Path to private key file"),
+            )
+            .arg(
+                Arg::with_name("workload")
+                    .long("workload")
+                    .takes_value(true)
+                    .required(true)
+                    .possible_values(&[
+                        #[cfg(feature = "workload-smallbank")] 
+                        "smallbank",
+                        "command",
+                    ])
+                    .help("The workload to be submitted"),
+            )
+            .arg(
+                Arg::with_name("update")
+                    .long("update")
+                    .short("u")
+                    .takes_value(true)
+                    .help("The time in seconds between updates, defaults to 30 seconds"),
+            )
+            .arg(
+                Arg::with_name("seed")
+                    .long("seed")
+                    .value_name("SEED")
+                    .long_help("An integer to use as a seed to make the workload reproducible"),
+            )
+            .arg(
+                Arg::with_name("duration")
+                    .long("duration")
+                    .short("d")
+                    .takes_value(true)
+                    .help(
+                        "The amount of time the workload should run for. Time can be given \
+                        in seconds, minutes, hours or days. If not set workload will run \
+                        indefinitely"
+                    )
+            );
+
+    #[cfg(feature = "workload-smallbank")]
     {
-        app = app.subcommand(
-            SubCommand::with_name("workload")
-                .about("Run a continuous workload against a set of targets")
-                .arg(
-                    Arg::with_name("targets")
-                        .long("targets")
-                        .takes_value(true)
-                        .multiple(true)
-                        .required(true)
-                        .help("Node URLS to submit batches to, combine groups with ;"),
-                )
-                .arg(
-                    Arg::with_name("target_rate")
-                        .long("target-rate")
-                        .takes_value(true)
-                        .long_help(
-                            "Rate of batch submit, either provide a float, a rate in form <float>/<h,m,s> or \
-                     a range with the min and max separated by '-' ex: 5.0-15.0, 1/m, 15/s-2/m, defaults to 1/s",
-                        ),
-                )
-                .arg(
-                    Arg::with_name("key")
-                        .value_name("private-key-file")
-                        .short("k")
-                        .long("key")
-                        .takes_value(true)
-                        .help("Path to private key file"),
-                )
-                .arg(
-                    Arg::with_name("workload")
-                        .long("workload")
-                        .takes_value(true)
-                        .required(true)
-                        .possible_values(&["smallbank", "command"])
-                        .help("The workload to be submitted"),
-                )
-                .arg(
-                    Arg::with_name("update")
-                        .long("update")
-                        .short("u")
-                        .takes_value(true)
-                        .help("The time in seconds between updates, defaults to 30 seconds"),
-                )
-                .arg(
-                    Arg::with_name("smallbank_num_accounts")
-                        .long("smallbank-num-accounts")
-                        .value_name("ACCOUNTS")
-                        .help("The number of smallbank accounts to make. Defaults to 100"),
-                )
-                .arg(
-                    Arg::with_name("seed")
-                        .long("seed")
-                        .value_name("SEED")
-                        .long_help("An integer to use as a seed to make the workload reproducible"),
-                )
-                .arg(
-                    Arg::with_name("duration")
-                        .long("duration")
-                        .short("d")
-                        .takes_value(true)
-                        .help(
-                            "The amount of time the workload should run for. Time can be given \
-                         in seconds, minutes, hours or days. If not set workload will run \
-                         indefinitely"
-                        )
-                ),
+        workload_command = workload_command.arg(
+            Arg::with_name("smallbank_num_accounts")
+                .long("smallbank-num-accounts")
+                .value_name("ACCOUNTS")
+                .help("The number of smallbank accounts to make. Defaults to 100"),
         );
     }
+
+    #[cfg(feature = "workload")]
+    {
+        app = app.subcommand(workload_command);
+    }
+
     #[cfg(feature = "playlist")]
     {
         app = app.subcommand(

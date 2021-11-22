@@ -19,11 +19,12 @@ use std::time::Duration;
 use clap::ArgMatches;
 use cylinder::Signer;
 use rand::Rng;
-use transact::families::{
-    command::workload::{CommandBatchWorkload, CommandGeneratingIter, CommandTransactionWorkload},
-    smallbank::workload::{
-        playlist::SmallbankGeneratingIter, SmallbankBatchWorkload, SmallbankTransactionWorkload,
-    },
+use transact::families::command::workload::{
+    CommandBatchWorkload, CommandGeneratingIter, CommandTransactionWorkload,
+};
+#[cfg(feature = "workload-smallbank")]
+use transact::families::smallbank::workload::{
+    playlist::SmallbankGeneratingIter, SmallbankBatchWorkload, SmallbankTransactionWorkload,
 };
 use transact::workload::{HttpRequestCounter, WorkloadRunner};
 
@@ -126,6 +127,7 @@ impl Action for WorkloadAction {
         let mut request_counters = Vec::new();
         for i in 0..targets.len() {
             let id = match workload {
+                #[cfg(feature = "workload-smallbank")]
                 "smallbank" => format!("Smallbank-Workload-{}", i),
                 "command" => format!("Command-Workload-{}", i),
                 _ => {
@@ -149,6 +151,7 @@ impl Action for WorkloadAction {
         let mut workload_runner = WorkloadRunner::default();
 
         match workload {
+            #[cfg(feature = "workload-smallbank")]
             "smallbank" => {
                 let num_accounts: usize = args
                     .value_of("smallbank_num_accounts")
@@ -219,6 +222,7 @@ impl Action for WorkloadAction {
     }
 }
 
+#[cfg(feature = "workload-smallbank")]
 #[allow(clippy::too_many_arguments)]
 fn start_smallbank_workloads(
     workload_runner: &mut WorkloadRunner,

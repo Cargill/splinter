@@ -60,12 +60,14 @@ experimental = [
     # The following features are experimental:
     "command",
     "playlist",
-    "workload"
+    "workload",
+    "workload-smallbank"
 ]
 
 command = ["cylinder", "hex", "protobuf", "reqwest", "serde", "serde_json"]
 playlist = ["cylinder", "serde_json"]
-workload = ["ctrlc", "cylinder", "rand", "transact/family-command-workload", "transact/family-smallbank-workload"]
+workload = ["ctrlc", "cylinder", "rand", "transact/family-command-workload"]
+workload-smallbank = ["workload", "transact/family-smallbank-workload"]
 
 [package.metadata.deb]
 maintainer = "The Transact Team"
