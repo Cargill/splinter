@@ -15,10 +15,10 @@
 //! Builder for constructing new service orchestrators.
 
 use crate::error::InvalidStateError;
-use crate::service::ServiceFactory;
 use crate::transport::Connection;
 
 use super::runnable::RunnableServiceOrchestrator;
+use super::OrchestratableServiceFactory;
 
 const DEFAULT_INCOMING_CAPACITY: usize = 512;
 const DEFAULT_OUTGOING_CAPACITY: usize = 512;
@@ -31,7 +31,7 @@ pub struct ServiceOrchestratorBuilder {
     incoming_capacity: Option<usize>,
     outgoing_capacity: Option<usize>,
     channel_capacity: Option<usize>,
-    service_factories: Vec<Box<dyn ServiceFactory>>,
+    service_factories: Vec<Box<dyn OrchestratableServiceFactory>>,
 }
 
 impl ServiceOrchestratorBuilder {
@@ -78,7 +78,10 @@ impl ServiceOrchestratorBuilder {
     /// Adds a service factory which will be used to create service instances.
     ///
     /// This function may be called more than once to add additional service factories.
-    pub fn with_service_factory(mut self, service_factory: Box<dyn ServiceFactory>) -> Self {
+    pub fn with_service_factory(
+        mut self,
+        service_factory: Box<dyn OrchestratableServiceFactory>,
+    ) -> Self {
         self.service_factories.push(service_factory);
 
         self

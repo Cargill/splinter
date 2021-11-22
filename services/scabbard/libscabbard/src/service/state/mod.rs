@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
 use std::sync::{
-    mpsc::{channel, Receiver, RecvTimeoutError, Sender},
+    mpsc::{channel, Receiver, Sender, TryRecvError},
     Arc, RwLock,
 };
 use std::time::{Duration, Instant, SystemTime};
@@ -54,7 +54,7 @@ use crate::store::CommitHashStore;
 
 const EXECUTION_TIMEOUT: u64 = 300; // five minutes
 const ITER_CACHE_SIZE: usize = 64;
-const COMPLETED_BATCH_INFO_ITER_RETRY_MILLIS: u64 = 100;
+const COMPLETED_BATCH_INFO_ITER_RETRY: Duration = Duration::from_millis(100);
 const DEFAULT_BATCH_HISTORY_SIZE: usize = 100;
 
 type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
@@ -633,7 +633,7 @@ impl BatchHistory {
         let batch_info = self.upsert_batch(signature.into(), status);
 
         match batch_info.status {
-            BatchStatus::Invalid(_) | BatchStatus::Valid(_) => {
+            BatchStatus::Invalid(_) | BatchStatus::Committed(_) => {
                 self.send_completed_batch_info_to_subscribers(batch_info)
             }
             _ => {}
@@ -644,7 +644,7 @@ impl BatchHistory {
         match self.history.get_mut(signature) {
             Some(info) => match info.status.clone() {
                 BatchStatus::Valid(txns) => {
-                    info.set_status(BatchStatus::Committed(txns));
+                    self.update_batch_status(signature, BatchStatus::Committed(txns));
                 }
                 _ => {
                     error!(
@@ -755,9 +755,15 @@ impl BatchHistory {
             .batch_subscribers
             .drain(..)
             .filter_map(|(mut pending_signatures, sender)| {
-                if pending_signatures.remove(&info.id) && sender.send(info.clone()).is_err() {
-                    // Receiver has been dropped
-                    return None;
+                match info.status {
+                    BatchStatus::Invalid(_) | BatchStatus::Committed(_) => {
+                        if pending_signatures.remove(&info.id) && sender.send(info.clone()).is_err()
+                        {
+                            // Receiver has been dropped
+                            return None;
+                        }
+                    }
+                    _ => (),
                 }
 
                 if pending_signatures.is_empty() {
@@ -795,14 +801,12 @@ impl ChannelBatchInfoIter {
         timeout: Duration,
         pending_ids: HashSet<String>,
     ) -> Result<Self, ScabbardStateError> {
-        let timeout = Instant::now()
-            .checked_add(timeout)
-            .ok_or_else(|| ScabbardStateError("failed to schedule timeout".into()))?;
-
         Ok(Self {
             receiver,
-            retry_interval: Duration::from_millis(COMPLETED_BATCH_INFO_ITER_RETRY_MILLIS),
-            timeout,
+            retry_interval: std::cmp::min(timeout, COMPLETED_BATCH_INFO_ITER_RETRY),
+            timeout: Instant::now()
+                .checked_add(timeout)
+                .ok_or_else(|| ScabbardStateError("failed to schedule timeout".into()))?,
             pending_ids,
         })
     }
@@ -817,21 +821,26 @@ impl Iterator for ChannelBatchInfoIter {
             if self.pending_ids.is_empty() {
                 return None;
             }
-            // Check if the timeout has expired
-            if Instant::now() >= self.timeout {
-                return Some(Err(format!(
-                    "timeout expired while waiting for incompleted batches: {:?}",
-                    self.pending_ids
-                )));
-            }
-            // Check for the next BatchInfo
-            match self.receiver.recv_timeout(self.retry_interval) {
-                Ok(batch_info) => {
-                    self.pending_ids.remove(&batch_info.id);
-                    return Some(Ok(batch_info));
+
+            match self.receiver.try_recv() {
+                Ok(batch_info) => match batch_info.status {
+                    BatchStatus::Invalid(_) | BatchStatus::Committed(_) => {
+                        self.pending_ids.remove(&batch_info.id);
+                        return Some(Ok(batch_info));
+                    }
+                    _ => {}
+                },
+                Err(TryRecvError::Empty) => {
+                    // Check if the timeout has expired
+                    if Instant::now() >= self.timeout {
+                        return Some(Err(format!(
+                            "timeout expired while waiting for incompleted batches: {:?}",
+                            self.pending_ids
+                        )));
+                    }
+                    std::thread::sleep(self.retry_interval);
                 }
-                Err(RecvTimeoutError::Timeout) => {}
-                Err(RecvTimeoutError::Disconnected) => return None,
+                Err(TryRecvError::Disconnected) => return None,
             }
         }
     }
@@ -862,6 +871,102 @@ mod tests {
     use crate::store::transact::{TransactCommitHashStore, CURRENT_STATE_ROOT_INDEX};
 
     use super::merkle_state::{MerkleState, MerkleStateConfig};
+
+    /// Verify that the ChannelBatchInfoIter returns an error if no results are returned before the
+    /// timeout.
+    #[test]
+    fn channel_batch_iter_no_resuls_before_timeout() -> Result<(), Box<dyn std::error::Error>> {
+        let (_tx, rx) = channel();
+
+        let mut iter = ChannelBatchInfoIter::new(
+            rx,
+            Duration::from_secs(0),
+            vec!["batch-id-1".to_string()].into_iter().collect(),
+        )?;
+
+        assert!(iter.next().unwrap().is_err());
+
+        Ok(())
+    }
+
+    /// Verify that the ChannelBatchInfoIter returns a value if it is sent before next is called.
+    #[test]
+    fn channel_batch_iter_batch_info_before_next() -> Result<(), Box<dyn std::error::Error>> {
+        let (tx, rx) = channel();
+
+        let mut iter = ChannelBatchInfoIter::new(
+            rx,
+            Duration::from_secs(0),
+            vec!["batch-id-1".to_string()].into_iter().collect(),
+        )?;
+
+        tx.send(BatchInfo {
+            id: "batch-id-1".into(),
+            status: BatchStatus::Committed(vec![ValidTransaction::new("ab".into())]),
+            timestamp: SystemTime::now(),
+        })?;
+
+        let info = iter.next().transpose()?;
+
+        assert!(info.is_some());
+
+        let info = info.unwrap();
+
+        assert_eq!(&info.id, "batch-id-1");
+
+        let info = iter.next();
+
+        assert!(info.is_none());
+
+        Ok(())
+    }
+
+    /// Verify that the ChannelBatchInfoIter returns a value if it is sent after next is called.
+    #[test]
+    fn channel_batch_iter_batch_info_after_next() -> Result<(), Box<dyn std::error::Error>> {
+        let (tx, rx) = channel();
+
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+
+        let iter_barrier = Arc::clone(&barrier);
+        let jh = std::thread::spawn(move || {
+            let mut iter = ChannelBatchInfoIter::new(
+                rx,
+                Duration::from_secs(1),
+                vec!["batch-id-1".to_string()].into_iter().collect(),
+            )
+            .unwrap();
+
+            iter_barrier.wait();
+
+            let info = iter.next().transpose().unwrap();
+
+            assert!(info.is_some());
+
+            let info = info.unwrap();
+
+            assert_eq!(&info.id, "batch-id-1");
+
+            let info = iter.next();
+
+            assert!(info.is_none());
+        });
+
+        barrier.wait();
+
+        // Wait a tiny amount for the iter.next() call.
+        std::thread::sleep(Duration::from_millis(10));
+
+        tx.send(BatchInfo {
+            id: "batch-id-1".into(),
+            status: BatchStatus::Committed(vec![ValidTransaction::new("ab".into())]),
+            timestamp: SystemTime::now(),
+        })?;
+
+        jh.join().unwrap();
+
+        Ok(())
+    }
 
     /// Verify that an empty receipt store returns an empty iterator
     #[test]
