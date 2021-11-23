@@ -6,6 +6,7 @@ on:
       - 0-6
   schedule:
     - cron: "0 10 * * *"
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
