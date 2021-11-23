@@ -52,6 +52,7 @@ default = []
 stable = [
     # The stable feature extends default:
     "default",
+    "workload",
 ]
 
 experimental = [
@@ -60,7 +61,6 @@ experimental = [
     # The following features are experimental:
     "command",
     "playlist",
-    "workload",
     "workload-smallbank"
 ]
 
