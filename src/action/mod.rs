@@ -15,7 +15,7 @@
 
 #[cfg(feature = "command")]
 pub mod command;
-#[cfg(feature = "playlist")]
+#[cfg(feature = "playlist-smallbank")]
 pub mod playlist;
 #[cfg(feature = "workload")]
 pub mod workload;
@@ -23,11 +23,19 @@ pub mod workload;
 pub mod time;
 
 use std::collections::HashMap;
-#[cfg(any(feature = "workload", feature = "playlist", feature = "command"))]
+#[cfg(any(
+    feature = "workload",
+    feature = "playlist-smallbank",
+    feature = "command"
+))]
 use std::path::Path;
 
 use clap::ArgMatches;
-#[cfg(any(feature = "workload", feature = "playlist", feature = "command"))]
+#[cfg(any(
+    feature = "workload",
+    feature = "playlist-smallbank",
+    feature = "command"
+))]
 use cylinder::{
     current_user_key_name, current_user_search_path, jwt::JsonWebTokenBuilder, load_key,
     load_key_from_path, secp256k1::Secp256k1Context, Context, Signer,
@@ -35,7 +43,7 @@ use cylinder::{
 
 use super::error::CliError;
 
-#[cfg(any(feature = "workload", feature = "playlist"))]
+#[cfg(any(feature = "workload", feature = "playlist-smallbank"))]
 const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
 
 /// A CLI Command Action.
@@ -57,7 +65,11 @@ impl<'a> SubcommandActions<'a> {
         Self::default()
     }
 
-    #[cfg(any(feature = "playlist", feature = "workload", feature = "command"))]
+    #[cfg(any(
+        feature = "playlist-smallbank",
+        feature = "workload",
+        feature = "command"
+    ))]
     pub fn with_command<'action: 'a, A: Action + 'action>(
         mut self,
         command: &str,
@@ -83,7 +95,11 @@ impl<'s> Action for SubcommandActions<'s> {
     }
 }
 
-#[cfg(any(feature = "playlist", feature = "workload", feature = "command"))]
+#[cfg(any(
+    feature = "playlist-smallbank",
+    feature = "workload",
+    feature = "command"
+))]
 // build a signed json web token using the private key
 fn create_cylinder_jwt_auth_signer_key(
     key_name: Option<&str>,
@@ -135,7 +151,7 @@ fn create_cylinder_jwt_auth_signer_key(
     Ok((format!("Bearer Cylinder:{}", encoded_token), signer))
 }
 
-#[cfg(feature = "playlist")]
+#[cfg(feature = "playlist-smallbank")]
 // load signing key from key file
 fn load_cylinder_signer_key(key_name: &str) -> Result<Box<dyn Signer>, CliError> {
     let private_key = if key_name.contains('/') {

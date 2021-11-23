@@ -16,11 +16,15 @@ extern crate log;
 
 mod action;
 pub mod error;
-#[cfg(any(feature = "workload", feature = "playlist"))]
+#[cfg(any(feature = "workload", feature = "playlist-smallbank"))]
 mod request_logger;
 
 use clap::clap_app;
-#[cfg(any(feature = "workload", feature = "playlist", feature = "command"))]
+#[cfg(any(
+    feature = "workload",
+    feature = "playlist-smallbank",
+    feature = "command"
+))]
 use clap::{Arg, SubCommand};
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
@@ -28,7 +32,7 @@ use std::ffi::OsString;
 
 #[cfg(feature = "command")]
 use crate::action::command;
-#[cfg(feature = "playlist")]
+#[cfg(feature = "playlist-smallbank")]
 use crate::action::playlist;
 #[cfg(feature = "workload")]
 use crate::action::workload;
@@ -144,7 +148,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         app = app.subcommand(workload_command);
     }
 
-    #[cfg(feature = "playlist")]
+    #[cfg(feature = "playlist-smallbank")]
     {
         app = app.subcommand(
             SubCommand::with_name("playlist")
@@ -466,7 +470,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         subcommands = subcommands.with_command("workload", workload::WorkloadAction)
     }
 
-    #[cfg(feature = "playlist")]
+    #[cfg(feature = "playlist-smallbank")]
     {
         subcommands = subcommands.with_command(
             "playlist",

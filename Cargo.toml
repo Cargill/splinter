@@ -61,12 +61,12 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
-    "playlist",
+    "playlist-smallbank",
     "workload-smallbank"
 ]
 
 command = ["cylinder", "hex", "protobuf", "reqwest", "serde", "serde_json"]
-playlist = ["cylinder", "serde_json", "transact/family-smallbank-workload", "transact/workload-batch-gen"]
+playlist-smallbank = ["cylinder", "serde_json", "transact/family-smallbank-workload", "transact/workload-batch-gen"]
 workload = ["ctrlc", "cylinder", "rand", "transact/family-command-workload"]
 workload-smallbank = ["workload", "transact/family-smallbank-workload"]
 
