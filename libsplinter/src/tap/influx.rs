@@ -24,9 +24,9 @@ use chrono::{DateTime, Utc};
 use influxdb::Client;
 use influxdb::InfluxDbWriteable;
 use metrics::{GaugeValue, Key, Label, Recorder, SharedString, Unit};
-use tokio_0_2::runtime::Runtime;
-use tokio_0_2::sync::mpsc::{unbounded_channel, UnboundedSender};
-use tokio_0_2::task::JoinHandle;
+use tokio_1::runtime::Runtime;
+use tokio_1::sync::mpsc::{unbounded_channel, UnboundedSender};
+use tokio_1::task::JoinHandle;
 
 use crate::error::InternalError;
 use crate::threading::lifecycle::ShutdownHandle;
@@ -260,7 +260,7 @@ impl ShutdownHandle for InfluxRecorder {
         }
     }
 
-    fn wait_for_shutdown(mut self) -> Result<(), InternalError> {
+    fn wait_for_shutdown(self) -> Result<(), InternalError> {
         self.rt.block_on(self.join_handle).map_err(|err| {
             InternalError::with_message(format!("Unable to join InfluxRecorder thread: {:?}", err))
         })
