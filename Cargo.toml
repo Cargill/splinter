@@ -47,13 +47,14 @@ transact = {path = "../libtransact", features=["family-smallbank-workload", "fam
 
 
 [features]
-default = []
+default = [
+    "command",
+    "workload",
+]
 
 stable = [
     # The stable feature extends default:
-    "command",
     "default",
-    "workload",
 ]
 
 experimental = [
