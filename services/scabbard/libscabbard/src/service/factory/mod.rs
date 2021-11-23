@@ -51,7 +51,7 @@ use crate::service::ScabbardStatePurgeHandler;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use crate::service::{
     error::ScabbardError,
-    state::merkle_state::{MerkleState, MerkleStateConfig},
+    state::merkle_state::{self, MerkleState, MerkleStateConfig},
     Scabbard, ScabbardVersion, SERVICE_TYPE,
 };
 #[cfg(feature = "diesel")]
@@ -281,6 +281,8 @@ impl ScabbardFactoryBuilder {
         #[cfg(feature = "lmdb")]
         if !state_storage_configuration.enable_lmdb {
             check_for_lmdb_files(lmdb_path)?;
+        } else {
+            check_for_sql_trees(&store_factory_config)?;
         }
 
         #[cfg(feature = "lmdb")]
@@ -363,6 +365,52 @@ fn check_for_lmdb_files(lmdb_path: &Path) -> Result<(), InvalidStateError> {
             lmdb_path.display(),
             err
         ))),
+    }
+}
+
+#[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
+fn check_for_sql_trees(
+    store_factory_config: &ScabbardFactoryStorageConfig,
+) -> Result<(), InvalidStateError> {
+    match store_factory_config {
+        #[cfg(feature = "postgres")]
+        ScabbardFactoryStorageConfig::Postgres { pool } => {
+            merkle_state::postgres_list_available_trees(pool)
+                .map_err(|e| {
+                    InvalidStateError::with_message(format!(
+                        "Unable to read merkle state trees in postgres: {}",
+                        e
+                    ))
+                })
+                .and_then(|trees| {
+                    if trees.is_empty() {
+                        Ok(())
+                    } else {
+                        Err(InvalidStateError::with_message(
+                            "SQL Merkle Radix trees exist, but LMDB storage is enabled".into(),
+                        ))
+                    }
+                })
+        }
+        #[cfg(feature = "sqlite")]
+        ScabbardFactoryStorageConfig::Sqlite { pool } => {
+            merkle_state::sqlite_list_available_trees(pool)
+                .map_err(|e| {
+                    InvalidStateError::with_message(format!(
+                        "Unable to read merkle state trees in sqlite: {}",
+                        e
+                    ))
+                })
+                .and_then(|trees| {
+                    if trees.is_empty() {
+                        Ok(())
+                    } else {
+                        Err(InvalidStateError::with_message(
+                            "SQL Merkle Radix trees exist, but LMDB storage is enabled".into(),
+                        ))
+                    }
+                })
+        }
     }
 }
 

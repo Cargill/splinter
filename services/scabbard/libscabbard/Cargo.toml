@@ -39,7 +39,7 @@ sawtooth-sabre = "0.7.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 splinter = { path = "../../../libsplinter" }
-transact = { version = "0.3.13", features = ["sawtooth-compat", "state-merkle-sql"] }
+transact = { version = "0.3.14", features = ["sawtooth-compat", "state-merkle-sql"] }
 
 [dependencies.sawtooth]
 version = "0.6.7"
@@ -48,7 +48,7 @@ features = ["lmdb", "transaction-receipt-store"]
 
 [dev-dependencies]
 tempdir = "0.3"
-transact = { version = "0.3.13", features = ["family-command", "sawtooth-compat", "state-merkle-sql"] }
+transact = { version = "0.3.14", features = ["family-command", "sawtooth-compat", "state-merkle-sql"] }
 
 [build-dependencies]
 protoc-rust = "2.14"

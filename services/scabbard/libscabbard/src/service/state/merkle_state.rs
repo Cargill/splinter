@@ -18,7 +18,10 @@ use std::collections::HashMap;
 use diesel::r2d2::{ConnectionManager, Pool};
 use splinter::error::InternalError;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
-use transact::state::merkle::sql;
+use transact::state::merkle::sql::{
+    self,
+    store::{MerkleRadixStore, SqlMerkleRadixStore},
+};
 use transact::{
     database::Database,
     state::{
@@ -249,6 +252,28 @@ impl Prune for MerkleState {
             MerkleState::SqlSqlite { state } => state.prune(state_ids),
         }
     }
+}
+
+#[cfg(feature = "sqlite")]
+pub fn sqlite_list_available_trees(
+    pool: &Pool<ConnectionManager<diesel::SqliteConnection>>,
+) -> Result<Vec<String>, InternalError> {
+    let sqlite_backend = sql::backend::SqliteBackend::from(pool.clone());
+    SqlMerkleRadixStore::new(&sqlite_backend)
+        .list_trees()
+        .and_then(|iter| iter.collect::<Result<Vec<_>, _>>())
+        .map_err(|e| InternalError::from_source(Box::new(e)))
+}
+
+#[cfg(feature = "postgres")]
+pub fn postgres_list_available_trees(
+    pool: &Pool<ConnectionManager<diesel::pg::PgConnection>>,
+) -> Result<Vec<String>, InternalError> {
+    let postgres_backend = sql::backend::PostgresBackend::from(pool.clone());
+    SqlMerkleRadixStore::new(&postgres_backend)
+        .list_trees()
+        .and_then(|iter| iter.collect::<Result<Vec<_>, _>>())
+        .map_err(|e| InternalError::from_source(Box::new(e)))
 }
 
 #[cfg(feature = "sqlite")]
