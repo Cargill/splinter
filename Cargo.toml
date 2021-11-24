@@ -24,7 +24,7 @@ serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 sabre-sdk = {path = "../sdks/rust"}
-transact = "0.3"
+transact = "0.4"
 
 [build-dependencies]
 protoc-rust = "2"
