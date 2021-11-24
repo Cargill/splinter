@@ -630,10 +630,10 @@ fn create_circuit_proposal(circuit_id: &str, node_a: &Node, node_b: &Node, auth:
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client_with_auth(auth.into())
-        .submit_admin_payload(circuit_payload_bytes.clone());
-    assert!(res.is_ok());
+        .submit_admin_payload(circuit_payload_bytes.clone())
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for the proposal event from each node.
     let proposal_a_event = node_a_event_client

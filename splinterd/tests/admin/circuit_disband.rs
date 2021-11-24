@@ -90,10 +90,10 @@ pub fn test_2_party_circuit_lifecycle() {
         &*node_a.admin_signer().clone_box(),
     );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client()
-        .submit_admin_payload(disband_payload.clone());
-    assert!(res.is_ok());
+        .submit_admin_payload(disband_payload.clone())
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for the proposal event from each node.
     let proposal_a_event = node_a_events.next().expect("Unable to get next event");
@@ -118,10 +118,10 @@ pub fn test_2_party_circuit_lifecycle() {
         &*node_b.admin_signer().clone_box(),
         true,
     );
-    let res = node_b
+    node_b
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for proposal accepted
     let accepted_a_event = node_a_events.next().expect("Unable to get next event");
@@ -233,10 +233,10 @@ pub fn test_2_party_circuit_disband_proposal_rejected() {
         &*node_a.admin_signer().clone_box(),
     );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client()
-        .submit_admin_payload(disband_payload);
-    assert!(res.is_ok());
+        .submit_admin_payload(disband_payload)
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for the proposal event from each node.
     let proposal_a_event = node_a_events.next().expect("Unable to get next event");
@@ -255,10 +255,10 @@ pub fn test_2_party_circuit_disband_proposal_rejected() {
         &*node_b.admin_signer().clone_box(),
         false,
     );
-    let res = node_b
+    node_b
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for proposal rejection
     let rejected_a_event = node_a_events.next().expect("Unable to get next event");
@@ -382,10 +382,10 @@ pub fn test_3_party_circuit_lifecycle() {
         &*node_a.admin_signer().clone_box(),
     );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client()
-        .submit_admin_payload(disband_payload.clone());
-    assert!(res.is_ok());
+        .submit_admin_payload(disband_payload.clone())
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for the proposal event from each node.
     let proposal_a_event = node_a_events.next().expect("Unable to get next event");
@@ -418,10 +418,10 @@ pub fn test_3_party_circuit_lifecycle() {
         &*node_b.admin_signer().clone_box(),
         true,
     );
-    let res = node_b
+    node_b
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // wait for vote event
     let vote_a_event = node_a_events.next().expect("Unable to get next event");
@@ -456,10 +456,10 @@ pub fn test_3_party_circuit_lifecycle() {
         &*node_c.admin_signer().clone_box(),
         true,
     );
-    let res = node_c
+    node_c
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for proposal accepted
     let accepted_a_event = node_a_events.next().expect("Unable to get next event");
@@ -586,10 +586,10 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
         &*node_a.admin_signer().clone_box(),
     );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client()
-        .submit_admin_payload(disband_payload);
-    assert!(res.is_ok());
+        .submit_admin_payload(disband_payload)
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for the proposal event from each node.
     let proposal_a_event = node_a_events.next().expect("Unable to get next event");
@@ -611,10 +611,10 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
         &*node_b.admin_signer().clone_box(),
         true,
     );
-    let res = node_b
+    node_b
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // wait for vote event
     let vote_a_event = node_a_events.next().expect("Unable to get next event");
@@ -649,10 +649,10 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
         &*node_c.admin_signer().clone_box(),
         false,
     );
-    let res = node_c
+    node_c
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for proposal accepted
     let rejected_a_event = node_a_events.next().expect("Unable to get next event");
@@ -798,10 +798,10 @@ pub fn test_2_party_circuit_lifecycle_stop() {
         &*node_a.admin_signer().clone_box(),
     );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client()
-        .submit_admin_payload(disband_payload.clone());
-    assert!(res.is_ok());
+        .submit_admin_payload(disband_payload.clone())
+        .expect("Unable to submit admin payload to admin service");
     // Restart the second node in the network
     network = network.start(1).expect("Unable to start second node");
     node_a = network.node(0).expect("Unable to get first node");
@@ -847,10 +847,10 @@ pub fn test_2_party_circuit_lifecycle_stop() {
         &*node_b.admin_signer().clone_box(),
         true,
     );
-    let res = node_b
+    node_b
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the first node in the network
     network = network.start(0).expect("Unable to start first node");
@@ -1000,10 +1000,10 @@ pub fn test_2_party_circuit_disband_rejected_stop() {
         &*node_a.admin_signer().clone_box(),
     );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client()
-        .submit_admin_payload(disband_payload);
-    assert!(res.is_ok());
+        .submit_admin_payload(disband_payload)
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the second node in the network
     network = network.start(1).expect("Unable to start second node");
@@ -1051,10 +1051,10 @@ pub fn test_2_party_circuit_disband_rejected_stop() {
         &*node_b.admin_signer().clone_box(),
         false,
     );
-    let res = node_b
+    node_b
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the first node in the network
     network = network.start(0).expect("Unable to start first node");
@@ -1214,10 +1214,10 @@ pub fn test_3_party_circuit_lifecycle_stop() {
         &*node_a.admin_signer().clone_box(),
     );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client()
-        .submit_admin_payload(disband_payload.clone());
-    assert!(res.is_ok());
+        .submit_admin_payload(disband_payload.clone())
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the second node in the network
     network = network.start(1).expect("Unable to start second node");
@@ -1277,10 +1277,10 @@ pub fn test_3_party_circuit_lifecycle_stop() {
         &*node_b.admin_signer().clone_box(),
         true,
     );
-    let res = node_b
+    node_b
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the third node in the network
     network = network.start(2).expect("Unable to start third node");
@@ -1342,10 +1342,10 @@ pub fn test_3_party_circuit_lifecycle_stop() {
         &*node_c.admin_signer().clone_box(),
         true,
     );
-    let res = node_c
+    node_c
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the first node in the network
     network = network.start(0).expect("Unable to start first node");
@@ -1515,10 +1515,10 @@ pub fn test_3_party_circuit_disband_rejected_stop() {
         &*node_a.admin_signer().clone_box(),
     );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client()
-        .submit_admin_payload(disband_payload);
-    assert!(res.is_ok());
+        .submit_admin_payload(disband_payload)
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the second node in the network
     network = network.start(1).expect("Unable to start second node");
@@ -1578,10 +1578,10 @@ pub fn test_3_party_circuit_disband_rejected_stop() {
         &*node_b.admin_signer().clone_box(),
         true,
     );
-    let res = node_b
+    node_b
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the third node in the network
     network = network.start(2).expect("Unable to start third node");
@@ -1643,10 +1643,10 @@ pub fn test_3_party_circuit_disband_rejected_stop() {
         &*node_c.admin_signer().clone_box(),
         false,
     );
-    let res = node_c
+    node_c
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the first node in the network
     network = network.start(0).expect("Unable to start first node");

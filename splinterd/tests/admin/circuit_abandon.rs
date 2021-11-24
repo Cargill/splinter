@@ -544,10 +544,10 @@ pub fn test_2_party_circuit_abandon_stop() {
         &*node_a.admin_signer().clone_box(),
     );
 
-    assert!(node_a
+    node_a
         .admin_service_client()
         .submit_admin_payload(abandon_payload)
-        .is_ok());
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the second node in the network
     network = network.start(1).expect("Unable to start second node");
@@ -578,10 +578,10 @@ pub fn test_2_party_circuit_abandon_stop() {
         node_b.node_id(),
         &*node_b.admin_signer().clone_box(),
     );
-    assert!(node_b
+    node_b
         .admin_service_client()
         .submit_admin_payload(abandon_payload)
-        .is_ok());
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the first node in the network
     network = network.start(0).expect("Unable to start first node");
@@ -700,10 +700,10 @@ pub fn test_3_party_circuit_abandon_stop() {
         node_a.node_id(),
         &*node_a.admin_signer().clone_box(),
     );
-    assert!(node_a
+    node_a
         .admin_service_client()
         .submit_admin_payload(abandon_payload)
-        .is_ok());
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the second node in the network
     network = network.start(1).expect("Unable to start second node");
@@ -749,10 +749,10 @@ pub fn test_3_party_circuit_abandon_stop() {
         node_b.node_id(),
         &*node_b.admin_signer().clone_box(),
     );
-    assert!(node_b
+    node_b
         .admin_service_client()
         .submit_admin_payload(abandon_payload)
-        .is_ok());
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the third node in the network
     network = network.start(2).expect("Unable to start third node");
@@ -798,10 +798,10 @@ pub fn test_3_party_circuit_abandon_stop() {
         node_c.node_id(),
         &*node_c.admin_signer().clone_box(),
     );
-    assert!(node_c
+    node_c
         .admin_service_client()
         .submit_admin_payload(abandon_payload)
-        .is_ok());
+        .expect("Unable to submit admin payload to admin service");
 
     // Restart the first node in the network
     network = network.start(0).expect("Unable to start first node");
