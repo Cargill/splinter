@@ -25,7 +25,6 @@ COPY splinterd /build/splinterd
 COPY cli /build/cli
 COPY services/scabbard/cli /build/services/scabbard/cli
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
-COPY services/health /build/services/health
 COPY examples/gameroom/database /build/examples/gameroom/database
 COPY examples/gameroom/daemon /build/examples/gameroom/daemon
 COPY examples/gameroom/cli /build/examples/gameroom/cli

@@ -18,7 +18,6 @@ crates := '\
     cli \
     services/scabbard/cli \
     services/scabbard/libscabbard \
-    services/health \
     examples/gameroom/database \
     examples/gameroom/daemon \
     examples/gameroom/cli \
@@ -30,7 +29,6 @@ crates_quick := '\
     cli \
     services/scabbard/cli \
     services/scabbard/libscabbard \
-    services/health \
     '
 
 features := '\
