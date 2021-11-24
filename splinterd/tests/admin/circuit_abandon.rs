@@ -77,7 +77,7 @@ pub fn test_2_party_circuit_abandon() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_a
+    node_a
         .scabbard_client()
         .expect("Unable to get first node's ScabbardClient")
         .submit(
@@ -85,7 +85,7 @@ pub fn test_2_party_circuit_abandon() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     // Commit a circuit between the 2 nodes that will remain active while the other circuit is
     // abandoned
@@ -101,7 +101,7 @@ pub fn test_2_party_circuit_abandon() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_a
+    node_a
         .scabbard_client()
         .expect("Unable to get first node's ScabbardClient")
         .submit(
@@ -109,7 +109,7 @@ pub fn test_2_party_circuit_abandon() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     // Create the abandon request to be sent from the first node
     let abandon_payload = make_circuit_abandon_payload(
@@ -158,7 +158,7 @@ pub fn test_2_party_circuit_abandon() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_1", &*node_b.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_b
+    node_b
         .scabbard_client()
         .expect("Unable to get first node's ScabbardClient")
         .submit(
@@ -166,7 +166,7 @@ pub fn test_2_party_circuit_abandon() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     // Create the abandon request to be sent from the first node
     let abandon_payload = make_circuit_abandon_payload(
@@ -209,7 +209,7 @@ pub fn test_2_party_circuit_abandon() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_2", &*node_b.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_b
+    node_b
         .scabbard_client()
         .expect("Unable to get first node's ScabbardClient")
         .submit(
@@ -217,7 +217,7 @@ pub fn test_2_party_circuit_abandon() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     shutdown!(network).expect("Unable to shutdown network");
 }
@@ -288,7 +288,7 @@ pub fn test_3_party_circuit_abandon() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_a
+    node_a
         .scabbard_client()
         .expect("Unable to get first node's ScabbardClient")
         .submit(
@@ -296,7 +296,7 @@ pub fn test_3_party_circuit_abandon() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     // Commit a circuit between the nodes that will remain active while the other circuit is
     // abandoned
@@ -318,7 +318,7 @@ pub fn test_3_party_circuit_abandon() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_a
+    node_a
         .scabbard_client()
         .expect("Unable to get first node's ScabbardClient")
         .submit(
@@ -326,7 +326,7 @@ pub fn test_3_party_circuit_abandon() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     // Create the abandon request to be sent from the first node
     let abandon_payload = make_circuit_abandon_payload(
@@ -375,7 +375,7 @@ pub fn test_3_party_circuit_abandon() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_1", &*node_b.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_b
+    node_b
         .scabbard_client()
         .expect("Unable to get first node's ScabbardClient")
         .submit(
@@ -383,7 +383,7 @@ pub fn test_3_party_circuit_abandon() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     // Create the abandon request to be sent from the second node
     let abandon_payload = make_circuit_abandon_payload(
@@ -432,7 +432,7 @@ pub fn test_3_party_circuit_abandon() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_2", &*node_c.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_c
+    node_c
         .scabbard_client()
         .expect("Unable to get first node's ScabbardClient")
         .submit(
@@ -440,7 +440,7 @@ pub fn test_3_party_circuit_abandon() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     // Create the abandon request to be sent from the third node
     let abandon_payload = make_circuit_abandon_payload(
@@ -483,7 +483,7 @@ pub fn test_3_party_circuit_abandon() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_3", &*node_c.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_c
+    node_c
         .scabbard_client()
         .expect("Unable to get first node's ScabbardClient")
         .submit(
@@ -491,7 +491,7 @@ pub fn test_3_party_circuit_abandon() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     shutdown!(network).expect("Unable to shutdown network");
 }

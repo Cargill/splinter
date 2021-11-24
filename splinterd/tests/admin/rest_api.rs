@@ -206,13 +206,13 @@ fn test_endpoints_with_valid_permissions() {
     // `scabbard/circuit_id/service_id/state/address` endpoint can be reached
     let scabbard_batch = make_create_contract_registry_batch("name", admin_signer)
         .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(scabbard_client
+    scabbard_client
         .submit(
             &service_id_a,
             vec![scabbard_batch],
-            Some(std::time::Duration::from_secs(25))
+            Some(std::time::Duration::from_secs(25)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     // Loop through all endpoints checking that a successful response is returned indicating the
     // endpoint was accessible with the necessary permissions configured
