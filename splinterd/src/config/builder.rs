@@ -24,8 +24,7 @@ use std::path::Path;
 use crate::config::error::ConfigError;
 use crate::config::{Config, ConfigSource, PartialConfig};
 
-use super::logging::AppenderConfig;
-use super::LoggerConfig;
+use super::{AppenderConfig, LoggerConfig};
 
 pub trait PartialConfigBuilder {
     /// Takes all values set in a config object to create a `PartialConfig` object.

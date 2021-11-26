@@ -16,10 +16,11 @@
 
 use std::collections::HashMap;
 
-use crate::config::logging::UnnamedLoggerConfig;
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
-use super::logging::{RootConfig, UnnamedAppenderConfig, DEFAULT_LOGGING_PATTERN};
+use super::logging::{
+    RootConfig, UnnamedAppenderConfig, UnnamedLoggerConfig, DEFAULT_LOGGING_PATTERN,
+};
 use super::ScabbardState;
 
 const CONFIG_DIR: &str = "/etc/splinter";
