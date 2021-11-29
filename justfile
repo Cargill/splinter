@@ -223,7 +223,7 @@ test:
     do
         for crate in $(echo {{crates}})
         do
-            cmd="cargo test --manifest-path=$crate/Cargo.toml $TEST_MODE $feature"
+            cmd="cargo test --manifest-path=$crate/Cargo.toml $TEST_MODE $feature $JUSTX_CARGO_TEST_ARGS -- $JUSTX_TEST_BINARY_ARGS"
             echo "\033[1m$cmd\033[0m"
             $cmd
         done
