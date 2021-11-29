@@ -113,7 +113,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
 
         let root_logger: Option<RootConfig> = Some(RootConfig {
             appenders: vec!["stdout".to_string()],
-            level: log::Level::Trace,
+            level: log::Level::Warn,
         });
         let stdout = UnnamedAppenderConfig {
             encoder: String::from(DEFAULT_LOGGING_PATTERN),
@@ -124,24 +124,17 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         };
         let loggers = vec![
             (
-                "tokio".to_string(),
+                "splinter".to_string(),
                 UnnamedLoggerConfig {
                     appenders: Some(vec!["stdout".into()]),
-                    level: Some(log::Level::Warn),
+                    level: Some(log::Level::Info),
                 },
             ),
             (
-                "tokio_reactor".to_string(),
+                "splinterd".to_string(),
                 UnnamedLoggerConfig {
                     appenders: Some(vec!["stdout".into()]),
-                    level: Some(log::Level::Warn),
-                },
-            ),
-            (
-                "hyper".to_string(),
-                UnnamedLoggerConfig {
-                    appenders: Some(vec!["stdout".into()]),
-                    level: Some(log::Level::Warn),
+                    level: Some(log::Level::Info),
                 },
             ),
         ]
