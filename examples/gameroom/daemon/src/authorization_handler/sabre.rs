@@ -147,7 +147,7 @@ fn create_contract_registry_txn(
         .with_name(XO_NAME.into())
         .with_owners(owners)
         .into_payload_builder()?
-        .into_transaction_builder(signer)?
+        .into_transaction_builder()?
         .build(signer)?)
 }
 
@@ -170,7 +170,7 @@ fn upload_contract_txn(signer: &dyn Signer) -> Result<Transaction, AppAuthHandle
         .with_outputs(action_addresses)
         .with_contract(contract)
         .into_payload_builder()?
-        .into_transaction_builder(signer)?
+        .into_transaction_builder()?
         .build(signer)?)
 }
 
@@ -182,7 +182,7 @@ fn create_xo_namespace_registry_txn(
         .with_namespace(XO_PREFIX.into())
         .with_owners(owners)
         .into_payload_builder()?
-        .into_transaction_builder(signer)?
+        .into_transaction_builder()?
         .build(signer)?)
 }
 
@@ -193,7 +193,7 @@ fn xo_namespace_permissions_txn(signer: &dyn Signer) -> Result<Transaction, AppA
         .with_read(true)
         .with_write(true)
         .into_payload_builder()?
-        .into_transaction_builder(signer)?
+        .into_transaction_builder()?
         .build(signer)?)
 }
 
