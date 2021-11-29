@@ -45,7 +45,7 @@ log4rs = { version = "1", features = ["threshold_filter"] }
 openssl = { version = "0.10", optional = true }
 protobuf = "2.23"
 rand = "0.7"
-sawtooth = { version = "0.6.7", default-features = false, optional = true }
+sawtooth = { version = "0.7", default-features = false, optional = true }
 serde = "1.0.80"
 serde_derive = "1.0.80"
 tempdir = "0.3"
@@ -54,8 +54,8 @@ toml = "0.5"
 [dev-dependencies]
 openssl = { version = "0.10" }
 reqwest = { version = "0.11", features = ["blocking"] }
-sabre-sdk = "0.7"
-transact = { version = "0.3" }
+sabre-sdk = "0.8"
+transact = "0.4"
 
 [dependencies.scabbard]
 path = "../services/scabbard/libscabbard"
