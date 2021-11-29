@@ -383,12 +383,13 @@ fn check_for_sql_trees(
                     ))
                 })
                 .and_then(|trees| {
-                    if trees.is_empty() {
-                        Ok(())
-                    } else {
+                    // Check that if any trees exist, it is only the default tree
+                    if trees.iter().any(|name| name != "default") {
                         Err(InvalidStateError::with_message(
                             "SQL Merkle Radix trees exist, but LMDB storage is enabled".into(),
                         ))
+                    } else {
+                        Ok(())
                     }
                 })
         }
@@ -402,12 +403,13 @@ fn check_for_sql_trees(
                     ))
                 })
                 .and_then(|trees| {
-                    if trees.is_empty() {
-                        Ok(())
-                    } else {
+                    // Check that if any trees exist, it is only the default tree
+                    if trees.iter().any(|name| name != "default") {
                         Err(InvalidStateError::with_message(
                             "SQL Merkle Radix trees exist, but LMDB storage is enabled".into(),
                         ))
+                    } else {
+                        Ok(())
                     }
                 })
         }
