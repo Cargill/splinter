@@ -34,8 +34,8 @@ cylinder = { version = "0.2.2", features = ["jwt", "key-load"] }
 dirs = "4"
 flexi_logger = "0.14"
 log = "0.4"
-sabre-sdk = "0.7"
-transact = { version = "0.3", features = ["contract-archive"] }
+sabre-sdk = "0.8"
+transact = { version = "0.4", features = ["contract-archive"] }
 scabbard = { path = "../libscabbard", features = ["client-reqwest"], default-features=false }
 
 [dev-dependencies]
