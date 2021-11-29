@@ -91,10 +91,10 @@ pub(in crate::admin) fn commit_2_party_circuit(
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client()
-        .submit_admin_payload(circuit_payload_bytes.clone());
-    assert!(res.is_ok());
+        .submit_admin_payload(circuit_payload_bytes.clone())
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for the proposal event from each node.
     let proposal_a_event = node_a_event_client
@@ -127,10 +127,10 @@ pub(in crate::admin) fn commit_2_party_circuit(
         &*node_b.admin_signer().clone_box(),
         true,
     );
-    let res = node_b
+    node_b
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for proposal accepted
     let accepted_a_event = node_a_event_client
@@ -257,10 +257,10 @@ pub(in crate::admin) fn commit_2_party_circuit_with_auth(
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client_with_auth(auth.clone())
-        .submit_admin_payload(circuit_payload_bytes.clone());
-    assert!(res.is_ok());
+        .submit_admin_payload(circuit_payload_bytes.clone())
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for the proposal event from each node.
     let proposal_a_event = node_a_event_client
@@ -293,10 +293,10 @@ pub(in crate::admin) fn commit_2_party_circuit_with_auth(
         &*node_b.admin_signer().clone_box(),
         true,
     );
-    let res = node_b
+    node_b
         .admin_service_client_with_auth(auth.clone())
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for proposal accepted
     let accepted_a_event = node_a_event_client
@@ -436,10 +436,10 @@ pub(in crate::admin) fn commit_3_party_circuit(
     )
     .expect("Unable to generate circuit request");
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a
+    node_a
         .admin_service_client()
-        .submit_admin_payload(circuit_payload_bytes.clone());
-    assert!(res.is_ok());
+        .submit_admin_payload(circuit_payload_bytes.clone())
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for the proposal event from each node
     let proposal_a_event = node_a_event_client
@@ -479,10 +479,10 @@ pub(in crate::admin) fn commit_3_party_circuit(
         &*node_b.admin_signer().clone_box(),
         true,
     );
-    let res = node_b
+    node_b
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // wait for vote event
     let vote_a_event = node_a_event_client
@@ -524,10 +524,10 @@ pub(in crate::admin) fn commit_3_party_circuit(
         &*node_c.admin_signer().clone_box(),
         true,
     );
-    let res = node_c
+    node_c
         .admin_service_client()
-        .submit_admin_payload(vote_payload_bytes);
-    assert!(res.is_ok());
+        .submit_admin_payload(vote_payload_bytes)
+        .expect("Unable to submit admin payload to admin service");
 
     // Wait for proposal accepted
     let accepted_a_event = node_a_event_client

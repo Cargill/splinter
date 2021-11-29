@@ -56,15 +56,15 @@ pub fn test_2_party_circuit_purge() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_a
+    node_a
         .scabbard_client()
         .expect("Unable to get first node's scabbard client")
         .submit(
             &test_service_id_a,
             vec![scabbard_batch],
-            Some(Duration::from_secs(5))
+            Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     // Commit a circuit between the 2 nodes that will remain active while the other circuit is
     // purged
@@ -85,7 +85,7 @@ pub fn test_2_party_circuit_purge() {
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_a
+    node_a
         .scabbard_client()
         .expect("Unable to get first node's ScabbardClient")
         .submit(
@@ -93,7 +93,7 @@ pub fn test_2_party_circuit_purge() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     // Create the abandon request to be sent from the first node
     // Circuits must be abandoned before they can be purged
@@ -159,7 +159,7 @@ pub fn test_2_party_circuit_purge() {
         make_create_contract_registry_batch("contract_registry_1", &*node_b.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
     // Check that the non purged circuit is still working
-    assert!(node_b
+    node_b
         .scabbard_client()
         .expect("Unable to get second node's ScabbardClient")
         .submit(
@@ -167,7 +167,7 @@ pub fn test_2_party_circuit_purge() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_1", &*node_b.admin_signer())
@@ -187,7 +187,7 @@ pub fn test_2_party_circuit_purge() {
         make_create_contract_registry_batch("contract_registry_2", &*node_a.admin_signer())
             .expect("Unable to build `CreateContractRegistryAction`");
     // Check that the non purged circuit is still working
-    assert!(node_a
+    node_a
         .scabbard_client()
         .expect("Unable to get second node's ScabbardClient")
         .submit(
@@ -195,7 +195,7 @@ pub fn test_2_party_circuit_purge() {
             vec![scabbard_batch],
             Some(Duration::from_secs(5)),
         )
-        .is_ok());
+        .expect("Unable to submit batch to scabbard");
 
     let scabbard_batch =
         make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
@@ -267,15 +267,14 @@ pub fn test_3_party_circuit_purge() {
             &*node.admin_signer(),
         )
         .expect("Unable to build `CreateContractRegistryAction`");
-        assert!(node
-            .scabbard_client()
+        node.scabbard_client()
             .expect("Unable to get node's ScabbardClient")
             .submit(
                 service_id,
                 vec![scabbard_batch],
                 Some(Duration::from_secs(5)),
             )
-            .is_ok());
+            .expect("Unable to submit batch to scabbard");
     };
     // Check test circuit function
     let mask = "before_test";
@@ -405,15 +404,14 @@ fn test_purge_non_abandoned_circuit() {
             &*node.admin_signer(),
         )
         .expect("Unable to build `CreateContractRegistryAction`");
-        assert!(node
-            .scabbard_client()
+        node.scabbard_client()
             .expect("Unable to get first node's scabbard client")
             .submit(
                 service_id,
                 vec![scabbard_batch],
-                Some(Duration::from_secs(5))
+                Some(Duration::from_secs(5)),
             )
-            .is_ok());
+            .expect("Unable to submit batch to scabbard");
     };
     let mask = "before";
     basic_function(node_a, &service_id_a, &mask);
