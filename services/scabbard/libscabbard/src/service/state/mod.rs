@@ -26,7 +26,8 @@ use std::time::{Duration, Instant, SystemTime};
 use protobuf::Message;
 use sawtooth::receipt::store::ReceiptStore;
 use sawtooth_sabre::{
-    handler::SabreTransactionHandler, ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
+    admin::SettingsAdminPermission, handler::SabreTransactionHandler,
+    ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "events")]
@@ -125,7 +126,7 @@ impl ScabbardState {
         let mut executor = Executor::new(vec![Box::new(StaticExecutionAdapter::new_adapter(
             vec![
                 Box::new(SawtoothToTransactHandlerAdapter::new(
-                    SabreTransactionHandler::new(),
+                    SabreTransactionHandler::new(Box::new(SettingsAdminPermission)),
                 )),
                 #[cfg(test)]
                 Box::new(CommandTransactionHandler::new()),
