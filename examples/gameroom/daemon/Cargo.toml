@@ -40,7 +40,7 @@ ctrlc = "3.0"
 cylinder = { version = "0.2.2", features = ["jwt", "key-load"] }
 diesel = { version = "1.0.0", features = ["serde_json"] }
 flate2 = "1.0.10"
-flexi_logger = "0.14"
+flexi_logger = { version = "0.20", features = ["use_chrono_for_offset"] }
 futures = "0.1"
 gameroom-database = { path = "../database" }
 hyper = "0.12"

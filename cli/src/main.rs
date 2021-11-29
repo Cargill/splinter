@@ -1611,7 +1611,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
 
     match Logger::with(log_spec_builder.build())
         .format(log_format)
-        .log_target(flexi_logger::LogTarget::StdOut)
+        .log_to_stdout()
         .start()
     {
         Ok(_) => {}
