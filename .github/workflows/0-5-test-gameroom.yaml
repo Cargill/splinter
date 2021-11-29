@@ -1,17 +1,22 @@
-name: Lint OpenAPI spec
+name: 0-5 Test Gameroom
 
 on:
   pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
 
 concurrency:
   group: "${{ github.ref }}-${{ github.workflow }}"
   cancel-in-progress: true
 
 jobs:
-  lint_openapi:
-    runs-on: ubuntu-latest
+  gameroom_tests:
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: 0-5
 
       - name: Display envvars
         run: env
@@ -19,5 +24,5 @@ jobs:
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
-      - name: Lint OpenAPI files
-        run: just ci-lint-openapi
+      - name: Gameroom Tests
+        run: just ci-test-gameroom

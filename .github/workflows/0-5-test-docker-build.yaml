@@ -1,4 +1,4 @@
-name: Unit Test Splinter
+name: 0-5 Build Docker
 
 on:
   pull_request:
@@ -11,10 +11,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  unit_test_splinter:
+  build_docker:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          ref: 0-5
 
       - name: Display envvars
         run: env
@@ -22,5 +25,5 @@ jobs:
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
-      - name: Unit Test Splinter
-        run: just ci-test
+      - name: Test Docker Build
+        run: just docker-build

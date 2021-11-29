@@ -1,4 +1,4 @@
-name: Test Gameroom UI
+name: 0-5 Unit Test Splinter
 
 on:
   pull_request:
@@ -11,10 +11,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gameroom_ui_tests:
+  unit_test_splinter:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: 0-5
 
       - name: Display envvars
         run: env
@@ -22,5 +24,5 @@ jobs:
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
-      - name: Gameroom UI Tests
-        run: just ci-test-gameroom-ui
+      - name: Unit Test Splinter
+        run: just ci-test

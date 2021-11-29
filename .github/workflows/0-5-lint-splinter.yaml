@@ -1,4 +1,4 @@
-name: Test Gameroom
+name: 0-5 Lint Splinter
 
 on:
   pull_request:
@@ -11,10 +11,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gameroom_tests:
+  lint_splinter:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: 0-5
 
       - name: Display envvars
         run: env
@@ -22,5 +24,5 @@ jobs:
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
-      - name: Gameroom Tests
-        run: just ci-test-gameroom
+      - name: Run Lint/Clippy on Splinter
+        run: just ci-lint-splinter

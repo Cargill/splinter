@@ -1,20 +1,19 @@
-name: Shellcheck Splinter CLI
+name: 0-5 Lint OpenAPI spec
 
 on:
   pull_request:
-
-env:
-  CARGO_TERM_COLOR: always
 
 concurrency:
   group: "${{ github.ref }}-${{ github.workflow }}"
   cancel-in-progress: true
 
 jobs:
-  shellcheck_splinter:
-    runs-on: ubuntu-18.04
+  lint_openapi:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: 0-5
 
       - name: Display envvars
         run: env
@@ -22,5 +21,5 @@ jobs:
       - name: Install Just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
-      - name: Run Shellcheck on Splinter
-        run: just ci-shellcheck
+      - name: Lint OpenAPI files
+        run: just ci-lint-openapi
