@@ -345,7 +345,7 @@ pub(in crate::admin) fn make_create_contract_registry_batch(
         .with_owners(owners)
         .into_payload_builder()
         .map_err(|err| InternalError::from_source(Box::new(err)))?
-        .into_transaction_builder(signer)
+        .into_transaction_builder()
         .map_err(|err| InternalError::from_source(Box::new(err)))?
         .into_batch_builder(signer)
         .map_err(|err| InternalError::from_source(Box::new(err)))?

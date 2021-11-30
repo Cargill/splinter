@@ -26,7 +26,6 @@ use splinter::{
     service::ServiceNetworkSender,
 };
 
-use crate::hex::parse_hex;
 use crate::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
 
 use super::error::ScabbardError;
@@ -274,9 +273,7 @@ impl ScabbardShared {
                     .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?;
 
                 // Verify this transaction matches the corresponding ID in the batch header
-                let header_signature_bytes = parse_hex(txn.header_signature())
-                    .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?;
-                if header_signature_bytes != batch.header().transaction_ids()[i] {
+                if txn.header_signature() != batch.header().transaction_ids()[i] {
                     warn!(
                         "Transaction at index {} does not match corresponding transaction ID in
                          batch header: {}",
@@ -315,7 +312,7 @@ impl ScabbardShared {
                 }
 
                 if !match header.payload_hash_method() {
-                    HashMethod::SHA512 => {
+                    HashMethod::Sha512 => {
                         let expected_hash = hash(MessageDigest::sha512(), txn.payload())
                             .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?;
                         header.payload_hash() == expected_hash.as_ref()

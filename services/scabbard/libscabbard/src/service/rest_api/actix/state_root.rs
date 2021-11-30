@@ -83,11 +83,8 @@ mod tests {
         state::merkle::INDEXES,
     };
     use transact::{
-        families::command::make_command_transaction,
-        protocol::{
-            batch::BatchBuilder,
-            command::{BytesEntry, Command, SetState},
-        },
+        families::command::workload::CommandTransactionBuilder,
+        protocol::command::{BytesEntry, Command, SetState},
     };
 
     #[cfg(feature = "authorization")]
@@ -153,18 +150,15 @@ mod tests {
 
             let signing_context = Secp256k1Context::new();
             let signer = signing_context.new_signer(signing_context.new_random_private_key());
-            let batch = BatchBuilder::new()
-                .with_transactions(vec![
-                    make_command_transaction(
-                        &[Command::SetState(SetState::new(vec![
-                            BytesEntry::new("abcdef".into(), b"value1".to_vec()),
-                            BytesEntry::new("012345".into(), b"value2".to_vec()),
-                        ]))],
-                        &*signer,
-                    )
-                    .take()
-                    .0,
-                ])
+            let batch = CommandTransactionBuilder::new()
+                .with_commands(vec![Command::SetState(SetState::new(vec![
+                    BytesEntry::new("abcdef".into(), b"value1".to_vec()),
+                    BytesEntry::new("012345".into(), b"value2".to_vec()),
+                ]))])
+                .into_transaction_builder()
+                .expect("failed to convert to transaction builder")
+                .into_batch_builder(&*signer)
+                .expect("failed to build transaction")
                 .build_pair(&*signer)
                 .expect("Failed to build batch");
             state
