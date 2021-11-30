@@ -22,6 +22,7 @@ use super::error::ConfigError;
 use super::toml::{TomlRawLogTarget, TomlUnnamedAppenderConfig, TomlUnnamedLoggerConfig};
 
 pub const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
+const DEFAULT_LOG_SIZE: u64 = 100_000_000;
 
 pub(super) fn default_pattern() -> String {
     String::from(DEFAULT_LOGGING_PATTERN)
@@ -124,10 +125,13 @@ impl TryFrom<(String, UnnamedAppenderConfig)> for AppenderConfig {
                 }
             }
             RawLogTarget::RollingFile => {
-                if let (Some(filename), Some(size)) = (value.1.filename, value.1.size) {
-                    Ok(LogTarget::RollingFile { filename, size })
+                if let Some(filename) = value.1.filename {
+                    Ok(LogTarget::RollingFile {
+                        filename,
+                        size: value.1.size.unwrap_or(DEFAULT_LOG_SIZE),
+                    })
                 } else {
-                    Err(ConfigError::MissingValue("filename|size".to_string()))
+                    Err(ConfigError::MissingValue("filename".to_string()))
                 }
             }
         }?;
