@@ -249,7 +249,7 @@ version = "1"
 #
 # Valid options are, Trace, Debug, Info, Warn, and Error in decreasing order of
 # verbosity.
-#level = "Trace"
+#level = "Warn"
 
 #
 # Logging Options (Advanced)
@@ -272,3 +272,15 @@ version = "1"
 # are, Trace, Debug, Info, Warn, and Error in decreasing order of verbosity.
 # Optional for non-root loggers, defaults to the root loggers level.
 #level = "Warn"
+#
+# By default there are two non-root loggers configured. 
+#
+#[loggers.splinter]
+#appenders = ["stdout"]
+#level = "Info"
+#
+#[loggers.splinterd]
+#appenders = ["stdout"]
+#level = "Info"
+#
+# These two loggers select for the logs related to Splinter operations.
