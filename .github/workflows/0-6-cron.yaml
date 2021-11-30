@@ -1,0 +1,265 @@
+name: 0-6 Cron
+
+on:
+  schedule:
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  slack-channel: 'alerts'
+
+concurrency:
+  group: "${{ github.ref }}-${{ github.workflow }}"
+  cancel-in-progress: true
+
+jobs:
+
+  update_status:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          ref: 0-6
+
+      - name: get SHA
+        run:  echo "SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Update commit status to pending
+        run: |
+              env
+              curl \
+                -X POST \
+                -H "Authorization: token ${{ secrets.GH_TOKEN }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                https://api.github.com/repos/${{ github.repository }}/statuses/${{ env.SHA }} \
+                -d '{"state": "pending", "context": "Cron"}'
+
+  lint_gameroom_client:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 0-6
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Lint Gameroom Client
+        run: just ci-lint-client
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  lint_splinter:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 0-6
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Run Lint/Clippy on Splinter
+        run: just ci-lint-splinter
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  lint_openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 0-6
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Lint OpenAPI files
+        run: just ci-lint-openapi
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  unit_test_splinter:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 0-6
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Unit Test Splinter
+        run: just ci-test
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  gameroom_tests:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 0-6
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Gameroom Tests
+        run: just ci-test-gameroom
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  gameroom_ui_tests:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 0-6
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Gameroom UI Tests
+        run: just ci-test-gameroom-ui
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  build_docker:
+    runs-on: ubuntu-18.04
+    if: >-
+      github.repository_owner == 'Cargill'
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 0-6
+          fetch-depth: 0
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Test Docker Build
+        run: just docker-build
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  shellcheck_splinter:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 0-6
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Run Shellcheck on Splinter
+        run: just ci-shellcheck
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  lint_dockerfiles:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 0-6
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Run hadolint on Splinter Dockerfiles
+        run: just ci-lint-dockerfiles
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
