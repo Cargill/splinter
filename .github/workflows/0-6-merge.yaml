@@ -6,14 +6,11 @@ on:
       - 0-6
   schedule:
     - cron: "0 10 * * *"
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
   slack-channel: 'alerts'
-
-concurrency:
-  group: "${{ github.ref }}-${{ github.workflow }}"
-  cancel-in-progress: true
 
 jobs:
 
@@ -32,7 +29,7 @@ jobs:
         run: just ci-lint-client
 
       - name: Notify Slack of Failure
-        if: failure()
+        if: cancelled() || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -55,7 +52,7 @@ jobs:
         run: just ci-lint-splinter
 
       - name: Notify Slack of Failure
-        if: failure()
+        if: cancelled() || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -78,7 +75,7 @@ jobs:
         run: just ci-lint-openapi
 
       - name: Notify Slack of Failure
-        if: failure()
+        if: cancelled() || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -101,7 +98,7 @@ jobs:
         run: just ci-test
 
       - name: Notify Slack of Failure
-        if: failure()
+        if: cancelled() || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -124,7 +121,7 @@ jobs:
         run: just ci-test-gameroom
 
       - name: Notify Slack of Failure
-        if: failure()
+        if: cancelled() || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -147,7 +144,7 @@ jobs:
         run: just ci-test-gameroom-ui
 
       - name: Notify Slack of Failure
-        if: failure()
+        if: cancelled() || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -174,7 +171,7 @@ jobs:
         run: just docker-build
 
       - name: Notify Slack of Failure
-        if: failure()
+        if: cancelled() || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -197,7 +194,7 @@ jobs:
         run: just ci-shellcheck
 
       - name: Notify Slack of Failure
-        if: failure()
+        if: cancelled() || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -220,7 +217,7 @@ jobs:
         run: just ci-lint-dockerfiles
 
       - name: Notify Slack of Failure
-        if: failure()
+        if: cancelled() || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
