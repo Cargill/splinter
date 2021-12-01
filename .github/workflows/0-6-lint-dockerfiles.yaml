@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  shellcheck_splinter:
+  lint_dockerfiles:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
