@@ -29,8 +29,8 @@ use std::path::Path;
 use clap::ArgMatches;
 #[cfg(any(feature = "workload", feature = "playlist", feature = "command"))]
 use cylinder::{
-    current_user_search_path, jwt::JsonWebTokenBuilder, load_key, load_key_from_path,
-    secp256k1::Secp256k1Context, Context, Signer,
+    current_user_key_name, current_user_search_path, jwt::JsonWebTokenBuilder, load_key,
+    load_key_from_path, secp256k1::Secp256k1Context, Context, Signer,
 };
 
 use super::error::CliError;
@@ -86,19 +86,36 @@ impl<'s> Action for SubcommandActions<'s> {
 #[cfg(any(feature = "playlist", feature = "workload", feature = "command"))]
 // build a signed json web token using the private key
 fn create_cylinder_jwt_auth_signer_key(
-    key_name: &str,
+    key_name: Option<&str>,
 ) -> Result<(String, Box<dyn Signer>), CliError> {
-    let private_key = if key_name.contains('/') {
-        load_key_from_path(Path::new(key_name))
-            .map_err(|err| CliError::ActionError(err.to_string()))?
+    let private_key = if let Some(key_name) = key_name {
+        if key_name.contains('/') {
+            load_key_from_path(Path::new(key_name))
+                .map_err(|err| CliError::ActionError(err.to_string()))?
+        } else {
+            let path = &current_user_search_path();
+            load_key(key_name, path)
+                .map_err(|err| CliError::ActionError(err.to_string()))?
+                .ok_or_else(|| {
+                    CliError::ActionError({
+                        format!(
+                            "No signing key found in {}. Specify the --key argument",
+                            path.iter()
+                                .map(|path| path.as_path().display().to_string())
+                                .collect::<Vec<String>>()
+                                .join(":")
+                        )
+                    })
+                })?
+        }
     } else {
         let path = &current_user_search_path();
-        load_key(key_name, path)
+        load_key(&current_user_key_name(), path)
             .map_err(|err| CliError::ActionError(err.to_string()))?
             .ok_or_else(|| {
                 CliError::ActionError({
                     format!(
-                        "No signing key found in {}. Specify the --key argument",
+                        "No signing key found in {}, use the --key argument",
                         path.iter()
                             .map(|path| path.as_path().display().to_string())
                             .collect::<Vec<String>>()
