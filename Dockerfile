@@ -38,13 +38,7 @@ ENV PATH=$PATH:/root/.cargo/bin
 
 RUN cargo install cargo-deb
 
-# Copy over workspace Cargo.toml
-COPY Cargo.toml /build/Cargo.toml
-
 # Copy over dependencies and source files
-COPY examples/simple_xo /build/examples/simple_xo
-COPY examples/address_generator /build/examples/address_generator
-COPY examples/sabre_command_executor /build/examples/sabre_command_executor
 COPY libtransact /build/libtransact
 COPY README.md /build/README.md
 COPY cli /build/cli
@@ -57,7 +51,7 @@ RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" Car
 RUN sed -i -e "0,/readme.*$/ s/readme.*$/readme\ =\ \"\/build\/README.md\"/" Cargo.toml
 RUN cargo deb --deb-version $REPO_VERSION $CARGO_ARGS
 
-RUN mv /build/target/debian/transact-cli*.deb /tmp
+RUN mv /build/cli/target/debian/transact-cli*.deb /tmp
 
 # Log the commit hash
 COPY .git/ /tmp/.git/
