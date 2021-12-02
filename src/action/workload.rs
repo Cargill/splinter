@@ -39,10 +39,7 @@ impl Action for WorkloadAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
-        let key_path = args
-            .value_of("key")
-            .ok_or_else(|| CliError::ActionError("'key' is required".into()))?;
-        let (auth, signer) = create_cylinder_jwt_auth_signer_key(key_path)?;
+        let (auth, signer) = create_cylinder_jwt_auth_signer_key(args.value_of("key"))?;
 
         let targets_vec: Vec<String> = args
             .values_of("targets")

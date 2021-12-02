@@ -210,10 +210,7 @@ impl Action for SubmitPlaylistAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
-        let key_path = args
-            .value_of("key")
-            .ok_or_else(|| CliError::ActionError("'key' is required".into()))?;
-        let (auth, _) = create_cylinder_jwt_auth_signer_key(key_path)?;
+        let (auth, _) = create_cylinder_jwt_auth_signer_key(args.value_of("key"))?;
 
         let rate_string = args.value_of("rate").unwrap_or(DEFAULT_RATE);
         let rate: Duration = if let Ok(interval) = rate_string.parse::<Time>() {
