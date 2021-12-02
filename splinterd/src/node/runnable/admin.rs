@@ -142,7 +142,7 @@ impl RunnableAdminSubsystem {
             .with_public_keys(self.public_keys.to_vec());
 
         let circuit_resource_provider =
-            CircuitResourceProvider::new(node_id, store_factory.get_admin_service_store());
+            CircuitResourceProvider::new(store_factory.get_admin_service_store());
 
         let admin_service = admin_service_builder
             .build()

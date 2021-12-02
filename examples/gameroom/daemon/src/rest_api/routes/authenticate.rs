@@ -66,7 +66,6 @@ struct Keys {
 struct Key {
     pub public_key: String,
     pub encrypted_private_key: String,
-    pub user_id: String,
     pub display_name: String,
 }
 

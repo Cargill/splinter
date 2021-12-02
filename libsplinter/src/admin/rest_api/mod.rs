@@ -90,13 +90,12 @@ impl RestResourceProvider for AdminService {
 /// * `rest-api-actix`
 #[derive(Clone)]
 pub struct CircuitResourceProvider {
-    node_id: String,
     store: Box<dyn AdminServiceStore>,
 }
 
 impl CircuitResourceProvider {
-    pub fn new(node_id: String, store: Box<dyn AdminServiceStore>) -> Self {
-        Self { node_id, store }
+    pub fn new(store: Box<dyn AdminServiceStore>) -> Self {
+        Self { store }
     }
 }
 

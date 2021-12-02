@@ -551,11 +551,8 @@ impl SplinterDaemon {
         let network_endpoints = self.network_endpoints.clone();
         let advertised_endpoints = self.advertised_endpoints.clone();
 
-        let circuit_resource_provider = CircuitResourceProvider::new(
-            #[allow(clippy::redundant_clone)]
-            node_id.to_owned(),
-            store_factory.get_admin_service_store(),
-        );
+        let circuit_resource_provider =
+            CircuitResourceProvider::new(store_factory.get_admin_service_store());
 
         #[cfg(not(feature = "https-bind"))]
         let bind = self
