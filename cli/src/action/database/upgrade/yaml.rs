@@ -178,18 +178,10 @@ impl Error for ImportError {
     }
 }
 
+#[derive(Default)]
 struct ImportResult {
     circuits: usize,
     proposals: usize,
-}
-
-impl Default for ImportResult {
-    fn default() -> Self {
-        ImportResult {
-            circuits: 0,
-            proposals: 0,
-        }
-    }
 }
 
 #[cfg(test)]
