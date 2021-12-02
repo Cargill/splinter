@@ -401,6 +401,10 @@ impl AuthorizationManagerStateMachine {
                 .or_insert(ManagedAuthorizationState {
                     initiating_state: AuthorizationInitiatingState::Start,
                     accepting_state: AuthorizationAcceptingState::Start,
+                    #[cfg(any(
+                        feature = "trust-authorization",
+                        feature = "challenge-authorization"
+                    ))]
                     received_complete: false,
                     local_authorization: None,
                 });
@@ -561,6 +565,10 @@ impl AuthorizationManagerStateMachine {
                 .or_insert(ManagedAuthorizationState {
                     initiating_state: AuthorizationInitiatingState::Start,
                     accepting_state: AuthorizationAcceptingState::Start,
+                    #[cfg(any(
+                        feature = "trust-authorization",
+                        feature = "challenge-authorization"
+                    ))]
                     received_complete: false,
                     local_authorization: None,
                 });
