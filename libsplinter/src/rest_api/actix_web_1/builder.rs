@@ -36,6 +36,7 @@ use super::RestResourceProvider;
 use super::{Resource, RestApi};
 
 /// Builder `struct` for `RestApi`.
+#[derive(Default)]
 pub struct RestApiBuilder {
     resources: Vec<Resource>,
     bind: Option<BindConfig>,
@@ -44,20 +45,6 @@ pub struct RestApiBuilder {
     auth_configs: Vec<AuthConfig>,
     #[cfg(feature = "authorization")]
     authorization_handlers: Vec<Box<dyn AuthorizationHandler>>,
-}
-
-impl Default for RestApiBuilder {
-    fn default() -> Self {
-        Self {
-            resources: Vec::new(),
-            bind: None,
-            #[cfg(feature = "rest-api-cors")]
-            whitelist: None,
-            auth_configs: Vec::new(),
-            #[cfg(feature = "authorization")]
-            authorization_handlers: Vec::new(),
-        }
-    }
 }
 
 impl RestApiBuilder {
