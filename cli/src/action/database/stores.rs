@@ -32,6 +32,12 @@ pub trait UpgradeStores {
         -> Box<dyn CommitHashStore>;
 
     fn new_receipt_store(&self, circuit_id: &str, service_id: &str) -> Box<dyn ReceiptStore>;
+
+    #[cfg(feature = "sqlite")]
+    fn get_sqlite_pool(&self) -> Pool<ConnectionManager<diesel::SqliteConnection>>;
+
+    #[cfg(feature = "postgres")]
+    fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>>;
 }
 
 pub fn new_upgrade_stores(
@@ -116,6 +122,16 @@ impl UpgradeStores for PostgresUpgradeStores {
             Some(format!("{}::{}", circuit_id, service_id)),
         ))
     }
+
+    // should never be used if using postgres
+    #[cfg(feature = "sqlite")]
+    fn get_sqlite_pool(&self) -> Pool<ConnectionManager<diesel::SqliteConnection>> {
+        unimplemented!()
+    }
+
+    fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
+        self.0.clone()
+    }
 }
 
 #[cfg(feature = "sqlite")]
@@ -148,5 +164,15 @@ impl UpgradeStores for SqliteUpgradeStores {
             self.0.clone(),
             Some(format!("{}::{}", circuit_id, service_id)),
         ))
+    }
+
+    fn get_sqlite_pool(&self) -> Pool<ConnectionManager<diesel::SqliteConnection>> {
+        self.0.clone()
+    }
+
+    // should never be used if using sqlite
+    #[cfg(feature = "postgres")]
+    fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
+        unimplemented!()
     }
 }
