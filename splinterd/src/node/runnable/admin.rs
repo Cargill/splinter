@@ -126,7 +126,7 @@ impl RunnableAdminSubsystem {
         let mut admin_service_builder = AdminServiceBuilder::new();
 
         admin_service_builder = admin_service_builder
-            .with_node_id(node_id.clone())
+            .with_node_id(node_id)
             .with_service_orchestrator(orchestrator)
             .with_peer_manager_connector(peer_connector.clone())
             .with_admin_service_store(store_factory.get_admin_service_store())
@@ -142,7 +142,7 @@ impl RunnableAdminSubsystem {
             .with_public_keys(self.public_keys.to_vec());
 
         let circuit_resource_provider =
-            CircuitResourceProvider::new(node_id, store_factory.get_admin_service_store());
+            CircuitResourceProvider::new(store_factory.get_admin_service_store());
 
         let admin_service = admin_service_builder
             .build()

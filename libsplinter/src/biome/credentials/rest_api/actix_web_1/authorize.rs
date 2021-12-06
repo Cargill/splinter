@@ -32,7 +32,7 @@ pub(crate) fn authorize_user(
     validation: &Validation,
 ) -> AuthorizationResult {
     let token = match get_authorization_token(request) {
-        Ok(token) => match token.splitn(2, ':').nth(1) {
+        Ok(token) => match token.split_once(':').map(|x| x.1) {
             Some(token) => token.to_string(),
             None => {
                 debug!("Invalid token; should be in the format 'Biome:<JWT>'");
