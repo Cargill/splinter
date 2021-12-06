@@ -276,11 +276,11 @@ version = "1"
 # By default there are two non-root loggers configured. 
 #
 #[loggers.splinter]
-#appenders = ["stdout"]
 #level = "Info"
 #
 #[loggers.splinterd]
-#appenders = ["stdout"]
 #level = "Info"
 #
-# These two loggers select for the logs related to Splinter operations.
+# These two loggers select for the logs related to Splinter operations. Their
+# appenders fields are not set so they inherit their appenders from the root
+# logger.
