@@ -66,7 +66,6 @@ RUN USER=root cargo new --bin cli \
  && USER=root cargo new --bin examples/gameroom/daemon \
  && USER=root cargo new --lib examples/gameroom/database \
 # Create empty Cargo projects for splinter services
- && USER=root cargo new --bin services/health \
  && USER=root cargo new --bin services/scabbard/cli \
  && USER=root cargo new --lib services/scabbard/libscabbard
 
@@ -77,7 +76,6 @@ COPY libsplinter/build.rs /build/libsplinter/build.rs
 COPY libsplinter/Cargo.toml /build/libsplinter/Cargo.toml
 COPY libsplinter/protos /build/libsplinter/protos
 COPY splinterd/Cargo.toml /build/splinterd/Cargo.toml
-COPY services/health/Cargo.toml /build/services/health/Cargo.toml
 COPY services/scabbard/cli/Cargo.toml /build/services/scabbard/cli/Cargo.toml
 COPY services/scabbard/libscabbard/build.rs /build/services/scabbard/libscabbard/build.rs
 COPY services/scabbard/libscabbard/Cargo.toml /build/services/scabbard/libscabbard/Cargo.toml
@@ -104,7 +102,6 @@ RUN find ./*/ -name 'Cargo.toml' -print0 | \
     xargs -0 -I {} sh -c 'echo Building $1; cargo build --tests --release --manifest-path $1 --no-default-features' sh {} \
 # Clean up built files
  && find target/release -path target/release/.fingerprint -prune -false -o -name '*gameroom*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
- && find target/release -path target/release/.fingerprint -prune -false -o -name '*health*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
  && find target/release -path target/release/.fingerprint -prune -false -o -name '*scabbard*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
  && find target/release -path target/release/.fingerprint -prune -false -o -name '*splinter*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
 # Clean up leftover files

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM splintercommunity/splinter-dev:v8 as BUILDER
+FROM splintercommunity/splinter-dev:v9 as BUILDER
 
 # Copy over splinter files
 COPY Cargo.toml /build/Cargo.toml
@@ -21,7 +21,6 @@ COPY libsplinter/build.rs /build/libsplinter/build.rs
 COPY libsplinter/Cargo.toml /build/libsplinter/Cargo.toml
 COPY libsplinter/protos /build/libsplinter/protos
 COPY splinterd/Cargo.toml /build/splinterd/Cargo.toml
-COPY services/health/Cargo.toml /build/services/health/Cargo.toml
 COPY services/scabbard/cli/Cargo.toml /build/services/scabbard/cli/Cargo.toml
 COPY services/scabbard/libscabbard/build.rs /build/services/scabbard/libscabbard/build.rs
 COPY services/scabbard/libscabbard/Cargo.toml /build/services/scabbard/libscabbard/Cargo.toml

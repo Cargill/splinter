@@ -28,8 +28,6 @@ use std::thread;
 use std::time::Duration;
 
 use cylinder::{secp256k1::Secp256k1Context, Signer, SigningError, VerifierFactory};
-#[cfg(feature = "health-service")]
-use health::HealthService;
 use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactoryBuilder;
 use splinter::admin::rest_api::CircuitResourceProvider;
@@ -103,13 +101,6 @@ pub use store::ConnectionUri;
 const ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
-
-#[cfg(feature = "health-service")]
-const HEALTH_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
-#[cfg(feature = "health-service")]
-const HEALTH_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
-#[cfg(feature = "health-service")]
-const HEALTH_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 
 pub struct SplinterDaemon {
     #[cfg(feature = "authorization-handler-allow-keys")]
@@ -239,8 +230,6 @@ impl SplinterDaemon {
         let internal_service_listeners = vec![
             transport.listen("inproc://admin-service")?,
             transport.listen("inproc://orchestator")?,
-            #[cfg(feature = "health-service")]
-            transport.listen("inproc://health_service")?,
         ];
 
         let secp256k1_context: Box<dyn VerifierFactory> = Box::new(Secp256k1Context::new());
@@ -262,9 +251,7 @@ impl SplinterDaemon {
             StartError::NetworkError(format!("Unable to create authorization manager: {}", err))
         })?;
 
-        // Allowing unused_mut because inproc_ids must be mutable if feature health is enabled
-        #[allow(unused_mut)]
-        let mut inproc_ids = vec![
+        let inproc_ids = vec![
             (
                 "inproc://orchestator".to_string(),
                 format!("orchestator::{}", &node_id),
@@ -274,12 +261,6 @@ impl SplinterDaemon {
                 admin_service_id(&node_id),
             ),
         ];
-
-        #[cfg(feature = "health-service")]
-        inproc_ids.push((
-            "inproc://health-service".to_string(),
-            format!("health::{}", &node_id),
-        ));
 
         let inproc_authorizer = InprocAuthorizer::new(inproc_ids, node_id.clone());
 
@@ -334,16 +315,6 @@ impl SplinterDaemon {
             .map_err(|err| {
                 StartError::AdminServiceError(format!(
                     "unable to initiate admin service connection: {:?}",
-                    err
-                ))
-            })?;
-
-        #[cfg(feature = "health-service")]
-        let health_connection = service_transport
-            .connect("inproc://health_service")
-            .map_err(|err| {
-                StartError::HealthServiceError(format!(
-                    "unable to initiate health service connection: {:?}",
                     err
                 ))
             })?;
@@ -804,14 +775,6 @@ impl SplinterDaemon {
             );
         }
 
-        #[cfg(feature = "health-service")]
-        let mut health_service_shutdown_handle = {
-            let health_service = HealthService::new(&node_id);
-            rest_api_builder = rest_api_builder.add_resources(health_service.resources());
-
-            start_health_service(health_connection, health_service)?
-        };
-
         let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api_builder.build()?.run()?;
 
         let mut admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
@@ -834,8 +797,6 @@ impl SplinterDaemon {
 
         admin_shutdown_handle.signal_shutdown();
         orchestator_shutdown_handle.signal_shutdown();
-        #[cfg(feature = "health-service")]
-        health_service_shutdown_handle.signal_shutdown();
 
         if let Err(err) = admin_shutdown_handle.wait_for_shutdown() {
             error!("Unable to cleanly shut down Admin service: {}", err);
@@ -843,10 +804,6 @@ impl SplinterDaemon {
 
         if let Err(err) = orchestator_shutdown_handle.wait_for_shutdown() {
             error!("Unable to cleanly shut down Orchestrator service: {}", err);
-        }
-        #[cfg(feature = "health-service")]
-        if let Err(err) = health_service_shutdown_handle.wait_for_shutdown() {
-            error!("Unable to cleanly shut down Health service: {}", err);
         }
 
         if let Err(err) = rest_api_shutdown_handle.shutdown() {
@@ -1007,39 +964,6 @@ impl SplinterDaemon {
             StartError::AdminServiceError(format!("unable to start service processor: {}", err))
         })
     }
-}
-
-#[cfg(feature = "health-service")]
-fn start_health_service(
-    connection: Box<dyn Connection>,
-    health_service: HealthService,
-) -> Result<service::ServiceProcessorShutdownHandle, StartError> {
-    let mut health_service_processor = service::ServiceProcessor::new(
-        connection,
-        "health".into(),
-        HEALTH_SERVICE_PROCESSOR_INCOMING_CAPACITY,
-        HEALTH_SERVICE_PROCESSOR_OUTGOING_CAPACITY,
-        HEALTH_SERVICE_PROCESSOR_CHANNEL_CAPACITY,
-    )
-    .map_err(|err| {
-        StartError::HealthServiceError(format!(
-            "unable to create health service processor: {}",
-            err
-        ))
-    })?;
-
-    health_service_processor
-        .add_service(Box::new(health_service))
-        .map_err(|err| {
-            StartError::HealthServiceError(format!(
-                "unable to add health service to processor: {}",
-                err
-            ))
-        })?;
-
-    health_service_processor.start().map_err(|err| {
-        StartError::HealthServiceError(format!("unable to health service processor: {}", err))
-    })
 }
 
 fn set_up_network_dispatcher(

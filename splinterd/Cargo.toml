@@ -39,7 +39,6 @@ crossbeam-channel = "0.3"
 ctrlc = "3.0"
 cylinder = { version = "0.2.2", features = ["key-load"] }
 diesel = { version = "1.0", features = ["postgres"], optional = true }
-health = { path = "../services/health", optional = true }
 log = "0.4"
 log4rs = { version = "1", features = ["threshold_filter"] }
 openssl = { version = "0.10", optional = true }
@@ -106,7 +105,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization-handler-maintenance",
-    "health-service",
     "https-bind",
     "node",
     "service-endpoint",
@@ -130,7 +128,6 @@ biome-profile = ["splinter/biome-profile"]
 config-allow-keys = ["authorization-handler-allow-keys"]
 database-postgres = ["diesel", "diesel/postgres", "scabbard/postgres", "splinter/postgres"]
 database-sqlite = ["diesel", "diesel/sqlite", "scabbard/sqlite", "splinter/sqlite"]
-health-service = ["health", "health/authorization"]
 https-bind = ["splinter/https-bind"]
 tap = [
   "splinter/tap",

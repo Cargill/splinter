@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM splintercommunity/splinter-dev:v8
+FROM splintercommunity/splinter-dev:v9
 
 ENV PATH=$PATH:/project/splinter/bin
 
