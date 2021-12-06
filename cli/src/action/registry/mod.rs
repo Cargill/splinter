@@ -65,7 +65,7 @@ impl Action for RegistryGenerateAction {
         let keys = args
             .values_of("key_files")
             .ok_or_else(|| CliError::ActionError("One or more key files must be specified".into()))?
-            .map(|key_file| read_private_key(key_file))
+            .map(read_private_key)
             .collect::<Result<_, _>>()?;
 
         let metadata = if let Some(metadata) = args.values_of("metadata") {
