@@ -559,22 +559,12 @@ impl RestApi {
 }
 
 /// Builder `struct` for `RestApi`.
+#[derive(Default)]
 pub struct RestApiBuilder {
     resources: Vec<Resource>,
     bind: Option<String>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
-}
-
-impl Default for RestApiBuilder {
-    fn default() -> Self {
-        Self {
-            resources: Vec::new(),
-            bind: None,
-            #[cfg(feature = "rest-api-cors")]
-            whitelist: None,
-        }
-    }
 }
 
 impl RestApiBuilder {

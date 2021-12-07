@@ -72,6 +72,8 @@ impl RestResourceProvider for AdminService {
 ///
 /// * `rest-api-actix`
 #[derive(Clone)]
+// Allow dead code here as this is a part of the public API but it may never be used
+#[allow(dead_code)]
 pub struct CircuitResourceProvider<T: store::CircuitStore> {
     node_id: String,
     store: T,
