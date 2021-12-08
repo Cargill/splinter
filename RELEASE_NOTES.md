@@ -1,5 +1,22 @@
 # Release Notes
 
+## Changes in Splinter 0.4.2
+
+### libsplinter
+
+* Fix several Clippy errors introduced in new versions of Rust.
+
+* Pin protobuf version to 2.18 due to deprecations in 2.19. Pins the version of
+  protobuf because 2.19 introduces some deprecation warnings that fail our build
+  (because warnings are fatal).
+
+### scabbard
+
+* Add `set_auth` method to `ScabbardClient`. This provides a way to provide
+  an authorization header to the scabbard requests. This allows for
+  compatibility between a the 0.4.2 `ScabbardClient` and the 0.6 scabbard
+  instance.
+
 ## Changes in Splinter 0.4.1
 
 ### Highlights
