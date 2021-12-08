@@ -24,7 +24,7 @@ use protobuf::Message;
 use splinter::admin::messages::{
     AuthorizationType, CreateCircuit, CreateCircuitBuilder, SplinterNode,
 };
-use splinter::circuit::template::CircuitCreateTemplate;
+use splinter::circuit::template::CircuitTemplateManager;
 use splinter::protocol;
 use splinter::protos::admin::{
     CircuitManagementPayload, CircuitManagementPayload_Action as Action,
@@ -97,7 +97,7 @@ pub async fn propose_gameroom(
     client: web::Data<Client>,
     gameroomd_data: web::Data<GameroomdData>,
 ) -> HttpResponse {
-    let mut template = match CircuitCreateTemplate::from_yaml_file("gameroom.yaml") {
+    let mut template = match CircuitTemplateManager::default().load("gameroom") {
         Ok(template) => template,
         Err(err) => {
             error!("Failed to load Gameroom template: {}", err);
