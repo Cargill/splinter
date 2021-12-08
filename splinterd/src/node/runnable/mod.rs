@@ -81,6 +81,7 @@ pub struct RunnableNode {
     pub(super) node_id: String,
     pub(super) enable_biome: bool,
     pub(super) signers: Vec<Box<dyn cylinder::Signer>>,
+    pub(super) auth: String,
 }
 
 impl RunnableNode {
@@ -212,7 +213,7 @@ impl RunnableNode {
             admin_subsystem
                 .admin_service_event_client(
                     format!("http://localhost:{}", rest_api_port),
-                    "foo".to_string(),
+                    self.auth,
                     "*".to_string(),
                     None,
                 )

@@ -388,6 +388,7 @@ impl NodeBuilder {
             node_id,
             enable_biome,
             signers,
+            auth,
         })
     }
 }
