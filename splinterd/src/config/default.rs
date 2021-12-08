@@ -126,14 +126,14 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             (
                 "splinter".to_string(),
                 UnnamedLoggerConfig {
-                    appenders: Some(vec!["stdout".into()]),
+                    appenders: None,
                     level: Some(log::Level::Info),
                 },
             ),
             (
                 "splinterd".to_string(),
                 UnnamedLoggerConfig {
-                    appenders: Some(vec!["stdout".into()]),
+                    appenders: None,
                     level: Some(log::Level::Info),
                 },
             ),
