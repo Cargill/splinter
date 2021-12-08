@@ -571,7 +571,7 @@ fn get_config_file(matches: &'_ ArgMatches) -> Result<String, UserError> {
     Ok("/etc/splinter/splinterd.toml".to_string())
 }
 
-fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserError> {
+fn start_daemon(matches: ArgMatches, log_handle: Handle) -> Result<(), UserError> {
     // get provided config file or search default location
     let config_file = get_config_file(&matches)?;
 
@@ -583,8 +583,8 @@ fn start_daemon(matches: ArgMatches, _log_handle: Handle) -> Result<(), UserErro
 
     let config = create_config(config_file_path, matches.clone())?;
 
-    if let Err(e) = configure_logging(&config, &_log_handle) {
-        _log_handle.set_config(default_log_settings());
+    if let Err(e) = configure_logging(&config, &log_handle) {
+        log_handle.set_config(default_log_settings());
         config.log_as_debug();
         return Err(e);
     }
