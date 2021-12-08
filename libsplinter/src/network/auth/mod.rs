@@ -66,6 +66,7 @@ pub(crate) struct ManagedAuthorizationState {
     accepting_state: AuthorizationAcceptingState,
 
     // Tracks whether the local node has completed authorization with the remote node
+    #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
     received_complete: bool,
 
     // Stores the local authorization used

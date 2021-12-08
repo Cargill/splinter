@@ -77,7 +77,7 @@ impl Action for RegistryGenerateAction {
         let keys = args
             .values_of("key_files")
             .ok_or_else(|| CliError::ActionError("One or more key files must be specified".into()))?
-            .map(|key_file| read_private_key(key_file))
+            .map(read_private_key)
             .collect::<Result<Vec<String>, _>>()?;
 
         let mut node_builder = Node::builder(node_status.node_id.clone())
@@ -241,7 +241,7 @@ impl Action for RegistryAddAction {
                 .ok_or_else(|| {
                     CliError::ActionError("One or more key files must be specified".into())
                 })?
-                .map(|key_file| read_private_key(key_file))
+                .map(read_private_key)
                 .collect::<Result<_, _>>()?;
 
             let node = RegistryNode {

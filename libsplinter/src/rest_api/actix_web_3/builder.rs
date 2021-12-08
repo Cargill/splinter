@@ -21,18 +21,10 @@ use super::{ResourceProvider, RunnableRestApi};
 /// Builds a `RunnableRestApi`.
 ///
 /// This builder's primary function is to create the runnable REST API in a valid state.
+#[derive(Default)]
 pub struct RestApiBuilder {
     resource_providers: Vec<Box<dyn ResourceProvider>>,
     bind: Option<BindConfig>,
-}
-
-impl Default for RestApiBuilder {
-    fn default() -> Self {
-        Self {
-            resource_providers: Vec::new(),
-            bind: None,
-        }
-    }
 }
 
 impl RestApiBuilder {
