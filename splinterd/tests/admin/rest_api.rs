@@ -54,6 +54,13 @@ fn test_endpoints_with_no_permissions() {
     );
     let signer = &*circuit_create_perm_config.signer();
 
+    // Create the token and auth string for the signer that has permission to submit a circuit
+    let token = JsonWebTokenBuilder::new()
+        .build(signer)
+        .expect("failed to build jwt");
+
+    let auth = &format!("Bearer Cylinder:{}", token);
+
     // Start a 2-node network with the only `PermissionConfig` being the one for the signer
     // that will be used to create the circuit. The `PermissionConfig`s that grant signers
     // permission to access each of the REST API endpoints are not submitted so that each
@@ -62,18 +69,14 @@ fn test_endpoints_with_no_permissions() {
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .with_permission_config(vec![circuit_create_perm_config])
         .with_cylinder_auth()
+        .with_admin_signer(signer.clone_box())
+        .with_client_auth(auth.into())
         .add_nodes_with_defaults(2)
         .expect("Unable to start 2-node ActixWeb1 network");
     // Get the first node in the network
     let node_a = network.node(0).expect("Unable to get first node");
     // Get the second node in the network
     let node_b = network.node(1).expect("Unable to get second node");
-    // Create the token and auth string for the signer that has permission to submit a circuit
-    let token = JsonWebTokenBuilder::new()
-        .build(signer)
-        .expect("failed to build jwt");
-
-    let auth = &format!("Bearer Cylinder:{}", token);
 
     let circuit_id = "ABCDE-01234";
 
@@ -141,6 +144,13 @@ fn test_endpoints_with_valid_permissions() {
     let admin_signer = &*admin_perm_config.signer();
     perm_configs.push(admin_perm_config);
 
+    // Create the token and auth string for the signer that has permission to submit a circuit
+    let token = JsonWebTokenBuilder::new()
+        .build(admin_signer)
+        .expect("failed to build jwt");
+
+    let auth = &format!("Bearer Cylinder:{}", token);
+
     // Start a 2-node network
     let mut network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
@@ -148,6 +158,7 @@ fn test_endpoints_with_valid_permissions() {
         .with_cylinder_auth()
         .set_num_of_keys(2)
         .with_admin_signer(admin_signer.clone_box())
+        .with_client_auth(auth.into())
         .add_nodes_with_defaults(2)
         .expect("Unable to start 2-node ActixWeb1 network");
     // Get the first node in the network
@@ -156,12 +167,6 @@ fn test_endpoints_with_valid_permissions() {
     let node_b = network.node(1).expect("Unable to get second node");
 
     let node_a_id = node_a.node_id();
-
-    let token = JsonWebTokenBuilder::new()
-        .build(admin_signer)
-        .expect("failed to build jwt");
-
-    let auth = &format!("Bearer Cylinder:{}", token);
 
     let circuit_id = "ABCDE-01234";
 
