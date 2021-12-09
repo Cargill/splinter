@@ -67,6 +67,9 @@ SUBCOMMANDS
 `role`
 : Role-based authorization role-related commands
 
+`state`
+: Commands to manage scabbard state
+
 `upgrade`
 : Upgrades splinter YAML state to database state
 
@@ -134,6 +137,7 @@ SEE ALSO
 | `splinter-role-list(1)`
 | `splinter-role-show(1)`
 | `splinter-role-update(1)`
+| `splinter-state-migrate(1)`
 | `splinter-upgrade(1)`
 | `splinter-user(1)`
 |

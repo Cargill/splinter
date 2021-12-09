@@ -947,7 +947,60 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .help("Database connection URI"),
                         ),
                 ),
-        )
+        );
+
+        app = app.subcommand(
+            SubCommand::with_name("state")
+                .about("Commands to manage scabbard state")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommand(
+                    SubCommand::with_name("migrate")
+                        .about(
+                            "Move scabbard state to or from LMDB, deleting from the \
+                            input database",
+                        )
+                        .arg(
+                            Arg::with_name("in")
+                                .long("in")
+                                .help(
+                                    "Database URI that currently contains the scabbard state. If \
+                                    state is in individual LMDB files, provide `lmdb`",
+                                )
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("out")
+                                .long("out")
+                                .help(
+                                    "The database URI the scabbard state should end up in. \
+                                    If state should be put into individual LMDB files, provide \
+                                    `lmdb`",
+                                )
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("state_dir")
+                                .long("state-dir")
+                                .long_help(
+                                    "The location of the state directory for the LMDB files. \
+                                    Defaults to /var/lib/splinter. This location can also be \
+                                    changed with the SPLINTER_STATE_DIR or SPLINTER_HOME \
+                                    environment variables",
+                                )
+                                .takes_value(true),
+                        )
+                        .arg(Arg::with_name("force").short("f").long("force").help(
+                            "Always attempt to move state, regardless of if there is \
+                                    existing data in the out database",
+                        ))
+                        .arg(
+                            Arg::with_name("yes")
+                                .short("y")
+                                .long("yes")
+                                .help("Do not prompt for confirmation"),
+                        ),
+                ),
+        );
     }
 
     #[cfg(feature = "upgrade")]
@@ -1676,7 +1729,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         subcommands = subcommands.with_command(
             "database",
             SubcommandActions::new().with_command("migrate", database::MigrateAction),
-        )
+        );
+
+        subcommands = subcommands.with_command(
+            "state",
+            SubcommandActions::new().with_command("migrate", database::StateMigrateAction),
+        );
     }
 
     #[cfg(feature = "upgrade")]
