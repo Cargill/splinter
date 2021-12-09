@@ -127,14 +127,14 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 "splinter".to_string(),
                 UnnamedLoggerConfig {
                     appenders: None,
-                    level: Some(log::Level::Info),
+                    level: Some(log::Level::Trace),
                 },
             ),
             (
                 "splinterd".to_string(),
                 UnnamedLoggerConfig {
                     appenders: None,
-                    level: Some(log::Level::Info),
+                    level: Some(log::Level::Trace),
                 },
             ),
         ]
