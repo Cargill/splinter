@@ -14,14 +14,17 @@
 
 //! Contains a `StoreFactory` trait, which is an abstract factory for building stores
 //! backed by a single storage mechanism (e.g. database)
-#[cfg(feature = "memory")]
+#[cfg(all(feature = "store-factory", feature = "memory"))]
 pub mod memory;
-#[cfg(feature = "postgres")]
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+pub(crate) mod pool;
+#[cfg(all(feature = "store-factory", feature = "postgres"))]
 pub mod postgres;
-#[cfg(feature = "sqlite")]
+#[cfg(all(feature = "store-factory", feature = "sqlite"))]
 pub mod sqlite;
 
 /// An abstract factory for creating Splinter stores backed by the same storage
+#[cfg(feature = "store-factory")]
 pub trait StoreFactory {
     /// Get a new `CredentialsStore`
     #[cfg(feature = "biome-credentials")]
