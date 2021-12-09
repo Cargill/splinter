@@ -37,6 +37,7 @@ pub struct Network {
     cylinder_auth: bool,
     permission_config: Option<Vec<PermissionConfig>>,
     admin_signer: Option<Box<dyn Signer>>,
+    auth: Option<String>,
 }
 
 pub enum NetworkNode {
@@ -55,6 +56,7 @@ impl Network {
             cylinder_auth: true,
             permission_config: None,
             admin_signer: None,
+            auth: None,
         }
     }
 
@@ -112,7 +114,8 @@ impl Network {
                 .with_signers(signers)
                 .with_external_registries(self.external_registries.clone())
                 .with_biome_enabled()
-                .with_permission_config(self.permission_config.clone());
+                .with_permission_config(self.permission_config.clone())
+                .with_client_auth(self.auth.clone());
             if self.cylinder_auth {
                 builder = builder.with_cylinder_auth(Box::new(Secp256k1Context::new()));
             }
@@ -175,6 +178,11 @@ impl Network {
 
     pub fn with_admin_signer(mut self, signer: Box<dyn Signer>) -> Self {
         self.admin_signer = Some(signer);
+        self
+    }
+
+    pub fn with_client_auth(mut self, auth: String) -> Self {
+        self.auth = Some(auth);
         self
     }
 

@@ -73,6 +73,7 @@ pub struct NodeBuilder {
     cylinder_auth: Option<Box<dyn Verifier>>,
     permission_config: Option<Vec<PermissionConfig>>,
     store_factory: Option<Box<dyn StoreFactory>>,
+    auth: Option<String>,
 }
 
 impl Default for NodeBuilder {
@@ -98,6 +99,7 @@ impl NodeBuilder {
             cylinder_auth: None,
             permission_config: None,
             store_factory: None,
+            auth: None,
         }
     }
 
@@ -237,6 +239,11 @@ impl NodeBuilder {
         }
     }
 
+    pub fn with_client_auth(mut self, auth: Option<String>) -> Self {
+        self.auth = auth;
+        self
+    }
+
     /// Builds the `RunnableNode` and consumes the `NodeBuilder`.
     pub fn build(mut self) -> Result<RunnableNode, InternalError> {
         let url = format!("127.0.0.1:{}", self.rest_api_port.take().unwrap_or(0),);
@@ -338,6 +345,11 @@ impl NodeBuilder {
                 None => vec![Box::new(MockAuthorizationHandler)],
             };
 
+        let auth: String = match self.auth {
+            Some(auth) => auth,
+            None => "foo".to_string(),
+        };
+
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => RunnableNodeRestApiVariant::ActixWeb1(
                 RestApiBuilder1::new()
@@ -376,6 +388,7 @@ impl NodeBuilder {
             node_id,
             enable_biome,
             signers,
+            auth,
         })
     }
 }
