@@ -16,7 +16,11 @@ pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
 
+use std::sync::{Arc, RwLock};
+
 use diesel::r2d2::{ConnectionManager, Pool};
+
+use crate::store::pool::ConnectionPool;
 
 use super::{
     Credentials, CredentialsStore, CredentialsStoreError, PasswordEncryptionCost, UsernameId,
@@ -34,7 +38,7 @@ use operations::CredentialsStoreOperations;
 
 /// Manages creating, updating and fetching SplinterCredentials from the database
 pub struct DieselCredentialsStore<C: diesel::Connection + 'static> {
-    connection_pool: Pool<ConnectionManager<C>>,
+    connection_pool: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection> DieselCredentialsStore<C> {
@@ -44,14 +48,34 @@ impl<C: diesel::Connection> DieselCredentialsStore<C> {
     ///
     ///  * `connection_pool`: connection pool to the database
     pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
-        DieselCredentialsStore { connection_pool }
+        DieselCredentialsStore {
+            connection_pool: connection_pool.into(),
+        }
+    }
+
+    /// Create a new `DieselCredentialsStore` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+    ) -> Self {
+        DieselCredentialsStore {
+            connection_pool: connection_pool.into(),
+        }
     }
 }
 
 #[cfg(feature = "postgres")]
 impl CredentialsStore for DieselCredentialsStore<diesel::pg::PgConnection> {
     fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
+        self.connection_pool.execute_write(|conn| {
+            CredentialsStoreOperations::new(conn).add_credentials(credentials)
+        })
     }
 
     fn update_credentials(
@@ -61,47 +85,57 @@ impl CredentialsStore for DieselCredentialsStore<diesel::pg::PgConnection> {
         password: &str,
         password_encryption_cost: PasswordEncryptionCost,
     ) -> Result<(), CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).update_credentials(
-            user_id,
-            username,
-            password,
-            password_encryption_cost,
-        )
+        self.connection_pool.execute_write(|conn| {
+            CredentialsStoreOperations::new(conn).update_credentials(
+                user_id,
+                username,
+                password,
+                password_encryption_cost,
+            )
+        })
     }
 
     fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).remove_credentials(user_id)
+        self.connection_pool
+            .execute_write(|conn| CredentialsStoreOperations::new(conn).remove_credentials(user_id))
     }
 
     fn fetch_credential_by_user_id(
         &self,
         user_id: &str,
     ) -> Result<Credentials, CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
-            .fetch_credential_by_id(user_id)
+        self.connection_pool.execute_read(|conn| {
+            CredentialsStoreOperations::new(conn).fetch_credential_by_id(user_id)
+        })
     }
 
     fn fetch_credential_by_username(
         &self,
         username: &str,
     ) -> Result<Credentials, CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
-            .fetch_credential_by_username(username)
+        self.connection_pool.execute_read(|conn| {
+            CredentialsStoreOperations::new(conn).fetch_credential_by_username(username)
+        })
     }
 
     fn fetch_username_by_id(&self, user_id: &str) -> Result<UsernameId, CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).fetch_username_by_id(user_id)
+        self.connection_pool.execute_read(|conn| {
+            CredentialsStoreOperations::new(conn).fetch_username_by_id(user_id)
+        })
     }
 
     fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).list_usernames()
+        self.connection_pool
+            .execute_read(|conn| CredentialsStoreOperations::new(conn).list_usernames())
     }
 }
 
 #[cfg(feature = "sqlite")]
 impl CredentialsStore for DieselCredentialsStore<diesel::sqlite::SqliteConnection> {
     fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
+        self.connection_pool.execute_write(|conn| {
+            CredentialsStoreOperations::new(conn).add_credentials(credentials)
+        })
     }
 
     fn update_credentials(
@@ -111,40 +145,48 @@ impl CredentialsStore for DieselCredentialsStore<diesel::sqlite::SqliteConnectio
         password: &str,
         password_encryption_cost: PasswordEncryptionCost,
     ) -> Result<(), CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).update_credentials(
-            user_id,
-            username,
-            password,
-            password_encryption_cost,
-        )
+        self.connection_pool.execute_write(|conn| {
+            CredentialsStoreOperations::new(conn).update_credentials(
+                user_id,
+                username,
+                password,
+                password_encryption_cost,
+            )
+        })
     }
 
     fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).remove_credentials(user_id)
+        self.connection_pool
+            .execute_write(|conn| CredentialsStoreOperations::new(conn).remove_credentials(user_id))
     }
 
     fn fetch_credential_by_user_id(
         &self,
         user_id: &str,
     ) -> Result<Credentials, CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
-            .fetch_credential_by_id(user_id)
+        self.connection_pool.execute_read(|conn| {
+            CredentialsStoreOperations::new(conn).fetch_credential_by_id(user_id)
+        })
     }
 
     fn fetch_credential_by_username(
         &self,
         username: &str,
     ) -> Result<Credentials, CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
-            .fetch_credential_by_username(username)
+        self.connection_pool.execute_read(|conn| {
+            CredentialsStoreOperations::new(conn).fetch_credential_by_username(username)
+        })
     }
 
     fn fetch_username_by_id(&self, user_id: &str) -> Result<UsernameId, CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).fetch_username_by_id(user_id)
+        self.connection_pool.execute_read(|conn| {
+            CredentialsStoreOperations::new(conn).fetch_username_by_id(user_id)
+        })
     }
 
     fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).list_usernames()
+        self.connection_pool
+            .execute_read(|conn| CredentialsStoreOperations::new(conn).list_usernames())
     }
 }
 

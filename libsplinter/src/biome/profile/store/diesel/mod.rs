@@ -18,7 +18,11 @@ pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
 
+use std::sync::{Arc, RwLock};
+
 use diesel::r2d2::{ConnectionManager, Pool};
+
+use crate::store::pool::ConnectionPool;
 
 use super::{Profile, UserProfileStore, UserProfileStoreError};
 
@@ -33,7 +37,7 @@ use operations::{
 
 /// Manages creating, updating, and fetching profiles from the database
 pub struct DieselUserProfileStore<C: diesel::Connection + 'static> {
-    connection_pool: Pool<ConnectionManager<C>>,
+    connection_pool: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection> DieselUserProfileStore<C> {
@@ -43,35 +47,57 @@ impl<C: diesel::Connection> DieselUserProfileStore<C> {
     ///
     ///  * `connection_pool`: connection pool to the database
     pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
-        DieselUserProfileStore { connection_pool }
+        DieselUserProfileStore {
+            connection_pool: connection_pool.into(),
+        }
+    }
+
+    /// Create a new `DieselUserProfileStore` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+    ) -> Self {
+        Self {
+            connection_pool: connection_pool.into(),
+        }
     }
 }
 
 #[cfg(feature = "postgres")]
 impl UserProfileStore for DieselUserProfileStore<diesel::pg::PgConnection> {
     fn add_profile(&self, profile: Profile) -> Result<(), UserProfileStoreError> {
-        let connection = self.connection_pool.get()?;
-        UserProfileStoreOperations::new(&*connection).add_profile(profile)
+        self.connection_pool.execute_write(|connection| {
+            UserProfileStoreOperations::new(connection).add_profile(profile)
+        })
     }
 
     fn update_profile(&self, profile: Profile) -> Result<(), UserProfileStoreError> {
-        let connection = self.connection_pool.get()?;
-        UserProfileStoreOperations::new(&*connection).update_profile(profile)
+        self.connection_pool.execute_write(|connection| {
+            UserProfileStoreOperations::new(connection).update_profile(profile)
+        })
     }
 
     fn remove_profile(&self, user_id: &str) -> Result<(), UserProfileStoreError> {
-        let connection = self.connection_pool.get()?;
-        UserProfileStoreOperations::new(&*connection).remove_profile(user_id)
+        self.connection_pool.execute_write(|connection| {
+            UserProfileStoreOperations::new(connection).remove_profile(user_id)
+        })
     }
 
     fn get_profile(&self, user_id: &str) -> Result<Profile, UserProfileStoreError> {
-        let connection = self.connection_pool.get()?;
-        UserProfileStoreOperations::new(&*connection).get_profile(user_id)
+        self.connection_pool.execute_read(|connection| {
+            UserProfileStoreOperations::new(connection).get_profile(user_id)
+        })
     }
 
     fn list_profiles(&self) -> Result<Option<Vec<Profile>>, UserProfileStoreError> {
-        let connection = self.connection_pool.get()?;
-        UserProfileStoreOperations::new(&*connection).list_profiles()
+        self.connection_pool
+            .execute_read(|connection| UserProfileStoreOperations::new(connection).list_profiles())
     }
 
     fn clone_box(&self) -> Box<dyn UserProfileStore> {
@@ -84,28 +110,32 @@ impl UserProfileStore for DieselUserProfileStore<diesel::pg::PgConnection> {
 #[cfg(feature = "sqlite")]
 impl UserProfileStore for DieselUserProfileStore<diesel::sqlite::SqliteConnection> {
     fn add_profile(&self, profile: Profile) -> Result<(), UserProfileStoreError> {
-        let connection = self.connection_pool.get()?;
-        UserProfileStoreOperations::new(&*connection).add_profile(profile)
+        self.connection_pool.execute_write(|connection| {
+            UserProfileStoreOperations::new(connection).add_profile(profile)
+        })
     }
 
     fn update_profile(&self, profile: Profile) -> Result<(), UserProfileStoreError> {
-        let connection = self.connection_pool.get()?;
-        UserProfileStoreOperations::new(&*connection).update_profile(profile)
+        self.connection_pool.execute_write(|connection| {
+            UserProfileStoreOperations::new(connection).update_profile(profile)
+        })
     }
 
     fn remove_profile(&self, user_id: &str) -> Result<(), UserProfileStoreError> {
-        let connection = self.connection_pool.get()?;
-        UserProfileStoreOperations::new(&*connection).remove_profile(user_id)
+        self.connection_pool.execute_write(|connection| {
+            UserProfileStoreOperations::new(connection).remove_profile(user_id)
+        })
     }
 
     fn get_profile(&self, user_id: &str) -> Result<Profile, UserProfileStoreError> {
-        let connection = self.connection_pool.get()?;
-        UserProfileStoreOperations::new(&*connection).get_profile(user_id)
+        self.connection_pool.execute_read(|connection| {
+            UserProfileStoreOperations::new(connection).get_profile(user_id)
+        })
     }
 
     fn list_profiles(&self) -> Result<Option<Vec<Profile>>, UserProfileStoreError> {
-        let connection = self.connection_pool.get()?;
-        UserProfileStoreOperations::new(&*connection).list_profiles()
+        self.connection_pool
+            .execute_read(|connection| UserProfileStoreOperations::new(connection).list_profiles())
     }
 
     fn clone_box(&self) -> Box<dyn UserProfileStore> {

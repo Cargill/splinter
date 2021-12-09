@@ -18,7 +18,11 @@ mod models;
 mod operations;
 mod schema;
 
+use std::sync::{Arc, RwLock};
+
 use diesel::r2d2::{ConnectionManager, Pool};
+
+use crate::store::pool::ConnectionPool;
 
 use super::error::NodeIdStoreError;
 use super::NodeIdStore;
@@ -30,7 +34,7 @@ use operations::{
 
 /// Database backed [NodeIdStore] implementation.
 pub struct DieselNodeIdStore<Conn: diesel::Connection + 'static> {
-    pool: Pool<ConnectionManager<Conn>>,
+    pool: ConnectionPool<Conn>,
 }
 
 impl<C: diesel::Connection> DieselNodeIdStore<C> {
@@ -40,25 +44,45 @@ impl<C: diesel::Connection> DieselNodeIdStore<C> {
     ///
     /// * `pool` - Database connection pool
     pub fn new(pool: Pool<ConnectionManager<C>>) -> Self {
-        Self { pool }
+        Self { pool: pool.into() }
+    }
+
+    /// Create a new `DieselNodeIdStore` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+    ) -> Self {
+        Self {
+            pool: connection_pool.into(),
+        }
     }
 }
 
 #[cfg(feature = "postgres")]
 impl NodeIdStore for DieselNodeIdStore<diesel::pg::PgConnection> {
     fn get_node_id(&self) -> Result<Option<String>, NodeIdStoreError> {
-        NodeIdOperations::new(&*self.pool.get()?).get_node_id()
+        self.pool
+            .execute_read(|conn| NodeIdOperations::new(conn).get_node_id())
     }
     fn set_node_id(&self, new_id: String) -> Result<(), NodeIdStoreError> {
-        NodeIdOperations::new(&*self.pool.get()?).set_node_id(new_id)
+        self.pool
+            .execute_write(|conn| NodeIdOperations::new(conn).set_node_id(new_id))
     }
 }
 #[cfg(feature = "sqlite")]
 impl NodeIdStore for DieselNodeIdStore<diesel::sqlite::SqliteConnection> {
     fn get_node_id(&self) -> Result<Option<String>, NodeIdStoreError> {
-        NodeIdOperations::new(&*self.pool.get()?).get_node_id()
+        self.pool
+            .execute_read(|conn| NodeIdOperations::new(conn).get_node_id())
     }
     fn set_node_id(&self, new_id: String) -> Result<(), NodeIdStoreError> {
-        NodeIdOperations::new(&*self.pool.get()?).set_node_id(new_id)
+        self.pool
+            .execute_write(|conn| NodeIdOperations::new(conn).set_node_id(new_id))
     }
 }

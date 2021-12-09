@@ -18,7 +18,11 @@ pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
 
+use std::sync::{Arc, RwLock};
+
 use diesel::r2d2::{ConnectionManager, Pool};
+
+use crate::store::pool::ConnectionPool;
 
 use super::{
     InsertableOAuthUserSession, OAuthUser, OAuthUserIter, OAuthUserSession, OAuthUserSessionStore,
@@ -35,12 +39,30 @@ use operations::{
 
 /// A database-backed [OAuthUserSessionStore], powered by [diesel].
 pub struct DieselOAuthUserSessionStore<C: diesel::Connection + 'static> {
-    connection_pool: Pool<ConnectionManager<C>>,
+    connection_pool: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection + 'static> DieselOAuthUserSessionStore<C> {
     pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
-        Self { connection_pool }
+        Self {
+            connection_pool: connection_pool.into(),
+        }
+    }
+
+    /// Create a new `DieselOAuthUserSessionStore` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+    ) -> Self {
+        Self {
+            connection_pool: connection_pool.into(),
+        }
     }
 }
 
@@ -50,42 +72,48 @@ impl OAuthUserSessionStore for DieselOAuthUserSessionStore<diesel::sqlite::Sqlit
         &self,
         session: InsertableOAuthUserSession,
     ) -> Result<(), OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).add_session(session)
+        self.connection_pool.execute_write(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).add_session(session)
+        })
     }
 
     fn update_session(
         &self,
         session: InsertableOAuthUserSession,
     ) -> Result<(), OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).update_session(session)
+        self.connection_pool.execute_write(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).update_session(session)
+        })
     }
 
     fn remove_session(
         &self,
         splinter_access_token: &str,
     ) -> Result<(), OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).remove_session(splinter_access_token)
+        self.connection_pool.execute_write(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).remove_session(splinter_access_token)
+        })
     }
 
     fn get_session(
         &self,
         splinter_access_token: &str,
     ) -> Result<Option<OAuthUserSession>, OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).get_session(splinter_access_token)
+        self.connection_pool.execute_read(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).get_session(splinter_access_token)
+        })
     }
 
     fn get_user(&self, subject: &str) -> Result<Option<OAuthUser>, OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).get_user(subject)
+        self.connection_pool.execute_read(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).get_user(subject)
+        })
     }
 
     fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).list_users()
+        self.connection_pool.execute_read(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).list_users()
+        })
     }
 
     fn clone_box(&self) -> Box<dyn OAuthUserSessionStore> {
@@ -101,42 +129,48 @@ impl OAuthUserSessionStore for DieselOAuthUserSessionStore<diesel::pg::PgConnect
         &self,
         session: InsertableOAuthUserSession,
     ) -> Result<(), OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).add_session(session)
+        self.connection_pool.execute_write(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).add_session(session)
+        })
     }
 
     fn update_session(
         &self,
         session: InsertableOAuthUserSession,
     ) -> Result<(), OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).update_session(session)
+        self.connection_pool.execute_write(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).update_session(session)
+        })
     }
 
     fn remove_session(
         &self,
         splinter_access_token: &str,
     ) -> Result<(), OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).remove_session(splinter_access_token)
+        self.connection_pool.execute_write(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).remove_session(splinter_access_token)
+        })
     }
 
     fn get_session(
         &self,
         splinter_access_token: &str,
     ) -> Result<Option<OAuthUserSession>, OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).get_session(splinter_access_token)
+        self.connection_pool.execute_read(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).get_session(splinter_access_token)
+        })
     }
 
     fn get_user(&self, subject: &str) -> Result<Option<OAuthUser>, OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).get_user(subject)
+        self.connection_pool.execute_read(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).get_user(subject)
+        })
     }
 
     fn list_users(&self) -> Result<OAuthUserIter, OAuthUserSessionStoreError> {
-        let connection = self.connection_pool.get()?;
-        OAuthUserSessionStoreOperations::new(&*connection).list_users()
+        self.connection_pool.execute_read(|connection| {
+            OAuthUserSessionStoreOperations::new(connection).list_users()
+        })
     }
 
     fn clone_box(&self) -> Box<dyn OAuthUserSessionStore> {
