@@ -137,6 +137,34 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                     level: Some(log::Level::Trace),
                 },
             ),
+            (
+                "sawtooth".to_string(),
+                UnnamedLoggerConfig {
+                    appenders: None,
+                    level: Some(log::Level::Trace),
+                },
+            ),
+            (
+                "scabbard".to_string(),
+                UnnamedLoggerConfig {
+                    appenders: None,
+                    level: Some(log::Level::Trace),
+                },
+            ),
+            (
+                "cylinder".to_string(),
+                UnnamedLoggerConfig {
+                    appenders: None,
+                    level: Some(log::Level::Trace),
+                },
+            ),
+            (
+                "transact".to_string(),
+                UnnamedLoggerConfig {
+                    appenders: None,
+                    level: Some(log::Level::Trace),
+                },
+            ),
         ]
         .into_iter()
         .collect::<HashMap<String, UnnamedLoggerConfig>>();
