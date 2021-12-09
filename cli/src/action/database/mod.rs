@@ -17,6 +17,8 @@ mod postgres;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
+mod state;
+mod stores;
 #[cfg(feature = "upgrade")]
 mod upgrade;
 
@@ -30,6 +32,7 @@ use clap::ArgMatches;
 use self::postgres::get_default_database;
 #[cfg(feature = "sqlite")]
 use self::sqlite::{get_default_database, sqlite_migrations};
+pub use self::state::StateMigrateAction;
 #[cfg(feature = "upgrade")]
 pub use self::upgrade::UpgradeAction;
 use crate::error::CliError;
@@ -70,6 +73,18 @@ pub enum ConnectionUri {
     Postgres(String),
     #[cfg(feature = "sqlite")]
     Sqlite(String),
+}
+
+impl std::fmt::Display for ConnectionUri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            #[cfg(feature = "postgres")]
+            ConnectionUri::Postgres(pg) => pg,
+            #[cfg(feature = "sqlite")]
+            ConnectionUri::Sqlite(sqlite) => sqlite,
+        };
+        f.write_str(string)
+    }
 }
 
 impl FromStr for ConnectionUri {
