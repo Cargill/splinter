@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! Implementation of a `StoreFactory` for SQLite
+use std::sync::{Arc, RwLock};
 
 use diesel::{
     connection::SimpleConnection,
@@ -22,6 +23,10 @@ use diesel::{
 
 use crate::error::InternalError;
 use crate::migrations::{any_pending_sqlite_migrations, run_sqlite_migrations};
+#[cfg(feature = "authorization-handler-rbac")]
+use crate::rest_api::auth::authorization::rbac::store::{
+    DieselRoleBasedAuthorizationStore, RoleBasedAuthorizationStore,
+};
 
 use super::StoreFactory;
 
@@ -79,84 +84,95 @@ pub fn create_sqlite_connection_pool(
 
 /// A `StoreFactory` backed by a SQLite database.
 pub struct SqliteStoreFactory {
-    pool: Pool<ConnectionManager<SqliteConnection>>,
+    pool: Arc<RwLock<Pool<ConnectionManager<SqliteConnection>>>>,
 }
 
 impl SqliteStoreFactory {
     /// Create a new `SqliteStoreFactory`.
     pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
-        Self { pool }
+        Self {
+            pool: Arc::new(RwLock::new(pool)),
+        }
     }
 }
 
 impl StoreFactory for SqliteStoreFactory {
     #[cfg(feature = "biome-credentials")]
     fn get_biome_credentials_store(&self) -> Box<dyn crate::biome::CredentialsStore> {
-        Box::new(crate::biome::DieselCredentialsStore::new(self.pool.clone()))
+        Box::new(
+            crate::biome::DieselCredentialsStore::new_with_write_exclusivity(self.pool.clone()),
+        )
     }
 
     #[cfg(feature = "biome-key-management")]
     fn get_biome_key_store(&self) -> Box<dyn crate::biome::KeyStore> {
-        Box::new(crate::biome::DieselKeyStore::new(self.pool.clone()))
+        Box::new(crate::biome::DieselKeyStore::new_with_write_exclusivity(
+            self.pool.clone(),
+        ))
     }
 
     #[cfg(feature = "biome-credentials")]
     fn get_biome_refresh_token_store(&self) -> Box<dyn crate::biome::RefreshTokenStore> {
-        Box::new(crate::biome::DieselRefreshTokenStore::new(
-            self.pool.clone(),
-        ))
+        Box::new(
+            crate::biome::DieselRefreshTokenStore::new_with_write_exclusivity(self.pool.clone()),
+        )
     }
 
     #[cfg(feature = "oauth")]
     fn get_biome_oauth_user_session_store(&self) -> Box<dyn crate::biome::OAuthUserSessionStore> {
-        Box::new(crate::biome::DieselOAuthUserSessionStore::new(
-            self.pool.clone(),
-        ))
+        Box::new(
+            crate::biome::DieselOAuthUserSessionStore::new_with_write_exclusivity(
+                self.pool.clone(),
+            ),
+        )
     }
 
     #[cfg(feature = "admin-service")]
     fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore> {
-        Box::new(crate::admin::store::diesel::DieselAdminServiceStore::new(
-            self.pool.clone(),
-        ))
+        Box::new(
+            crate::admin::store::diesel::DieselAdminServiceStore::new_with_write_exclusivity(
+                self.pool.clone(),
+            ),
+        )
     }
 
     #[cfg(feature = "oauth")]
     fn get_oauth_inflight_request_store(
         &self,
     ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore> {
-        Box::new(crate::oauth::store::DieselInflightOAuthRequestStore::new(
-            self.pool.clone(),
-        ))
-    }
-
-    #[cfg(feature = "registry")]
-    fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
-        Box::new(crate::registry::DieselRegistry::new(self.pool.clone()))
-    }
-
-    #[cfg(feature = "authorization-handler-rbac")]
-    fn get_role_based_authorization_store(
-        &self,
-    ) -> Box<dyn crate::rest_api::auth::authorization::rbac::store::RoleBasedAuthorizationStore>
-    {
         Box::new(
-            crate::rest_api::auth::authorization::rbac::store::DieselRoleBasedAuthorizationStore::new(
+            crate::oauth::store::DieselInflightOAuthRequestStore::new_with_write_exclusivity(
                 self.pool.clone(),
             ),
         )
     }
 
+    #[cfg(feature = "registry")]
+    fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
+        Box::new(crate::registry::DieselRegistry::new_with_write_exclusivity(
+            self.pool.clone(),
+        ))
+    }
+
+    #[cfg(feature = "authorization-handler-rbac")]
+    fn get_role_based_authorization_store(&self) -> Box<dyn RoleBasedAuthorizationStore> {
+        Box::new(DieselRoleBasedAuthorizationStore::new_with_write_exclusivity(self.pool.clone()))
+    }
+
     #[cfg(feature = "biome-profile")]
     fn get_biome_user_profile_store(&self) -> Box<dyn crate::biome::UserProfileStore> {
-        Box::new(crate::biome::DieselUserProfileStore::new(self.pool.clone()))
+        Box::new(
+            crate::biome::DieselUserProfileStore::new_with_write_exclusivity(self.pool.clone()),
+        )
     }
 
     #[cfg(feature = "node-id-store")]
     fn get_node_id_store(&self) -> Box<dyn crate::node_id::store::NodeIdStore> {
-        Box::new(crate::node_id::store::diesel::DieselNodeIdStore::new(
-            self.pool.clone(),
-        ))
+        Box::new(
+            crate::node_id::store::diesel::DieselNodeIdStore::new_with_write_exclusivity(
+                self.pool.clone(),
+            ),
+        )
     }
 }
 
