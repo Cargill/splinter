@@ -86,3 +86,9 @@ impl From<diesel::result::Error> for UserProfileStoreError {
         }
     }
 }
+
+impl From<InternalError> for UserProfileStoreError {
+    fn from(err: InternalError) -> Self {
+        Self::Internal(err)
+    }
+}

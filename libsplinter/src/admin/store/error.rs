@@ -98,3 +98,9 @@ impl From<diesel::result::Error> for AdminServiceStoreError {
         }
     }
 }
+
+impl From<InternalError> for AdminServiceStoreError {
+    fn from(err: InternalError) -> Self {
+        Self::InternalError(err)
+    }
+}
