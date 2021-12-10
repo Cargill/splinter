@@ -105,4 +105,4 @@ SEE ALSO
 | `splinter-role-list(1)`
 | `splinter-role-show(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/0.5/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/

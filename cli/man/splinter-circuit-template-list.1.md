@@ -100,4 +100,4 @@ SEE ALSO
 | `splinter-circuit-template-arguments(1)`
 | `splinter-circuit-template-show(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/0.5/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/

@@ -59,4 +59,4 @@ splinter database migrate -C postgres://admin:admin@splinter-db-alpha:5432/splin
 
 SEE ALSO
 ========
-| Splinter documentation: https://www.splinter.dev/docs/0.5/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/

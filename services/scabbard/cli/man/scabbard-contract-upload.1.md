@@ -123,4 +123,4 @@ SEE ALSO
 | `scabbard-contract-list(1)`
 | `scabbard-contract-show(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/

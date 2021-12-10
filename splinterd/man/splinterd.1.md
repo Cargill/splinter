@@ -547,4 +547,4 @@ SEE ALSO
 | `splinter-circuit-propose(1)`
 | `splinter-cert-generate(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/0.5/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/

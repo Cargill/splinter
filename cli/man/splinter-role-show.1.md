@@ -89,4 +89,4 @@ SEE ALSO
 | `splinter-role-delete(1)`
 | `splinter-role-list(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/0.5/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/
