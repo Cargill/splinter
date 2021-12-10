@@ -67,6 +67,7 @@ tempdir = "0.3"
 
 [features]
 default = [
+    "authorization-handler-rbac",
     "circuit-template",
     "database",
     "postgres",
@@ -76,7 +77,6 @@ default = [
 ]
 
 stable = [
-    "authorization-handler-rbac",
     "default",
 ]
 
