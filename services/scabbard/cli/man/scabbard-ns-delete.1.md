@@ -86,4 +86,4 @@ SEE ALSO
 | `scabbard-ns-create(1)`
 | `scabbard-ns-update(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/
+| Splinter documentation: https://www.splinter.dev/docs/0.7/
