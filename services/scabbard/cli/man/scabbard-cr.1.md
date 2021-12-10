@@ -46,4 +46,4 @@ SEE ALSO
 | `scabbard-cr-delete(1)`
 | `scabbard-cr-update(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/

@@ -131,4 +131,4 @@ SEE ALSO
 ========
 | `splinter-registry-build(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/0.5/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/

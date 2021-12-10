@@ -48,4 +48,4 @@ SEE ALSO
 ========
 | `splinter-health-status(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/0.5/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/

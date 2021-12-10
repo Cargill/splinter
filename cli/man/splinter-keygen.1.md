@@ -113,4 +113,4 @@ ENVIRONMENT VARIABLES
 SEE ALSO
 ========
 
-| Splinter documentation: https://www.splinter.dev/docs/0.5/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/

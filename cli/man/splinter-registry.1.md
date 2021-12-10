@@ -51,4 +51,4 @@ SEE ALSO
 | `splinter-registry-add(1)`
 | `splinter-registry-build(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/0.5/
+| Splinter documentation: https://www.splinter.dev/docs/0.6/
