@@ -895,6 +895,8 @@ mod tests {
 
     use std::sync::mpsc;
 
+    use protobuf::Message;
+
     use crate::mesh::Mesh;
     use crate::network::auth::tests::negotiation_connection_auth;
     use crate::network::auth::AuthorizationManager;
@@ -1011,7 +1013,7 @@ mod tests {
         // Verify mesh received heartbeat
 
         let envelope = mesh.recv().unwrap();
-        let heartbeat: NetworkMessage = protobuf::parse_from_bytes(&envelope.payload()).unwrap();
+        let heartbeat: NetworkMessage = Message::parse_from_bytes(&envelope.payload()).unwrap();
         assert_eq!(
             heartbeat.get_message_type(),
             NetworkMessageType::NETWORK_HEARTBEAT
@@ -1041,8 +1043,7 @@ mod tests {
             // Verify mesh received heartbeat
 
             let envelope = mesh.recv().unwrap();
-            let heartbeat: NetworkMessage =
-                protobuf::parse_from_bytes(&envelope.payload()).unwrap();
+            let heartbeat: NetworkMessage = Message::parse_from_bytes(&envelope.payload()).unwrap();
             assert_eq!(
                 heartbeat.get_message_type(),
                 NetworkMessageType::NETWORK_HEARTBEAT
@@ -1221,7 +1222,7 @@ mod tests {
 
             // Verify mesh received heartbeat
             let envelope = mesh2.recv().expect("Cannot receive message");
-            let heartbeat: NetworkMessage = protobuf::parse_from_bytes(&envelope.payload())
+            let heartbeat: NetworkMessage = Message::parse_from_bytes(&envelope.payload())
                 .expect("Cannot parse NetworkMessage");
             assert_eq!(
                 heartbeat.get_message_type(),

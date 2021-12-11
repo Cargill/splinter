@@ -618,16 +618,16 @@ mod tests {
         msg_bytes: &[u8],
     ) -> M {
         let network_msg: NetworkMessage =
-            protobuf::parse_from_bytes(msg_bytes).expect("Unable to parse network message");
+            Message::parse_from_bytes(msg_bytes).expect("Unable to parse network message");
         assert_eq!(NetworkMessageType::AUTHORIZATION, network_msg.message_type);
 
         let auth_msg: authorization::AuthorizationMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload())
+            Message::parse_from_bytes(network_msg.get_payload())
                 .expect("Unable to parse auth message");
 
         assert_eq!(message_type, auth_msg.message_type);
 
-        match protobuf::parse_from_bytes(auth_msg.get_payload()) {
+        match Message::parse_from_bytes(auth_msg.get_payload()) {
             Ok(msg) => msg,
             Err(err) => panic!(
                 "unable to parse message for type {:?}: {:?}",

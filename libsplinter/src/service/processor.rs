@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crossbeam_channel::{Receiver, Sender};
+use protobuf::Message;
 use uuid::Uuid;
 
 use std::collections::HashMap;
@@ -318,7 +319,7 @@ fn process_incoming_msg(
     message_bytes: &[u8],
     inbound_router: &mut InboundRouter<CircuitMessageType>,
 ) -> Result<(), ServiceProcessorError> {
-    let msg: NetworkMessage = protobuf::parse_from_bytes(message_bytes)
+    let msg: NetworkMessage = Message::parse_from_bytes(message_bytes)
         .map_err(to_process_err!("unable parse network message"))?;
 
     // if a service is waiting on a reply the inbound router will
@@ -326,13 +327,13 @@ fn process_incoming_msg(
     // the message, otherwise it will be sent to the inbound thread
     match msg.get_message_type() {
         NetworkMessageType::CIRCUIT => {
-            let mut circuit_msg: CircuitMessage = protobuf::parse_from_bytes(msg.get_payload())
+            let mut circuit_msg: CircuitMessage = Message::parse_from_bytes(msg.get_payload())
                 .map_err(to_process_err!("unable to parse circuit message"))?;
 
             match circuit_msg.get_message_type() {
                 CircuitMessageType::ADMIN_DIRECT_MESSAGE => {
                     let admin_direct_message: AdminDirectMessage =
-                        protobuf::parse_from_bytes(circuit_msg.get_payload())
+                        Message::parse_from_bytes(circuit_msg.get_payload())
                             .map_err(to_process_err!("unable to parse admin direct message"))?;
                     inbound_router
                         .route(
@@ -346,7 +347,7 @@ fn process_incoming_msg(
                 }
                 CircuitMessageType::CIRCUIT_DIRECT_MESSAGE => {
                     let direct_message: CircuitDirectMessage =
-                        protobuf::parse_from_bytes(circuit_msg.get_payload())
+                        Message::parse_from_bytes(circuit_msg.get_payload())
                             .map_err(to_process_err!("unable to parse circuit direct message"))?;
                     inbound_router
                         .route(
@@ -360,7 +361,7 @@ fn process_incoming_msg(
                 }
                 CircuitMessageType::SERVICE_CONNECT_RESPONSE => {
                     let response: ServiceConnectResponse =
-                        protobuf::parse_from_bytes(circuit_msg.get_payload())
+                        Message::parse_from_bytes(circuit_msg.get_payload())
                             .map_err(to_process_err!("unable to parse service connect response"))?;
                     inbound_router
                         .route(
@@ -374,7 +375,7 @@ fn process_incoming_msg(
                 }
                 CircuitMessageType::SERVICE_DISCONNECT_RESPONSE => {
                     let response: ServiceDisconnectResponse =
-                        protobuf::parse_from_bytes(circuit_msg.get_payload()).map_err(|err| {
+                        Message::parse_from_bytes(circuit_msg.get_payload()).map_err(|err| {
                             process_err!(err, "unable to parse service disconnect response")
                         })?;
                     inbound_router
@@ -403,7 +404,7 @@ fn process_inbound_msg_with_correlation_id(
 ) -> Result<(), ServiceProcessorError> {
     match service_message {
         (CircuitMessageType::ADMIN_DIRECT_MESSAGE, msg) => {
-            let admin_direct_message: AdminDirectMessage = protobuf::parse_from_bytes(&msg)
+            let admin_direct_message: AdminDirectMessage = Message::parse_from_bytes(&msg)
                 .map_err(to_process_err!(
                     "unable to parse inbound admin direct message"
                 ))?;
@@ -413,7 +414,7 @@ fn process_inbound_msg_with_correlation_id(
             )?;
         }
         (CircuitMessageType::CIRCUIT_DIRECT_MESSAGE, msg) => {
-            let circuit_direct_message: CircuitDirectMessage = protobuf::parse_from_bytes(&msg)
+            let circuit_direct_message: CircuitDirectMessage = Message::parse_from_bytes(&msg)
                 .map_err(to_process_err!(
                     "unable to parse inbound circuit direct message"
                 ))?;
@@ -423,7 +424,7 @@ fn process_inbound_msg_with_correlation_id(
             )?;
         }
         (CircuitMessageType::CIRCUIT_ERROR_MESSAGE, msg) => {
-            let response: CircuitError = protobuf::parse_from_bytes(&msg)
+            let response: CircuitError = Message::parse_from_bytes(&msg)
                 .map_err(to_process_err!("unable to parse circuit error message"))?;
             warn!("Received circuit error message {:?}", response);
         }
@@ -1035,29 +1036,29 @@ pub mod tests {
     }
 
     fn get_service_connect(network_msg_bytes: Vec<u8>) -> ServiceConnectRequest {
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&network_msg_bytes).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&network_msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         let request: ServiceConnectRequest =
-            protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
         request
     }
 
     fn get_circuit_direct_msg(network_msg_bytes: Vec<u8>) -> CircuitDirectMessage {
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&network_msg_bytes).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&network_msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         let direct_message: CircuitDirectMessage =
-            protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
         direct_message
     }
 
     fn get_admin_direct_msg(network_msg_bytes: Vec<u8>) -> AdminDirectMessage {
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&network_msg_bytes).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&network_msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         let direct_message: AdminDirectMessage =
-            protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
         direct_message
     }
 }

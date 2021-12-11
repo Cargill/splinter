@@ -149,8 +149,8 @@ mod tests {
             .next_outbound()
             .expect("Unable to get expected message");
 
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&network_message).unwrap();
-        let echo: NetworkEcho = protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&network_message).unwrap();
+        let echo: NetworkEcho = Message::parse_from_bytes(network_msg.get_payload()).unwrap();
 
         assert_eq!(echo.get_recipient(), "TestPeer");
         assert_eq!(echo.get_time_to_live(), 2);

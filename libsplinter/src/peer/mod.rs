@@ -1470,6 +1470,8 @@ pub mod tests {
     use std::sync::mpsc;
     use std::time::Duration;
 
+    use protobuf::Message;
+
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
         AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
@@ -2179,7 +2181,7 @@ pub mod tests {
                 .expect("Cannot add connection to mesh");
             // Verify mesh received heartbeat
             let envelope = mesh2.recv().expect("Cannot receive message");
-            let heartbeat: NetworkMessage = protobuf::parse_from_bytes(&envelope.payload())
+            let heartbeat: NetworkMessage = Message::parse_from_bytes(&envelope.payload())
                 .expect("Cannot parse NetworkMessage");
             assert_eq!(
                 heartbeat.get_message_type(),

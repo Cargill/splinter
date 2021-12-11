@@ -32,6 +32,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use openssl::hash::{hash, MessageDigest};
+use protobuf::Message;
 use splinter::{
     consensus::{Proposal, ProposalUpdate},
     service::{
@@ -315,7 +316,7 @@ impl Service for Scabbard {
         message_bytes: &[u8],
         _message_context: &ServiceMessageContext,
     ) -> Result<(), ServiceError> {
-        let message: ScabbardMessage = protobuf::parse_from_bytes(message_bytes)?;
+        let message: ScabbardMessage = Message::parse_from_bytes(message_bytes)?;
 
         match message.get_message_type() {
             ScabbardMessage_Type::CONSENSUS_MESSAGE => self
