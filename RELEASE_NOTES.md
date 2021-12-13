@@ -1,14 +1,17 @@
 # Release Notes
 
-## Changes in Splinter 0.4.2
+## Changes in Splinter 0.4.3
 
 ### libsplinter
 
 * Fix several Clippy errors introduced in new versions of Rust.
 
-* Pin protobuf version to 2.18 due to deprecations in 2.19. Pins the version of
-  protobuf because 2.19 introduces some deprecation warnings that fail our build
-  (because warnings are fatal).
+* Use Message::parse_from_bytes instead of protobuf::parse_from_bytes and
+  update protobuf version to 2.19. There were deprecations introduced in 2.19.
+
+* Add OrchestratableService to Orchestrator.
+
+* Remove lock-contention in Orchestrator REST API calls.
 
 ### scabbard
 
@@ -16,6 +19,12 @@
   an authorization header to the scabbard requests. This allows for
   compatibility between a the 0.4.2 `ScabbardClient` and the 0.6 scabbard
   instance.
+
+* Fix missing wait parameter in `ReqwestScabbardClient`.
+
+## Changes in Splinter 0.4.2
+
+* Unreleased version.
 
 ## Changes in Splinter 0.4.1
 
