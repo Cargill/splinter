@@ -75,22 +75,8 @@ fn single_node_network_actix_web_1() {
     single_node_network(RestApiVariant::ActixWeb1);
 }
 
-/// Executes the single node network test with Actix Web 3.
-#[test]
-#[ignore]
-fn single_node_network_actix_web_3() {
-    single_node_network(RestApiVariant::ActixWeb3);
-}
-
 /// Executes the multi node network test with Actix Web 1.
 #[test]
 fn multi_node_network_actix_web_1() {
     multi_node_network(RestApiVariant::ActixWeb1);
-}
-
-/// Executes the multi node network test with Actix Web 3.
-#[test]
-#[ignore]
-fn multi_node_network_actix_web_3() {
-    multi_node_network(RestApiVariant::ActixWeb3);
 }

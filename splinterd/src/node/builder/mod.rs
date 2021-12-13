@@ -30,7 +30,6 @@ use splinter::biome::credentials::rest_api::{
 use splinter::error::InternalError;
 use splinter::public_key::PublicKey;
 use splinter::rest_api::actix_web_1::RestApiBuilder as RestApiBuilder1;
-use splinter::rest_api::actix_web_3::RestApiBuilder as RestApiBuilder3;
 use splinter::rest_api::auth::authorization::rbac::RoleBasedAuthorizationHandler;
 use splinter::rest_api::auth::{
     authorization::{
@@ -53,9 +52,6 @@ use self::network::NetworkSubsystemBuilder;
 pub enum RestApiVariant {
     /// Actix Web 1 as the backend implementation
     ActixWeb1,
-
-    /// Actix Web 3 as the backend implementation
-    ActixWeb3,
 }
 
 /// Constructs a `RunnableNode` instance.
@@ -343,12 +339,6 @@ impl NodeBuilder {
                 RestApiBuilder1::new()
                     .with_bind(BindConfig::Http(url))
                     .with_authorization_handlers(authorization_handlers),
-            ),
-            RestApiVariant::ActixWeb3 => RunnableNodeRestApiVariant::ActixWeb3(
-                RestApiBuilder3::new()
-                    .with_bind(BindConfig::Http(url))
-                    .build()
-                    .map_err(|e| InternalError::from_source(Box::new(e)))?,
             ),
         };
 

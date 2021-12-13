@@ -158,11 +158,6 @@ impl Network {
         self
     }
 
-    pub fn with_external_registries(mut self, files: Vec<String>) -> Self {
-        self.external_registries = Some(files);
-        self
-    }
-
     pub fn set_num_of_keys(mut self, num_of_keys: usize) -> Self {
         self.num_of_keys = num_of_keys;
         self
