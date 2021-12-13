@@ -13,6 +13,8 @@
 // limitations under the License.
 
 use std::collections::HashMap;
+#[cfg(feature = "sqlite")]
+use std::sync::{Arc, RwLock};
 
 #[cfg(feature = "diesel")]
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -42,6 +44,11 @@ pub enum MerkleStateConfig {
     #[cfg(feature = "sqlite")]
     Sqlite {
         pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
+        tree_name: String,
+    },
+    #[cfg(feature = "sqlite")]
+    SqliteExclusiveWrites {
+        pool: Arc<RwLock<Pool<ConnectionManager<diesel::SqliteConnection>>>>,
         tree_name: String,
     },
 }
@@ -109,6 +116,19 @@ impl MerkleState {
 
                 Ok(MerkleState::SqlSqlite { state })
             }
+            #[cfg(feature = "sqlite")]
+            MerkleStateConfig::SqliteExclusiveWrites { pool, tree_name } => {
+                let sqlite_backend = sql::backend::SqliteBackend::from(pool);
+
+                let state = sql::SqlMerkleStateBuilder::new()
+                    .with_backend(sqlite_backend)
+                    .with_tree(tree_name)
+                    .create_tree_if_necessary()
+                    .build()
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+                Ok(MerkleState::SqlSqlite { state })
+            }
         }
     }
 
@@ -130,6 +150,17 @@ impl MerkleState {
             }
             #[cfg(feature = "sqlite")]
             MerkleStateConfig::Sqlite { pool, tree_name } => {
+                let sqlite_backend = sql::backend::SqliteBackend::from(pool.clone());
+
+                // This will fail if the tree does not previously exist.
+                sql::SqlMerkleStateBuilder::new()
+                    .with_backend(sqlite_backend)
+                    .with_tree(tree_name)
+                    .build()
+                    .is_ok()
+            }
+            #[cfg(feature = "sqlite")]
+            MerkleStateConfig::SqliteExclusiveWrites { pool, tree_name } => {
                 let sqlite_backend = sql::backend::SqliteBackend::from(pool.clone());
 
                 // This will fail if the tree does not previously exist.
