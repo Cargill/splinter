@@ -17,6 +17,8 @@ use bcrypt::BcryptError;
 use std::error::Error;
 use std::fmt;
 
+use crate::error::InternalError;
+
 /// Represents CredentialsStore errors
 #[derive(Debug)]
 pub enum CredentialsStoreError {
@@ -43,6 +45,9 @@ pub enum CredentialsStoreError {
     DuplicateError(String),
     // Represents the specific case where a query returns no records
     NotFoundError(String),
+
+    /// An internal error has occurred
+    InternalError(InternalError),
 }
 
 impl Error for CredentialsStoreError {
@@ -58,6 +63,7 @@ impl Error for CredentialsStoreError {
             CredentialsStoreError::ConnectionError(err) => Some(&**err),
             CredentialsStoreError::DuplicateError(_) => None,
             CredentialsStoreError::NotFoundError(_) => None,
+            CredentialsStoreError::InternalError(source) => Some(source),
         }
     }
 }
@@ -91,6 +97,7 @@ impl fmt::Display for CredentialsStoreError {
             CredentialsStoreError::NotFoundError(ref s) => {
                 write!(f, "credentials not found: {}", s)
             }
+            CredentialsStoreError::InternalError(e) => f.write_str(&e.to_string()),
         }
     }
 }
@@ -99,6 +106,12 @@ impl fmt::Display for CredentialsStoreError {
 impl From<diesel::r2d2::PoolError> for CredentialsStoreError {
     fn from(err: diesel::r2d2::PoolError) -> CredentialsStoreError {
         CredentialsStoreError::ConnectionError(Box::new(err))
+    }
+}
+
+impl From<InternalError> for CredentialsStoreError {
+    fn from(err: InternalError) -> Self {
+        Self::InternalError(err)
     }
 }
 

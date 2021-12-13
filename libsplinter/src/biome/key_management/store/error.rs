@@ -15,6 +15,8 @@
 use std::error::Error;
 use std::fmt;
 
+use crate::error::InternalError;
+
 /// Represents KeyStore errors
 #[derive(Debug)]
 pub enum KeyStoreError {
@@ -41,6 +43,8 @@ pub enum KeyStoreError {
     DuplicateKeyError(String),
     /// Returned when a user is not found with the provided ID
     UserDoesNotExistError(String),
+    /// An internal error has occurred
+    InternalError(InternalError),
 }
 
 impl Error for KeyStoreError {
@@ -57,6 +61,7 @@ impl Error for KeyStoreError {
             KeyStoreError::NotFoundError(_) => None,
             KeyStoreError::DuplicateKeyError(_) => None,
             KeyStoreError::UserDoesNotExistError(_) => None,
+            KeyStoreError::InternalError(err) => Some(err),
         }
     }
 }
@@ -88,6 +93,7 @@ impl fmt::Display for KeyStoreError {
             KeyStoreError::NotFoundError(msg) => write!(f, "key not found: {}", msg),
             KeyStoreError::DuplicateKeyError(msg) => write!(f, "key already exists: {}", msg),
             KeyStoreError::UserDoesNotExistError(msg) => write!(f, "user does not exist: {}", msg),
+            KeyStoreError::InternalError(err) => f.write_str(&err.to_string()),
         }
     }
 }
@@ -96,5 +102,11 @@ impl fmt::Display for KeyStoreError {
 impl From<diesel::r2d2::PoolError> for KeyStoreError {
     fn from(err: diesel::r2d2::PoolError) -> KeyStoreError {
         KeyStoreError::ConnectionError(Box::new(err))
+    }
+}
+
+impl From<InternalError> for KeyStoreError {
+    fn from(err: InternalError) -> Self {
+        Self::InternalError(err)
     }
 }

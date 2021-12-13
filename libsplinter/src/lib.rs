@@ -98,7 +98,7 @@ pub mod registry;
 pub mod rest_api;
 pub mod service;
 pub mod sets;
-#[cfg(feature = "store-factory")]
+#[cfg(feature = "store")]
 pub mod store;
 pub mod threading;
 pub mod transport;

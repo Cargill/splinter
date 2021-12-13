@@ -15,6 +15,8 @@
 use std::error::Error;
 use std::fmt;
 
+use crate::error::InternalError;
+
 #[derive(Debug)]
 pub enum RefreshTokenError {
     /// Represents CRUD operations failures
@@ -37,6 +39,9 @@ pub enum RefreshTokenError {
 
     // Represents the specific case where a query returns no records
     NotFoundError(String),
+
+    /// An internal error has occurred
+    InternalError(InternalError),
 }
 
 impl Error for RefreshTokenError {
@@ -51,6 +56,7 @@ impl Error for RefreshTokenError {
             RefreshTokenError::StorageError { source: None, .. } => None,
             RefreshTokenError::ConnectionError(err) => Some(&**err),
             RefreshTokenError::NotFoundError(_) => None,
+            RefreshTokenError::InternalError(err) => Some(err),
         }
     }
 }
@@ -79,6 +85,7 @@ impl fmt::Display for RefreshTokenError {
                 write!(f, "failed to connect to underlying storage: {}", s)
             }
             RefreshTokenError::NotFoundError(ref s) => write!(f, "refresh token not found: {}", s),
+            RefreshTokenError::InternalError(err) => f.write_str(&err.to_string()),
         }
     }
 }
@@ -87,5 +94,11 @@ impl fmt::Display for RefreshTokenError {
 impl From<diesel::r2d2::PoolError> for RefreshTokenError {
     fn from(err: diesel::r2d2::PoolError) -> RefreshTokenError {
         RefreshTokenError::ConnectionError(Box::new(err))
+    }
+}
+
+impl From<InternalError> for RefreshTokenError {
+    fn from(err: InternalError) -> Self {
+        Self::InternalError(err)
     }
 }

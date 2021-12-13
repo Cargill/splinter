@@ -24,7 +24,11 @@ mod models;
 mod operations;
 mod schema;
 
+use std::sync::{Arc, RwLock};
+
 use diesel::r2d2::{ConnectionManager, Pool};
+
+use crate::store::pool::ConnectionPool;
 
 use super::{
     MetadataPredicate, Node, NodeIter, RegistryError, RegistryReader, RegistryWriter, RwRegistry,
@@ -41,7 +45,7 @@ use operations::RegistryOperations;
 
 /// A database-backed registry, powered by [`Diesel`](https://crates.io/crates/diesel).
 pub struct DieselRegistry<C: diesel::Connection + 'static> {
-    connection_pool: Pool<ConnectionManager<C>>,
+    connection_pool: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection> DieselRegistry<C> {
@@ -51,7 +55,25 @@ impl<C: diesel::Connection> DieselRegistry<C> {
     ///
     ///  * `connection_pool`: connection pool for the database
     pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
-        DieselRegistry { connection_pool }
+        DieselRegistry {
+            connection_pool: connection_pool.into(),
+        }
+    }
+
+    /// Create a new `DieselRegistry` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+    ) -> Self {
+        Self {
+            connection_pool: connection_pool.into(),
+        }
     }
 }
 
@@ -83,51 +105,62 @@ where
         &'b self,
         predicates: &'a [MetadataPredicate],
     ) -> Result<NodeIter<'a>, RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?)
-            .list_nodes(predicates)
-            .map(|nodes| Box::new(nodes.into_iter()) as NodeIter<'a>)
+        self.connection_pool.execute_read(|conn| {
+            RegistryOperations::new(conn)
+                .list_nodes(predicates)
+                .map(|nodes| Box::new(nodes.into_iter()) as NodeIter<'a>)
+        })
     }
 
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).count_nodes(predicates)
+        self.connection_pool
+            .execute_read(|conn| RegistryOperations::new(conn).count_nodes(predicates))
     }
 
     fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).get_node(identity)
+        self.connection_pool
+            .execute_read(|conn| RegistryOperations::new(conn).get_node(identity))
     }
 
     fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).has_node(identity)
+        self.connection_pool
+            .execute_read(|conn| RegistryOperations::new(conn).has_node(identity))
     }
 }
 
 #[cfg(feature = "postgres")]
 impl RegistryWriter for DieselRegistry<diesel::pg::PgConnection> {
     fn add_node(&self, node: Node) -> Result<(), RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).add_node(node)
+        self.connection_pool
+            .execute_write(|conn| RegistryOperations::new(conn).add_node(node))
     }
 
     fn update_node(&self, node: Node) -> Result<(), RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).update_node(node)
+        self.connection_pool
+            .execute_write(|conn| RegistryOperations::new(conn).update_node(node))
     }
 
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).delete_node(identity)
+        self.connection_pool
+            .execute_write(|conn| RegistryOperations::new(conn).delete_node(identity))
     }
 }
 
 #[cfg(feature = "sqlite")]
 impl RegistryWriter for DieselRegistry<diesel::sqlite::SqliteConnection> {
     fn add_node(&self, node: Node) -> Result<(), RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).add_node(node)
+        self.connection_pool
+            .execute_write(|conn| RegistryOperations::new(conn).add_node(node))
     }
 
     fn update_node(&self, node: Node) -> Result<(), RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).update_node(node)
+        self.connection_pool
+            .execute_write(|conn| RegistryOperations::new(conn).update_node(node))
     }
 
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).delete_node(identity)
+        self.connection_pool
+            .execute_write(|conn| RegistryOperations::new(conn).delete_node(identity))
     }
 }
 

@@ -25,6 +25,8 @@ mod models;
 mod operations;
 mod schema;
 
+use std::sync::{Arc, RwLock};
+
 use diesel::r2d2::{ConnectionManager, Pool};
 
 use crate::admin::messages;
@@ -33,6 +35,8 @@ use crate::admin::store::{
     CircuitProposal, Service, ServiceId,
 };
 use crate::admin::store::{AdminServiceEvent, EventIter};
+use crate::store::pool::ConnectionPool;
+
 use operations::add_circuit::AdminServiceStoreAddCircuitOperation as _;
 use operations::add_event::AdminServiceStoreAddEventOperation as _;
 use operations::add_proposal::AdminServiceStoreAddProposalOperation as _;
@@ -57,7 +61,7 @@ use operations::AdminServiceStoreOperations;
 
 /// A database-backed AdminServiceStore, powered by [`Diesel`](https://crates.io/crates/diesel).
 pub struct DieselAdminServiceStore<C: diesel::Connection + 'static> {
-    connection_pool: Pool<ConnectionManager<C>>,
+    connection_pool: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection> DieselAdminServiceStore<C> {
@@ -67,7 +71,25 @@ impl<C: diesel::Connection> DieselAdminServiceStore<C> {
     ///
     ///  * `connection_pool`: connection pool for the database
     pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
-        DieselAdminServiceStore { connection_pool }
+        DieselAdminServiceStore {
+            connection_pool: connection_pool.into(),
+        }
+    }
+
+    /// Create a new `DieselAdminServiceStore` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+    ) -> Self {
+        Self {
+            connection_pool: connection_pool.into(),
+        }
     }
 }
 
@@ -92,36 +114,43 @@ impl Clone for DieselAdminServiceStore<diesel::pg::PgConnection> {
 #[cfg(feature = "postgres")]
 impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
     fn add_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_proposal(proposal)
+        self.connection_pool
+            .execute_write(|conn| AdminServiceStoreOperations::new(conn).add_proposal(proposal))
     }
 
     fn update_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).update_proposal(proposal)
+        self.connection_pool
+            .execute_write(|conn| AdminServiceStoreOperations::new(conn).update_proposal(proposal))
     }
 
     fn remove_proposal(&self, proposal_id: &str) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).remove_proposal(proposal_id)
+        self.connection_pool.execute_write(|conn| {
+            AdminServiceStoreOperations::new(conn).remove_proposal(proposal_id)
+        })
     }
 
     fn get_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Option<CircuitProposal>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_proposal(proposal_id)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).get_proposal(proposal_id))
     }
 
     fn list_proposals(
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<Box<dyn ExactSizeIterator<Item = CircuitProposal>>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_proposals(predicates)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).list_proposals(predicates))
     }
 
     fn count_proposals(
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<u32, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).count_proposals(predicates)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).count_proposals(predicates))
     }
 
     fn add_circuit(
@@ -129,73 +158,87 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         circuit: Circuit,
         nodes: Vec<CircuitNode>,
     ) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_circuit(circuit, nodes)
+        self.connection_pool.execute_write(|conn| {
+            AdminServiceStoreOperations::new(conn).add_circuit(circuit, nodes)
+        })
     }
 
     fn update_circuit(&self, circuit: Circuit) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).update_circuit(circuit)
+        self.connection_pool
+            .execute_write(|conn| AdminServiceStoreOperations::new(conn).update_circuit(circuit))
     }
 
     fn remove_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).remove_circuit(circuit_id)
+        self.connection_pool
+            .execute_write(|conn| AdminServiceStoreOperations::new(conn).remove_circuit(circuit_id))
     }
 
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_circuit(circuit_id)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).get_circuit(circuit_id))
     }
 
     fn list_circuits(
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<Box<dyn ExactSizeIterator<Item = Circuit>>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_circuits(predicates)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).list_circuits(predicates))
     }
 
     fn count_circuits(
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<u32, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).count_circuits(predicates)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).count_circuits(predicates))
     }
 
     fn upgrade_proposal_to_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?)
-            .upgrade_proposal_to_circuit(circuit_id)
+        self.connection_pool.execute_write(|conn| {
+            AdminServiceStoreOperations::new(conn).upgrade_proposal_to_circuit(circuit_id)
+        })
     }
 
     fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_node(node_id)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).get_node(node_id))
     }
 
     fn list_nodes(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = CircuitNode>>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_nodes()
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).list_nodes())
     }
 
     fn get_service(
         &self,
         service_id: &ServiceId,
     ) -> Result<Option<Service>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_service(service_id)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).get_service(service_id))
     }
 
     fn list_services(
         &self,
         circuit_id: &str,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Service>>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_services(circuit_id)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).list_services(circuit_id))
     }
 
     fn add_event(
         &self,
         event: messages::AdminServiceEvent,
     ) -> Result<AdminServiceEvent, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_event(event)
+        self.connection_pool
+            .execute_write(|conn| AdminServiceStoreOperations::new(conn).add_event(event))
     }
 
     fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_events_since(start)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).list_events_since(start))
     }
 
     fn list_events_by_management_type_since(
@@ -203,8 +246,10 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         management_type: String,
         start: i64,
     ) -> Result<EventIter, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?)
-            .list_events_by_management_type_since(management_type, start)
+        self.connection_pool.execute_read(|conn| {
+            AdminServiceStoreOperations::new(conn)
+                .list_events_by_management_type_since(management_type, start)
+        })
     }
 
     fn clone_boxed(&self) -> Box<dyn AdminServiceStore> {
@@ -215,36 +260,43 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
 #[cfg(feature = "sqlite")]
 impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnection> {
     fn add_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_proposal(proposal)
+        self.connection_pool
+            .execute_write(|conn| AdminServiceStoreOperations::new(conn).add_proposal(proposal))
     }
 
     fn update_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).update_proposal(proposal)
+        self.connection_pool
+            .execute_write(|conn| AdminServiceStoreOperations::new(conn).update_proposal(proposal))
     }
 
     fn remove_proposal(&self, proposal_id: &str) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).remove_proposal(proposal_id)
+        self.connection_pool.execute_write(|conn| {
+            AdminServiceStoreOperations::new(conn).remove_proposal(proposal_id)
+        })
     }
 
     fn get_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Option<CircuitProposal>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_proposal(proposal_id)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).get_proposal(proposal_id))
     }
 
     fn list_proposals(
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<Box<dyn ExactSizeIterator<Item = CircuitProposal>>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_proposals(predicates)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).list_proposals(predicates))
     }
 
     fn count_proposals(
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<u32, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).count_proposals(predicates)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).count_proposals(predicates))
     }
 
     fn add_circuit(
@@ -252,73 +304,87 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         circuit: Circuit,
         nodes: Vec<CircuitNode>,
     ) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_circuit(circuit, nodes)
+        self.connection_pool.execute_write(|conn| {
+            AdminServiceStoreOperations::new(conn).add_circuit(circuit, nodes)
+        })
     }
 
     fn update_circuit(&self, circuit: Circuit) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).update_circuit(circuit)
+        self.connection_pool
+            .execute_write(|conn| AdminServiceStoreOperations::new(conn).update_circuit(circuit))
     }
 
     fn remove_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).remove_circuit(circuit_id)
+        self.connection_pool
+            .execute_write(|conn| AdminServiceStoreOperations::new(conn).remove_circuit(circuit_id))
     }
 
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_circuit(circuit_id)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).get_circuit(circuit_id))
     }
 
     fn list_circuits(
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<Box<dyn ExactSizeIterator<Item = Circuit>>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_circuits(predicates)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).list_circuits(predicates))
     }
 
     fn count_circuits(
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<u32, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).count_circuits(predicates)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).count_circuits(predicates))
     }
 
     fn upgrade_proposal_to_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?)
-            .upgrade_proposal_to_circuit(circuit_id)
+        self.connection_pool.execute_write(|conn| {
+            AdminServiceStoreOperations::new(conn).upgrade_proposal_to_circuit(circuit_id)
+        })
     }
 
     fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_node(node_id)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).get_node(node_id))
     }
 
     fn list_nodes(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = CircuitNode>>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_nodes()
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).list_nodes())
     }
 
     fn get_service(
         &self,
         service_id: &ServiceId,
     ) -> Result<Option<Service>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_service(service_id)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).get_service(service_id))
     }
 
     fn list_services(
         &self,
         circuit_id: &str,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Service>>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_services(circuit_id)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).list_services(circuit_id))
     }
 
     fn add_event(
         &self,
         event: messages::AdminServiceEvent,
     ) -> Result<AdminServiceEvent, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_event(event)
+        self.connection_pool
+            .execute_write(|conn| AdminServiceStoreOperations::new(conn).add_event(event))
     }
 
     fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_events_since(start)
+        self.connection_pool
+            .execute_read(|conn| AdminServiceStoreOperations::new(conn).list_events_since(start))
     }
 
     fn list_events_by_management_type_since(
@@ -326,8 +392,10 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         management_type: String,
         start: i64,
     ) -> Result<EventIter, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?)
-            .list_events_by_management_type_since(management_type, start)
+        self.connection_pool.execute_read(|conn| {
+            AdminServiceStoreOperations::new(conn)
+                .list_events_by_management_type_since(management_type, start)
+        })
     }
 
     fn clone_boxed(&self) -> Box<dyn AdminServiceStore> {
