@@ -105,6 +105,10 @@ pub enum ScabbardStorageConfiguration {
     Sqlite {
         pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
     },
+    #[cfg(feature = "sqlite")]
+    SqliteExclusiveWrites {
+        pool: Arc<RwLock<Pool<ConnectionManager<diesel::SqliteConnection>>>>,
+    },
 }
 
 impl From<String> for ScabbardStorageConfiguration {
@@ -138,6 +142,15 @@ impl From<Pool<ConnectionManager<diesel::pg::PgConnection>>> for ScabbardStorage
 impl From<Pool<ConnectionManager<diesel::SqliteConnection>>> for ScabbardStorageConfiguration {
     fn from(pool: Pool<ConnectionManager<diesel::SqliteConnection>>) -> Self {
         Self::Sqlite { pool }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl From<Arc<RwLock<Pool<ConnectionManager<diesel::SqliteConnection>>>>>
+    for ScabbardStorageConfiguration
+{
+    fn from(pool: Arc<RwLock<Pool<ConnectionManager<diesel::SqliteConnection>>>>) -> Self {
+        Self::SqliteExclusiveWrites { pool }
     }
 }
 
@@ -276,6 +289,10 @@ impl ScabbardFactoryBuilder {
             ScabbardStorageConfiguration::Sqlite { pool } => {
                 ScabbardFactoryStorageConfig::Sqlite { pool }
             }
+            #[cfg(feature = "sqlite")]
+            ScabbardStorageConfiguration::SqliteExclusiveWrites { pool } => {
+                ScabbardFactoryStorageConfig::SqliteExclusiveWrites { pool }
+            }
         };
 
         #[cfg(feature = "lmdb")]
@@ -413,6 +430,29 @@ fn check_for_sql_trees(
                     }
                 })
         }
+        #[cfg(feature = "sqlite")]
+        ScabbardFactoryStorageConfig::SqliteExclusiveWrites { pool } => {
+            let pool = pool.read().map_err(|_e| {
+                InvalidStateError::with_message("RwLock on connection pool is poisoned".into())
+            })?;
+            merkle_state::sqlite_list_available_trees(&pool)
+                .map_err(|e| {
+                    InvalidStateError::with_message(format!(
+                        "Unable to read merkle state trees in sqlite: {}",
+                        e
+                    ))
+                })
+                .and_then(|trees| {
+                    // Check that if any trees exist, it is only the default tree
+                    if trees.iter().any(|name| name != "default") {
+                        Err(InvalidStateError::with_message(
+                            "SQL Merkle Radix trees exist, but LMDB storage is enabled".into(),
+                        ))
+                    } else {
+                        Ok(())
+                    }
+                })
+        }
     }
 }
 
@@ -426,6 +466,10 @@ enum ScabbardFactoryStorageConfig {
     #[cfg(feature = "sqlite")]
     Sqlite {
         pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
+    },
+    #[cfg(feature = "sqlite")]
+    SqliteExclusiveWrites {
+        pool: Arc<RwLock<Pool<ConnectionManager<diesel::SqliteConnection>>>>,
     },
 }
 
@@ -720,6 +764,18 @@ impl ScabbardFactory {
                         &service_id,
                     )),
                 ),
+                #[cfg(feature = "sqlite")]
+                ScabbardFactoryStorageConfig::SqliteExclusiveWrites { pool } => (
+                    Arc::new(RwLock::new(DieselReceiptStore::new_with_write_exclusivity(
+                        pool.clone(),
+                        Some(format!("{}::{}", circuit_id, service_id)),
+                    ))),
+                    Box::new(DieselCommitHashStore::new_with_write_exclusivity(
+                        pool.clone(),
+                        circuit_id,
+                        &service_id,
+                    )),
+                ),
             };
 
         Scabbard::new(
@@ -799,6 +855,13 @@ impl ScabbardFactory {
                 pool: pool.clone(),
                 tree_name: format!("{}::{}", circuit_id, service_id),
             },
+            #[cfg(feature = "sqlite")]
+            ScabbardFactoryStorageConfig::SqliteExclusiveWrites { pool } => {
+                MerkleStateConfig::SqliteExclusiveWrites {
+                    pool: pool.clone(),
+                    tree_name: format!("{}::{}", circuit_id, service_id),
+                }
+            }
         }
     }
 
@@ -818,6 +881,13 @@ impl ScabbardFactory {
             }
             #[cfg(feature = "sqlite")]
             ScabbardFactoryStorageConfig::Sqlite { pool } => {
+                Box::new(SqliteMerkleStatePurgeHandler {
+                    pool: Arc::new(RwLock::new(pool.clone())),
+                    tree_name: format!("{}::{}", circuit_id, service_id),
+                })
+            }
+            #[cfg(feature = "sqlite")]
+            ScabbardFactoryStorageConfig::SqliteExclusiveWrites { pool } => {
                 Box::new(SqliteMerkleStatePurgeHandler {
                     pool: pool.clone(),
                     tree_name: format!("{}::{}", circuit_id, service_id),
@@ -910,7 +980,7 @@ impl ScabbardStatePurgeHandler for PostgresMerkleStatePurgeHandler {
 
 #[cfg(feature = "sqlite")]
 struct SqliteMerkleStatePurgeHandler {
-    pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
+    pool: Arc<RwLock<Pool<ConnectionManager<diesel::SqliteConnection>>>>,
     tree_name: String,
 }
 
