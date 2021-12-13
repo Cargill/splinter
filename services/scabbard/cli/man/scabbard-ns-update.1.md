@@ -98,4 +98,4 @@ SEE ALSO
 | `scabbard-ns-delete(1)`
 | `scabbard-perm(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/
+| Splinter documentation: https://www.splinter.dev/docs/0.7/

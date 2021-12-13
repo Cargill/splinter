@@ -97,4 +97,4 @@ SEE ALSO
 | `scabbard-cr-create(1)`
 | `scabbard-cr-delete(1)`
 |
-| Splinter documentation: https://www.splinter.dev/docs/
+| Splinter documentation: https://www.splinter.dev/docs/0.7/
