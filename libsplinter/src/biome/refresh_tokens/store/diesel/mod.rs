@@ -16,9 +16,12 @@ mod models;
 mod operations;
 mod schema;
 
+use std::sync::{Arc, RwLock};
+
 use diesel::r2d2::{ConnectionManager, Pool};
 
 use crate::biome::refresh_tokens::store::{RefreshTokenError, RefreshTokenStore};
+use crate::store::pool::ConnectionPool;
 
 use operations::{
     add_token::RefreshTokenStoreAddTokenOperation,
@@ -28,44 +31,72 @@ use operations::{
 };
 
 pub struct DieselRefreshTokenStore<C: diesel::Connection + 'static> {
-    connection_pool: Pool<ConnectionManager<C>>,
+    connection_pool: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection> DieselRefreshTokenStore<C> {
     pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
-        Self { connection_pool }
+        Self {
+            connection_pool: connection_pool.into(),
+        }
+    }
+
+    /// Create a new `DieselRefreshTokenStore` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+    ) -> Self {
+        Self {
+            connection_pool: connection_pool.into(),
+        }
     }
 }
 
 #[cfg(feature = "postgres")]
 impl RefreshTokenStore for DieselRefreshTokenStore<diesel::pg::PgConnection> {
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
-        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).add_token(user_id, token)
+        self.connection_pool
+            .execute_write(|conn| RefreshTokenStoreOperations::new(conn).add_token(user_id, token))
     }
     fn remove_token(&self, user_id: &str) -> Result<(), RefreshTokenError> {
-        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).remove_token(user_id)
+        self.connection_pool
+            .execute_write(|conn| RefreshTokenStoreOperations::new(conn).remove_token(user_id))
     }
     fn update_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
-        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).update_token(user_id, token)
+        self.connection_pool.execute_write(|conn| {
+            RefreshTokenStoreOperations::new(conn).update_token(user_id, token)
+        })
     }
     fn fetch_token(&self, user_id: &str) -> Result<String, RefreshTokenError> {
-        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).fetch_token(user_id)
+        self.connection_pool
+            .execute_read(|conn| RefreshTokenStoreOperations::new(conn).fetch_token(user_id))
     }
 }
 
 #[cfg(feature = "sqlite")]
 impl RefreshTokenStore for DieselRefreshTokenStore<diesel::sqlite::SqliteConnection> {
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
-        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).add_token(user_id, token)
+        self.connection_pool
+            .execute_write(|conn| RefreshTokenStoreOperations::new(conn).add_token(user_id, token))
     }
     fn remove_token(&self, user_id: &str) -> Result<(), RefreshTokenError> {
-        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).remove_token(user_id)
+        self.connection_pool
+            .execute_write(|conn| RefreshTokenStoreOperations::new(conn).remove_token(user_id))
     }
     fn update_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
-        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).update_token(user_id, token)
+        self.connection_pool.execute_write(|conn| {
+            RefreshTokenStoreOperations::new(conn).update_token(user_id, token)
+        })
     }
     fn fetch_token(&self, user_id: &str) -> Result<String, RefreshTokenError> {
-        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).fetch_token(user_id)
+        self.connection_pool
+            .execute_read(|conn| RefreshTokenStoreOperations::new(conn).fetch_token(user_id))
     }
 }
 

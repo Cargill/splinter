@@ -18,6 +18,8 @@ mod models;
 mod operations;
 mod schema;
 
+use std::sync::{Arc, RwLock};
+
 use diesel::{
     r2d2::{ConnectionManager, Pool},
     result,
@@ -25,6 +27,7 @@ use diesel::{
 
 use crate::error::{ConstraintViolationError, ConstraintViolationType, InternalError};
 use crate::oauth::PendingAuthorization;
+use crate::store::pool::ConnectionPool;
 
 use super::{InflightOAuthRequestStore, InflightOAuthRequestStoreError};
 
@@ -34,12 +37,30 @@ use operations::InflightOAuthRequestOperations;
 
 /// A Diesel-backed InflightOAuthRequestStore
 pub struct DieselInflightOAuthRequestStore<C: diesel::Connection + 'static> {
-    connection_pool: Pool<ConnectionManager<C>>,
+    connection_pool: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection + 'static> DieselInflightOAuthRequestStore<C> {
     pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
-        Self { connection_pool }
+        Self {
+            connection_pool: connection_pool.into(),
+        }
+    }
+
+    /// Create a new `DieselInflightOAuthRequestStore` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+    ) -> Self {
+        Self {
+            connection_pool: connection_pool.into(),
+        }
     }
 }
 
@@ -52,30 +73,26 @@ impl InflightOAuthRequestStore
         request_id: String,
         pending_authorization: PendingAuthorization,
     ) -> Result<(), InflightOAuthRequestStoreError> {
-        let connection = self
-            .connection_pool
-            .get()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
-        InflightOAuthRequestOperations::new(&*connection).insert_request(
-            models::OAuthInflightRequest {
-                id: request_id,
-                pkce_verifier: pending_authorization.pkce_verifier,
-                client_redirect_url: pending_authorization.client_redirect_url,
-            },
-        )
+        self.connection_pool.execute_write(|connection| {
+            InflightOAuthRequestOperations::new(connection).insert_request(
+                models::OAuthInflightRequest {
+                    id: request_id,
+                    pkce_verifier: pending_authorization.pkce_verifier,
+                    client_redirect_url: pending_authorization.client_redirect_url,
+                },
+            )
+        })
     }
 
     fn remove_request(
         &self,
         request_id: &str,
     ) -> Result<Option<PendingAuthorization>, InflightOAuthRequestStoreError> {
-        let connection = self
-            .connection_pool
-            .get()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
-        InflightOAuthRequestOperations::new(&*connection)
-            .remove_request(request_id)
-            .map(|opt_request| opt_request.map(PendingAuthorization::from))
+        self.connection_pool.execute_write(|connection| {
+            InflightOAuthRequestOperations::new(connection)
+                .remove_request(request_id)
+                .map(|opt_request| opt_request.map(PendingAuthorization::from))
+        })
     }
 
     fn clone_box(&self) -> Box<dyn InflightOAuthRequestStore> {
@@ -92,30 +109,26 @@ impl InflightOAuthRequestStore for DieselInflightOAuthRequestStore<diesel::pg::P
         request_id: String,
         pending_authorization: PendingAuthorization,
     ) -> Result<(), InflightOAuthRequestStoreError> {
-        let connection = self
-            .connection_pool
-            .get()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
-        InflightOAuthRequestOperations::new(&*connection).insert_request(
-            models::OAuthInflightRequest {
-                id: request_id,
-                pkce_verifier: pending_authorization.pkce_verifier,
-                client_redirect_url: pending_authorization.client_redirect_url,
-            },
-        )
+        self.connection_pool.execute_write(|connection| {
+            InflightOAuthRequestOperations::new(connection).insert_request(
+                models::OAuthInflightRequest {
+                    id: request_id,
+                    pkce_verifier: pending_authorization.pkce_verifier,
+                    client_redirect_url: pending_authorization.client_redirect_url,
+                },
+            )
+        })
     }
 
     fn remove_request(
         &self,
         request_id: &str,
     ) -> Result<Option<PendingAuthorization>, InflightOAuthRequestStoreError> {
-        let connection = self
-            .connection_pool
-            .get()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
-        InflightOAuthRequestOperations::new(&*connection)
-            .remove_request(request_id)
-            .map(|opt_request| opt_request.map(PendingAuthorization::from))
+        self.connection_pool.execute_write(|connection| {
+            InflightOAuthRequestOperations::new(connection)
+                .remove_request(request_id)
+                .map(|opt_request| opt_request.map(PendingAuthorization::from))
+        })
     }
 
     fn clone_box(&self) -> Box<dyn InflightOAuthRequestStore> {

@@ -16,12 +16,15 @@ pub(in crate::biome) mod models;
 mod operations;
 mod schema;
 
+use std::sync::{Arc, RwLock};
+
 use diesel::r2d2::{ConnectionManager, Pool};
 
 #[cfg(feature = "biome-credentials")]
 use crate::biome::credentials::store::PasswordEncryptionCost;
 use crate::biome::key_management::store::{KeyStore, KeyStoreError};
 use crate::biome::key_management::Key;
+use crate::store::pool::ConnectionPool;
 
 #[cfg(feature = "biome-credentials")]
 use operations::update_keys_and_password::KeyStoreUpdateKeysAndPasswordOperation as _;
@@ -34,7 +37,7 @@ use operations::{
 
 /// Manages creating, updating and fetching keys from a database.
 pub struct DieselKeyStore<C: diesel::Connection + 'static> {
-    connection_pool: Pool<ConnectionManager<C>>,
+    connection_pool: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection> DieselKeyStore<C> {
@@ -45,14 +48,33 @@ impl<C: diesel::Connection> DieselKeyStore<C> {
     ///  * `connection_pool`: connection pool to the database
     ///
     pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
-        DieselKeyStore { connection_pool }
+        DieselKeyStore {
+            connection_pool: connection_pool.into(),
+        }
+    }
+
+    /// Create a new `DieselKeyStore` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+    ) -> Self {
+        Self {
+            connection_pool: connection_pool.into(),
+        }
     }
 }
 
 #[cfg(feature = "postgres")]
 impl KeyStore for DieselKeyStore<diesel::pg::PgConnection> {
     fn add_key(&self, key: Key) -> Result<(), KeyStoreError> {
-        KeyStoreOperations::new(&*self.connection_pool.get()?).insert_key(key)
+        self.connection_pool
+            .execute_write(|conn| KeyStoreOperations::new(conn).insert_key(key))
     }
 
     fn update_key(
@@ -61,27 +83,26 @@ impl KeyStore for DieselKeyStore<diesel::pg::PgConnection> {
         user_id: &str,
         new_display_name: &str,
     ) -> Result<(), KeyStoreError> {
-        KeyStoreOperations::new(&*self.connection_pool.get()?).update_key(
-            public_key,
-            user_id,
-            new_display_name,
-        )
+        self.connection_pool.execute_write(|conn| {
+            KeyStoreOperations::new(conn).update_key(public_key, user_id, new_display_name)
+        })
     }
 
     fn remove_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError> {
-        KeyStoreOperations::new(&*self.connection_pool.get()?).remove_key(public_key, user_id)
+        self.connection_pool
+            .execute_write(|conn| KeyStoreOperations::new(conn).remove_key(public_key, user_id))
     }
 
     fn fetch_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError> {
-        KeyStoreOperations::new(&*self.connection_pool.get()?).fetch_key(public_key, user_id)
+        self.connection_pool
+            .execute_read(|conn| KeyStoreOperations::new(conn).fetch_key(public_key, user_id))
     }
 
     fn list_keys(&self, user_id: Option<&str>) -> Result<Vec<Key>, KeyStoreError> {
-        match user_id {
-            Some(user_id) => KeyStoreOperations::new(&*self.connection_pool.get()?)
-                .list_keys_with_user_id(user_id),
-            None => KeyStoreOperations::new(&*self.connection_pool.get()?).list_keys(),
-        }
+        self.connection_pool.execute_read(|conn| match user_id {
+            Some(user_id) => KeyStoreOperations::new(conn).list_keys_with_user_id(user_id),
+            None => KeyStoreOperations::new(conn).list_keys(),
+        })
     }
 
     #[cfg(feature = "biome-credentials")]
@@ -92,19 +113,22 @@ impl KeyStore for DieselKeyStore<diesel::pg::PgConnection> {
         password_encryption_cost: PasswordEncryptionCost,
         keys: &[Key],
     ) -> Result<(), KeyStoreError> {
-        KeyStoreOperations::new(&*self.connection_pool.get()?).update_keys_and_password(
-            user_id,
-            updated_password,
-            password_encryption_cost,
-            keys,
-        )
+        self.connection_pool.execute_write(|conn| {
+            KeyStoreOperations::new(conn).update_keys_and_password(
+                user_id,
+                updated_password,
+                password_encryption_cost,
+                keys,
+            )
+        })
     }
 }
 
 #[cfg(feature = "sqlite")]
 impl KeyStore for DieselKeyStore<diesel::sqlite::SqliteConnection> {
     fn add_key(&self, key: Key) -> Result<(), KeyStoreError> {
-        KeyStoreOperations::new(&*self.connection_pool.get()?).insert_key(key)
+        self.connection_pool
+            .execute_write(|conn| KeyStoreOperations::new(conn).insert_key(key))
     }
 
     fn update_key(
@@ -113,27 +137,26 @@ impl KeyStore for DieselKeyStore<diesel::sqlite::SqliteConnection> {
         user_id: &str,
         new_display_name: &str,
     ) -> Result<(), KeyStoreError> {
-        KeyStoreOperations::new(&*self.connection_pool.get()?).update_key(
-            public_key,
-            user_id,
-            new_display_name,
-        )
+        self.connection_pool.execute_write(|conn| {
+            KeyStoreOperations::new(conn).update_key(public_key, user_id, new_display_name)
+        })
     }
 
     fn remove_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError> {
-        KeyStoreOperations::new(&*self.connection_pool.get()?).remove_key(public_key, user_id)
+        self.connection_pool
+            .execute_write(|conn| KeyStoreOperations::new(conn).remove_key(public_key, user_id))
     }
 
     fn fetch_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError> {
-        KeyStoreOperations::new(&*self.connection_pool.get()?).fetch_key(public_key, user_id)
+        self.connection_pool
+            .execute_read(|conn| KeyStoreOperations::new(conn).fetch_key(public_key, user_id))
     }
 
     fn list_keys(&self, user_id: Option<&str>) -> Result<Vec<Key>, KeyStoreError> {
-        match user_id {
-            Some(user_id) => KeyStoreOperations::new(&*self.connection_pool.get()?)
-                .list_keys_with_user_id(user_id),
-            None => KeyStoreOperations::new(&*self.connection_pool.get()?).list_keys(),
-        }
+        self.connection_pool.execute_read(|conn| match user_id {
+            Some(user_id) => KeyStoreOperations::new(conn).list_keys_with_user_id(user_id),
+            None => KeyStoreOperations::new(conn).list_keys(),
+        })
     }
 
     #[cfg(feature = "biome-credentials")]
@@ -144,12 +167,14 @@ impl KeyStore for DieselKeyStore<diesel::sqlite::SqliteConnection> {
         password_encryption_cost: PasswordEncryptionCost,
         keys: &[Key],
     ) -> Result<(), KeyStoreError> {
-        KeyStoreOperations::new(&*self.connection_pool.get()?).update_keys_and_password(
-            user_id,
-            updated_password,
-            password_encryption_cost,
-            keys,
-        )
+        self.connection_pool.execute_write(|conn| {
+            KeyStoreOperations::new(conn).update_keys_and_password(
+                user_id,
+                updated_password,
+                password_encryption_cost,
+                keys,
+            )
+        })
     }
 }
 

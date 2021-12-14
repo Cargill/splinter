@@ -90,3 +90,9 @@ impl From<diesel::result::Error> for OAuthUserSessionStoreError {
         }
     }
 }
+
+impl From<InternalError> for OAuthUserSessionStoreError {
+    fn from(err: InternalError) -> Self {
+        Self::Internal(err)
+    }
+}

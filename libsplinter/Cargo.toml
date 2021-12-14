@@ -106,6 +106,7 @@ stable = [
     "rest-api-actix",
     "rest-api-cors",
     "sqlite",
+    "store",
     "store-factory",
     "tap",
     "trust-authorization",
@@ -163,7 +164,7 @@ https-bind = ["actix-web/ssl"]
 memory = ["sqlite"]
 node-id-store = []
 oauth = ["biome", "base64", "oauth2", "reqwest", "rest-api"]
-postgres = ["diesel/postgres", "diesel_migrations"]
+postgres = ["diesel/postgres", "diesel_migrations", "store"]
 registry = []
 registry-client = ["registry"]
 registry-client-reqwest = ["registry-client", "reqwest"]
@@ -181,8 +182,9 @@ rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
 rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
 service-network = []
-sqlite = ["diesel/sqlite", "diesel_migrations"]
-store-factory = []
+sqlite = ["diesel/sqlite", "diesel_migrations", "store"]
+store = []
+store-factory = ["store"]
 tap = ["chrono", "futures-0-3", "influxdb", "metrics", "tokio-1"]
 trust-authorization = []
 ws-transport = ["tungstenite"]

@@ -68,6 +68,12 @@ impl From<diesel::r2d2::PoolError> for RegistryError {
     }
 }
 
+impl From<InternalError> for RegistryError {
+    fn from(err: InternalError) -> Self {
+        Self::InternalError(err)
+    }
+}
+
 /// Represents the reason that a node was found to be invalid
 #[derive(Debug)]
 pub enum InvalidNodeError {

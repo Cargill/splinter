@@ -17,10 +17,12 @@ mod operations;
 mod schema;
 
 use std::convert::TryFrom;
+use std::sync::{Arc, RwLock};
 
 use crate::error::{
     ConstraintViolationError, ConstraintViolationType, InternalError, InvalidStateError,
 };
+use crate::store::pool::ConnectionPool;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
@@ -44,12 +46,30 @@ use operations::RoleBasedAuthorizationStoreOperations;
 
 /// A database-backed [RoleBasedAuthorizationStore], powered by [diesel].
 pub struct DieselRoleBasedAuthorizationStore<C: diesel::Connection + 'static> {
-    connection_pool: Pool<ConnectionManager<C>>,
+    connection_pool: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection + 'static> DieselRoleBasedAuthorizationStore<C> {
     pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
-        Self { connection_pool }
+        Self {
+            connection_pool: connection_pool.into(),
+        }
+    }
+
+    /// Create a new `DieselRoleBasedAuthorizationStore` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+    ) -> Self {
+        Self {
+            connection_pool: connection_pool.into(),
+        }
     }
 }
 
@@ -59,16 +79,18 @@ impl RoleBasedAuthorizationStore
 {
     /// Returns the role for the given ID, if one exists.
     fn get_role(&self, id: &str) -> Result<Option<Role>, RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).get_role(id)
+        self.connection_pool.execute_read(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).get_role(id)
+        })
     }
 
     /// Lists all roles.
     fn list_roles(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).list_roles()
+        self.connection_pool.execute_read(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).list_roles()
+        })
     }
 
     /// Adds a role.
@@ -77,8 +99,9 @@ impl RoleBasedAuthorizationStore
     ///
     /// Returns a `ConstraintViolation` error if a duplicate role ID is added.
     fn add_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).add_role(role)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).add_role(role)
+        })
     }
 
     /// Updates a role.
@@ -94,8 +117,9 @@ impl RoleBasedAuthorizationStore
                 )),
             ));
         }
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).update_role(role)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).update_role(role)
+        })
     }
 
     /// Removes a role.
@@ -111,8 +135,9 @@ impl RoleBasedAuthorizationStore
                 )),
             ));
         }
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).remove_role(role_id)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).remove_role(role_id)
+        })
     }
 
     /// Returns the role for the given Identity, if one exists.
@@ -120,8 +145,9 @@ impl RoleBasedAuthorizationStore
         &self,
         identity: &Identity,
     ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).get_assignment(identity)
+        self.connection_pool.execute_read(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).get_assignment(identity)
+        })
     }
 
     /// Returns the assigned roles for the given Identity.
@@ -129,8 +155,9 @@ impl RoleBasedAuthorizationStore
         &self,
         identity: &Identity,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).get_assigned_roles(identity)
+        self.connection_pool.execute_read(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).get_assigned_roles(identity)
+        })
     }
 
     /// Lists all assignments.
@@ -138,8 +165,9 @@ impl RoleBasedAuthorizationStore
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Assignment>>, RoleBasedAuthorizationStoreError>
     {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).list_assignments()
+        self.connection_pool.execute_read(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).list_assignments()
+        })
     }
 
     /// Adds an assignment.
@@ -152,8 +180,9 @@ impl RoleBasedAuthorizationStore
         &self,
         assignment: Assignment,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).add_assignment(assignment)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).add_assignment(assignment)
+        })
     }
 
     /// Updates an assignment.
@@ -165,8 +194,9 @@ impl RoleBasedAuthorizationStore
         &self,
         assignment: Assignment,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).update_assignment(assignment)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).update_assignment(assignment)
+        })
     }
 
     /// Removes an assignment.
@@ -178,8 +208,9 @@ impl RoleBasedAuthorizationStore
         &self,
         identity: &Identity,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).remove_assignment(identity)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).remove_assignment(identity)
+        })
     }
 
     /// Clone into a boxed, dynamically dispatched store
@@ -194,16 +225,18 @@ impl RoleBasedAuthorizationStore
 impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::pg::PgConnection> {
     /// Returns the role for the given ID, if one exists.
     fn get_role(&self, id: &str) -> Result<Option<Role>, RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).get_role(id)
+        self.connection_pool.execute_read(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).get_role(id)
+        })
     }
 
     /// Lists all roles.
     fn list_roles(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).list_roles()
+        self.connection_pool.execute_read(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).list_roles()
+        })
     }
 
     /// Adds a role.
@@ -212,8 +245,9 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
     ///
     /// Returns a `ConstraintViolation` error if a duplicate role ID is added.
     fn add_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).add_role(role)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).add_role(role)
+        })
     }
 
     /// Updates a role.
@@ -229,8 +263,9 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
                 )),
             ));
         }
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).update_role(role)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).update_role(role)
+        })
     }
 
     /// Removes a role.
@@ -246,8 +281,9 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
                 )),
             ));
         }
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).remove_role(role_id)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).remove_role(role_id)
+        })
     }
 
     /// Returns the role for the given Identity, if one exists.
@@ -255,8 +291,9 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
         &self,
         identity: &Identity,
     ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).get_assignment(identity)
+        self.connection_pool.execute_read(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).get_assignment(identity)
+        })
     }
 
     /// Returns the assigned roles for the given Identity.
@@ -264,8 +301,9 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
         &self,
         identity: &Identity,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).get_assigned_roles(identity)
+        self.connection_pool.execute_read(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).get_assigned_roles(identity)
+        })
     }
 
     /// Lists all assignments.
@@ -273,8 +311,9 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Assignment>>, RoleBasedAuthorizationStoreError>
     {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).list_assignments()
+        self.connection_pool.execute_read(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).list_assignments()
+        })
     }
 
     /// Adds an assignment.
@@ -287,8 +326,9 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
         &self,
         assignment: Assignment,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).add_assignment(assignment)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).add_assignment(assignment)
+        })
     }
 
     /// Updates an assignment.
@@ -300,8 +340,9 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
         &self,
         assignment: Assignment,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).update_assignment(assignment)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).update_assignment(assignment)
+        })
     }
 
     /// Removes an assignment.
@@ -313,8 +354,9 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
         &self,
         identity: &Identity,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        let connection = self.connection_pool.get()?;
-        RoleBasedAuthorizationStoreOperations::new(&*connection).remove_assignment(identity)
+        self.connection_pool.execute_write(|connection| {
+            RoleBasedAuthorizationStoreOperations::new(connection).remove_assignment(identity)
+        })
     }
 
     /// Clone into a boxed, dynamically dispatched store

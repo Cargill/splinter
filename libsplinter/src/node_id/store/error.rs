@@ -72,3 +72,9 @@ impl From<std::io::Error> for NodeIdStoreError {
         Self::InternalError(InternalError::from_source(Box::new(err)))
     }
 }
+
+impl From<InternalError> for NodeIdStoreError {
+    fn from(err: InternalError) -> Self {
+        Self::InternalError(err)
+    }
+}
