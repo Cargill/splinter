@@ -281,7 +281,12 @@ pub fn make_callback_route(
 
 /// Generates a new Splinter access token, which is a string of 32 random alphanumeric characters
 fn new_splinter_access_token() -> String {
-    thread_rng().sample_iter(&Alphanumeric).take(32).collect()
+    let mut rng = thread_rng();
+    std::iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .map(char::from)
+        .take(32)
+        .collect()
 }
 
 /// Gets the user's Biome ID from the session store and saves the user profile information to
