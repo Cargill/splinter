@@ -21,8 +21,10 @@ use rand::{distributions::Alphanumeric, Rng};
 /// Generate a random base62 string of the given length.
 #[cfg(any(feature = "admin-service", feature = "benchmark"))]
 pub fn generate_random_base62_string(len: usize) -> String {
-    rand::thread_rng()
-        .sample_iter(Alphanumeric)
+    let mut rng = rand::thread_rng();
+    std::iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .map(char::from)
         .take(len)
         .collect()
 }
