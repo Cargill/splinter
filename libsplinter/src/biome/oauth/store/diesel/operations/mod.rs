@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides [OAuthUserSessionStore] operations implemented for a diesel backend
+//! Provides [`OAuthUserSessionStore`](crate::biome::oauth::store::OAuthUserSessionStore)
+//! operations implemented for a diesel backend
 
 pub(super) mod add_session;
 pub(super) mod get_session;
