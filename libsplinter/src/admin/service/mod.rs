@@ -38,7 +38,6 @@ use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
 use crate::peer::{PeerManagerConnector, PeerManagerNotification, PeerTokenPair};
-use crate::protocol::{ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION};
 use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
 };
@@ -61,6 +60,9 @@ pub use self::error::AdminServiceError;
 pub use self::error::AdminSubscriberError;
 pub use self::shared::AdminServiceStatus;
 pub use self::subscriber::AdminServiceEventSubscriber;
+
+const ADMIN_SERVICE_PROTOCOL_MIN: u32 = 1;
+pub(crate) const ADMIN_SERVICE_PROTOCOL_VERSION: u32 = 2;
 
 pub trait AdminCommands: Send + Sync {
     fn submit_circuit_change(

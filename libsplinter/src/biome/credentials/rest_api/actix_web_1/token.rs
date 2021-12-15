@@ -26,7 +26,6 @@ use crate::biome::{
     refresh_tokens::store::{RefreshTokenError, RefreshTokenStore},
 };
 use crate::futures::{Future, IntoFuture};
-use crate::protocol;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::secrets::SecretManager;
@@ -35,8 +34,10 @@ use crate::rest_api::{
     sessions::{
         default_validation, ignore_exp_validation, AccessTokenIssuer, ClaimsBuilder, TokenIssuer,
     },
-    ErrorResponse,
+    ErrorResponse, BIOME_PROTOCOL_VERSION,
 };
+
+const BIOME_TOKEN_PROTOCOL_MIN: u32 = 1;
 
 /// Defines a REST endpoint for requesting a new authorization token
 ///
@@ -56,11 +57,9 @@ pub fn make_token_route(
     token_issuer: Arc<AccessTokenIssuer>,
     rest_config: Arc<BiomeCredentialsRestConfig>,
 ) -> Resource {
-    let resource =
-        Resource::build("/biome/token").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::BIOME_LOGIN_PROTOCOL_MIN,
-            protocol::BIOME_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("/biome/token").add_request_guard(
+        ProtocolVersionRangeGuard::new(BIOME_TOKEN_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+    );
     #[cfg(feature = "authorization")]
     {
         resource.add_method(
