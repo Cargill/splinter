@@ -2159,6 +2159,37 @@ components:
         type: integer
         example: 2
 
+    identity_type:
+      name: identity_type
+      description: Enum of possible identity types.
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+          - key
+          - user
+
+    identity:
+      name: identity
+      description: The unique identity string.
+      in: path
+      required: true
+      schema:
+        type: string
+
+    paging:
+      name: paging_query 
+      in: query
+      description: An offset and limit for paginated results.
+      required: true
+      schema:
+        type: object
+        properties:
+          limit:
+            type: integer
+          offset:
+            type: integer
   schemas:
     BiomeNewUser:
       additionalProperties: false
