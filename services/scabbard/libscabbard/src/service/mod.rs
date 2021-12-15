@@ -35,6 +35,7 @@ use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 use splinter::{
     consensus::{Proposal, ProposalUpdate},
+    orchestrator::OrchestratableService,
     service::{
         Service, ServiceDestroyError, ServiceError, ServiceMessageContext, ServiceNetworkRegistry,
         ServiceStartError, ServiceStopError,
@@ -358,6 +359,16 @@ impl Service for Scabbard {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+impl OrchestratableService for Scabbard {
+    fn as_service(&self) -> &dyn Service {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn OrchestratableService> {
+        Box::new(self.clone())
     }
 }
 
