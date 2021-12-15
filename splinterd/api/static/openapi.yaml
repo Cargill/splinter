@@ -2199,6 +2199,54 @@ components:
         username:
           type: string
 
+    Assignment:
+      properties:
+        identity:
+          type: object
+          $ref: '#/components/schemas/Identity'
+        roles:
+          type: array
+          items:
+            type: string
+
+    AssignmentData:
+      properties:
+        data:
+          type: object
+          $ref: '#/components/schemas/Assignment'
+
+    AssignmentUpdate:
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+
+    AssignmentPayload:
+      properties:
+        identity:
+          type: object
+          $ref: '#/components/schemas/IdentityPayload'
+        roles:
+          type: array
+          items:
+            type: string
+
+    IdentityPayload:
+      properties:
+        key:
+          type: string
+        user:
+          type: string
+
+    Identity:
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+        User:
+          type: string
+
     Error:
       additionalProperties: false
       properties:
@@ -2222,6 +2270,19 @@ components:
           example: "Invalid payload"
       required:
         - message
+
+    ErrorResponse:
+      additionalProperties: false
+      properties:
+        code:
+          description: Http response code
+          type: string
+          example: "400"
+        message:
+          description: A message describing the error that occurred.
+          type: string
+          example: "Invalid query"
+
 
     Status:
       additionalProperties: false
