@@ -14,15 +14,15 @@
 
 pub const SCABBARD_PROTOCOL_VERSION: u32 = 1;
 
-#[cfg(all(feature = "rest-api", feature = "rest-api-actix"))]
+#[cfg(all(feature = "rest-api", feature = "rest-api-actix-web-1"))]
 pub(crate) const SCABBARD_SUBSCRIBE_PROTOCOL_MIN: u32 = 1;
-#[cfg(all(feature = "rest-api", feature = "rest-api-actix"))]
+#[cfg(all(feature = "rest-api", feature = "rest-api-actix-web-1"))]
 pub(crate) const SCABBARD_ADD_BATCHES_PROTOCOL_MIN: u32 = 1;
-#[cfg(all(feature = "rest-api", feature = "rest-api-actix"))]
+#[cfg(all(feature = "rest-api", feature = "rest-api-actix-web-1"))]
 pub(crate) const SCABBARD_BATCH_STATUSES_PROTOCOL_MIN: u32 = 1;
-#[cfg(all(feature = "rest-api", feature = "rest-api-actix"))]
+#[cfg(all(feature = "rest-api", feature = "rest-api-actix-web-1"))]
 pub(crate) const SCABBARD_GET_STATE_PROTOCOL_MIN: u32 = 1;
-#[cfg(all(feature = "rest-api", feature = "rest-api-actix"))]
+#[cfg(all(feature = "rest-api", feature = "rest-api-actix-web-1"))]
 pub(crate) const SCABBARD_LIST_STATE_PROTOCOL_MIN: u32 = 1;
-#[cfg(all(feature = "rest-api", feature = "rest-api-actix"))]
+#[cfg(all(feature = "rest-api", feature = "rest-api-actix-web-1"))]
 pub(crate) const SCABBARD_STATE_ROOT_PROTOCOL_MIN: u32 = 1;

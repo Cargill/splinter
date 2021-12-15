@@ -68,7 +68,7 @@ stable = [
   "metrics",
   "postgres",
   "rest-api",
-  "rest-api-actix",
+  "rest-api-actix-web-1",
   "sqlite",
 ]
 
@@ -87,6 +87,6 @@ https = []
 lmdb = []
 postgres = ["diesel/postgres", "diesel_migrations", "log", "sawtooth/postgres", "transact/postgres"]
 rest-api = ["futures", "splinter/rest-api"]
-rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
+rest-api-actix-web-1 = ["actix-web", "rest-api", "splinter/rest-api-actix-web-1"]
 splinter-service = ["log", "sawtooth"]
 sqlite = ["diesel/sqlite", "diesel_migrations", "log", "sawtooth/sqlite", "transact/sqlite"]

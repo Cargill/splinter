@@ -14,16 +14,16 @@
 
 //! REST API endpoints for authorization tools
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 mod actix;
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 mod resources;
 
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 use crate::rest_api::auth::authorization::Permission;
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 const AUTHORIZATION_PERMISSIONS_READ_PERMISSION: Permission = Permission::Check {
     permission_id: "authorization.permissions.read",
     permission_display_name: "Permissions read",
@@ -39,15 +39,15 @@ const AUTHORIZATION_PERMISSIONS_READ_PERMISSION: Permission = Permission::Check 
 ///
 /// * `rest-api-actix`
 pub struct AuthorizationResourceProvider {
-    #[cfg(feature = "rest-api-actix")]
+    #[cfg(feature = "rest-api-actix-web-1")]
     permissions: Vec<Permission>,
 }
 
 impl AuthorizationResourceProvider {
     /// Creates a new `AuthorizationResourceProvider`
-    pub fn new(#[cfg(feature = "rest-api-actix")] permissions: Vec<Permission>) -> Self {
+    pub fn new(#[cfg(feature = "rest-api-actix-web-1")] permissions: Vec<Permission>) -> Self {
         Self {
-            #[cfg(feature = "rest-api-actix")]
+            #[cfg(feature = "rest-api-actix-web-1")]
             permissions,
         }
     }
@@ -67,7 +67,7 @@ impl RestResourceProvider for AuthorizationResourceProvider {
         #[allow(unused_mut)]
         let mut resources = Vec::new();
 
-        #[cfg(feature = "rest-api-actix")]
+        #[cfg(feature = "rest-api-actix-web-1")]
         {
             resources.push(actix::make_permissions_resource(self.permissions.clone()));
         }

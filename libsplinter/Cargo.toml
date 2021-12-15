@@ -102,7 +102,7 @@ stable = [
     "registry",
     "registry-remote",
     "rest-api",
-    "rest-api-actix",
+    "rest-api-actix-web-1",
     "rest-api-cors",
     "sqlite",
     "store",
@@ -177,7 +177,7 @@ rest-api = [
     "jsonwebtoken",
     "percent-encoding",
 ]
-rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
+rest-api-actix-web-1 = ["actix", "actix-http", "actix-web", "actix-web-actors", "rest-api"]
 rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
 service-network = []

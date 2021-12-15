@@ -14,27 +14,27 @@
 
 //! This module defines the REST API endpoints for interacting with the Splinter admin service.
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 mod actix;
 #[cfg(feature = "rest-api-actix-web-3")]
 pub mod actix_web_3;
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 mod error;
 mod resources;
 
 use crate::admin::service::AdminService;
 use crate::admin::store::AdminServiceStore;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
-#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
 use crate::rest_api::auth::authorization::Permission;
 
-#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
 const CIRCUIT_READ_PERMISSION: Permission = Permission::Check {
     permission_id: "circuit.read",
     permission_display_name: "Circuit read",
     permission_description: "Allows the client to read circuit state",
 };
-#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
 const CIRCUIT_WRITE_PERMISSION: Permission = Permission::Check {
     permission_id: "circuit.write",
     permission_display_name: "Circuit write",
@@ -52,15 +52,15 @@ const CIRCUIT_WRITE_PERMISSION: Permission = Permission::Check {
 ///
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///
-/// * `rest-api-actix`
+/// * `rest-api-actix-web-1`
 impl RestResourceProvider for AdminService {
     fn resources(&self) -> Vec<Resource> {
-        // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
+        // Allowing unused_mut because resources must be mutable if feature rest-api-actix-web-1 is
         // enabled
         #[allow(unused_mut)]
         let mut resources = Vec::new();
 
-        #[cfg(feature = "rest-api-actix")]
+        #[cfg(feature = "rest-api-actix-web-1")]
         {
             resources.append(&mut vec![
                 actix::ws_register_type::make_application_handler_registration_route(
@@ -87,7 +87,7 @@ impl RestResourceProvider for AdminService {
 ///
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///
-/// * `rest-api-actix`
+/// * `rest-api-actix-web-1`
 #[derive(Clone)]
 pub struct CircuitResourceProvider {
     store: Box<dyn AdminServiceStore>,
@@ -107,15 +107,15 @@ impl CircuitResourceProvider {
 ///
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///
-/// * `rest-api-actix`
+/// * `rest-api-actix-web-1`
 impl RestResourceProvider for CircuitResourceProvider {
     fn resources(&self) -> Vec<Resource> {
-        // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
+        // Allowing unused_mut because resources must be mutable if feature rest-api-actix-web-1 is
         // enabled
         #[allow(unused_mut)]
         let mut resources = Vec::new();
 
-        #[cfg(feature = "rest-api-actix")]
+        #[cfg(feature = "rest-api-actix-web-1")]
         {
             resources.append(&mut vec![
                 actix::circuits_circuit_id::make_fetch_circuit_resource(self.store.clone()),
