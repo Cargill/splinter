@@ -38,10 +38,6 @@ sabre-sdk = "0.8"
 transact = { version = "0.4", features = ["contract-archive"] }
 scabbard = { path = "../libscabbard", features = ["client-reqwest"], default-features=false }
 
-[dev-dependencies]
-serial_test = "0.3"
-tempfile = "3.1"
-
 [features]
 default = []
 
