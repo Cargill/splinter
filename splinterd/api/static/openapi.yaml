@@ -2642,3 +2642,13 @@ components:
 tags:
   - name: Biome
     description: Routes supporting user management in Splinter applications. Optionally compiled.
+  - name: Proposals
+  - name: Admin Service
+  - name: Circuits
+  - name: Authorization
+  - name: Permissions
+  - name: Roles
+  - name: RBAC
+  - name: Splinter Registry
+  - name: Scabbard
+  - name: OAuth
