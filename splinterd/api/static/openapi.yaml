@@ -446,6 +446,112 @@ paths:
                 code: "500"
                 message: "Internal Server Error"
 
+  /authorization/assignments/{identity_type}/{identity}:
+    parameters:
+      - $ref: "#/components/parameters/auth"
+      - $ref: "#/components/parameters/protocol_version"
+      - $ref: "#/components/parameters/identity_type"
+      - $ref: "#/components/parameters/identity"
+    get:
+      tags:
+        - Authorization
+      summary:
+        Get assignment
+      description: |
+        Gets the assignment associated with the identity.
+
+        This endpoint requires the permission "authorization.rbac.read".
+      responses:
+        200:
+          description: Assignment associated with the identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentData"
+        404:
+          description: Assignment not found for given identity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "404"
+                message: "Assignment not found"
+        500:
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "500"
+                message: "Internal Server Error"
+
+    patch:
+      tags:
+        - Authorization
+      summary:
+        Update assignment.
+      description: |
+        Updates the assignment associated with the identity.
+
+        This endpoint requires the permission "authorization.rbac.write".
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignmentUpdate"
+      responses:
+        200:
+          description: Updated assignment associated with identity
+        404:
+          description: Identity not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "404"
+                message: "Identity not found"
+        409:
+          description: Assignment violates state constraints
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "409"
+                message: "Assignment is invalid"
+        500:
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "500"
+                message: "Internal Server Error"
+
+    delete:
+      tags:
+        - Authorization
+      description: |
+        Removes the assignment associated with the identity and identity_type.
+
+        This endpoint requires the permission "authorization.rbac.write".
+      responses:
+        200:
+          description: Assignment is removed.
+        500:
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "500"
+                message: "Internal Server Error"
+
   /authorization/maintenance:
     get:
       tags:
