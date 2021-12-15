@@ -82,6 +82,14 @@ pub fn create_sqlite_connection_pool(
     Ok(pool)
 }
 
+pub fn create_sqlite_connection_pool_with_write_exclusivity(
+    conn_str: &str,
+) -> Result<Arc<RwLock<Pool<ConnectionManager<SqliteConnection>>>>, InternalError> {
+    Ok(Arc::new(RwLock::new(create_sqlite_connection_pool(
+        conn_str,
+    )?)))
+}
+
 /// A `StoreFactory` backed by a SQLite database.
 pub struct SqliteStoreFactory {
     pool: Arc<RwLock<Pool<ConnectionManager<SqliteConnection>>>>,
@@ -93,6 +101,13 @@ impl SqliteStoreFactory {
         Self {
             pool: Arc::new(RwLock::new(pool)),
         }
+    }
+
+    /// Create a new `SqliteStoreFactory` with shared write-exclusivity.
+    pub fn new_with_write_exclusivity(
+        pool: Arc<RwLock<Pool<ConnectionManager<SqliteConnection>>>>,
+    ) -> Self {
+        Self { pool }
     }
 }
 
