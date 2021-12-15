@@ -252,7 +252,7 @@ jobs:
           fetch-depth: 0
 
       - name: Publish branch to dockerhub
-        run: ./ci/publish-docker 0-6-dev
+        run: ./ci/publish-docker 0.6-dev
         env:
           NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
           VERSION: AUTO_STRICT
