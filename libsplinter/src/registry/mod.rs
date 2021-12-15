@@ -29,7 +29,7 @@ pub mod client;
 #[cfg(feature = "diesel")]
 mod diesel;
 mod error;
-#[cfg(feature = "rest-api")]
+#[cfg(feature = "rest-api-actix-web-1")]
 mod rest_api;
 mod unified;
 mod yaml;

@@ -15,6 +15,6 @@
 //! Defines a basic API to register and authenticate a User using a username and a password.
 //! Not recommended for use in production.
 
-#[cfg(feature = "rest-api")]
+#[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
 pub mod store;

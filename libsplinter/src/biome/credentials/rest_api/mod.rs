@@ -12,26 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "rest-api-actix-web-1")]
 mod actix_web_1;
 mod resources;
 
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
+#[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 
-#[cfg(feature = "rest-api-actix-web-1")]
 pub use actix_web_1::{
     BiomeCredentialsRestConfig, BiomeCredentialsRestConfigBuilder,
     BiomeCredentialsRestResourceProvider, BiomeCredentialsRestResourceProviderBuilder,
 };
 
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
+#[cfg(feature = "authorization")]
 const BIOME_USER_READ_PERMISSION: Permission = Permission::Check {
     permission_id: "biome.user.read",
     permission_display_name: "Biome user read",
     permission_description: "Allows the client to view all Biome users",
 };
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
+#[cfg(feature = "authorization")]
 const BIOME_USER_WRITE_PERMISSION: Permission = Permission::Check {
     permission_id: "biome.user.write",
     permission_display_name: "Biome user write",
