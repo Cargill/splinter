@@ -22,19 +22,19 @@ pub mod service;
 // Admin REST API protocol versions
 pub const ADMIN_PROTOCOL_VERSION: u32 = 2;
 
-#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
+#[cfg(all(feature = "rest-api-actix-web-1", feature = "admin-service"))]
 pub(crate) const ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN: u32 = 1;
-#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
+#[cfg(all(feature = "rest-api-actix-web-1", feature = "admin-service"))]
 pub(crate) const ADMIN_SUBMIT_PROTOCOL_MIN: u32 = 1;
 
-#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
+#[cfg(all(feature = "rest-api-actix-web-1", feature = "admin-service"))]
 pub(crate) const ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 
-#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
+#[cfg(all(feature = "rest-api-actix-web-1", feature = "admin-service"))]
 pub(crate) const ADMIN_LIST_PROPOSALS_PROTOCOL_MIN: u32 = 1;
-#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
+#[cfg(all(feature = "rest-api-actix-web-1", feature = "admin-service"))]
 pub(crate) const ADMIN_LIST_CIRCUITS_MIN: u32 = 1;
-#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
+#[cfg(all(feature = "rest-api-actix-web-1", feature = "admin-service"))]
 pub(crate) const ADMIN_FETCH_CIRCUIT_MIN: u32 = 1;
 
 // Admin Service protocol versions
@@ -51,38 +51,38 @@ pub const AUTHORIZATION_PROTOCOL_VERSION: u32 = 1;
 
 #[cfg(all(
     feature = "authorization-handler-maintenance",
-    feature = "rest-api-actix"
+    feature = "rest-api-actix-web-1"
 ))]
 pub(crate) const AUTHORIZATION_MAINTENANCE_MIN: u32 = 1;
-#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
 pub(crate) const AUTHORIZATION_PERMISSIONS_MIN: u32 = 1;
 
 // Authorization (namely RBAC management)  protocol versions
-#[cfg(all(feature = "authorization-handler-rbac", feature = "rest-api-actix"))]
+#[cfg(all(feature = "authorization-handler-rbac", feature = "rest-api-actix-web-1"))]
 pub(crate) const AUTHORIZATION_RBAC_ROLES_MIN: u32 = 1;
-#[cfg(all(feature = "authorization-handler-rbac", feature = "rest-api-actix"))]
+#[cfg(all(feature = "authorization-handler-rbac", feature = "rest-api-actix-web-1"))]
 pub(crate) const AUTHORIZATION_RBAC_ROLE_MIN: u32 = 1;
-#[cfg(all(feature = "authorization-handler-rbac", feature = "rest-api-actix"))]
+#[cfg(all(feature = "authorization-handler-rbac", feature = "rest-api-actix-web-1"))]
 pub(crate) const AUTHORIZATION_RBAC_ASSIGNMENTS_MIN: u32 = 1;
 
 #[cfg(feature = "oauth")]
 pub const OAUTH_PROTOCOL_VERSION: u32 = 1;
 
-#[cfg(all(feature = "oauth", feature = "rest-api-actix"))]
+#[cfg(all(feature = "oauth", feature = "rest-api-actix-web-1"))]
 pub(crate) const OAUTH_CALLBACK_MIN: u32 = 1;
-#[cfg(all(feature = "oauth", feature = "rest-api-actix"))]
+#[cfg(all(feature = "oauth", feature = "rest-api-actix-web-1"))]
 pub(crate) const OAUTH_LOGIN_MIN: u32 = 1;
-#[cfg(all(feature = "oauth", feature = "rest-api-actix"))]
+#[cfg(all(feature = "oauth", feature = "rest-api-actix-web-1"))]
 pub(crate) const OAUTH_LOGOUT_MIN: u32 = 1;
-#[cfg(all(feature = "oauth", feature = "rest-api-actix"))]
+#[cfg(all(feature = "oauth", feature = "rest-api-actix-web-1"))]
 pub(crate) const OAUTH_USER_READ_PROTOCOL_MIN: u32 = 1;
 
 #[cfg(feature = "registry")]
 pub const REGISTRY_PROTOCOL_VERSION: u32 = 1;
 
-#[cfg(all(feature = "registry", feature = "rest-api-actix"))]
+#[cfg(all(feature = "registry", feature = "rest-api-actix-web-1"))]
 pub(crate) const REGISTRY_LIST_NODES_MIN: u32 = 1;
-#[cfg(all(feature = "registry", feature = "rest-api-actix"))]
+#[cfg(all(feature = "registry", feature = "rest-api-actix-web-1"))]
 pub(crate) const REGISTRY_FETCH_NODE_MIN: u32 = 1;
 
 #[cfg(any(

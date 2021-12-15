@@ -60,8 +60,7 @@ transact = "0.4"
 path = "../services/scabbard/libscabbard"
 features = [
   "lmdb",
-  "rest-api",
-  "rest-api-actix",
+  "rest-api-actix-web-1",
   "splinter-service",
 ]
 
@@ -74,8 +73,7 @@ features = [
   "memory",
   "registry",
   "registry-remote",
-  "rest-api",
-  "rest-api-actix",
+  "rest-api-actix-web-1",
   "store-factory",
   "node-id-store",
 ]

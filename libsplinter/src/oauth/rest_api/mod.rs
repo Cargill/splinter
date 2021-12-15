@@ -14,13 +14,13 @@
 
 //! OAuth REST API endpoints
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 mod actix;
 mod resources;
 
 use crate::biome::OAuthUserSessionStore;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
-#[cfg(all(feature = "authorization", feature = "rest-api-actix",))]
+#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1",))]
 use crate::rest_api::auth::authorization::Permission;
 
 #[cfg(feature = "biome-profile")]
@@ -28,7 +28,7 @@ use crate::biome::UserProfileStore;
 
 use super::OAuthClient;
 
-#[cfg(all(feature = "authorization", feature = "rest-api-actix",))]
+#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1",))]
 const OAUTH_USER_READ_PERMISSION: Permission = Permission::Check {
     permission_id: "oauth.users.read",
     permission_display_name: "OAuth Users read",
@@ -44,7 +44,7 @@ const OAUTH_USER_READ_PERMISSION: Permission = Permission::Check {
 ///
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///
-/// * `rest-api-actix`
+/// * `rest-api-actix-web-1`
 #[derive(Clone)]
 pub struct OAuthResourceProvider {
     client: OAuthClient,
@@ -78,15 +78,15 @@ impl OAuthResourceProvider {
 ///
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///
-/// * `rest-api-actix`
+/// * `rest-api-actix-web-1`
 impl RestResourceProvider for OAuthResourceProvider {
     fn resources(&self) -> Vec<Resource> {
-        // Allowing unused_mut because resources must be mutable if feature `rest-api-actix` is
+        // Allowing unused_mut because resources must be mutable if feature `rest-api-actix-web-1` is
         // enabled
         #[allow(unused_mut)]
         let mut resources = Vec::new();
 
-        #[cfg(feature = "rest-api-actix")]
+        #[cfg(feature = "rest-api-actix-web-1")]
         {
             resources.append(&mut vec![
                 actix::login::make_login_route(self.client.clone()),

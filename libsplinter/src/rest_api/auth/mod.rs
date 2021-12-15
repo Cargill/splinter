@@ -14,7 +14,7 @@
 
 //! Authentication and authorization for Splinter
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 pub(crate) mod actix;
 #[cfg(feature = "authorization")]
 pub mod authorization;

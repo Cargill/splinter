@@ -14,24 +14,24 @@
 
 //! REST API endpoints for the maintenance mode authorization handler
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 mod actix;
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 mod resources;
 
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 use crate::rest_api::auth::authorization::Permission;
 
 use super::MaintenanceModeAuthorizationHandler;
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 const AUTHORIZATION_MAINTENANCE_READ_PERMISSION: Permission = Permission::Check {
     permission_id: "authorization.maintenance.read",
     permission_display_name: "Maintenance mode read",
     permission_description: "Allows the client to check maintenance mode status",
 };
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 const AUTHORIZATION_MAINTENANCE_WRITE_PERMISSION: Permission = Permission::Check {
     permission_id: "authorization.maintenance.write",
     permission_display_name: "Maintenance mode write",
@@ -54,7 +54,7 @@ impl RestResourceProvider for MaintenanceModeAuthorizationHandler {
         #[allow(unused_mut)]
         let mut resources = Vec::new();
 
-        #[cfg(feature = "rest-api-actix")]
+        #[cfg(feature = "rest-api-actix-web-1")]
         {
             resources.push(actix::make_maintenance_resource(self.clone()));
         }
