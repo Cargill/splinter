@@ -62,7 +62,7 @@ optional = true
 
 [dev-dependencies]
 gag = "1"
-serial_test = "0.3"
+serial_test = "0.5"
 tempdir = "0.3"
 
 [features]
