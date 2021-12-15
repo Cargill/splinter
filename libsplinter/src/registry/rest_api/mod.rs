@@ -14,24 +14,23 @@
 
 //! This module defines the REST API endpoints for interacting with registries.
 
-#[cfg(feature = "rest-api-actix-web-1")]
 mod actix;
 mod error;
 mod resources;
 
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
+#[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 
 use super::RwRegistry;
 
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
+#[cfg(feature = "authorization")]
 const REGISTRY_READ_PERMISSION: Permission = Permission::Check {
     permission_id: "registry.read",
     permission_display_name: "Registry read",
     permission_description: "Allows the client to read the registry",
 };
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
+#[cfg(feature = "authorization")]
 const REGISTRY_WRITE_PERMISSION: Permission = Permission::Check {
     permission_id: "registry.write",
     permission_display_name: "Registry write",
@@ -45,25 +44,11 @@ const REGISTRY_WRITE_PERMISSION: Permission = Permission::Check {
 /// * `GET /registry/nodes/{identity}` - Fetch a specific node in the registry
 /// * `PUT /registry/nodes/{identity}` - Replace a node in the registry
 /// * `DELETE /registry/nodes/{identity}` - Delete a node from the registry
-///
-/// These endpoints are only available if the following REST API backend feature is enabled:
-///
-/// * `rest-api-actix`
 impl RestResourceProvider for dyn RwRegistry {
     fn resources(&self) -> Vec<Resource> {
-        // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
-        // enabled
-        #[allow(unused_mut)]
-        let mut resources = Vec::new();
-
-        #[cfg(feature = "rest-api-actix-web-1")]
-        {
-            resources.append(&mut vec![
-                actix::nodes_identity::make_nodes_identity_resource(self.clone_box()),
-                actix::nodes::make_nodes_resource(self.clone_box()),
-            ]);
-        }
-
-        resources
+        vec![
+            actix::nodes_identity::make_nodes_identity_resource(self.clone_box()),
+            actix::nodes::make_nodes_resource(self.clone_box()),
+        ]
     }
 }

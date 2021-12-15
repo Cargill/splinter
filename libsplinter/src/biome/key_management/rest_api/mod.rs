@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "rest-api-actix-web-1")]
 mod actix_web_1;
 mod resources;
 
-#[cfg(feature = "rest-api-actix-web-1")]
 pub use actix_web_1::BiomeKeyManagementRestResourceProvider;
