@@ -23,7 +23,7 @@ use crate::error::{
     ConstraintViolationError, InternalError, InvalidArgumentError, InvalidStateError,
 };
 
-/// Errors that may occur during [OAuthUserSessionStore] operations.
+/// Errors that may occur during [`OAuthUserSessionStore`](super::OAuthUserSessionStore) operations.
 #[derive(Debug)]
 pub enum OAuthUserSessionStoreError {
     ConstraintViolation(ConstraintViolationError),
