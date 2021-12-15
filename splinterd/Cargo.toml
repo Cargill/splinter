@@ -35,7 +35,7 @@ path = "src/lib.rs"
 [dependencies]
 bytes = "0.4"
 clap = "2.32"
-crossbeam-channel = "0.3"
+crossbeam-channel = "0.5"
 ctrlc = "3.0"
 cylinder = { version = "0.2.2", features = ["key-load"] }
 diesel = { version = "1.0", features = ["postgres"], optional = true }
@@ -44,7 +44,7 @@ log = "0.4"
 log4rs = { version = "1", features = ["threshold_filter"] }
 openssl = { version = "0.10", optional = true }
 protobuf = "2.23"
-rand = "0.7"
+rand = "0.8"
 sawtooth = { version = "0.7", default-features = false, optional = true }
 serde = "1.0.80"
 serde_derive = "1.0.80"
