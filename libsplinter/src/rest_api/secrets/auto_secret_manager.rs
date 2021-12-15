@@ -43,8 +43,10 @@ impl SecretManager for AutoSecretManager {
 }
 
 fn generate_random_secret() -> String {
-    rand::thread_rng()
-        .sample_iter(Alphanumeric)
+    let mut rng = rand::thread_rng();
+    std::iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .map(char::from)
         .take(SECRET_LENGTH)
         .collect()
 }
