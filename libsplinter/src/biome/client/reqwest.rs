@@ -19,7 +19,7 @@ use std::convert::From;
 use reqwest::{blocking::Client, StatusCode};
 
 use crate::error::InternalError;
-use crate::protocol::BIOME_PROTOCOL_VERSION;
+use crate::rest_api::BIOME_PROTOCOL_VERSION;
 
 use super::{Authorization, BiomeClient, Credentials, Key, NewKey, Profile, UpdateUser};
 

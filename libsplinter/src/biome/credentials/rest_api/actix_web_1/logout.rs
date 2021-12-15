@@ -21,15 +21,16 @@ use crate::biome::credentials::rest_api::{
 };
 use crate::biome::refresh_tokens::store::{RefreshTokenError, RefreshTokenStore};
 use crate::futures::IntoFuture;
-use crate::protocol;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
     secrets::SecretManager,
     sessions::default_validation,
-    ErrorResponse,
+    ErrorResponse, BIOME_PROTOCOL_VERSION,
 };
+
+const BIOME_LOGOUT_PROTOCOL_MIN: u32 = 1;
 
 /// Defines a REST endpoint to remove any refresh tokens belonging to the user.
 ///
@@ -38,11 +39,9 @@ pub fn make_logout_route(
     secret_manager: Arc<dyn SecretManager>,
     rest_config: Arc<BiomeCredentialsRestConfig>,
 ) -> Resource {
-    let resource =
-        Resource::build("/biome/logout").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::BIOME_LOGIN_PROTOCOL_MIN,
-            protocol::BIOME_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("/biome/logout").add_request_guard(
+        ProtocolVersionRangeGuard::new(BIOME_LOGOUT_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+    );
     #[cfg(feature = "authorization")]
     {
         resource.add_method(

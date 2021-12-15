@@ -14,11 +14,12 @@
 
 use actix_web::{client::Client, http::StatusCode, web, Error, HttpResponse};
 use serde::{Deserialize, Serialize};
-use splinter::protocol;
 
 use crate::rest_api::GameroomdData;
 
 use super::{ErrorResponse, SuccessResponse};
+
+const BIOME_PROTOCOL_VERSION: u32 = 2;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -86,7 +87,7 @@ pub async fn login(
         .post(format!("{}/biome/login", &gameroomd_data.splinterd_url))
         .header(
             "SplinterProtocolVersion",
-            protocol::BIOME_PROTOCOL_VERSION.to_string(),
+            BIOME_PROTOCOL_VERSION.to_string(),
         )
         .send_json(&UsernamePassword::from(auth_data.into_inner()))
         .await?;
@@ -126,7 +127,7 @@ pub async fn login(
         .get(format!("{}/biome/keys", &gameroomd_data.splinterd_url))
         .header(
             "SplinterProtocolVersion",
-            protocol::BIOME_PROTOCOL_VERSION.to_string(),
+            BIOME_PROTOCOL_VERSION.to_string(),
         )
         .header("Authorization", authorization)
         .send()
@@ -196,7 +197,7 @@ pub async fn register(
         .post(format!("{}/biome/register", &gameroomd_data.splinterd_url))
         .header(
             "SplinterProtocolVersion",
-            protocol::BIOME_PROTOCOL_VERSION.to_string(),
+            BIOME_PROTOCOL_VERSION.to_string(),
         )
         .send_json(&username_password)
         .await?;
@@ -225,7 +226,7 @@ pub async fn register(
         .post(format!("{}/biome/login", &gameroomd_data.splinterd_url))
         .header(
             "SplinterProtocolVersion",
-            protocol::BIOME_PROTOCOL_VERSION.to_string(),
+            BIOME_PROTOCOL_VERSION.to_string(),
         )
         .send_json(&username_password)
         .await?;
@@ -256,7 +257,7 @@ pub async fn register(
         .post(format!("{}/biome/keys", &gameroomd_data.splinterd_url))
         .header(
             "SplinterProtocolVersion",
-            protocol::BIOME_PROTOCOL_VERSION.to_string(),
+            BIOME_PROTOCOL_VERSION.to_string(),
         )
         .header("Authorization", authorization)
         .send_json(&NewKey {

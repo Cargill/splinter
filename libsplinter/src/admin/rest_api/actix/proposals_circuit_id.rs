@@ -24,20 +24,18 @@ use crate::admin::rest_api::error::ProposalFetchError;
 #[cfg(feature = "authorization")]
 use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
 use crate::admin::service::proposal_store::ProposalStore;
-use crate::protocol;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse,
+    ErrorResponse, ADMIN_PROTOCOL_VERSION,
 };
 
 use super::super::resources;
 
+const ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN: u32 = 1;
+
 pub fn make_fetch_proposal_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
     let resource = Resource::build("admin/proposals/{circuit_id}").add_request_guard(
-        ProtocolVersionRangeGuard::new(
-            protocol::ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN,
-            protocol::ADMIN_PROTOCOL_VERSION,
-        ),
+        ProtocolVersionRangeGuard::new(ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN, ADMIN_PROTOCOL_VERSION),
     );
 
     #[cfg(feature = "authorization")]
@@ -71,7 +69,7 @@ fn fetch_proposal<PS: ProposalStore + 'static>(
                 "Unable to get SplinterProtocolVersion".to_string(),
             )),
         },
-        None => Ok(format!("{}", protocol::ADMIN_PROTOCOL_VERSION)),
+        None => Ok(format!("{}", ADMIN_PROTOCOL_VERSION)),
     };
 
     Box::new(
@@ -163,7 +161,7 @@ mod tests {
         .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::OK);
@@ -233,7 +231,7 @@ mod tests {
         .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);

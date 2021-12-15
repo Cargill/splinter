@@ -34,24 +34,23 @@ use crate::oauth::{
     rest_api::resources::callback::{generate_redirect_query, CallbackQuery},
     OAuthClient,
 };
-use crate::protocol;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse,
+    ErrorResponse, OAUTH_PROTOCOL_VERSION,
 };
+
+const OAUTH_CALLBACK_MIN: u32 = 1;
 
 pub fn make_callback_route(
     client: OAuthClient,
     oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
     #[cfg(feature = "biome-profile")] user_profile_store: Box<dyn UserProfileStore>,
 ) -> Resource {
-    let resource =
-        Resource::build("/oauth/callback").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::OAUTH_CALLBACK_MIN,
-            protocol::OAUTH_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("/oauth/callback").add_request_guard(
+        ProtocolVersionRangeGuard::new(OAUTH_CALLBACK_MIN, OAUTH_PROTOCOL_VERSION),
+    );
     #[cfg(feature = "authorization")]
     {
         resource.add_method(
@@ -437,7 +436,7 @@ mod tests {
             .build()
             .expect("Failed to build client")
             .get(url)
-            .header("SplinterProtocolVersion", protocol::OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -541,7 +540,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -621,7 +620,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -703,7 +702,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 

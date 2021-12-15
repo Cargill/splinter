@@ -17,7 +17,7 @@
 use reqwest::{blocking::Client, header, StatusCode};
 
 use crate::error::InternalError;
-use crate::protocol::ADMIN_PROTOCOL_VERSION;
+use crate::rest_api::ADMIN_PROTOCOL_VERSION;
 
 use super::{AdminServiceClient, CircuitListSlice, CircuitSlice, ProposalListSlice, ProposalSlice};
 
