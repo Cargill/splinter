@@ -16,10 +16,11 @@ mod models;
 mod operations;
 mod schema;
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use diesel::r2d2::{ConnectionManager, Pool};
-use splinter::error::InternalError;
+
+use crate::store::pool::ConnectionPool;
 
 use super::{CommitHashStore, CommitHashStoreError};
 
@@ -30,7 +31,7 @@ use operations::CommitHashStoreOperations;
 /// Database backed [CommitHashStore] implementation.
 #[derive(Clone)]
 pub struct DieselCommitHashStore<Conn: diesel::Connection + 'static> {
-    pool: Pool<ConnectionManager<Conn>>,
+    pool: ConnectionPool<Conn>,
     circuit_id: Arc<str>,
     service_id: Arc<str>,
 }
@@ -45,7 +46,29 @@ impl<C: diesel::Connection> DieselCommitHashStore<C> {
     /// * `service_id` - The service associated with the store
     pub fn new(pool: Pool<ConnectionManager<C>>, circuit_id: &str, service_id: &str) -> Self {
         Self {
-            pool,
+            pool: ConnectionPool::Normal(pool),
+            circuit_id: circuit_id.into(),
+            service_id: service_id.into(),
+        }
+    }
+
+    /// Create a new `DieselCommitHashStore` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    /// * `pool`: read-write lock-guarded connection pool for the database
+    /// * `circuit_id` - The circuit associated with the store
+    /// * `service_id` - The service associated with the store
+    pub fn new_with_write_exclusivity(
+        pool: Arc<RwLock<Pool<ConnectionManager<C>>>>,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> Self {
+        Self {
+            pool: ConnectionPool::WriteExclusive(pool),
             circuit_id: circuit_id.into(),
             service_id: service_id.into(),
         }
@@ -55,23 +78,20 @@ impl<C: diesel::Connection> DieselCommitHashStore<C> {
 #[cfg(feature = "postgres")]
 impl CommitHashStore for DieselCommitHashStore<diesel::pg::PgConnection> {
     fn get_current_commit_hash(&self) -> Result<Option<String>, CommitHashStoreError> {
-        CommitHashStoreOperations::new(
-            &*self
-                .pool
-                .get()
-                .map_err(|e| InternalError::from_source(Box::new(e)))?,
-        )
-        .get_current_commit_hash(&*self.circuit_id, &*self.service_id)
+        self.pool.execute_read(|conn| {
+            CommitHashStoreOperations::new(conn)
+                .get_current_commit_hash(&*self.circuit_id, &*self.service_id)
+        })
     }
 
     fn set_current_commit_hash(&self, commit_hash: &str) -> Result<(), CommitHashStoreError> {
-        CommitHashStoreOperations::new(
-            &*self
-                .pool
-                .get()
-                .map_err(|e| InternalError::from_source(Box::new(e)))?,
-        )
-        .set_current_commit_hash(&*self.circuit_id, &*self.service_id, commit_hash)
+        self.pool.execute_write(|conn| {
+            CommitHashStoreOperations::new(conn).set_current_commit_hash(
+                &*self.circuit_id,
+                &*self.service_id,
+                commit_hash,
+            )
+        })
     }
 
     fn clone_boxed(&self) -> Box<dyn CommitHashStore> {
@@ -86,23 +106,20 @@ impl CommitHashStore for DieselCommitHashStore<diesel::pg::PgConnection> {
 #[cfg(feature = "sqlite")]
 impl CommitHashStore for DieselCommitHashStore<diesel::sqlite::SqliteConnection> {
     fn get_current_commit_hash(&self) -> Result<Option<String>, CommitHashStoreError> {
-        CommitHashStoreOperations::new(
-            &*self
-                .pool
-                .get()
-                .map_err(|e| InternalError::from_source(Box::new(e)))?,
-        )
-        .get_current_commit_hash(&*self.circuit_id, &*self.service_id)
+        self.pool.execute_read(|conn| {
+            CommitHashStoreOperations::new(conn)
+                .get_current_commit_hash(&*self.circuit_id, &*self.service_id)
+        })
     }
 
     fn set_current_commit_hash(&self, commit_hash: &str) -> Result<(), CommitHashStoreError> {
-        CommitHashStoreOperations::new(
-            &*self
-                .pool
-                .get()
-                .map_err(|e| InternalError::from_source(Box::new(e)))?,
-        )
-        .set_current_commit_hash(&*self.circuit_id, &*self.service_id, commit_hash)
+        self.pool.execute_write(|conn| {
+            CommitHashStoreOperations::new(conn).set_current_commit_hash(
+                &*self.circuit_id,
+                &*self.service_id,
+                commit_hash,
+            )
+        })
     }
 
     fn clone_boxed(&self) -> Box<dyn CommitHashStore> {

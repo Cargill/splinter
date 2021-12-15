@@ -17,6 +17,8 @@
 #[cfg(feature = "diesel")]
 pub mod diesel;
 mod error;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+pub(crate) mod pool;
 pub mod transact;
 
 pub use error::CommitHashStoreError;
