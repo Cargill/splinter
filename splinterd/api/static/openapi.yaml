@@ -367,6 +367,85 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /authorization/assignments:
+    parameters:
+      - $ref: "#/components/parameters/auth"
+      - $ref: "#/components/parameters/protocol_version"
+    get:
+      tags:
+        - Authorization
+      summary: Get all assignments
+      description: |
+        Gets all assignments.
+
+        This endpoint requires the permission "authorization.rbac.read".
+
+      parameters:
+        - $ref: "#/components/parameters/paging"
+      responses:
+        200:
+          description: Get list of all assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  $ref: "#/components/schemas/Assignment"
+        400:
+          description: Malformed query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: "400"
+                message: "Malformed Query"
+        500:
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: "500"
+                message: "Internal Server Error"
+    post:
+      tags:
+        - Authorization
+      summary:
+        Add a new assignment
+      description:
+        Adds a new assignment
+
+        This endpoint requires the permission "authorization.rbac.write".
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentPayload'
+      responses:
+        200:
+          description: The assignment has been added
+        400:
+          description: Invalid assignment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: "400"
+                message: "Invalid assignment payload"
+        500:
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: "500"
+                message: "Internal Server Error"
+
   /authorization/maintenance:
     get:
       tags:
