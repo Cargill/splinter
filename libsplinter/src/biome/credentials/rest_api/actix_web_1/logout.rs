@@ -27,7 +27,7 @@ use crate::rest_api::{
     actix_web_1::{HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
     secrets::SecretManager,
     sessions::default_validation,
-    ErrorResponse, BIOME_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 const BIOME_LOGOUT_PROTOCOL_MIN: u32 = 1;
@@ -40,7 +40,7 @@ pub fn make_logout_route(
     rest_config: Arc<BiomeCredentialsRestConfig>,
 ) -> Resource {
     let resource = Resource::build("/biome/logout").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_LOGOUT_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_LOGOUT_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {

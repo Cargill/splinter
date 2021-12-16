@@ -26,7 +26,7 @@ use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{into_bytes, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
     auth::identity::Identity,
-    ErrorResponse, BIOME_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 const BIOME_KEYS_PROTOCOL_MIN: u32 = 1;
@@ -35,7 +35,7 @@ const BIOME_REPLACE_KEYS_PROTOCOL_MIN: u32 = 2;
 /// Defines a REST endpoint for managing keys including inserting, listing and updating keys
 pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
     let resource = Resource::build("/biome/keys").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_KEYS_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_KEYS_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {
@@ -48,7 +48,7 @@ pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
             .add_request_guard(
                 ProtocolVersionRangeGuard::new(
                     BIOME_REPLACE_KEYS_PROTOCOL_MIN,
-                    BIOME_PROTOCOL_VERSION,
+                    SPLINTER_PROTOCOL_VERSION,
                 )
                 .with_method(Method::Put),
             )
@@ -75,7 +75,7 @@ pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
             .add_request_guard(
                 ProtocolVersionRangeGuard::new(
                     BIOME_REPLACE_KEYS_PROTOCOL_MIN,
-                    BIOME_PROTOCOL_VERSION,
+                    SPLINTER_PROTOCOL_VERSION,
                 )
                 .with_method(Method::Put),
             )
@@ -305,7 +305,7 @@ fn handle_patch(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
 /// Defines a REST endpoint for managing keys including fetching and deleting a user's key
 pub fn make_key_management_route_with_public_key(key_store: Arc<dyn KeyStore>) -> Resource {
     let resource = Resource::build("/biome/keys/{public_key}").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_KEYS_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_KEYS_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {

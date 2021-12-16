@@ -17,7 +17,7 @@
 use reqwest::{blocking::Client, StatusCode};
 
 use crate::error::InternalError;
-use crate::rest_api::REGISTRY_PROTOCOL_VERSION;
+use crate::rest_api::SPLINTER_PROTOCOL_VERSION;
 
 use super::{RegistryClient, RegistryNode, RegistryNodeListSlice};
 
@@ -45,7 +45,7 @@ impl RegistryClient for ReqwestRegistryClient {
         let request = Client::new()
             .post(&format!("{}/registry/nodes", self.url))
             .json(&node)
-            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth);
 
         request
@@ -82,7 +82,7 @@ impl RegistryClient for ReqwestRegistryClient {
     fn get_node(&self, identity: &str) -> Result<Option<RegistryNode>, InternalError> {
         let request = Client::new()
             .get(&format!("{}/registry/nodes/{}", self.url, &identity))
-            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth);
 
         request
@@ -132,7 +132,7 @@ impl RegistryClient for ReqwestRegistryClient {
 
         let request = Client::new()
             .get(&url)
-            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth);
 
         request.send()
@@ -179,7 +179,7 @@ impl RegistryClient for ReqwestRegistryClient {
         let request = Client::new()
             .put(&format!("{}/registry/nodes/{}", self.url, node.identity))
             .json(&node)
-            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth);
 
         request
@@ -216,7 +216,7 @@ impl RegistryClient for ReqwestRegistryClient {
     fn delete_node(&self, identity: &str) -> Result<(), InternalError> {
         let request = Client::new()
             .delete(&format!("{}/registry/nodes/{}", self.url, identity))
-            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth);
 
         request

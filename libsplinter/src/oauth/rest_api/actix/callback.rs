@@ -38,7 +38,7 @@ use crate::oauth::{
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse, OAUTH_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 const OAUTH_CALLBACK_MIN: u32 = 1;
@@ -49,7 +49,7 @@ pub fn make_callback_route(
     #[cfg(feature = "biome-profile")] user_profile_store: Box<dyn UserProfileStore>,
 ) -> Resource {
     let resource = Resource::build("/oauth/callback").add_request_guard(
-        ProtocolVersionRangeGuard::new(OAUTH_CALLBACK_MIN, OAUTH_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(OAUTH_CALLBACK_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {
@@ -436,7 +436,7 @@ mod tests {
             .build()
             .expect("Failed to build client")
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -540,7 +540,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -620,7 +620,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -702,7 +702,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 

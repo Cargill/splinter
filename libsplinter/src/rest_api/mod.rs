@@ -98,20 +98,16 @@ pub use actix_web_1::{
     RestApiShutdownHandle, RestResourceProvider,
 };
 
-#[cfg(feature = "admin-service")]
-pub(crate) const ADMIN_PROTOCOL_VERSION: u32 = 2;
-#[cfg(feature = "authorization")]
-pub(crate) const AUTHORIZATION_PROTOCOL_VERSION: u32 = 1;
-#[cfg(feature = "oauth")]
-pub(crate) const OAUTH_PROTOCOL_VERSION: u32 = 1;
-#[cfg(feature = "registry")]
-pub(crate) const REGISTRY_PROTOCOL_VERSION: u32 = 1;
 #[cfg(any(
+    feature = "admin-service",
+    feature = "authorization",
     feature = "biome-credentials",
     feature = "biome-key-management",
     feature = "biome-notifications",
+    feature = "oauth",
+    feature = "registry",
 ))]
-pub(crate) const BIOME_PROTOCOL_VERSION: u32 = 2;
+pub(crate) const SPLINTER_PROTOCOL_VERSION: u32 = 2;
 
 const QUERY_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b' ')

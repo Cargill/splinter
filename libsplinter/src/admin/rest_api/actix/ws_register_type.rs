@@ -34,7 +34,7 @@ use crate::rest_api::{
         new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request,
         Resource,
     },
-    ErrorResponse, ADMIN_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 const ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN: u32 = 1;
@@ -45,7 +45,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
     let resource = Resource::build("/ws/admin/register/{type}").add_request_guard(
         ProtocolVersionRangeGuard::new(
             ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN,
-            ADMIN_PROTOCOL_VERSION,
+            SPLINTER_PROTOCOL_VERSION,
         ),
     );
 
@@ -95,7 +95,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                             )
                         }
                     },
-                    None => ADMIN_PROTOCOL_VERSION,
+                    None => SPLINTER_PROTOCOL_VERSION,
                 };
 
                 debug!(
@@ -226,7 +226,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                         )
                     }
                 },
-                None => ADMIN_PROTOCOL_VERSION,
+                None => SPLINTER_PROTOCOL_VERSION,
             };
 
             debug!(

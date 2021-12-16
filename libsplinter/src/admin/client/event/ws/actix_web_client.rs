@@ -29,7 +29,7 @@ use crate::events::{
     Igniter, ParseBytes, ParseError, Reactor, WebSocketClient, WebSocketError, WsResponse,
 };
 use crate::hex;
-use crate::rest_api::ADMIN_PROTOCOL_VERSION;
+use crate::rest_api::SPLINTER_PROTOCOL_VERSION;
 use crate::threading::lifecycle::ShutdownHandle;
 
 enum WsRuntime {
@@ -188,7 +188,7 @@ impl RunnableAwcAdminServiceEventClient {
 
         ws_client.header(
             "SplinterProtocolVersion",
-            ADMIN_PROTOCOL_VERSION.to_string(),
+            SPLINTER_PROTOCOL_VERSION.to_string(),
         );
 
         ws_client.set_reconnect(true);
