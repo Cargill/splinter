@@ -2173,7 +2173,7 @@ components:
         code:
           description: Error code
           type: string
-          example: 400
+          example: "400"
         message:
           description: A message describing the error that occurred
           type: string
