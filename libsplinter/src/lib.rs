@@ -71,7 +71,7 @@ pub mod admin;
 mod base62;
 #[cfg(feature = "biome")]
 pub mod biome;
-pub mod channel;
+pub(crate) mod channel;
 pub mod circuit;
 mod collections;
 pub mod consensus;
