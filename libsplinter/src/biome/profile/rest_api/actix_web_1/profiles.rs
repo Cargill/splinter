@@ -20,7 +20,7 @@ use crate::biome::profile::rest_api::BIOME_PROFILE_READ_PERMISSION;
 use crate::biome::profile::store::UserProfileStore;
 use crate::futures::IntoFuture;
 use crate::rest_api::{
-    ErrorResponse, Method, ProtocolVersionRangeGuard, Resource, BIOME_PROTOCOL_VERSION,
+    ErrorResponse, Method, ProtocolVersionRangeGuard, Resource, SPLINTER_PROTOCOL_VERSION,
 };
 
 const BIOME_LIST_PROFILES_PROTOCOL_MIN: u32 = 1;
@@ -28,7 +28,7 @@ const BIOME_LIST_PROFILES_PROTOCOL_MIN: u32 = 1;
 /// Defines a REST endpoint to list profiles from the database
 pub fn make_profiles_list_route(profile_store: Arc<dyn UserProfileStore>) -> Resource {
     let resource = Resource::build("/biome/profiles").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_LIST_PROFILES_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_LIST_PROFILES_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {

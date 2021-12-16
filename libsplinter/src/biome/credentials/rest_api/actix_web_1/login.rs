@@ -21,7 +21,7 @@ use crate::futures::{Future, IntoFuture};
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse, BIOME_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 use crate::biome::credentials::rest_api::actix_web_1::BiomeCredentialsRestConfig;
@@ -45,7 +45,7 @@ pub fn make_login_route(
     token_issuer: Arc<AccessTokenIssuer>,
 ) -> Resource {
     let resource = Resource::build("/biome/login").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_LOGIN_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_LOGIN_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {

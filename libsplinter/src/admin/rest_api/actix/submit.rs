@@ -21,7 +21,7 @@ use crate::admin::service::{AdminCommands, AdminServiceError};
 use crate::protos::admin::CircuitManagementPayload;
 use crate::rest_api::{
     actix_web_1::{into_protobuf, Method, ProtocolVersionRangeGuard, Resource},
-    ADMIN_PROTOCOL_VERSION,
+    SPLINTER_PROTOCOL_VERSION,
 };
 use crate::service::ServiceError;
 
@@ -29,7 +29,7 @@ const ADMIN_SUBMIT_PROTOCOL_MIN: u32 = 1;
 
 pub fn make_submit_route<A: AdminCommands + Clone + 'static>(admin_commands: A) -> Resource {
     let resource = Resource::build("/admin/submit").add_request_guard(
-        ProtocolVersionRangeGuard::new(ADMIN_SUBMIT_PROTOCOL_MIN, ADMIN_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(ADMIN_SUBMIT_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
 
     #[cfg(feature = "authorization")]

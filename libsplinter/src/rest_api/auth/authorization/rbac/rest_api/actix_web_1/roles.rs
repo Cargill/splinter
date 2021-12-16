@@ -34,7 +34,7 @@ use crate::rest_api::{
         store::{Role, RoleBasedAuthorizationStore},
     },
     paging::get_response_paging_info,
-    ErrorResponse, AUTHORIZATION_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 use super::error::SendableRoleBasedAuthorizationStoreError;
@@ -50,7 +50,7 @@ pub fn make_roles_resource(
     Resource::build("/authorization/roles")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             AUTHORIZATION_RBAC_ROLES_MIN,
-            AUTHORIZATION_PROTOCOL_VERSION,
+            SPLINTER_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, RBAC_READ_PERMISSION, move |r, _| {
             list_roles(r, web::Data::new(list_store.clone()))
@@ -69,7 +69,7 @@ pub fn make_role_resource(
     Resource::build("/authorization/roles/{role_id}")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             AUTHORIZATION_RBAC_ROLE_MIN,
-            AUTHORIZATION_PROTOCOL_VERSION,
+            SPLINTER_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, RBAC_READ_PERMISSION, move |r, _| {
             get_role(r, web::Data::new(get_store.clone()))
@@ -409,7 +409,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -488,7 +488,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -534,7 +534,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -578,7 +578,7 @@ mod tests {
 
         let resp = Client::new()
             .post(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .json(&json!({
                 "role_id": "new_test_role",
                 "display_name": "New Test Display Name",
@@ -592,7 +592,7 @@ mod tests {
         // verify the role is in the list
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -648,7 +648,7 @@ mod tests {
 
         let resp = Client::new()
             .post(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .json(&json!({
                 "role_id": "test-role-1",
                 "display_name": "Doesn't matter",
@@ -704,7 +704,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -767,7 +767,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -820,7 +820,7 @@ mod tests {
         // update the display name
         let resp = Client::new()
             .patch(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .json(&json!({
                 "display_name": "New Test Display Name",
             }))
@@ -831,7 +831,7 @@ mod tests {
         // verify the change
         let resp = Client::new()
             .get(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -851,7 +851,7 @@ mod tests {
         // update the permissions
         let resp = Client::new()
             .patch(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .json(&json!({
                 "permissions": ["new-perm-1", "new-perm-2"],
             }))
@@ -862,7 +862,7 @@ mod tests {
         // verify the change
         let resp = Client::new()
             .get(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -882,7 +882,7 @@ mod tests {
         // update both display name and permissions
         let resp = Client::new()
             .patch(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .json(&json!({
                 "display_name": "Better Display Name",
                 "permissions": ["updated-perm-1", "updated-perm-2"],
@@ -894,7 +894,7 @@ mod tests {
         // verify the change
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -932,7 +932,7 @@ mod tests {
 
         let resp = Client::new()
             .patch(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .json(&json!({
                 "display_name": "New Test Display Name",
             }))
@@ -973,7 +973,7 @@ mod tests {
 
         let resp = Client::new()
             .patch(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .json(&json!({
                 "permissions": [],
             }))
@@ -1014,7 +1014,7 @@ mod tests {
 
         let resp = Client::new()
             .delete(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -1027,7 +1027,7 @@ mod tests {
         // verify that it is idempotent
         let resp = Client::new()
             .delete(url)
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);

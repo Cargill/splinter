@@ -34,7 +34,7 @@ use crate::rest_api::{
     sessions::{
         default_validation, ignore_exp_validation, AccessTokenIssuer, ClaimsBuilder, TokenIssuer,
     },
-    ErrorResponse, BIOME_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 const BIOME_TOKEN_PROTOCOL_MIN: u32 = 1;
@@ -58,7 +58,7 @@ pub fn make_token_route(
     rest_config: Arc<BiomeCredentialsRestConfig>,
 ) -> Resource {
     let resource = Resource::build("/biome/token").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_TOKEN_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_TOKEN_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {

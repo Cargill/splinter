@@ -26,7 +26,7 @@ use crate::futures::{Future, IntoFuture};
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse, BIOME_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 /// This is the UUID namespace for Biome user IDs generated for users that register with Biome
@@ -49,7 +49,7 @@ pub fn make_register_route(
     rest_config: Arc<BiomeCredentialsRestConfig>,
 ) -> Resource {
     let resource = Resource::build("/biome/register").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_REGISTER_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_REGISTER_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {
