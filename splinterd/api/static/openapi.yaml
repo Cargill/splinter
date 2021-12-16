@@ -389,8 +389,8 @@ paths:
                   message:
                     type: string
                     enum:
-                      - true
-                      - false
+                      - "true"
+                      - "false"
         '401':
           description: The client is unauthorized
     post:
