@@ -14,7 +14,7 @@
 
 mod builder;
 mod error;
-#[cfg(feature = "rest-api")]
+#[cfg(feature = "rest-api-actix-web-1")]
 mod rest_api;
 mod runnable;
 

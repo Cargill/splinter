@@ -144,7 +144,7 @@ admin-service-event-client-actix-web-client = [
 admin-service-event-subscriber-glob = ["admin-service"]
 authorization-handler-allow-keys = ["authorization"]
 authorization-handler-maintenance = ["authorization"]
-authorization = ["rest-api"]
+authorization = ["rest-api-actix-web-1"]
 authorization-handler-rbac = ["authorization"]
 biome = []
 biome-client = ["biome"]
@@ -167,16 +167,15 @@ registry = []
 registry-client = ["registry"]
 registry-client-reqwest = ["registry-client", "reqwest"]
 registry-remote = ["reqwest", "registry"]
-rest-api = [
+rest-api = ["jsonwebtoken", "percent-encoding"]
+rest-api-actix-web-1 = [
     "actix",
     "actix-http",
     "actix-web",
     "actix-web-actors",
     "futures",
-    "jsonwebtoken",
-    "percent-encoding",
+    "rest-api",
 ]
-rest-api-actix-web-1 = ["actix", "actix-http", "actix-web", "actix-web-actors", "rest-api"]
 rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
 service-network = []

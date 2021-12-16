@@ -29,9 +29,11 @@ use super::Method;
 
 #[cfg(feature = "authorization")]
 use authorization::{AuthorizationHandler, AuthorizationHandlerResult, Permission, PermissionMap};
+#[cfg(feature = "rest-api-actix-web-1")]
 use identity::{Identity, IdentityProvider};
 
 /// The possible outcomes of attempting to authorize a client
+#[cfg(feature = "rest-api-actix-web-1")]
 enum AuthorizationResult {
     /// The client was authorized to the given identity based on the authorization header
     Authorized(Identity),
@@ -60,6 +62,7 @@ enum AuthorizationResult {
 /// * `identity_providers` - The identity providers that will be used to check the client's identity
 /// * `authorization_handlers` - The authorization handlers that will be used to check the client's
 ///   permissions
+#[cfg(feature = "rest-api-actix-web-1")]
 fn authorize(
     #[cfg(feature = "authorization")] method: &Method,
     #[cfg(any(
@@ -145,6 +148,7 @@ fn authorize(
     }
 }
 
+#[cfg(feature = "rest-api-actix-web-1")]
 fn get_identity(
     auth_header: Option<&str>,
     identity_providers: &[Box<dyn IdentityProvider>],
