@@ -14,23 +14,23 @@
 
 //! Role-based Authorization REST API resources.
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 mod actix_web_1;
 mod resources;
 
 use crate::rest_api::auth::Permission;
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 pub use actix_web_1::RoleBasedAuthorizationResourceProvider;
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 const RBAC_READ_PERMISSION: Permission = Permission::Check {
     permission_id: "authorization.rbac.read",
     permission_display_name: "RBAC read",
     permission_description: "Allows the client to read roles, identities, and role assignments",
 };
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 const RBAC_WRITE_PERMISSION: Permission = Permission::Check {
     permission_id: "authorization.rbac.write",
     permission_display_name: "RBAC write",

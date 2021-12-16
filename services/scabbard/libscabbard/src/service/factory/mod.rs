@@ -44,7 +44,7 @@ use transact::database::Database;
 use transact::state::merkle::sql;
 
 use crate::hex::parse_hex;
-#[cfg(feature = "rest-api-actix")]
+#[cfg(feature = "rest-api-actix-web-1")]
 use crate::service::rest_api::actix;
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 use crate::service::ScabbardStatePurgeHandler;
@@ -610,7 +610,7 @@ impl ServiceFactory for ScabbardFactory {
         #[allow(unused_mut)]
         let mut endpoints = vec![];
 
-        #[cfg(feature = "rest-api-actix")]
+        #[cfg(feature = "rest-api-actix-web-1")]
         {
             endpoints.append(&mut vec![
                 actix::batches::make_add_batches_to_queue_endpoint(),

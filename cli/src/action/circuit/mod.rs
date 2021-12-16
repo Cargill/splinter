@@ -26,8 +26,10 @@ use std::fs::File;
 use clap::ArgMatches;
 use cylinder::Signer;
 use serde::Deserialize;
-use splinter::admin::messages::{CircuitStatus, CreateCircuit, SplinterNode, SplinterService};
-use splinter::protocol::CIRCUIT_PROTOCOL_VERSION;
+use splinter::admin::{
+    messages::{CircuitStatus, CreateCircuit, SplinterNode, SplinterService},
+    CIRCUIT_PROTOCOL_VERSION,
+};
 
 use crate::circuit::builder::parse_hex;
 use crate::error::CliError;

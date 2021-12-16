@@ -19,13 +19,15 @@
 use actix_web::HttpResponse;
 use futures::future::IntoFuture;
 
-use crate::protocol;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     auth::authorization::Permission,
+    AUTHORIZATION_PROTOCOL_VERSION,
 };
 
 use super::{resources::PermissionResponse, AUTHORIZATION_PERMISSIONS_READ_PERMISSION};
+
+const AUTHORIZATION_PERMISSIONS_MIN: u32 = 1;
 
 pub fn make_permissions_resource(permissions: Vec<Permission>) -> Resource {
     let permissions = permissions
@@ -57,8 +59,8 @@ pub fn make_permissions_resource(permissions: Vec<Permission>) -> Resource {
 
     Resource::build("/authorization/permissions")
         .add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::AUTHORIZATION_PERMISSIONS_MIN,
-            protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            AUTHORIZATION_PERMISSIONS_MIN,
+            AUTHORIZATION_PROTOCOL_VERSION,
         ))
         .add_method(
             Method::Get,
@@ -117,10 +119,7 @@ mod tests {
             .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::AUTHORIZATION_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);

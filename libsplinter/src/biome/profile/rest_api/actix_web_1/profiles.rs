@@ -19,16 +19,17 @@ use crate::actix_web::HttpResponse;
 use crate::biome::profile::rest_api::BIOME_PROFILE_READ_PERMISSION;
 use crate::biome::profile::store::UserProfileStore;
 use crate::futures::IntoFuture;
-use crate::protocol;
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    ErrorResponse, Method, ProtocolVersionRangeGuard, Resource, BIOME_PROTOCOL_VERSION,
+};
+
+const BIOME_LIST_PROFILES_PROTOCOL_MIN: u32 = 1;
 
 /// Defines a REST endpoint to list profiles from the database
 pub fn make_profiles_list_route(profile_store: Arc<dyn UserProfileStore>) -> Resource {
-    let resource =
-        Resource::build("/biome/profiles").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::BIOME_LIST_PROFILES_PROTOCOL_MIN,
-            protocol::BIOME_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("/biome/profiles").add_request_guard(
+        ProtocolVersionRangeGuard::new(BIOME_LIST_PROFILES_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+    );
     #[cfg(feature = "authorization")]
     {
         resource.add_method(Method::Get, BIOME_PROFILE_READ_PERMISSION, move |_, _| {

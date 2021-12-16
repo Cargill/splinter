@@ -17,21 +17,20 @@ use std::sync::Arc;
 use crate::actix_web::HttpResponse;
 use crate::biome::profile::store::UserProfileStore;
 use crate::futures::IntoFuture;
-use crate::protocol;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
     auth::identity::Identity,
-    ErrorResponse,
+    ErrorResponse, BIOME_PROTOCOL_VERSION,
 };
 
+const BIOME_FETCH_PROFILE_PROTOCOL_MIN: u32 = 1;
+
 pub fn make_profile_route(profile_store: Arc<dyn UserProfileStore>) -> Resource {
-    let resource =
-        Resource::build("/biome/profile").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::BIOME_FETCH_PROFILE_PROTOCOL_MIN,
-            protocol::BIOME_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("/biome/profile").add_request_guard(
+        ProtocolVersionRangeGuard::new(BIOME_FETCH_PROFILE_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+    );
     #[cfg(feature = "authorization")]
     {
         resource.add_method(

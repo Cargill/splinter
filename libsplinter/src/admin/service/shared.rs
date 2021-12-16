@@ -28,6 +28,7 @@ use crate::admin::store::{
     ProposalType, ProposedCircuit, Service as StoreService, Vote, VoteRecordBuilder,
 };
 use crate::admin::token::{PeerAuthorizationTokenReader, PeerNode};
+use crate::admin::CIRCUIT_PROTOCOL_VERSION;
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
 use crate::error::InternalError;
@@ -36,9 +37,6 @@ use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
 use crate::peer::{PeerAuthorizationToken, PeerManagerConnector, PeerRef, PeerTokenPair};
-use crate::protocol::{
-    ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION, CIRCUIT_PROTOCOL_VERSION,
-};
 use crate::protos::admin::{
     AbandonedCircuit, AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header, CircuitProposal,
@@ -57,6 +55,7 @@ use super::error::{AdminSharedError, MarshallingError};
 use super::messages;
 use super::subscriber::SubscriberMap;
 use super::{admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscriber, Events};
+use super::{ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION};
 
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";

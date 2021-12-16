@@ -29,22 +29,23 @@ use crate::admin::service::{
 };
 use crate::admin::store;
 use crate::error::InvalidStateError;
-use crate::protocol;
 use crate::rest_api::{
     actix_web_1::{
         new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request,
         Resource,
     },
-    ErrorResponse,
+    ErrorResponse, ADMIN_PROTOCOL_VERSION,
 };
+
+const ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN: u32 = 1;
 
 pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 'static>(
     admin_commands: A,
 ) -> Resource {
     let resource = Resource::build("/ws/admin/register/{type}").add_request_guard(
         ProtocolVersionRangeGuard::new(
-            protocol::ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN,
-            protocol::ADMIN_PROTOCOL_VERSION,
+            ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN,
+            ADMIN_PROTOCOL_VERSION,
         ),
     );
 
@@ -94,7 +95,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                             )
                         }
                     },
-                    None => protocol::ADMIN_PROTOCOL_VERSION,
+                    None => ADMIN_PROTOCOL_VERSION,
                 };
 
                 debug!(
@@ -225,7 +226,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                         )
                     }
                 },
-                None => protocol::ADMIN_PROTOCOL_VERSION,
+                None => ADMIN_PROTOCOL_VERSION,
             };
 
             debug!(

@@ -17,18 +17,19 @@ use std::sync::Arc;
 use crate::actix_web::HttpResponse;
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
 use crate::futures::{Future, IntoFuture};
-use crate::protocol;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse,
+    ErrorResponse, BIOME_PROTOCOL_VERSION,
 };
 
 use crate::biome::credentials::rest_api::actix_web_1::BiomeCredentialsRestConfig;
 use crate::biome::credentials::rest_api::resources::credentials::UsernamePassword;
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 use crate::rest_api::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
+
+const BIOME_LOGIN_PROTOCOL_MIN: u32 = 1;
 
 /// Defines a REST endpoint for login
 ///
@@ -43,11 +44,9 @@ pub fn make_login_route(
     rest_config: Arc<BiomeCredentialsRestConfig>,
     token_issuer: Arc<AccessTokenIssuer>,
 ) -> Resource {
-    let resource =
-        Resource::build("/biome/login").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::BIOME_LOGIN_PROTOCOL_MIN,
-            protocol::BIOME_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("/biome/login").add_request_guard(
+        ProtocolVersionRangeGuard::new(BIOME_LOGIN_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+    );
     #[cfg(feature = "authorization")]
     {
         resource.add_method(

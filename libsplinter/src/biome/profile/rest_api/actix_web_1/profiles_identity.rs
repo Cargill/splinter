@@ -19,17 +19,17 @@ use crate::actix_web::HttpResponse;
 use crate::biome::profile::rest_api::BIOME_PROFILE_READ_PERMISSION;
 use crate::biome::profile::store::{UserProfileStore, UserProfileStoreError};
 use crate::futures::IntoFuture;
-use crate::protocol;
 use crate::rest_api::{
     ErrorResponse, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource,
+    BIOME_PROTOCOL_VERSION,
 };
 
+const BIOME_FETCH_PROFILES_PROTOCOL_MIN: u32 = 1;
+
 pub fn make_profiles_routes(profile_store: Arc<dyn UserProfileStore>) -> Resource {
-    let resource =
-        Resource::build("/biome/profiles/{id}").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::BIOME_FETCH_PROFILES_PROTOCOL_MIN,
-            protocol::BIOME_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("/biome/profiles/{id}").add_request_guard(
+        ProtocolVersionRangeGuard::new(BIOME_FETCH_PROFILES_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+    );
     #[cfg(feature = "authorization")]
     {
         resource.add_method(

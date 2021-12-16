@@ -14,12 +14,13 @@
 
 use actix_web::{client::Client, http::StatusCode, web, Error, HttpResponse};
 use percent_encoding::utf8_percent_encode;
-use splinter::protocol;
 use std::collections::HashMap;
 
 use crate::rest_api::GameroomdData;
 
 use super::{ErrorResponse, SuccessResponse, DEFAULT_LIMIT, DEFAULT_OFFSET, QUERY_ENCODE_SET};
+
+const REGISTRY_PROTOCOL_VERSION: u32 = 1;
 
 pub async fn fetch_node(
     identity: web::Path<String>,
@@ -34,7 +35,7 @@ pub async fn fetch_node(
         .header("Authorization", gameroomd_data.authorization.as_str())
         .header(
             "SplinterProtocolVersion",
-            protocol::REGISTRY_PROTOCOL_VERSION.to_string(),
+            REGISTRY_PROTOCOL_VERSION.to_string(),
         )
         .send()
         .await?;
@@ -93,7 +94,7 @@ pub async fn list_nodes(
         .header("Authorization", gameroomd_data.authorization.as_str())
         .header(
             "SplinterProtocolVersion",
-            protocol::REGISTRY_PROTOCOL_VERSION.to_string(),
+            REGISTRY_PROTOCOL_VERSION.to_string(),
         )
         .send()
         .await?;

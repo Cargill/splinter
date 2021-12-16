@@ -14,7 +14,7 @@
 
 //! Provides an API for storing key pairs and associating them with users.
 
-#[cfg(feature = "rest-api")]
+#[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
 pub mod store;
 
