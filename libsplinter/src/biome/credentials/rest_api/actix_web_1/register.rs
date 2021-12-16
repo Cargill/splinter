@@ -22,12 +22,11 @@ use crate::biome::credentials::store::{
     CredentialsBuilder, CredentialsStore, CredentialsStoreError,
 };
 use crate::futures::{Future, IntoFuture};
-use crate::protocol;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse,
+    ErrorResponse, BIOME_PROTOCOL_VERSION,
 };
 
 /// This is the UUID namespace for Biome user IDs generated for users that register with Biome
@@ -35,6 +34,8 @@ use crate::rest_api::{
 /// with OAuth. The `u128` was calculated by creating a v5 UUID with the nil namespace and the name
 /// `b"biome credentials"`.
 const UUID_NAMESPACE: Uuid = Uuid::from_u128(140899893353887994607859851180695869034);
+
+const BIOME_REGISTER_PROTOCOL_MIN: u32 = 1;
 
 /// Defines a REST endpoint to add a user and credentials to the database
 ///
@@ -47,11 +48,9 @@ pub fn make_register_route(
     credentials_store: Arc<dyn CredentialsStore>,
     rest_config: Arc<BiomeCredentialsRestConfig>,
 ) -> Resource {
-    let resource =
-        Resource::build("/biome/register").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::BIOME_REGISTER_PROTOCOL_MIN,
-            protocol::BIOME_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("/biome/register").add_request_guard(
+        ProtocolVersionRangeGuard::new(BIOME_REGISTER_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+    );
     #[cfg(feature = "authorization")]
     {
         resource.add_method(

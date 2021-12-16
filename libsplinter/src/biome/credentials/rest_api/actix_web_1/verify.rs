@@ -16,14 +16,13 @@ use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
 use crate::futures::{Future, IntoFuture};
-use crate::protocol;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},
     secrets::SecretManager,
     sessions::default_validation,
-    ErrorResponse,
+    ErrorResponse, BIOME_PROTOCOL_VERSION,
 };
 
 use crate::biome::credentials::rest_api::actix_web_1::config::BiomeCredentialsRestConfig;
@@ -32,6 +31,8 @@ use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 use super::super::resources::authorize::AuthorizationResult;
 use super::super::resources::credentials::UsernamePassword;
 use super::authorize::authorize_user;
+
+const BIOME_VERIFY_PROTOCOL_MIN: u32 = 1;
 
 /// Defines a REST endpoint to verify a user's password
 ///
@@ -45,11 +46,9 @@ pub fn make_verify_route(
     rest_config: Arc<BiomeCredentialsRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
-    let resource =
-        Resource::build("/biome/verify").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::BIOME_VERIFY_PROTOCOL_MIN,
-            protocol::BIOME_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("/biome/verify").add_request_guard(
+        ProtocolVersionRangeGuard::new(BIOME_VERIFY_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+    );
     #[cfg(feature = "authorization")]
     {
         resource.add_method(

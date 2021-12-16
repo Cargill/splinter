@@ -23,22 +23,21 @@ use futures::{future::IntoFuture, Future};
 use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
 use crate::admin::service::proposal_store::ProposalStore;
 use crate::admin::store::CircuitPredicate;
-use crate::protocol;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    ErrorResponse,
+    ErrorResponse, ADMIN_PROTOCOL_VERSION,
 };
 
 use super::super::error::ProposalListError;
 use super::super::resources;
 
+const ADMIN_LIST_PROPOSALS_PROTOCOL_MIN: u32 = 1;
+
 pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
-    let resource =
-        Resource::build("admin/proposals").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::ADMIN_LIST_PROPOSALS_PROTOCOL_MIN,
-            protocol::ADMIN_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("admin/proposals").add_request_guard(
+        ProtocolVersionRangeGuard::new(ADMIN_LIST_PROPOSALS_PROTOCOL_MIN, ADMIN_PROTOCOL_VERSION),
+    );
 
     #[cfg(feature = "authorization")]
     {
@@ -131,7 +130,7 @@ fn list_proposals<PS: ProposalStore + 'static>(
                 )
             }
         },
-        None => format!("{}", protocol::ADMIN_PROTOCOL_VERSION),
+        None => format!("{}", ADMIN_PROTOCOL_VERSION),
     };
 
     Box::new(query_list_proposals(
@@ -264,7 +263,7 @@ mod tests {
             .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::OK);
@@ -380,7 +379,7 @@ mod tests {
         .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::OK);
@@ -431,7 +430,7 @@ mod tests {
         .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::OK);
@@ -484,7 +483,7 @@ mod tests {
         .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::OK);
@@ -531,7 +530,7 @@ mod tests {
             .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::OK);
@@ -578,7 +577,7 @@ mod tests {
             .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::OK);

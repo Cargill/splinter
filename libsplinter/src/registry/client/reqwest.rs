@@ -17,7 +17,7 @@
 use reqwest::{blocking::Client, StatusCode};
 
 use crate::error::InternalError;
-use crate::protocol::REGISTRY_PROTOCOL_VERSION;
+use crate::rest_api::REGISTRY_PROTOCOL_VERSION;
 
 use super::{RegistryClient, RegistryNode, RegistryNodeListSlice};
 

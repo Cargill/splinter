@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "rest-api-actix")]
 mod actix_web_1;
 
-#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+#[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 
-#[cfg(feature = "rest-api-actix")]
 pub use actix_web_1::BiomeProfileRestResourceProvider;
 
-#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+#[cfg(feature = "authorization")]
 const BIOME_PROFILE_READ_PERMISSION: Permission = Permission::Check {
     permission_id: "biome.profile.read",
     permission_display_name: "Biome profile read",

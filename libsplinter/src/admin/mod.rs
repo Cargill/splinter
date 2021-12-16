@@ -21,3 +21,5 @@ pub mod rest_api;
 pub mod service;
 pub mod store;
 mod token;
+
+pub const CIRCUIT_PROTOCOL_VERSION: i32 = 2;

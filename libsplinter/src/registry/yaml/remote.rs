@@ -429,7 +429,7 @@ impl ShutdownHandle for RemoteYamlShutdownHandle {
     }
 }
 
-#[cfg(all(test, feature = "rest-api", feature = "rest-api-actix"))]
+#[cfg(all(test, feature = "rest-api-actix-web-1"))]
 mod tests {
     use super::*;
 

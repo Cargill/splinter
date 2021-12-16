@@ -25,7 +25,6 @@ use splinter::admin::messages::{
     AuthorizationType, CreateCircuit, CreateCircuitBuilder, SplinterNode,
 };
 use splinter::circuit::template::CircuitTemplateManager;
-use splinter::protocol;
 use splinter::protos::admin::{
     CircuitManagementPayload, CircuitManagementPayload_Action as Action,
     CircuitManagementPayload_Header as Header,
@@ -38,6 +37,8 @@ use super::{
     get_response_paging_info, validate_limit, ErrorResponse, SuccessResponse, DEFAULT_LIMIT,
     DEFAULT_OFFSET,
 };
+
+const REGISTRY_PROTOCOL_VERSION: u32 = 1;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateGameroomForm {
@@ -229,7 +230,7 @@ async fn fetch_node_information(
         .header("Authorization", authorization)
         .header(
             "SplinterProtocolVersion",
-            protocol::REGISTRY_PROTOCOL_VERSION.to_string(),
+            REGISTRY_PROTOCOL_VERSION.to_string(),
         )
         .send()
         .await

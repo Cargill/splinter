@@ -23,7 +23,6 @@ use std::convert::TryFrom;
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use crate::error::InvalidStateError;
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
-use crate::protocol;
 use crate::registry::rest_api::error::RegistryRestApiError;
 #[cfg(feature = "authorization")]
 use crate::registry::rest_api::{REGISTRY_READ_PERMISSION, REGISTRY_WRITE_PERMISSION};
@@ -33,17 +32,16 @@ use crate::registry::{
 };
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse,
+    ErrorResponse, REGISTRY_PROTOCOL_VERSION,
 };
+
+const REGISTRY_FETCH_NODE_MIN: u32 = 1;
 
 pub fn make_nodes_identity_resource(registry: Box<dyn RwRegistry>) -> Resource {
     let registry1 = registry.clone();
     let registry2 = registry.clone();
     let resource = Resource::build("/registry/nodes/{identity}").add_request_guard(
-        ProtocolVersionRangeGuard::new(
-            protocol::REGISTRY_FETCH_NODE_MIN,
-            protocol::REGISTRY_PROTOCOL_VERSION,
-        ),
+        ProtocolVersionRangeGuard::new(REGISTRY_FETCH_NODE_MIN, REGISTRY_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {
@@ -234,10 +232,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::REGISTRY_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -270,10 +265,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::REGISTRY_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -302,10 +294,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .put(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::REGISTRY_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -325,10 +314,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .put(url.clone())
-            .header(
-                "SplinterProtocolVersion",
-                protocol::REGISTRY_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
             .json(&node)
             .send()
             .expect("Failed to perform request");
@@ -337,10 +323,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::REGISTRY_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -359,10 +342,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .put(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::REGISTRY_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
             .json(&node)
             .send()
             .expect("Failed to perform request");
@@ -392,10 +372,7 @@ mod tests {
         .expect("Failed to parse URL");
         let resp = Client::new()
             .delete(url.clone())
-            .header(
-                "SplinterProtocolVersion",
-                protocol::REGISTRY_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -404,10 +381,7 @@ mod tests {
         // Verify that a non-existent node gets a NOT_FOUND response
         let resp = Client::new()
             .delete(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::REGISTRY_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", REGISTRY_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 

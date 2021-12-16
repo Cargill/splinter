@@ -18,22 +18,21 @@ use crate::oauth::rest_api::{
     resources::list_users::{ListOAuthUserResponse, OAuthUserResponse, PagingQuery},
     OAUTH_USER_READ_PERMISSION,
 };
-use crate::protocol;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     paging::get_response_paging_info,
-    ErrorResponse,
+    ErrorResponse, OAUTH_PROTOCOL_VERSION,
 };
 use futures::future::IntoFuture;
+
+const OAUTH_USER_READ_PROTOCOL_MIN: u32 = 1;
 
 pub fn make_oauth_list_users_resource(
     oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
 ) -> Resource {
-    let resource =
-        Resource::build("/oauth/users").add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::OAUTH_USER_READ_PROTOCOL_MIN,
-            protocol::OAUTH_PROTOCOL_VERSION,
-        ));
+    let resource = Resource::build("/oauth/users").add_request_guard(
+        ProtocolVersionRangeGuard::new(OAUTH_USER_READ_PROTOCOL_MIN, OAUTH_PROTOCOL_VERSION),
+    );
     #[cfg(feature = "authorization")]
     {
         resource.add_method(Method::Get, OAUTH_USER_READ_PERMISSION, move |req, _| {
@@ -191,10 +190,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::AUTHORIZATION_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -256,10 +252,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::AUTHORIZATION_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -283,10 +276,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::AUTHORIZATION_PROTOCOL_VERSION,
-            )
+            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
