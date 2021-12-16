@@ -53,7 +53,7 @@ transact = { version = "0.4", features = ["family-command", "family-command-work
 
 [build-dependencies]
 protoc-rust = "2.14"
-glob = "0.2"
+glob = "0.3"
 
 [features]
 default = ["splinter-service"]
