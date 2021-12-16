@@ -230,7 +230,7 @@ fn new_basic_client(
                 .map_err(|err| InvalidArgumentError::new("token_url".into(), err.to_string()))?,
         ),
     )
-    .set_redirect_url(
+    .set_redirect_uri(
         RedirectUrl::new(redirect_url)
             .map_err(|err| InvalidArgumentError::new("redirect_url".into(), err.to_string()))?,
     ))

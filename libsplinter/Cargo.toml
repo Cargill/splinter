@@ -53,7 +53,7 @@ log = "0.4"
 metrics = {version = "0.17", features = ["std"], optional = true}
 mio = { version = "0.6", default-features = false }
 mio-extras = "2"
-oauth2 = { version = "3.0", optional = true }
+oauth2 = { version = "4", optional = true }
 openssl = "0.10"
 percent-encoding = { version = "2.0", optional = true }
 protobuf = "2.23"
