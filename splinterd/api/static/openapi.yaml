@@ -35,15 +35,15 @@ paths:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        200:
+        '200':
           description: Server is running correctly and accepting connections
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Status'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error
           content:
             application/json:
@@ -99,7 +99,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: Successfully retrieved the list of proposals
           content:
             application/json:
@@ -112,15 +112,15 @@ paths:
                       $ref: '#/components/schemas/Proposal'
                   paging:
                     $ref: '#/components/schemas/Paging'
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -147,21 +147,21 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: Successfully retrieved the requested proposal
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Proposal"
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: The requested circuit proposal was not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -187,17 +187,17 @@ paths:
               type: string
               format: binary
       responses:
-        202:
+        '202':
           description: The circuit management payload was accepted
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error
           content:
             application/json:
@@ -231,22 +231,22 @@ paths:
             type: integer
             default: 0
       responses:
-        200:
+        '200':
           description: Registration request was successfully submitted
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApplicationRegistration'
-        400:
+        '400':
           description: |
             The circuit management type was invalid or the request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error
           content:
             application/json:
@@ -298,7 +298,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: Successfully retrieved the list of circuits
           content:
             application/json:
@@ -311,15 +311,15 @@ paths:
                       $ref: '#/components/schemas/Circuit'
                   paging:
                     $ref: '#/components/schemas/Paging'
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -346,21 +346,21 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: Successfully retrieved the requested circuit
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Circuit"
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: The requested circuit was not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -379,7 +379,7 @@ paths:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        200:
+        '200':
           description: Successfully checked maintenance mode
           content:
             text/plain:
@@ -391,7 +391,7 @@ paths:
                     enum:
                       - true
                       - false
-        401:
+        '401':
           description: The client is unauthorized
     post:
       tags:
@@ -412,7 +412,7 @@ paths:
           schema:
             type: boolean
       responses:
-        200:
+        '200':
           description: Successfully checked maintenance mode
           content:
             text/plain:
@@ -421,13 +421,13 @@ paths:
                 properties:
                   message:
                     type: boolean
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
 
   /authorization/permissions:
@@ -443,7 +443,7 @@ paths:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        200:
+        '200':
           description: Successfully retrieved the list of REST API permissions
           content:
             application/json:
@@ -454,13 +454,13 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Permission'
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
 
   /authorization/roles:
@@ -495,7 +495,7 @@ paths:
             type: integer
             default: 100
       responses:
-        200:
+        '200':
           description: Successfully retrieved the requested list of roles
           content:
             application/json:
@@ -508,15 +508,15 @@ paths:
                       $ref: '#/components/schemas/Role'
                   paging:
                     $ref: '#/components/schemas/Paging'
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -545,17 +545,17 @@ paths:
             schema:
               $ref: '#/components/schemas/Role'
       responses:
-        200:
+        '200':
           description: The role was successfully added
-        400:
+        '400':
           description: The request was malformed or the role was invalid
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -581,7 +581,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: Successfully retrieved the requested role
           content:
             application/json:
@@ -590,15 +590,15 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Role'
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: The requested role was not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -626,17 +626,17 @@ paths:
             schema:
               $ref: '#/components/schemas/RegisteredNode'
       responses:
-        200:
+        '200':
           description: The node was successfully added to the registry
-        400:
+        '400':
           description: The request was malformed or the node was invalid
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -682,7 +682,7 @@ paths:
             type: string
           example: "%7B%22company%22%3A%5B%22%3D%22%2C%22Cargill%22%5D%7D"
       responses:
-        200:
+        '200':
           description: The list of nodes was successfully retrieved
           content:
             application/json:
@@ -695,15 +695,15 @@ paths:
                       $ref: '#/components/schemas/RegisteredNode'
                   paging:
                     $ref: '#/components/schemas/Paging'
-        400:
+        '400':
           description: The request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -729,7 +729,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: The node was successfully retrieved
           content:
             application/json:
@@ -738,15 +738,15 @@ paths:
                 properties:
                   data:
                     $ref: "#/components/schemas/RegisteredNode"
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: The node was not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -779,17 +779,17 @@ paths:
             schema:
               $ref: '#/components/schemas/RegisteredNode'
       responses:
-        200:
+        '200':
           description: The node has been added or replaced
-        400:
+        '400':
           description: The request was malformed or the node was invalid
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -814,17 +814,17 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: The node has been deleted from the registry
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: The node was not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -859,21 +859,21 @@ paths:
           schema:
             type: string
       responses:
-        202:
+        '202':
           description: Batch was submitted successfully
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Link"
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: |
             The scabbard service with the given circuit and service id was not
             found
@@ -881,9 +881,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        429:
+        '429':
           description: Too many requests have been made to process batches
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -937,7 +937,7 @@ paths:
             type: integer
             default: 300
       responses:
-        200:
+        '200':
           description: The statuses of the batches were successfully retrieved
           content:
             application/json:
@@ -945,15 +945,15 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BatchStatus'
-        400:
+        '400':
           description: The request was malformed or no batch IDs were provided
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: |
             The scabbard service with the given circuit and service id was not
             found
@@ -961,14 +961,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        408:
+        '408':
           description: |
             The batches were not committed before the specified wait time
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -1011,7 +1011,7 @@ paths:
             type: string
             example: 00ec01
       responses:
-        200:
+        '200':
           description: The state entries were successfully retrieved
           content:
             application/json:
@@ -1026,15 +1026,15 @@ paths:
                       type: array
                       items:
                         type: integer
-        400:
+        '400':
           description: The request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: |
             The scabbard service with the given circuit and service id was not
             found
@@ -1042,7 +1042,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -1082,7 +1082,7 @@ paths:
             type: string
             example: 000000a87cb5eafdcca6a814e4add97c4b517d3c530c2f44b31d18e3b0c44298fc1c14
       responses:
-        200:
+        '200':
           description: The value was successfully retrieved
           content:
             application/json:
@@ -1090,9 +1090,9 @@ paths:
                 type: array
                 items:
                   type: integer
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: |
             The scabbard service with the given circuit and service id was not
             found, or there is no value at the given address
@@ -1100,7 +1100,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: An internal server error occurred
           content:
             application/json:
@@ -1131,7 +1131,7 @@ paths:
                 username: alice@acme.com
                 hashed_password: F4AABE0B40C9ABB8B6FD2EEACB39C965
       responses:
-        200:
+        '200':
           description: User created successfully
           content:
             application/json:
@@ -1145,13 +1145,13 @@ paths:
                     type: object
                     example:
                       ref: '#/components/schemas/BiomeNewUser'
-        400:
+        '400':
           description: Invalid request
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1184,7 +1184,7 @@ paths:
                 hashed_password: |-
                   8945622435187243046536949706b5272644c71336c7254563679727565494b376d4b3554696b734662685962652f6v52562e437a70462f6552489c8b
       responses:
-        200:
+        '200':
           description: Successful operation
           content:
             application/json:
@@ -1212,13 +1212,13 @@ paths:
                       IjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE0Iiwia\
                       XNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_x\
                       riYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
-        400:
+        '400':
           description: Invalid request
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1234,7 +1234,7 @@ paths:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        200:
+        '200':
           description: Successful operation
           content:
             application/json:
@@ -1244,15 +1244,15 @@ paths:
                   message:
                     type: string
                     example: "User successfully logged out"
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1282,7 +1282,7 @@ paths:
                   XNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_x\
                   riYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
       responses:
-        200:
+        '200':
           description: Successful operation
           content:
             application/json:
@@ -1296,25 +1296,25 @@ paths:
                       VyX2lkIjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE\
                       0IiwiaXNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8h\
                       A0ru_xriYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
-        400:
+        '400':
           description: Invalid request
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
-        401:
+        '401':
           description: Access token is invalid
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBiome'
-        403:
+        '403':
           description: Refresh token is invalid
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBiome'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1347,7 +1347,7 @@ paths:
                 hashed_password: |-
                   8945622435187243046536949706b5272644c71336c7254563679727565494b376d4b3554696b734662685962652f6v52562e437a70462f6552489c8b
       responses:
-        200:
+        '200':
           description: Successful operation
           content:
             application/json:
@@ -1361,15 +1361,15 @@ paths:
                     type: string
                     description: "Internal unique identifier for the user"
                     example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1388,7 +1388,7 @@ paths:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        200:
+        '200':
           description: List of users registered in Biome
           content:
             application/json:
@@ -1405,9 +1405,9 @@ paths:
                       type: string
                       description: "Internal unique identifier for the user"
                       example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1433,7 +1433,7 @@ paths:
             type: string
             example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
       responses:
-        200:
+        '200':
           description: User information
           content:
             application/json:
@@ -1448,21 +1448,21 @@ paths:
                     type: string
                     description: "Internal unique identifier for the user"
                     example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: Resource not found
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1513,7 +1513,7 @@ paths:
                 hashed_password: |-
                   8945622435187243046536949706b5272644c71336c7254563679727565494b376d4b3554696b734662685962652f6v52562e437a70462f6552489c8b
       responses:
-        200:
+        '200':
           description: User updated successfully
           content:
             application/json:
@@ -1527,21 +1527,21 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/BiomeUserKey'
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: Resource not found
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1565,7 +1565,7 @@ paths:
             type: string
             example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
       responses:
-        200:
+        '200':
           description: User deleted successfully
           content:
             application/json:
@@ -1575,15 +1575,15 @@ paths:
                   message:
                     type: string
                     example: "User deleted successfully"
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: User with {user_id} not found
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1602,7 +1602,7 @@ paths:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        200:
+        '200':
           description: List of profiles for all users
           content:
             application/json:
@@ -1610,9 +1610,9 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BiomeProfile'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1638,21 +1638,21 @@ paths:
             type: string
             example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
       responses:
-        200:
+        '200':
           description: User profile
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BiomeProfile'
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: Resource not found
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1668,15 +1668,15 @@ paths:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        200:
+        '200':
           description: User's profile
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/BiomeProfile'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1692,7 +1692,7 @@ paths:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        200:
+        '200':
           description: User's keys
           content:
             application/json:
@@ -1700,9 +1700,9 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BiomeUserKey'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1723,7 +1723,7 @@ paths:
               items:
                 $ref: '#/components/schemas/BiomeUserKey'
       responses:
-        200:
+        '200':
           description: User updated successfully
           content:
             application/json:
@@ -1733,15 +1733,15 @@ paths:
                   message:
                     type: string
                     example: "Keys replaced successfully"
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1772,7 +1772,7 @@ paths:
                 new_display_name: |-
                   Admin key pair
       responses:
-        200:
+        '200':
           description: User updated successfully
           content:
             application/json:
@@ -1782,21 +1782,21 @@ paths:
                   message:
                     type: string
                     example: "Key updated successfully"
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: Resource not found
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1815,7 +1815,7 @@ paths:
             schema:
               $ref: '#/components/schemas/BiomeUserKey'
       responses:
-        200:
+        '200':
           description: User added successfully
           content:
             application/json:
@@ -1827,15 +1827,15 @@ paths:
                     example: "Key added successfully"
                   data:
                     $ref: '#/components/schemas/BiomeUserKey'
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1858,7 +1858,7 @@ paths:
             type: string
             example: "026c889058c2d22558ead2c61b321634b74e705c42f890e6b7bc2c80abb4713118"
       responses:
-        200:
+        '200':
           description: User's key
           content:
             application/json:
@@ -1867,21 +1867,21 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/BiomeUserKey'
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: Resource not found
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1902,7 +1902,7 @@ paths:
             type: string
             example: "026c889058c2d22558ead2c61b321634b74e705c42f890e6b7bc2c80abb4713118"
       responses:
-        200:
+        '200':
           description: User's key deleted successfully
           content:
             application/json:
@@ -1914,21 +1914,21 @@ paths:
                     example: "User deleted successfully"
                   data:
                     $ref: '#/components/schemas/BiomeUserKey'
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
-        404:
+        '404':
           description: Resource not found
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1957,14 +1957,14 @@ paths:
           schema:
             type: string
       responses:
-        302:
+        '302':
           description: Found redirect
           headers:
             Location:
               description: URL of the OAuth provider
               schema:
                 type: string
-        400:
+        '400':
           description: |
             Request was malformed or no `redirect_url` was provided and the server
             was unable to retrieve the request's `referer` header value.
@@ -1972,7 +1972,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -1990,7 +1990,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        302:
+        '302':
           description: |
             Splinter has successfully exchanged the authorization code provided
             by the OAuth provider has been successfully exchanged for an access
@@ -2006,7 +2006,7 @@ paths:
                 process, with the user's information appended as query parameters.
               schema:
                 type: string
-        400:
+        '400':
           description: |
             Request was malformed or no authorization request was found correlating
             to the authorization code and the server was unable to retrieve the
@@ -2015,7 +2015,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -2031,7 +2031,7 @@ paths:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        200:
+        '200':
           description: Successful operation
           content:
             application/json:
@@ -2041,19 +2041,19 @@ paths:
                   message:
                     type: string
                     example: "User successfully logged out"
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
@@ -2086,7 +2086,7 @@ paths:
             type: integer
             default: 100
       responses:
-        200:
+        '200':
           description: List of users registered in Biome's OAuth
           content:
             application/json:
@@ -2099,19 +2099,19 @@ paths:
                       $ref: '#/components/schemas/OAuthUser'
                   paging:
                     $ref: '#/components/schemas/Paging'
-        400:
+        '400':
           description: Request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        401:
+        '401':
           description: The client is unauthorized
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        500:
+        '500':
           description: Internal server error occurred
           content:
             application/json:
