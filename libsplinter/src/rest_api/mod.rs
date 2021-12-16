@@ -67,6 +67,7 @@
 //!     .run();
 //! ```
 
+#[cfg(feature = "rest-api-actix-web-1")]
 pub mod actix_web_1;
 #[cfg(feature = "rest-api-actix-web-3")]
 pub mod actix_web_3;
@@ -91,6 +92,7 @@ pub use errors::{RequestError, RestApiServerError};
 
 pub use response_models::ErrorResponse;
 
+#[cfg(feature = "rest-api-actix-web-1")]
 pub use actix_web_1::{
     get_authorization_token, into_bytes, into_protobuf, new_websocket_event_sender, require_header,
     AuthConfig, Continuation, EventSender, HandlerFunction, Method, ProtocolVersionRangeGuard,

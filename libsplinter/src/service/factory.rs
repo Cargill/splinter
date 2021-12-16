@@ -31,7 +31,7 @@ pub trait ServiceFactory: Send {
         args: HashMap<String, String>,
     ) -> Result<Box<dyn Service>, FactoryCreateError>;
 
-    #[cfg(feature = "rest-api")]
+    #[cfg(feature = "rest-api-actix-web-1")]
     /// Get the [`ServiceEndpoint`] definitions that represent the REST API resources provided by
     /// the services that this factory can create.
     ///
