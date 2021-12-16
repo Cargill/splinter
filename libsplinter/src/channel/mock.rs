@@ -33,26 +33,6 @@ impl<T: Clone> Default for MockSender<T> {
     }
 }
 
-impl<T: Clone> MockSender<T> {
-    pub fn new(sent: Arc<Mutex<Vec<T>>>) -> Self {
-        MockSender { sent }
-    }
-
-    pub fn sent(&self) -> Vec<T> {
-        self.sent.lock().unwrap().clone()
-    }
-
-    /// Clear the Sent list, and return the previous items
-    pub fn clear(&self) -> Vec<T> {
-        let mut sent = self.sent.lock().unwrap();
-        let mut current = Vec::new();
-
-        std::mem::swap(&mut *sent, &mut current);
-
-        current
-    }
-}
-
 impl<T: Any + Clone + Send> Sender<T> for MockSender<T> {
     fn send(&self, message: T) -> Result<(), SendError> {
         self.sent.lock().unwrap().push(message);
