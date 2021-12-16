@@ -1136,15 +1136,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
                 properties:
                   message:
                     type: string
                     example: "User created successfully"
                   data:
                     type: object
-                    example:
-                      ref: '#/components/schemas/BiomeNewUser'
+                    $ref: '#/components/schemas/BiomeNewUser'
         '400':
           description: Invalid request
           content:
@@ -2157,6 +2155,14 @@ components:
         example: 2
 
   schemas:
+    BiomeNewUser:
+      additionalProperties: false
+      properties:
+        user_id:
+          type: string
+        username:
+          type: string
+
     Error:
       additionalProperties: false
       properties:
