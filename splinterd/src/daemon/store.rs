@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "database-sqlite")]
+use std::sync::{Arc, RwLock};
+
 #[cfg(feature = "diesel")]
 use diesel::r2d2::{ConnectionManager, Pool};
 #[cfg(feature = "database-postgres")]
@@ -32,7 +35,7 @@ pub enum ConnectionPool {
     },
     #[cfg(feature = "database-sqlite")]
     Sqlite {
-        pool: Pool<ConnectionManager<diesel::SqliteConnection>>,
+        pool: Arc<RwLock<Pool<ConnectionManager<diesel::SqliteConnection>>>>,
     },
     // This variant is only enabled to such that the compiler does not complain.  It is never
     // constructed.
@@ -52,12 +55,12 @@ pub fn create_connection_pool(
         }
         #[cfg(feature = "database-sqlite")]
         ConnectionUri::Sqlite(conn_str) => {
-            let pool = sqlite::create_sqlite_connection_pool(conn_str)?;
+            let pool = sqlite::create_sqlite_connection_pool_with_write_exclusivity(conn_str)?;
             Ok(ConnectionPool::Sqlite { pool })
         }
         #[cfg(feature = "database-sqlite")]
         ConnectionUri::Memory => {
-            let pool = sqlite::create_sqlite_connection_pool(":memory:")?;
+            let pool = sqlite::create_sqlite_connection_pool_with_write_exclusivity(":memory:")?;
             Ok(ConnectionPool::Sqlite { pool })
         }
         #[cfg(not(feature = "database-sqlite"))]
@@ -82,9 +85,9 @@ pub fn create_store_factory(
             Ok(Box::new(postgres::PgStoreFactory::new(pool.clone())))
         }
         #[cfg(feature = "database-sqlite")]
-        ConnectionPool::Sqlite { pool } => {
-            Ok(Box::new(sqlite::SqliteStoreFactory::new(pool.clone())))
-        }
+        ConnectionPool::Sqlite { pool } => Ok(Box::new(
+            sqlite::SqliteStoreFactory::new_with_write_exclusivity(pool.clone()),
+        )),
         #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
         ConnectionPool::Unsupported => Err(InternalError::with_message(
             "Connection pools are unavailable in this configuration".into(),
