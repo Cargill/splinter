@@ -23,7 +23,7 @@ use futures::{future::IntoFuture, Future};
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     auth::authorization::maintenance::MaintenanceModeAuthorizationHandler,
-    ErrorResponse, AUTHORIZATION_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 use super::{
@@ -38,7 +38,7 @@ pub fn make_maintenance_resource(auth_handler: MaintenanceModeAuthorizationHandl
     Resource::build("/authorization/maintenance")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             AUTHORIZATION_MAINTENANCE_MIN,
-            AUTHORIZATION_PROTOCOL_VERSION,
+            SPLINTER_PROTOCOL_VERSION,
         ))
         .add_method(
             Method::Get,
@@ -109,7 +109,7 @@ mod tests {
         // Check disabled
         let resp = Client::new()
             .get(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -119,7 +119,7 @@ mod tests {
         let resp = Client::new()
             .post(url.clone())
             .query(&[("enabled", "true")])
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -127,7 +127,7 @@ mod tests {
         // Check enabled
         let resp = Client::new()
             .get(url.clone())
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -137,7 +137,7 @@ mod tests {
         let resp = Client::new()
             .post(url.clone())
             .query(&[("enabled", "false")])
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -145,7 +145,7 @@ mod tests {
         // Check disabled
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -182,7 +182,7 @@ mod tests {
         let resp = Client::new()
             .post(url.clone())
             .query(&[("enabled", "false")])
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -192,7 +192,7 @@ mod tests {
         let resp = Client::new()
             .post(url.clone())
             .query(&[("enabled", "true")])
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -202,7 +202,7 @@ mod tests {
         let resp = Client::new()
             .post(url.clone())
             .query(&[("enabled", "true")])
-            .header("SplinterProtocolVersion", AUTHORIZATION_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);

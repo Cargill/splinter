@@ -22,7 +22,7 @@ use crate::rest_api::{
     actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},
     secrets::SecretManager,
     sessions::default_validation,
-    ErrorResponse, BIOME_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 use crate::biome::credentials::rest_api::actix_web_1::config::BiomeCredentialsRestConfig;
@@ -47,7 +47,7 @@ pub fn make_verify_route(
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
     let resource = Resource::build("/biome/verify").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_VERIFY_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_VERIFY_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {

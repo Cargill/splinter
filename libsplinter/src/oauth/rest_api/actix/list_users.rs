@@ -21,7 +21,7 @@ use crate::oauth::rest_api::{
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     paging::get_response_paging_info,
-    ErrorResponse, OAUTH_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 use futures::future::IntoFuture;
 
@@ -31,7 +31,7 @@ pub fn make_oauth_list_users_resource(
     oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
 ) -> Resource {
     let resource = Resource::build("/oauth/users").add_request_guard(
-        ProtocolVersionRangeGuard::new(OAUTH_USER_READ_PROTOCOL_MIN, OAUTH_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(OAUTH_USER_READ_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {
@@ -190,7 +190,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -252,7 +252,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -276,7 +276,7 @@ mod tests {
 
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 

@@ -17,7 +17,7 @@
 use reqwest::{blocking::Client, header, StatusCode};
 
 use crate::error::InternalError;
-use crate::rest_api::ADMIN_PROTOCOL_VERSION;
+use crate::rest_api::SPLINTER_PROTOCOL_VERSION;
 
 use super::{AdminServiceClient, CircuitListSlice, CircuitSlice, ProposalListSlice, ProposalSlice};
 
@@ -45,7 +45,7 @@ impl AdminServiceClient for ReqwestAdminServiceClient {
         let request = Client::new()
             .post(&format!("{}/admin/submit", self.url))
             .header(header::CONTENT_TYPE, "octet-stream")
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .body(payload)
             .header("Authorization", &self.auth);
 
@@ -93,7 +93,7 @@ impl AdminServiceClient for ReqwestAdminServiceClient {
 
         let request = Client::new()
             .get(&url)
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth);
 
         let response = request.send();
@@ -139,7 +139,7 @@ impl AdminServiceClient for ReqwestAdminServiceClient {
     fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<CircuitSlice>, InternalError> {
         let request = Client::new()
             .get(&format!("{}/admin/circuits/{}", self.url, circuit_id))
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth);
 
         request
@@ -200,7 +200,7 @@ impl AdminServiceClient for ReqwestAdminServiceClient {
 
         let request = Client::new()
             .get(&url)
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth);
 
         request
@@ -242,7 +242,7 @@ impl AdminServiceClient for ReqwestAdminServiceClient {
     fn fetch_proposal(&self, circuit_id: &str) -> Result<Option<ProposalSlice>, InternalError> {
         let request = Client::new()
             .get(&format!("{}/admin/proposals/{}", self.url, circuit_id))
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth);
 
         request

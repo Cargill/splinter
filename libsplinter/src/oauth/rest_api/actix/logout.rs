@@ -23,14 +23,14 @@ use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     auth::{AuthorizationHeader, BearerToken},
-    ErrorResponse, OAUTH_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 const OAUTH_LOGOUT_MIN: u32 = 1;
 
 pub fn make_logout_route(oauth_user_session_store: Box<dyn OAuthUserSessionStore>) -> Resource {
     let resource = Resource::build("/oauth/logout").add_request_guard(
-        ProtocolVersionRangeGuard::new(OAUTH_LOGOUT_MIN, OAUTH_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(OAUTH_LOGOUT_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {
@@ -175,7 +175,7 @@ mod tests {
             Url::parse(&format!("http://{}/oauth/logout", bind_url)).expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header(
                 "Authorization",
                 format!("Bearer OAuth2:{}", SPLINTER_ACCESS_TOKEN),
@@ -216,7 +216,7 @@ mod tests {
             Url::parse(&format!("http://{}/oauth/logout", bind_url)).expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header(
                 "Authorization",
                 format!("Bearer OAuth2:{}", SPLINTER_ACCESS_TOKEN),

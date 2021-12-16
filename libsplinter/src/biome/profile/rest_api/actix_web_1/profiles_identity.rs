@@ -21,15 +21,17 @@ use crate::biome::profile::store::{UserProfileStore, UserProfileStoreError};
 use crate::futures::IntoFuture;
 use crate::rest_api::{
     ErrorResponse, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource,
-    BIOME_PROTOCOL_VERSION,
+    SPLINTER_PROTOCOL_VERSION,
 };
 
 const BIOME_FETCH_PROFILES_PROTOCOL_MIN: u32 = 1;
 
 pub fn make_profiles_routes(profile_store: Arc<dyn UserProfileStore>) -> Resource {
-    let resource = Resource::build("/biome/profiles/{id}").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_FETCH_PROFILES_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
-    );
+    let resource =
+        Resource::build("/biome/profiles/{id}").add_request_guard(ProtocolVersionRangeGuard::new(
+            BIOME_FETCH_PROFILES_PROTOCOL_MIN,
+            SPLINTER_PROTOCOL_VERSION,
+        ));
     #[cfg(feature = "authorization")]
     {
         resource.add_method(
