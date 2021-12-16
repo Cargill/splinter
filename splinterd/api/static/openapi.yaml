@@ -1489,11 +1489,14 @@ paths:
             schema:
               properties:
                 username:
+                  type: string
                   description: Existing username of user
                 hashed_password:
+                  type: string
                   description: |
                     Hashed password to be used for user authentication
                 new_password:
+                  type: string
                   description: |
                     Hash of the new password to be used for user authentication
                 new_key_pairs:
@@ -1755,8 +1758,10 @@ paths:
             schema:
               properties:
                 public_key:
+                  type: string
                   description: Public key
                 new_display_name:
+                  type: string
                   description: |
                     Updated display name for the key
               required:
@@ -2203,6 +2208,7 @@ components:
           type: string
           example: Cargill Node 009
         service_endpoint:
+          type: string
           description: The node's service endpoint
           example: tcp://foo.bar.biz
         network_endpoints:
