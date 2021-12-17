@@ -34,7 +34,7 @@ volumes:
 services:
 
     generate-registry:
-        image: splintercommunity/splinter-cli:main
+        image: splintercommunity/splinter-cli:0.6-dev
         networks:
           gameroom:
             ipv4_address: 172.28.1.1
@@ -93,7 +93,7 @@ services:
         - registry:/usr/local/apache2/htdocs
 
     db-acme:
-      image: splintercommunity/gameroom-database:main
+      image: splintercommunity/gameroom-database:0.6-dev
       container_name: db-acme
       restart: always
       expose:
@@ -111,7 +111,7 @@ services:
         - acme-db:/var/lib/postgresql/data/
 
     gameroom-app-acme:
-      image: splintercommunity/gameroom-app-acme:main
+      image: splintercommunity/gameroom-app-acme:0.6-dev
       container_name: gameroom-app-acme
       networks:
         gameroom:
@@ -124,7 +124,7 @@ services:
         - '8080:80'
 
     gameroomd-acme:
-        image: splintercommunity/gameroomd:main
+        image: splintercommunity/gameroomd:0.6-dev
         container_name: gameroomd-acme
         networks:
           gameroom:
@@ -160,7 +160,7 @@ services:
           "
 
     splinterd-node-acme:
-      image: splintercommunity/splinterd:main
+      image: splintercommunity/splinterd:0.6-dev
       container_name: splinterd-node-acme
       expose:
         - 8080
@@ -221,7 +221,7 @@ services:
         POSTGRES_DB: splinter
 
     db-bubba:
-      image: splintercommunity/gameroom-database:main
+      image: splintercommunity/gameroom-database:0.6-dev
       container_name: db-bubba
       restart: always
       networks:
@@ -239,7 +239,7 @@ services:
         - bubba-db:/var/lib/postgresql/data/
 
     gameroom-app-bubba:
-      image: splintercommunity/gameroom-app-bubba:main
+      image: splintercommunity/gameroom-app-bubba:0.6-dev
       container_name: gameroom-app-bubba
       networks:
         gameroom:
@@ -252,7 +252,7 @@ services:
         - '8081:80'
 
     gameroomd-bubba:
-        image: splintercommunity/gameroomd:main
+        image: splintercommunity/gameroomd:0.6-dev
         container_name: gameroomd-bubba
         networks:
           gameroom:
@@ -288,7 +288,7 @@ services:
           "
 
     splinterd-node-bubba:
-      image: splintercommunity/splinterd:main
+      image: splintercommunity/splinterd:0.6-dev
       container_name: splinterd-node-bubba
       expose:
         - 8080
