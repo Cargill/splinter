@@ -1,5 +1,16 @@
 # Release Notes
 
+## Changes in splinter 0.6.0
+
+## libsplinter
+
+* Add validation that no SQL backed trees exist if LMDB is enabled.
+
+### scabbard
+
+* Fix possible deadlock by shortening service lock time and adding
+  OrchestratableService trait.
+
 ## Changes in Splinter 0.5.26
 
 ### Highlights
