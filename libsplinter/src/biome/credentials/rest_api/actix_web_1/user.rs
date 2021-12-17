@@ -20,7 +20,7 @@ use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 use crate::futures::{Future, IntoFuture};
 use crate::rest_api::{
     actix_web_1::{into_bytes, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse, BIOME_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 #[cfg(feature = "biome-key-management")]
@@ -44,7 +44,7 @@ const BIOME_USER_PROTOCOL_MIN: u32 = 1;
 /// Defines a REST endpoint to list users from the db
 pub fn make_list_route(credentials_store: Arc<dyn CredentialsStore>) -> Resource {
     let resource = Resource::build("/biome/users").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_LIST_USERS_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_LIST_USERS_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {
@@ -86,7 +86,7 @@ pub fn make_user_routes(
     key_store: Arc<dyn KeyStore>,
 ) -> Resource {
     let resource = Resource::build("/biome/users/{id}").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_USER_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_USER_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {

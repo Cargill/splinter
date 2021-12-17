@@ -23,14 +23,14 @@ use crate::oauth::OAuthClient;
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse, OAUTH_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 const OAUTH_LOGIN_MIN: u32 = 1;
 
 pub fn make_login_route(client: OAuthClient) -> Resource {
     let resource = Resource::build("/oauth/login").add_request_guard(
-        ProtocolVersionRangeGuard::new(OAUTH_LOGIN_MIN, OAUTH_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(OAUTH_LOGIN_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {
@@ -213,7 +213,7 @@ mod tests {
             .build()
             .expect("Failed to build client")
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 
@@ -274,7 +274,7 @@ mod tests {
             .build()
             .expect("Failed to build client")
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Referer", CLIENT_REDIRECT_URL)
             .send()
             .expect("Failed to perform request");
@@ -332,7 +332,7 @@ mod tests {
             .build()
             .expect("Failed to build client")
             .get(url)
-            .header("SplinterProtocolVersion", OAUTH_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .send()
             .expect("Failed to perform request");
 

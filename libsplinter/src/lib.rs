@@ -20,7 +20,7 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-#[cfg(feature = "rest-api")]
+#[cfg(feature = "rest-api-actix-web-1")]
 extern crate serde_json;
 #[macro_use]
 #[cfg(feature = "diesel")]
@@ -103,7 +103,7 @@ pub mod store;
 pub mod threading;
 pub mod transport;
 
-#[cfg(feature = "rest-api")]
+#[cfg(feature = "rest-api-actix-web-1")]
 pub use actix_web;
-#[cfg(feature = "rest-api")]
+#[cfg(feature = "rest-api-actix-web-1")]
 pub use futures;

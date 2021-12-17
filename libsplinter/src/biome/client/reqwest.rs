@@ -19,7 +19,7 @@ use std::convert::From;
 use reqwest::{blocking::Client, StatusCode};
 
 use crate::error::InternalError;
-use crate::rest_api::BIOME_PROTOCOL_VERSION;
+use crate::rest_api::SPLINTER_PROTOCOL_VERSION;
 
 use super::{Authorization, BiomeClient, Credentials, Key, NewKey, Profile, UpdateUser};
 
@@ -59,7 +59,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn register(&self, username: &str, password: &str) -> Result<Credentials, InternalError> {
         let request = Client::new()
             .post(&format!("{}/biome/register", self.url))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .json(&json!({
                 "username": username,
                 "hashed_password": password,
@@ -112,7 +112,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn login(&self, username: &str, password: &str) -> Result<Authorization, InternalError> {
         let request = Client::new()
             .post(&format!("{}/biome/login", self.url))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .json(&json!({
                 "username": username,
                 "hashed_password": password,
@@ -164,7 +164,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn logout(&self) -> Result<(), InternalError> {
         let request = Client::new()
             .patch(&format!("{}/biome/logout", self.url))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?);
 
         let response = request.send();
@@ -207,7 +207,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn get_new_access_token(&self, refresh_token: &str) -> Result<String, InternalError> {
         let request = Client::new()
             .post(&format!("{}/biome/token", self.url))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?)
             .json(&json!({ "token": refresh_token }));
 
@@ -258,7 +258,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn verify(&self, username: &str, password: &str) -> Result<(), InternalError> {
         let request = Client::new()
             .post(&format!("{}/biome/verify", self.url))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?)
             .json(&json!({"username": username, "hashed_password": password}));
 
@@ -302,7 +302,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn list_users(&self) -> Result<Box<dyn Iterator<Item = Credentials>>, InternalError> {
         let request = Client::new()
             .get(&format!("{}/biome/users?limit={}", self.url, PAGING_LIMIT))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?);
 
         let response = request.send();
@@ -363,7 +363,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn get_user(&self, user_id: &str) -> Result<Option<Credentials>, InternalError> {
         let request = Client::new()
             .get(&format!("{}/biome/users/{}", self.url, user_id))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?);
 
         let response = request.send();
@@ -419,7 +419,7 @@ impl BiomeClient for ReqwestBiomeClient {
     ) -> Result<Box<dyn Iterator<Item = Key>>, InternalError> {
         let request = Client::new()
             .put(&format!("{}/biome/users/{}", self.url, user_id))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?)
             .json(&ClientUpdateUser::from(updated_user));
 
@@ -474,7 +474,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn delete_user(&self, user_id: &str) -> Result<(), InternalError> {
         let request = Client::new()
             .delete(&format!("{}/biome/users/{}", self.url, user_id))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?);
 
         let response = request.send();
@@ -520,7 +520,7 @@ impl BiomeClient for ReqwestBiomeClient {
                 "{}/biome/profiles?limit={}",
                 self.url, PAGING_LIMIT
             ))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?);
 
         let response = request.send();
@@ -581,7 +581,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn get_profile(&self, user_id: &str) -> Result<Option<Profile>, InternalError> {
         let request = Client::new()
             .get(&format!("{}/biome/profiles/{}", self.url, user_id))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?);
 
         let response = request.send();
@@ -630,7 +630,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn list_user_keys(&self) -> Result<Box<dyn Iterator<Item = Key>>, InternalError> {
         let request = Client::new()
             .get(&format!("{}/biome/keys?limit={}", self.url, PAGING_LIMIT))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?);
 
         let response = request.send();
@@ -684,7 +684,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn update_key(&self, public_key: &str, new_display_name: &str) -> Result<(), InternalError> {
         let request = Client::new()
             .patch(&format!("{}/biome/keys", self.url))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?)
             .json(&json!({
                 "public_key": public_key,
@@ -731,7 +731,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn add_key(&self, user_id: &str, new_key: NewKey) -> Result<(), InternalError> {
         let request = Client::new()
             .post(&format!("{}/biome/keys", self.url))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?)
             .json(&ClientKey::from((user_id.to_string(), new_key)));
 
@@ -776,7 +776,7 @@ impl BiomeClient for ReqwestBiomeClient {
         let keys: Vec<ClientNewKey> = keys.into_iter().map(ClientNewKey::from).collect();
         let request = Client::new()
             .put(&format!("{}/biome/keys", self.url))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?)
             .json(&keys);
 
@@ -820,7 +820,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn get_key(&self, public_key: &str) -> Result<Option<Key>, InternalError> {
         let request = Client::new()
             .get(&format!("{}/biome/keys/{}", self.url, public_key))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?);
 
         let response = request.send();
@@ -873,7 +873,7 @@ impl BiomeClient for ReqwestBiomeClient {
     fn delete_key(&self, public_key: &str) -> Result<Option<Key>, InternalError> {
         let request = Client::new()
             .delete(&format!("{}/biome/keys/{}", self.url, public_key))
-            .header("SplinterProtocolVersion", BIOME_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
             .header("Authorization", &self.auth()?);
 
         let response = request.send();

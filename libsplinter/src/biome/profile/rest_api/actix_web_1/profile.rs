@@ -22,14 +22,14 @@ use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
     auth::identity::Identity,
-    ErrorResponse, BIOME_PROTOCOL_VERSION,
+    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
 const BIOME_FETCH_PROFILE_PROTOCOL_MIN: u32 = 1;
 
 pub fn make_profile_route(profile_store: Arc<dyn UserProfileStore>) -> Resource {
     let resource = Resource::build("/biome/profile").add_request_guard(
-        ProtocolVersionRangeGuard::new(BIOME_FETCH_PROFILE_PROTOCOL_MIN, BIOME_PROTOCOL_VERSION),
+        ProtocolVersionRangeGuard::new(BIOME_FETCH_PROFILE_PROTOCOL_MIN, SPLINTER_PROTOCOL_VERSION),
     );
     #[cfg(feature = "authorization")]
     {
