@@ -1,5 +1,62 @@
 # Release Notes
 
+## Changes in splinter 0.6.1
+
+### Highlights
+
+* Add a `state migrate` command for migrating state between database backends.
+
+* Update stores to support write-exclusivity for database backends. This fixes
+  a database lock contention issue seen with SQLite deployments.
+
+### libsplinter
+
+* Add validation that no SQL backed trees exist if LMDB is enabled.
+
+* Add `OrchestratableService` to `Orchestrator`.
+
+* Remove lock-contention in `Orchestrator` REST API calls.
+
+* REST API features have been reorganized, placing all Actix Web 1 related code
+  under the `"rest-api-actix-web-1"` related feature.
+
+* Several public const values in `crate::protocol` have been moved or made
+  private; REST API clients should fill SplinterProtocolVersion to match the
+  REST API specification being referenced during development.
+
+* Update stores to support write-exclusivity for database backends.
+
+* The `crate::channel` module which was previously pub is now pub(crate) as it
+  is not a useful external to libsplinter and specific channel implementation
+  details may change in future releases.
+
+### splinter CLI
+
+* Implement `splinter state migrate` command. This command enables moving
+  scabbard state to or from LMDB, deleting from the input database.
+
+### splinterd
+
+* Adjust the default log settings to filter logs at the appender level.
+
+* Change logic behind the `-v` verbosity flag to work better with customized
+  log configurations
+
+* Move `"authorization-handler-rbac"` to the `"default"` feature set.
+
+* Update the REST API tests with authorization support.
+
+* Enable exclusive writes for SQLite database connection pools
+
+### libscabbard
+
+* Implement `OrchestratableService` on `ScabbardService`
+
+* Update stores to support write-exclusivity for database backends.
+
+* Update `ScabbardFactory` to include optional write-exclusive SQLite
+  configuration.
+
 ## Changes in Splinter 0.5.26
 
 ### Highlights
