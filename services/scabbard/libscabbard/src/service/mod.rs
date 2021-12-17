@@ -27,7 +27,7 @@ mod state;
 use std::any::Any;
 use std::collections::{HashSet, VecDeque};
 use std::convert::TryFrom;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use cylinder::Verifier as SignatureVerifier;
@@ -118,7 +118,7 @@ impl Scabbard {
         peer_services: HashSet<String>,
         merkle_state: MerkleState,
         commit_hash_store: Box<dyn CommitHashStore>,
-        receipt_store: Arc<RwLock<dyn ReceiptStore>>,
+        receipt_store: Arc<dyn ReceiptStore>,
         purge_handler: Box<dyn ScabbardStatePurgeHandler>,
         signature_verifier: Box<dyn SignatureVerifier>,
         // The public keys that are authorized to create and manage sabre contracts
@@ -554,7 +554,7 @@ pub mod tests {
             HashSet::new(),
             merkle_state,
             commit_hash_store,
-            Arc::new(RwLock::new(MockReceiptStore)),
+            Arc::new(MockReceiptStore),
             Box::new(NoOpScabbardStatePurgeHandler),
             Secp256k1Context::new().new_verifier(),
             vec![],
@@ -578,7 +578,7 @@ pub mod tests {
             HashSet::new(),
             merkle_state,
             commit_hash_store,
-            Arc::new(RwLock::new(MockReceiptStore)),
+            Arc::new(MockReceiptStore),
             Box::new(NoOpScabbardStatePurgeHandler),
             Secp256k1Context::new().new_verifier(),
             vec![],
@@ -601,7 +601,7 @@ pub mod tests {
             HashSet::new(),
             merkle_state,
             commit_hash_store,
-            Arc::new(RwLock::new(MockReceiptStore)),
+            Arc::new(MockReceiptStore),
             Box::new(NoOpScabbardStatePurgeHandler),
             Secp256k1Context::new().new_verifier(),
             vec![],

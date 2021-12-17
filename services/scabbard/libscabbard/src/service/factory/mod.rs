@@ -735,14 +735,14 @@ impl ScabbardFactory {
             self.create_sql_merkle_state_purge_handle(circuit_id, &service_id),
         );
 
-        let (receipt_store, commit_hash_store): (Arc<RwLock<dyn ReceiptStore>>, Box<dyn CommitHashStore>) =
+        let (receipt_store, commit_hash_store): (Arc<dyn ReceiptStore>, Box<dyn CommitHashStore>) =
             match &self.store_factory_config {
                 #[cfg(feature = "postgres")]
                 ScabbardFactoryStorageConfig::Postgres { pool } => (
-                    Arc::new(RwLock::new(DieselReceiptStore::new(
+                    Arc::new(DieselReceiptStore::new(
                         pool.clone(),
                         Some(format!("{}::{}", circuit_id, service_id)),
-                    ))),
+                    )),
                     Box::new(DieselCommitHashStore::new(
                         pool.clone(),
                         circuit_id,
@@ -751,10 +751,10 @@ impl ScabbardFactory {
                 ),
                 #[cfg(feature = "sqlite")]
                 ScabbardFactoryStorageConfig::Sqlite { pool } => (
-                    Arc::new(RwLock::new(DieselReceiptStore::new(
+                    Arc::new(DieselReceiptStore::new(
                         pool.clone(),
                         Some(format!("{}::{}", circuit_id, service_id)),
-                    ))),
+                    )),
                     Box::new(DieselCommitHashStore::new(
                         pool.clone(),
                         circuit_id,
@@ -763,10 +763,10 @@ impl ScabbardFactory {
                 ),
                 #[cfg(feature = "sqlite")]
                 ScabbardFactoryStorageConfig::SqliteExclusiveWrites { pool } => (
-                    Arc::new(RwLock::new(DieselReceiptStore::new_with_write_exclusivity(
+                    Arc::new(DieselReceiptStore::new_with_write_exclusivity(
                         pool.clone(),
                         Some(format!("{}::{}", circuit_id, service_id)),
-                    ))),
+                    )),
                     Box::new(DieselCommitHashStore::new_with_write_exclusivity(
                         pool.clone(),
                         circuit_id,
