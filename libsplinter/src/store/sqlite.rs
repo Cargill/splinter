@@ -201,9 +201,6 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCu
         conn.batch_execute(
             r#"
             PRAGMA busy_timeout = 2000;
-            PRAGMA journal_mode = WAL;
-            PRAGMA wal_checkpoint(truncate);
-            PRAGMA synchronous = FULL;
             PRAGMA foreign_keys = ON;
             "#,
         )
