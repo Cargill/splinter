@@ -19,7 +19,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::sync::{
     mpsc::{channel, Receiver, Sender, TryRecvError},
-    Arc, RwLock,
+    Arc,
 };
 use std::time::{Duration, Instant, SystemTime};
 
@@ -67,7 +67,7 @@ pub struct ScabbardState {
     context_manager: ContextManager,
     executor: Executor,
     current_state_root: String,
-    receipt_store: Arc<RwLock<dyn ReceiptStore>>,
+    receipt_store: Arc<dyn ReceiptStore>,
     pending_changes: Option<(String, Vec<TransactionReceipt>)>,
     event_subscribers: Vec<Box<dyn StateSubscriber>>,
     #[cfg(feature = "metrics")]
@@ -81,7 +81,7 @@ impl ScabbardState {
     pub fn new(
         merkle_state: merkle_state::MerkleState,
         commit_hash_store: Box<dyn CommitHashStore>,
-        receipt_store: Arc<RwLock<dyn ReceiptStore>>,
+        receipt_store: Arc<dyn ReceiptStore>,
         #[cfg(feature = "metrics")] service_id: String,
         #[cfg(feature = "metrics")] circuit_id: String,
         admin_keys: Vec<String>,
@@ -287,13 +287,6 @@ impl ScabbardState {
                     .collect::<Result<Vec<_>, _>>()?;
 
                 self.receipt_store
-                    .write()
-                    .map_err(|err| {
-                        ScabbardStateError(format!(
-                            "transaction receipt store lock poisoned: {}",
-                            err
-                        ))
-                    })?
                     .add_txn_receipts(txn_receipts)
                     .map_err(|err| {
                         ScabbardStateError(format!(
@@ -454,14 +447,14 @@ enum EventQuery {
 /// An iterator that wraps the `ReceiptStore` and returns `StateChangeEvent`s using an
 /// in-memory cache.
 pub struct Events {
-    receipt_store: Arc<RwLock<dyn ReceiptStore>>,
+    receipt_store: Arc<dyn ReceiptStore>,
     query: EventQuery,
     cache: VecDeque<StateChangeEvent>,
 }
 
 impl Events {
     fn new(
-        receipt_store: Arc<RwLock<dyn ReceiptStore>>,
+        receipt_store: Arc<dyn ReceiptStore>,
         start_id: Option<String>,
     ) -> Result<Self, ScabbardStateError> {
         let mut iter = Events {
@@ -476,14 +469,10 @@ impl Events {
     fn reload_cache(&mut self) -> Result<(), ScabbardStateError> {
         match self.query {
             EventQuery::Fetch(ref start_id) => {
-                let receipt_store = self.receipt_store.read().map_err(|err| {
-                    ScabbardStateError(format!("transaction receipt store lock poisoned: {}", err))
-                })?;
-
                 self.cache = if let Some(id) = start_id.as_ref() {
-                    receipt_store.list_receipts_since(Some(id.clone()))
+                    self.receipt_store.list_receipts_since(Some(id.clone()))
                 } else {
-                    receipt_store.list_receipts_since(None)
+                    self.receipt_store.list_receipts_since(None)
                 }
                 .map_err(|err| {
                     ScabbardStateError(format!(
@@ -969,10 +958,10 @@ mod tests {
     fn empty_event_iterator() {
         let pool = create_connection_pool_and_migrate(":memory:".to_string());
 
-        let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
+        let receipt_store = Arc::new(DieselReceiptStore::new(
             pool,
             Some("empty_event_iterator".into()),
-        )));
+        ));
 
         // Test without a specified start
         let all_events =
@@ -1000,14 +989,9 @@ mod tests {
 
         let pool = create_connection_pool_and_migrate(":memory:".to_string());
 
-        let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
-            pool,
-            Some("event_iterator".into()),
-        )));
+        let receipt_store = Arc::new(DieselReceiptStore::new(pool, Some("event_iterator".into())));
 
         receipt_store
-            .write()
-            .expect("failed to get write lock")
             .add_txn_receipts(receipts.clone())
             .expect("failed to add receipts to store");
 
@@ -1038,10 +1022,10 @@ mod tests {
     #[test]
     fn get_state_at_address() {
         // Initialize state
-        let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
+        let receipt_store = Arc::new(DieselReceiptStore::new(
             create_connection_pool_and_migrate(":memory:".to_string()),
             None,
-        )));
+        ));
 
         let db = create_btree_db();
         let merkle_state = MerkleState::new(MerkleStateConfig::key_value(db.clone_box()))
@@ -1111,10 +1095,10 @@ mod tests {
     ///    that no entries are returned (the iterator is empty).
     #[test]
     fn get_state_with_prefix() {
-        let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
+        let receipt_store = Arc::new(DieselReceiptStore::new(
             create_connection_pool_and_migrate(":memory:".to_string()),
             None,
-        )));
+        ));
 
         let db = create_btree_db();
         let merkle_state = MerkleState::new(MerkleStateConfig::key_value(db.clone_box()))

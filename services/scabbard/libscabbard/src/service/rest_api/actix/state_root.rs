@@ -68,7 +68,7 @@ pub fn make_get_state_root_endpoint() -> ServiceEndpoint {
 mod tests {
     use super::*;
 
-    use std::sync::{Arc, Mutex, RwLock};
+    use std::sync::{Arc, Mutex};
 
     use cylinder::{secp256k1::Secp256k1Context, Context};
     use diesel::{
@@ -128,10 +128,10 @@ mod tests {
     fn state_root() {
         let (merkle_state, commit_hash_store) = create_merkle_state_and_commit_hash_store();
 
-        let receipt_store = Arc::new(RwLock::new(DieselReceiptStore::new(
+        let receipt_store = Arc::new(DieselReceiptStore::new(
             create_connection_pool_and_migrate(":memory:".to_string()),
             None,
-        )));
+        ));
 
         // Initialize a temporary scabbard state and set some values to pre-populate the DBs, then
         // get the resulting state root hash.
