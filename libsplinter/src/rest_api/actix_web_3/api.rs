@@ -27,7 +27,6 @@ use futures_0_3::executor::block_on;
 use openssl::ssl::SslAcceptorBuilder;
 
 use crate::error::InternalError;
-use crate::rest_api::RestApiServerError;
 use crate::threading::lifecycle::ShutdownHandle;
 
 use super::ResourceProvider;
@@ -60,7 +59,7 @@ impl RestApi {
         bind_url: String,
         bind_acceptor_builder: Option<SslAcceptorBuilder>,
         resource_providers: Vec<Box<dyn ResourceProvider>>,
-    ) -> Result<Self, RestApiServerError> {
+    ) -> Result<Self, InternalError> {
         let providers: Arc<Mutex<Vec<_>>> = Arc::new(Mutex::new(resource_providers));
         let (sender, receiver) = mpsc::channel();
 
@@ -120,7 +119,8 @@ impl RestApi {
                     Ok(()) => info!("Rest API terminating"),
                     Err(err) => error!("REST API unexpectedly exiting: {}", err),
                 };
-            })?;
+            })
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
         let (server, bind_addresses) = loop {
             match receiver.recv() {
@@ -128,12 +128,9 @@ impl RestApi {
                     break (server, bind_address);
                 }
                 Ok(FromThreadMessage::IoError(err, error_msg)) => Err(
-                    RestApiServerError::StartUpError(format!("{}: {}", error_msg, err)),
+                    InternalError::from_source_with_message(Box::new(err), error_msg),
                 ),
-                Err(err) => Err(RestApiServerError::StartUpError(format!(
-                    "Error receiving message from Rest Api thread: {}",
-                    err
-                ))),
+                Err(err) => Err(InternalError::from_source(Box::new(err))),
             }?;
         };
 

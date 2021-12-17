@@ -14,7 +14,8 @@
 
 //! Contains the implementation of `RestApiBuilder`.
 
-use crate::rest_api::{BindConfig, RestApiServerError};
+use crate::error::InvalidStateError;
+use crate::rest_api::BindConfig;
 
 use super::{ResourceProvider, RunnableRestApi};
 
@@ -48,10 +49,10 @@ impl RestApiBuilder {
     }
 
     /// Validate the arguments and build the `RunnableRestApi` struct.
-    pub fn build(self) -> Result<RunnableRestApi, RestApiServerError> {
-        let bind = self
-            .bind
-            .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
+    pub fn build(self) -> Result<RunnableRestApi, InvalidStateError> {
+        let bind = self.bind.ok_or_else(|| {
+            InvalidStateError::with_message("Missing required field: 'bind'".to_string())
+        })?;
 
         Ok(RunnableRestApi {
             bind,

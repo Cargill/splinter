@@ -14,7 +14,8 @@
 
 //! Contains the implementation of `RunnableRestApi`.
 
-use crate::rest_api::{BindConfig, RestApiServerError};
+use crate::error::InternalError;
+use crate::rest_api::BindConfig;
 
 use super::{ResourceProvider, RestApi};
 
@@ -27,7 +28,7 @@ pub struct RunnableRestApi {
 impl RunnableRestApi {
     /// Start the REST API and finish any necessary setup such as binding to ports, adding resource
     /// endpoints, etc.
-    pub fn run(self) -> Result<RestApi, RestApiServerError> {
+    pub fn run(self) -> Result<RestApi, InternalError> {
         let RunnableRestApi {
             resource_providers,
             bind,
@@ -40,10 +41,17 @@ impl RunnableRestApi {
                 key_path,
             } => {
                 let mut acceptor =
-                    openssl::ssl::SslAcceptor::mozilla_modern(openssl::ssl::SslMethod::tls())?;
-                acceptor.set_private_key_file(key_path, openssl::ssl::SslFiletype::PEM)?;
-                acceptor.set_certificate_chain_file(&cert_path)?;
-                acceptor.check_private_key()?;
+                    openssl::ssl::SslAcceptor::mozilla_modern(openssl::ssl::SslMethod::tls())
+                        .map_err(|e| InternalError::from_source(Box::new(e)))?;
+                acceptor
+                    .set_private_key_file(key_path, openssl::ssl::SslFiletype::PEM)
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?;
+                acceptor
+                    .set_certificate_chain_file(&cert_path)
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?;
+                acceptor
+                    .check_private_key()
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
                 (bind, Some(acceptor))
             }
