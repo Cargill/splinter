@@ -1,5 +1,26 @@
 # Release Notes
 
+## Changes in Splinter 0.7.0
+
+### Highlights
+
+* Add a state migrate command for migrating state between database backends.
+
+* Update stores to support write-exclusivity for database backends
+
+### splinterd
+
+* Adjust the default log settings to squash bugs and adjust what subset of logs
+  are written out.
+
+* Move `"authorization-handler-rbac"` to default feature set.
+
+* Update the REST API tests with authorization support.
+
+### libsplinter
+
+* Remove the `health` service.
+
 ## Changes in splinter 0.6.0
 
 ## libsplinter
