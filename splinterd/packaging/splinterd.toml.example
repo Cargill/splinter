@@ -273,14 +273,26 @@ version = "1"
 # Optional for non-root loggers, defaults to the root loggers level.
 #level = "Warn"
 #
-# By default there are two non-root loggers configured. 
+# By default there are six non-root loggers configured. 
 #
 #[loggers.splinter]
-#appenders = ["stdout"]
-#level = "Info"
+#level = "Trace"
 #
 #[loggers.splinterd]
-#appenders = ["stdout"]
-#level = "Info"
+#level = "Trace"
 #
-# These two loggers select for the logs related to Splinter operations.
+#[loggers.scabbard]
+#level = "Trace"
+#
+#[loggers.sawtooth]
+#level = "Trace"
+#
+#[loggers.cylinder]
+#level = "Trace"
+#
+#[loggers.transact]
+#level = "Trace"
+#
+# These five loggers select for the logs related to Splinter operations. Their
+# appenders fields are not set so they inherit their appenders from the root
+# logger.
