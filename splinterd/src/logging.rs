@@ -185,19 +185,6 @@ pub fn configure_logging(
     };
     let loggers = if let Some(loggers) = config.loggers() {
         loggers
-            .iter()
-            .map(|l| {
-                if l.name == "splinterd" {
-                    LoggerConfig {
-                        level: Some(config.verbosity()),
-                        name: l.name.to_owned(),
-                        appenders: l.appenders.to_owned(),
-                    }
-                } else {
-                    l.to_owned()
-                }
-            })
-            .collect()
     } else {
         vec![]
     };
