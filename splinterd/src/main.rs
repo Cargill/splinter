@@ -229,6 +229,7 @@ fn main() {
                 .long_help("Publicly-visible network endpoints")
                 .takes_value(true)
                 .multiple(true)
+                .use_delimiter(true)
                 .alias("advertised-endpoint"),
         )
         .arg(
@@ -254,6 +255,7 @@ fn main() {
                 .long_help("Endpoints to connect to the network, protocol-prefix://ip:port")
                 .takes_value(true)
                 .multiple(true)
+                .use_delimiter(true)
                 .alias("network-endpoint"),
         )
         .arg(
@@ -279,6 +281,7 @@ fn main() {
                 )
                 .takes_value(true)
                 .multiple(true)
+                .use_delimiter(true)
                 .alias("peer"),
         )
         .arg(
@@ -293,6 +296,7 @@ fn main() {
                 .help("Read-only Splinter registries")
                 .takes_value(true)
                 .multiple(true)
+                .use_delimiter(true)
                 .alias("registry"),
         )
         .arg(
@@ -387,6 +391,7 @@ fn main() {
             .multiple(true)
             .required(false)
             .takes_value(true)
+            .use_delimiter(true)
             .help("Whitelisted domains"),
     );
 
