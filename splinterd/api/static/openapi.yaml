@@ -26,7 +26,7 @@ paths:
   /status:
     get:
       tags:
-        - diagnostics
+        - Diagnostics
       description: |
         Used to check if server is successfully running
 
@@ -389,8 +389,8 @@ paths:
                   message:
                     type: string
                     enum:
-                      - true
-                      - false
+                      - "true"
+                      - "false"
         '401':
           description: The client is unauthorized
     post:
@@ -1136,15 +1136,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
                 properties:
                   message:
                     type: string
                     example: "User created successfully"
                   data:
                     type: object
-                    example:
-                      ref: '#/components/schemas/BiomeNewUser'
+                    $ref: '#/components/schemas/BiomeNewUser'
         '400':
           description: Invalid request
           content:
@@ -1491,11 +1489,14 @@ paths:
             schema:
               properties:
                 username:
+                  type: string
                   description: Existing username of user
                 hashed_password:
+                  type: string
                   description: |
                     Hashed password to be used for user authentication
                 new_password:
+                  type: string
                   description: |
                     Hash of the new password to be used for user authentication
                 new_key_pairs:
@@ -1505,9 +1506,6 @@ paths:
               required:
                 - username
                 - hashed_password
-                - display_name
-                - public_key
-                - encrypted_private_key
               example:
                 username: alice@acme.com
                 hashed_password: |-
@@ -1760,8 +1758,10 @@ paths:
             schema:
               properties:
                 public_key:
+                  type: string
                   description: Public key
                 new_display_name:
+                  type: string
                   description: |
                     Updated display name for the key
               required:
@@ -2160,6 +2160,14 @@ components:
         example: 2
 
   schemas:
+    BiomeNewUser:
+      additionalProperties: false
+      properties:
+        user_id:
+          type: string
+        username:
+          type: string
+
     Error:
       additionalProperties: false
       properties:
@@ -2176,7 +2184,7 @@ components:
         code:
           description: Error code
           type: string
-          example: 400
+          example: "400"
         message:
           description: A message describing the error that occurred
           type: string
@@ -2200,6 +2208,7 @@ components:
           type: string
           example: Cargill Node 009
         service_endpoint:
+          type: string
           description: The node's service endpoint
           example: tcp://foo.bar.biz
         network_endpoints:
@@ -2645,3 +2654,13 @@ components:
 tags:
   - name: Biome
     description: Routes supporting user management in Splinter applications. Optionally compiled.
+  - name: Proposals
+  - name: Admin Service
+  - name: Circuits
+  - name: Authorization
+  - name: Permissions
+  - name: Roles
+  - name: RBAC
+  - name: Splinter Registry
+  - name: Scabbard
+  - name: OAuth
