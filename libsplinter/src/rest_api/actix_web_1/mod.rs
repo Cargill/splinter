@@ -23,7 +23,7 @@ mod websocket;
 pub use api::{RestApi, RestApiShutdownHandle};
 pub use auth::{get_authorization_token, require_header, AuthConfig};
 pub use builder::RestApiBuilder;
-pub use error::ResponseError;
+pub use error::{RequestError, ResponseError, RestApiServerError};
 pub use guard::{Continuation, ProtocolVersionRangeGuard, RequestGuard};
 pub use resource::{
     into_bytes, into_protobuf, HandlerFunction, Method, Resource, RestResourceProvider,

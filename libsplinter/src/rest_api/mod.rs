@@ -74,7 +74,6 @@ pub mod actix_web_3;
 pub mod auth;
 #[cfg(feature = "rest-api-cors")]
 pub mod cors;
-mod errors;
 pub mod paging;
 mod response_models;
 pub mod secrets;
@@ -88,8 +87,6 @@ use std::boxed::Box;
 #[cfg(feature = "oauth")]
 use crate::oauth::{rest_api::OAuthResourceProvider, store::InflightOAuthRequestStore};
 
-pub use errors::{RequestError, RestApiServerError};
-
 pub use response_models::ErrorResponse;
 
 #[cfg(feature = "rest-api-actix-web-1")]
@@ -99,6 +96,7 @@ pub use actix_web_1::{
     Request, RequestGuard, Resource, Response, ResponseError, RestApi, RestApiBuilder,
     RestApiShutdownHandle, RestResourceProvider,
 };
+pub use actix_web_1::{RequestError, RestApiServerError};
 
 #[cfg(any(
     feature = "admin-service",

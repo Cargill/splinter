@@ -28,12 +28,12 @@ use crate::rest_api::auth::identity::cylinder::CylinderKeyIdentityProvider;
 use crate::rest_api::{
     auth::identity::oauth::OAuthUserIdentityProvider, OAuthConfig, OAuthResourceProvider,
 };
-use crate::rest_api::{auth::identity::IdentityProvider, BindConfig, RestApiServerError};
+use crate::rest_api::{auth::identity::IdentityProvider, BindConfig};
 
 use super::AuthConfig;
 #[cfg(any(feature = "biome-credentials", feature = "oauth"))]
 use super::RestResourceProvider;
-use super::{Resource, RestApi};
+use super::{Resource, RestApi, RestApiServerError};
 
 /// Builder `struct` for `RestApi`.
 #[derive(Default)]

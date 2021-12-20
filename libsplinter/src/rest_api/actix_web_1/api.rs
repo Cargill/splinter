@@ -25,11 +25,11 @@ use crate::rest_api::auth::authorization::{
 use crate::rest_api::auth::{actix::Authorization, identity::IdentityProvider};
 #[cfg(feature = "rest-api-cors")]
 use crate::rest_api::cors::Cors;
-use crate::rest_api::{BindConfig, RestApiServerError};
+use crate::rest_api::BindConfig;
 
-use super::Resource;
 #[cfg(feature = "authorization")]
 use super::RestResourceProvider;
+use super::{Resource, RestApiServerError};
 
 /// Shutdown handle returned by `RestApi::run`. Allows rest api instance to be shut down
 /// gracefully.

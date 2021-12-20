@@ -22,11 +22,11 @@ use crate::biome::credentials::rest_api::BiomeCredentialsRestResourceProvider;
 use crate::biome::OAuthUserSessionStore;
 #[cfg(all(feature = "oauth", feature = "biome-profile"))]
 use crate::biome::UserProfileStore;
+use crate::rest_api::auth::identity::IdentityProvider;
 #[cfg(feature = "oauth")]
 use crate::rest_api::OAuthConfig;
-use crate::rest_api::{auth::identity::IdentityProvider, RequestError};
 
-use super::Resource;
+use super::{RequestError, Resource};
 
 /// Configurations for the various authentication methods supported by the Splinter REST API.
 pub enum AuthConfig {
