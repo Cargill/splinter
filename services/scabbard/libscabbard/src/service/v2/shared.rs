@@ -27,9 +27,9 @@ use splinter::{
 };
 
 use crate::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
+use crate::service::ScabbardVersion;
 
 use super::error::ScabbardError;
-use super::ScabbardVersion;
 
 const DEFAULT_PENDING_BATCH_LIMIT: usize = 30;
 

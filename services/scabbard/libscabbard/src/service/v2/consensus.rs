@@ -29,11 +29,10 @@ use splinter::consensus::{
 use transact::protos::IntoBytes;
 
 use crate::protos::scabbard::{ProposedBatch, ScabbardMessage, ScabbardMessage_Type};
+use crate::service::{state::ScabbardState, ScabbardVersion};
 
 use super::error::{ScabbardConsensusManagerError, ScabbardError};
 use super::shared::ScabbardShared;
-use super::state::ScabbardState;
-use super::ScabbardVersion;
 
 /// Component used by the service to manage and interact with consenus
 pub struct ScabbardConsensusManager {

@@ -50,7 +50,6 @@ use crate::service::rest_api::actix;
 use crate::service::ScabbardStatePurgeHandler;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use crate::service::{
-    error::ScabbardError,
     state::merkle_state::{self, MerkleState, MerkleStateConfig},
     Scabbard, ScabbardVersion, SERVICE_TYPE,
 };
@@ -60,6 +59,9 @@ use crate::store::diesel::DieselCommitHashStore;
 use crate::store::transact::factory::{LmdbDatabaseFactory, LmdbDatabasePurgeHandle};
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use crate::store::CommitHashStore;
+
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+use super::error::ScabbardError;
 
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 const DEFAULT_LMDB_DIR: &str = "/var/lib/splinter";
@@ -1020,8 +1022,8 @@ mod tests {
             .as_any()
             .downcast_ref::<Scabbard>()
             .expect("failed to downcast Service to Scabbard");
-        assert_eq!(&scabbard.service_id, "0");
-        assert_eq!(&scabbard.circuit_id, "1");
+        assert_eq!(scabbard.service_id(), "0");
+        assert_eq!(scabbard.circuit_id(), "1");
     }
 
     /// Verify that the scabbard factory produces a valid `Scabbard` instance if the service
@@ -1039,8 +1041,8 @@ mod tests {
             .as_any()
             .downcast_ref::<Scabbard>()
             .expect("failed to downcast Service to Scabbard");
-        assert_eq!(&scabbard.service_id, "2");
-        assert_eq!(&scabbard.circuit_id, "1");
+        assert_eq!(scabbard.service_id(), "2");
+        assert_eq!(scabbard.circuit_id(), "1");
     }
 
     /// Verify that the `coordinator_timeout` service argument is properly set for a new `Scabbard`
@@ -1059,7 +1061,7 @@ mod tests {
             .downcast_ref::<Scabbard>()
             .expect("failed to downcast Service to Scabbard");
 
-        assert_eq!(scabbard.coordinator_timeout, Duration::from_millis(123));
+        assert_eq!(*scabbard.coordinator_timeout(), Duration::from_millis(123));
     }
 
     /// Verify that `Scabbard` creation fails when the `peer_services` argument isn't specified.
