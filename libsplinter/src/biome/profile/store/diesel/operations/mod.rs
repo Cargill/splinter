@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides [UserProfileStore] operations implemented for a diesel backend
+//! Provides [`UserProfileStore`](crate::biome::profile::store::UserProfileStore) operations
+//! implemented for a diesel backend
 
 pub(super) mod add_profile;
 pub(super) mod get_profile;
