@@ -23,6 +23,7 @@ pub(crate) mod factory;
 mod rest_api;
 mod shared;
 mod state;
+mod version;
 
 use std::any::Any;
 use std::collections::{HashSet, VecDeque};
@@ -61,30 +62,11 @@ pub use state::{
     BatchInfo, BatchInfoIter, BatchStatus, Events, StateChange, StateChangeEvent, StateIter,
 };
 use state::{ScabbardState, StateSubscriber};
+pub use version::ScabbardVersion;
 
 const SERVICE_TYPE: &str = "scabbard";
 
 const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
-
-/// Specifies the version of scabbard to use.
-#[derive(Clone, Copy, PartialEq)]
-pub enum ScabbardVersion {
-    V1,
-    V2,
-}
-
-impl TryFrom<Option<&str>> for ScabbardVersion {
-    type Error = String;
-
-    fn try_from(str_opt: Option<&str>) -> Result<Self, Self::Error> {
-        match str_opt {
-            Some("1") => Ok(Self::V1),
-            Some("2") => Ok(Self::V2),
-            Some(v) => Err(format!("Unsupported scabbard version: {}", v)),
-            None => Ok(Self::V1),
-        }
-    }
-}
 
 /// A handler for purging a scabbard instances state
 pub trait ScabbardStatePurgeHandler: Send + Sync {
