@@ -20,6 +20,7 @@ RUN apt-get update \
  && rm -r /var/lib/apt/lists/*
 
 COPY Cargo.toml /build/Cargo.toml
+COPY README.md /build/README.md
 COPY libsplinter /build/libsplinter
 COPY splinterd /build/splinterd
 COPY cli /build/cli

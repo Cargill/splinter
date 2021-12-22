@@ -16,6 +16,7 @@ FROM splintercommunity/splinter-dev:v9 as BUILDER
 
 # Copy over splinter files
 COPY Cargo.toml /build/Cargo.toml
+COPY README.md /build/README.md
 COPY cli/Cargo.toml /build/cli/Cargo.toml
 COPY libsplinter/build.rs /build/libsplinter/build.rs
 COPY libsplinter/Cargo.toml /build/libsplinter/Cargo.toml
