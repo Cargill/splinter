@@ -85,7 +85,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization-handler-maintenance",
-    "health",
     "https-certs",
     "registry",
 ]
@@ -94,7 +93,6 @@ authorization-handler-maintenance = []
 authorization-handler-rbac = []
 circuit-template = ["splinter/circuit-template"]
 database = ["diesel"]
-health = []
 https-certs = []
 postgres = [
     "diesel/postgres",
