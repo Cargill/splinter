@@ -52,8 +52,9 @@ pub fn create_sqlite_connection_pool(
         )));
     }
     let connection_manager = ConnectionManager::<SqliteConnection>::new(conn_str);
-    let mut pool_builder =
-        Pool::builder().connection_customizer(Box::new(ConnectionCustomizer::default()));
+    let mut pool_builder = Pool::builder()
+        .connection_customizer(Box::new(ConnectionCustomizer::default()))
+        .error_handler(Box::new(HandlePoolError));
     // A new database is created for each connection to the in-memory SQLite
     // implementation; to ensure that the resulting stores will operate on the same
     // database, only one connection is allowed.
@@ -205,5 +206,18 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCu
             "#,
         )
         .map_err(diesel::r2d2::Error::QueryError)
+    }
+}
+
+#[derive(Debug)]
+struct HandlePoolError;
+
+impl diesel::r2d2::HandleError<diesel::r2d2::Error> for HandlePoolError {
+    fn handle_error(&self, error: diesel::r2d2::Error) {
+        // Ignore the logging of "database is locked" error when submitting the pragma to the new
+        // connection. The connection will be retried by the connection manager.
+        if &error.to_string() != "database is locked" {
+            error!("{}", error);
+        }
     }
 }
