@@ -367,6 +367,191 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /authorization/assignments:
+    parameters:
+      - $ref: "#/components/parameters/auth"
+      - $ref: "#/components/parameters/protocol_version"
+    get:
+      tags:
+        - Authorization
+      summary: Get all assignments
+      description: |
+        Gets all assignments.
+
+        This endpoint requires the permission "authorization.rbac.read".
+
+      parameters:
+        - $ref: "#/components/parameters/paging"
+      responses:
+        200:
+          description: Get list of all assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  $ref: "#/components/schemas/Assignment"
+        400:
+          description: Malformed query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: "400"
+                message: "Malformed Query"
+        500:
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: "500"
+                message: "Internal Server Error"
+    post:
+      tags:
+        - Authorization
+      summary:
+        Add a new assignment
+      description:
+        Adds a new assignment
+
+        This endpoint requires the permission "authorization.rbac.write".
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentPayload'
+      responses:
+        200:
+          description: The assignment has been added
+        400:
+          description: Invalid assignment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: "400"
+                message: "Invalid assignment payload"
+        500:
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: "500"
+                message: "Internal Server Error"
+
+  /authorization/assignments/{identity_type}/{identity}:
+    parameters:
+      - $ref: "#/components/parameters/auth"
+      - $ref: "#/components/parameters/protocol_version"
+      - $ref: "#/components/parameters/identity_type"
+      - $ref: "#/components/parameters/identity"
+    get:
+      tags:
+        - Authorization
+      summary:
+        Get assignment
+      description: |
+        Gets the assignment associated with the identity.
+
+        This endpoint requires the permission "authorization.rbac.read".
+      responses:
+        200:
+          description: Assignment associated with the identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentData"
+        404:
+          description: Assignment not found for given identity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "404"
+                message: "Assignment not found"
+        500:
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "500"
+                message: "Internal Server Error"
+
+    patch:
+      tags:
+        - Authorization
+      summary:
+        Update assignment.
+      description: |
+        Updates the assignment associated with the identity.
+
+        This endpoint requires the permission "authorization.rbac.write".
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignmentUpdate"
+      responses:
+        200:
+          description: Updated assignment associated with identity
+        404:
+          description: Identity not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "404"
+                message: "Identity not found"
+        409:
+          description: Assignment violates state constraints
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "409"
+                message: "Assignment is invalid"
+        500:
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "500"
+                message: "Internal Server Error"
+
+    delete:
+      tags:
+        - Authorization
+      description: |
+        Removes the assignment associated with the identity and identity_type.
+
+        This endpoint requires the permission "authorization.rbac.write".
+      responses:
+        200:
+          description: Assignment is removed.
+        500:
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "500"
+                message: "Internal Server Error"
+
   /authorization/maintenance:
     get:
       tags:
@@ -2159,6 +2344,37 @@ components:
         type: integer
         example: 2
 
+    identity_type:
+      name: identity_type
+      description: Enum of possible identity types.
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+          - key
+          - user
+
+    identity:
+      name: identity
+      description: The unique identity string.
+      in: path
+      required: true
+      schema:
+        type: string
+
+    paging:
+      name: paging_query 
+      in: query
+      description: An offset and limit for paginated results.
+      required: true
+      schema:
+        type: object
+        properties:
+          limit:
+            type: integer
+          offset:
+            type: integer
   schemas:
     BiomeNewUser:
       additionalProperties: false
@@ -2166,6 +2382,54 @@ components:
         user_id:
           type: string
         username:
+          type: string
+
+    Assignment:
+      properties:
+        identity:
+          type: object
+          $ref: '#/components/schemas/Identity'
+        roles:
+          type: array
+          items:
+            type: string
+
+    AssignmentData:
+      properties:
+        data:
+          type: object
+          $ref: '#/components/schemas/Assignment'
+
+    AssignmentUpdate:
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+
+    AssignmentPayload:
+      properties:
+        identity:
+          type: object
+          $ref: '#/components/schemas/IdentityPayload'
+        roles:
+          type: array
+          items:
+            type: string
+
+    IdentityPayload:
+      properties:
+        key:
+          type: string
+        user:
+          type: string
+
+    Identity:
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+        User:
           type: string
 
     Error:
@@ -2191,6 +2455,19 @@ components:
           example: "Invalid payload"
       required:
         - message
+
+    ErrorResponse:
+      additionalProperties: false
+      properties:
+        code:
+          description: Http response code
+          type: string
+          example: "400"
+        message:
+          description: A message describing the error that occurred.
+          type: string
+          example: "Invalid query"
+
 
     Status:
       additionalProperties: false
