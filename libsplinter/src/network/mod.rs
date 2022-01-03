@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Network connection management and message dispatching framework.
+
 pub mod auth;
 pub mod connection_manager;
 pub mod dispatch;
