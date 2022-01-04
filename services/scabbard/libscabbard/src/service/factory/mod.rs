@@ -486,55 +486,49 @@ pub struct ScabbardArgValidator;
 
 impl ServiceArgValidator for ScabbardArgValidator {
     fn validate(&self, args: &HashMap<String, String>) -> Result<(), InvalidArgumentError> {
-        let peer_services_str = args.get("peer_services").ok_or_else(|| {
-            InvalidArgumentError::new("peer_services".into(), "argument not provided".into())
-        })?;
+        let peer_services_str = args
+            .get("peer_services")
+            .ok_or_else(|| InvalidArgumentError::new("peer_services", "argument not provided"))?;
 
         let peer_services = parse_list(peer_services_str).map_err(|err| {
-            InvalidArgumentError::new(
-                "peer_services".into(),
-                format!("failed to parse list: {}", err,),
-            )
+            InvalidArgumentError::new("peer_services", format!("failed to parse list: {}", err,))
         })?;
 
         for service in peer_services {
             if service.is_empty() {
                 return Err(InvalidArgumentError::new(
-                    "peer_services".into(),
-                    "must provide at least one service ID".into(),
+                    "peer_services",
+                    "must provide at least one service ID",
                 ));
             }
         }
 
-        let admin_keys_str = args.get("admin_keys").ok_or_else(|| {
-            InvalidArgumentError::new("admin_keys".into(), "argument not provided".into())
-        })?;
+        let admin_keys_str = args
+            .get("admin_keys")
+            .ok_or_else(|| InvalidArgumentError::new("admin_keys", "argument not provided"))?;
 
         let admin_keys = parse_list(admin_keys_str).map_err(|err| {
-            InvalidArgumentError::new(
-                "admin_keys".into(),
-                format!("failed to parse list: {}", err,),
-            )
+            InvalidArgumentError::new("admin_keys", format!("failed to parse list: {}", err,))
         })?;
 
         for key in admin_keys {
             if key.is_empty() {
                 return Err(InvalidArgumentError::new(
-                    "admin_keys".into(),
-                    "must provide at least one admin key".into(),
+                    "admin_keys",
+                    "must provide at least one admin key",
                 ));
             }
 
             let key_bytes = parse_hex(&key).map_err(|_| {
                 InvalidArgumentError::new(
-                    "admin_keys".into(),
+                    "admin_keys",
                     format!("{:?} is not a valid hex-formatted public key", key,),
                 )
             })?;
 
             if key_bytes.len() != 33 {
                 return Err(InvalidArgumentError::new(
-                    "admin_keys".into(),
+                    "admin_keys",
                     format!("{} is not a valid public key: invalid length", key),
                 ));
             }

@@ -48,10 +48,7 @@ mod test {
     impl ServiceArgValidator for ContainsFoo {
         fn validate(&self, args: &Args) -> ValidationResult {
             if !args.contains_key("foo") {
-                return Err(InvalidArgumentError::new(
-                    "foo".into(),
-                    r#""foo" is missing"#.into(),
-                ));
+                return Err(InvalidArgumentError::new("foo", r#""foo" is missing"#));
             }
 
             Ok(())
@@ -64,8 +61,8 @@ mod test {
         fn validate(&self, args: &Args) -> ValidationResult {
             if args.get("bar").map(|v| v.is_empty()).unwrap_or(true) {
                 return Err(InvalidArgumentError::new(
-                    "bar".into(),
-                    r#""bar" is missing or empty"#.into(),
+                    "bar",
+                    r#""bar" is missing or empty"#,
                 ));
             }
 
@@ -98,9 +95,8 @@ mod test {
         let mut args: Args = HashMap::new();
         args.insert("bar".into(), "yes".into());
 
-        let _expected_result: Option<Result<(), InvalidArgumentError>> = Some(Err(
-            InvalidArgumentError::new("foo".into(), "argument is missing".into()),
-        ));
+        let _expected_result: Option<Result<(), InvalidArgumentError>> =
+            Some(Err(InvalidArgumentError::new("foo", "argument is missing")));
 
         assert!(matches!(
             validators
@@ -121,9 +117,8 @@ mod test {
         args.insert("foo".into(), "one".into());
         args.insert("bar".into(), "".into());
 
-        let _expected_result: Option<Result<(), InvalidArgumentError>> = Some(Err(
-            InvalidArgumentError::new("bar".into(), "missing or empty".into()),
-        ));
+        let _expected_result: Option<Result<(), InvalidArgumentError>> =
+            Some(Err(InvalidArgumentError::new("bar", "missing or empty")));
 
         assert!(matches!(
             validators
