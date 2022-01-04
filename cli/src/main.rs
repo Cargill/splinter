@@ -900,37 +900,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
 
     app = app.subcommand(registry_command);
 
-    #[cfg(feature = "health")]
-    {
-        app = app.subcommand(
-            SubCommand::with_name("health")
-                .about("Displays information about network health")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
-                .subcommand(
-                    SubCommand::with_name("status")
-                        .about(
-                            "Displays a node's version, endpoint, node id, and a list\n\
-                             of endpoints of its connected peers",
-                        )
-                        .arg(
-                            Arg::with_name("url")
-                                .short("U")
-                                .long("url")
-                                .help("URL of the Splinter daemon REST API")
-                                .takes_value(true),
-                        )
-                        .arg(
-                            Arg::with_name("private_key_file")
-                                .value_name("private-key-file")
-                                .short("k")
-                                .long("key")
-                                .takes_value(true)
-                                .help("Name or path of private key"),
-                        ),
-                ),
-        );
-    }
-
     #[cfg(feature = "database")]
     {
         app = app.subcommand(
@@ -1713,15 +1682,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     let registry_command = registry_command.with_command("add", registry::RegistryAddAction);
 
     subcommands = subcommands.with_command("registry", registry_command);
-
-    #[cfg(feature = "health")]
-    {
-        use action::health;
-        subcommands = subcommands.with_command(
-            "health",
-            SubcommandActions::new().with_command("status", health::StatusAction),
-        );
-    }
 
     #[cfg(feature = "database")]
     {
