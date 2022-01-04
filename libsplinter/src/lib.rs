@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![cfg_attr(feature = "benchmark", feature(test))]
+#![doc = include_str!("../../README.md")]
 
 #[macro_use]
 extern crate log;
@@ -36,6 +37,7 @@ extern crate metrics;
 #[macro_use]
 pub mod tap;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! rwlock_read_unwrap {
     ($lock:expr) => {
@@ -46,6 +48,7 @@ macro_rules! rwlock_read_unwrap {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! rwlock_write_unwrap {
     ($lock:expr) => {
@@ -56,6 +59,7 @@ macro_rules! rwlock_write_unwrap {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! mutex_lock_unwrap {
     ($lock:expr) => {

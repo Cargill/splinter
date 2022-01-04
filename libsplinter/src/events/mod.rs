@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Low-level websocket-based event client.
+
 mod error;
 mod reactor;
 mod ws;

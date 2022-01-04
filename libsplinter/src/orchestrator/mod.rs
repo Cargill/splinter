@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Dynamic service orchestration.
+
 mod builder;
 mod error;
 #[cfg(feature = "rest-api-actix-web-1")]
