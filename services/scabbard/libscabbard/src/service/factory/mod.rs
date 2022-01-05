@@ -64,9 +64,6 @@ use crate::store::CommitHashStore;
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 const DEFAULT_LMDB_DIR: &str = "/var/lib/splinter";
 
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
-type ScabbardReceiptStore = Arc<RwLock<dyn ReceiptStore>>;
-
 /// A connection URI to a database instance.
 #[derive(Clone)]
 pub enum ConnectionUri {
@@ -738,14 +735,14 @@ impl ScabbardFactory {
             self.create_sql_merkle_state_purge_handle(circuit_id, &service_id),
         );
 
-        let (receipt_store, commit_hash_store): (ScabbardReceiptStore, Box<dyn CommitHashStore>) =
+        let (receipt_store, commit_hash_store): (Arc<dyn ReceiptStore>, Box<dyn CommitHashStore>) =
             match &self.store_factory_config {
                 #[cfg(feature = "postgres")]
                 ScabbardFactoryStorageConfig::Postgres { pool } => (
-                    Arc::new(RwLock::new(DieselReceiptStore::new(
+                    Arc::new(DieselReceiptStore::new(
                         pool.clone(),
                         Some(format!("{}::{}", circuit_id, service_id)),
-                    ))),
+                    )),
                     Box::new(DieselCommitHashStore::new(
                         pool.clone(),
                         circuit_id,
@@ -754,10 +751,10 @@ impl ScabbardFactory {
                 ),
                 #[cfg(feature = "sqlite")]
                 ScabbardFactoryStorageConfig::Sqlite { pool } => (
-                    Arc::new(RwLock::new(DieselReceiptStore::new(
+                    Arc::new(DieselReceiptStore::new(
                         pool.clone(),
                         Some(format!("{}::{}", circuit_id, service_id)),
-                    ))),
+                    )),
                     Box::new(DieselCommitHashStore::new(
                         pool.clone(),
                         circuit_id,
@@ -766,10 +763,10 @@ impl ScabbardFactory {
                 ),
                 #[cfg(feature = "sqlite")]
                 ScabbardFactoryStorageConfig::SqliteExclusiveWrites { pool } => (
-                    Arc::new(RwLock::new(DieselReceiptStore::new_with_write_exclusivity(
+                    Arc::new(DieselReceiptStore::new_with_write_exclusivity(
                         pool.clone(),
                         Some(format!("{}::{}", circuit_id, service_id)),
-                    ))),
+                    )),
                     Box::new(DieselCommitHashStore::new_with_write_exclusivity(
                         pool.clone(),
                         circuit_id,
