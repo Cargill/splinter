@@ -78,6 +78,8 @@ impl PeerManagerConnector {
     /// * `peer_id` -  The unique PeerAuthorizationToken for the peer.
     /// * `endpoints` -  The list of endpoints associated with the peer. The list should be in
     ///   order of preference, with the first endpoint being the first attempted.
+    /// * `required_local_auth` - The local authorization that must be used to identify the local
+    ///   node during authorization.
     pub fn add_peer_ref(
         &self,
         peer_id: PeerAuthorizationToken,
