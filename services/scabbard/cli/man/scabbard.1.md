@@ -35,6 +35,9 @@ FLAGS
 `-h`, `--help`
 : Prints help information.
 
+`-V`, `--version`
+: Prints version information
+
 `-v`
 : Increases verbosity. Specify multiple times for more output.
 

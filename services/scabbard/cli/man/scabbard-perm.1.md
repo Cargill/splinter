@@ -37,6 +37,9 @@ FLAGS
 : Adds namespace read permissions for the contract. This flag conflicts with the
   `-d`/`--delete` flag.
 
+`-V`, `--version`
+: Prints version information
+
 `-v`
 : Increases verbosity. Specify multiple times for more output.
 
