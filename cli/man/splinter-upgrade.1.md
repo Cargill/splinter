@@ -27,6 +27,23 @@ file will be renamed to `node_id.old`.
 This command will also import data from `LMDB` files for transaction receipts
 and commit hashes.
 
+FLAGS
+=====
+
+`-h`, `--help`
+: Prints help information
+
+`-q`, `--quiet`
+: Decreases verbosity (the opposite of -v). When specified, only errors or
+  warnings will be output.
+
+`-V`, `--version`
+: Prints version information
+
+`-v`
+: Increases verbosity (the opposite of -q). Specify multiple times for more
+  output.
+
 OPTIONS
 =======
 `-S`, `--state-dir` `STATE-DIR`
