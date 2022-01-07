@@ -40,9 +40,6 @@ FLAGS
 SUBCOMMANDS
 ===========
 
-`add`
-: Add a node to the local registry
-
 `build`
 : Add a node to a YAML file
 
