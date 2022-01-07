@@ -64,14 +64,6 @@ OPTIONS
   `SPLINTER_HOME` is set). This directory must exist.
 
 `--common-name COMMON-NAME`
-: Alias for `--server-common-name`. Deprecated.
-
-`--rest-api-common-name COMMON-NAME`
-: Specifies a common name for the generated REST API certificate. (Default:
- `localhost`.) Use this option if the `splinterd` URL uses a DNS address instead
-  of a numerical IP address.
-
-`--server-common-name COMMON-NAME`
 : Specifies a common name for the generated server certificate. (Default:
  `localhost`.) Use this option if the `splinterd` URL uses a DNS address instead
   of a numerical IP address.
