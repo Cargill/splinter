@@ -57,6 +57,9 @@ FLAGS
 OPTIONS
 =======
 
+`--group GROUP`
+: `GROUP` that will be assigned group permissions on the generated key files.
+
 `--key-dir DIRECTORY`
 : Generates keys in the given `DIRECTORY`, creating the directory if it does not
   already exist.
