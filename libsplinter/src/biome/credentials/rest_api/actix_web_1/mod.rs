@@ -45,10 +45,10 @@ pub use config::{BiomeCredentialsRestConfig, BiomeCredentialsRestConfigBuilder};
 /// * `POST /biome/register - Creates credentials for a user
 /// * `POST /biome/token` - Creates a new access token for the authorized user
 /// * `POST /biome/verify` - Verify a users password
-/// * `GET /biome/user` - Get a list of all users in biome
-/// * `PUT /biome/user/{id}` - Update user with specified ID
-/// * `GET /biome/user/{id}` - Retrieve user with specified ID
-/// * `DELETE /biome/user/{id}` - Remove user with specified ID
+/// * `GET /biome/users` - Get a list of all users in biome
+/// * `PUT /biome/users/{id}` - Update user with specified ID
+/// * `GET /biome/users/{id}` - Retrieve user with specified ID
+/// * `DELETE /biome/users/{id}` - Remove user with specified ID
 pub struct BiomeCredentialsRestResourceProvider {
     #[cfg(feature = "biome-key-management")]
     key_store: Arc<dyn KeyStore>,
@@ -653,7 +653,7 @@ mod tests {
     ///
     /// Verify DELETE /biome/users/{id} removes the user
     /// specified by {id}. This means the user is no longer
-    /// accessible via GET /biome/user/{id}, which should return
+    /// accessible via GET /biome/users/{id}, which should return
     /// a status code of 404.
     ///
     /// Procedure
