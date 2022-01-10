@@ -443,7 +443,7 @@ impl ProposedCircuitBuilder {
     ///
     /// # Arguments
     ///
-    ///  * `routes` - The routes type for the circuit
+    ///  * `route_type` - The routes type for the circuit
     pub fn with_routes(mut self, route_type: &RouteType) -> ProposedCircuitBuilder {
         self.routes = Some(route_type.clone());
         self
