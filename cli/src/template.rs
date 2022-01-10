@@ -15,7 +15,7 @@
 //! Data structure and implementation of the circuit template representation for the CLI.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use splinter::circuit::template::{
     CircuitCreateTemplate, CircuitTemplateError, CircuitTemplateManager, RuleArgument,
@@ -91,13 +91,23 @@ impl CircuitTemplate {
         paths.push(DEFAULT_TEMPLATE_DIR.to_string());
         let manager = CircuitTemplateManager::new(&paths);
         let possible_values = manager.list_available_templates()?;
-        if !possible_values.iter().any(|(stem, _)| stem == name) {
-            return Err(CliError::ActionError(format!(
-                "Template with name {} was not found. Available templates: {:?}",
-                name, possible_values
-            )));
-        }
-        let template = manager.load(name)?;
+        let template = manager.load(name).map_err(|err| {
+            let named_path = Path::new(name);
+            if named_path.is_absolute()
+                || named_path.starts_with("./")
+                || named_path.starts_with("../")
+            {
+                CliError::from(err)
+            } else if !possible_values.iter().any(|(stem, _)| stem == name) {
+                CliError::ActionError(format!(
+                    "Template with name {} was not found. Available templates: {:?}",
+                    name, possible_values
+                ))
+            } else {
+                CliError::from(err)
+            }
+        })?;
+
         Ok(CircuitTemplate {
             template,
             arguments: HashMap::new(),
