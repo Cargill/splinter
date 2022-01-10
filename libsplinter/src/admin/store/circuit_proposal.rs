@@ -261,7 +261,7 @@ impl CircuitProposalBuilder {
     ///
     /// # Arguments
     ///
-    ///  * `requester_node_od` - The node ID of the node the requester has permissions to submit
+    ///  * `requester_node_id` - The node ID of the node the requester has permissions to submit
     ///       proposals for
     pub fn with_requester_node_id(mut self, requester_node_id: &str) -> CircuitProposalBuilder {
         self.requester_node_id = Some(requester_node_id.to_string());
