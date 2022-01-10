@@ -200,6 +200,7 @@ impl Circuit {
     /// * `circuit_id` -  The unique ID for the circuit
     /// * `roster` - The list of services in the circuit
     /// * `members` - The list of node IDs for the members of a circuit
+    /// * `authorization_type` - The authorization type used for the circuit
     pub fn new(
         circuit_id: String,
         roster: Vec<Service>,
