@@ -163,6 +163,7 @@ pub trait CredentialsStore: Send + Sync {
     ///  * `user_id` - The unique identifier of the user the credential belongs to
     ///  * `updated_username` - The updated username for the user
     ///  * `updated_password` - The updated password for the user
+    ///  * `password_encryption_cost` - Cost of the password encryption
     ///
     /// # Errors
     ///
