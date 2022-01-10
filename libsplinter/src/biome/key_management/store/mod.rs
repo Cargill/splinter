@@ -96,6 +96,7 @@ pub trait KeyStore: Sync + Send {
     ///
     /// * `user_id`: The ID owner of the key records to list.
     /// * `updated_password` - The updated password for the user
+    /// * `password_encryption_cost` - Cost of the password encryption
     /// * `keys` - The keys to be replaced
     ///
     fn update_keys_and_password(
