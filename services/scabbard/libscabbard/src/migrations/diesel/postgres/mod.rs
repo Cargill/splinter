@@ -57,7 +57,7 @@ pub fn any_pending_migrations(conn: &PgConnection) -> Result<bool, InternalError
     // to run the migrations, so we'll do that in a test transaction.
     let latest_version =
         conn.test_transaction::<Result<Option<String>, InternalError>, (), _>(|| {
-            Ok(match embedded_migrations::run(conn) {
+            Ok(match run_migrations(conn) {
                 Ok(_) => conn
                     .latest_run_migration_version()
                     .map_err(|err| InternalError::from_source(Box::new(err))),
