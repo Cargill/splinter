@@ -1780,7 +1780,7 @@ paths:
       description: |
         List all user profiles
 
-        This endpoint requires the permission "biome.user.read".
+        This endpoint requires the permission "biome.profile.read".
       parameters:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
@@ -1809,7 +1809,7 @@ paths:
       description: |
         Fetch a profile by ID
 
-        This endpoint requires the permission "biome.user.read".
+        This endpoint requires the permission "biome.profile.read".
       parameters:
         - $ref: "#/components/parameters/auth"
         - $ref: "#/components/parameters/protocol_version"
