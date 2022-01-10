@@ -257,6 +257,7 @@ impl CircuitNode {
     ///
     /// * `node_id` -  The unique ID for the circuit
     /// * `endpoints` -  A list of endpoints the node can be reached at
+    /// * `public_key` - The public key associated with the node
     pub fn new(node_id: String, endpoints: Vec<String>, public_key: Option<PublicKey>) -> Self {
         CircuitNode {
             node_id,
