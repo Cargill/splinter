@@ -216,12 +216,12 @@ impl CircuitProposalBuilder {
         self
     }
 
-    /// Set the hash the proposed circuit the proposal is for. This will be used to validate votes
-    /// are for the correct proposal
+    /// Set the hash of the proposed circuit the proposal is for. This will be used to validate
+    /// votes are for the correct proposal
     ///
     /// # Arguments
     ///
-    ///  * `circuit_id` - The unique circuit ID for the proposed circuit
+    ///  * `circuit_hash` - The hash of the proposed circuit
     pub fn with_circuit_hash(mut self, circuit_hash: &str) -> CircuitProposalBuilder {
         self.circuit_hash = Some(circuit_hash.to_string());
         self
