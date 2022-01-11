@@ -52,22 +52,40 @@ fn display_splinter_users(
         .with_auth(create_cylinder_jwt_auth(signer.clone())?)
         .build()?;
 
-    let biome_users = client
-        .list_biome_users()?
-        .into_iter()
-        .map(ClientSplinterUser::from);
+    let biome_users = match client.list_biome_users() {
+        Ok(users) => Some(users.into_iter().map(ClientSplinterUser::from)),
+        Err(e) => {
+            info!("Unable to retrieve Biome users: {}", e);
+            None
+        }
+    };
 
-    let biome_oauth_users = client
-        .list_oauth_users()?
-        .data
-        .into_iter()
-        .map(ClientSplinterUser::from);
+    let biome_oauth_users = match client.list_oauth_users() {
+        Ok(users) => Some(users.data.into_iter().map(ClientSplinterUser::from)),
+        Err(e) => {
+            info!("Unable to retrieve OAuth users: {}", e);
+            None
+        }
+    };
 
     let mut data = vec![
         // headers
         vec!["ID".to_string(), "USERNAME".to_string(), "TYPE".to_string()],
     ];
-    let users = biome_users.into_iter().chain(biome_oauth_users.into_iter());
+
+    let users = match (biome_users, biome_oauth_users) {
+        (Some(biome_users), Some(biome_oauth_users)) => biome_users
+            .into_iter()
+            .chain(biome_oauth_users.into_iter())
+            .collect::<Vec<_>>(),
+        (Some(biome_users), None) => biome_users.into_iter().collect::<Vec<_>>(),
+        (None, Some(biome_oauth_users)) => biome_oauth_users.into_iter().collect::<Vec<_>>(),
+        (None, None) => {
+            return Err(CliError::ActionError(
+                "Failed to get biome and oauth users".to_string(),
+            ))
+        }
+    };
     users.into_iter().for_each(|user| match user {
         ClientSplinterUser::Biome(user) => {
             data.push(vec![user.user_id, user.username, "Biome".to_string()])
