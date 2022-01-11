@@ -15,7 +15,7 @@
 
 [package]
 name = "transact-cli"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["Cargill Incorporated"]
 edition = "2018"
 license = "Apache-2.0"
