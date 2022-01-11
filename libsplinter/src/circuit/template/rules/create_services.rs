@@ -44,7 +44,7 @@ impl CreateServices {
 
         if !is_valid_service_id(&self.first_service) {
             return Err(CircuitTemplateError::new(&format!(
-                "Field first_service is invalid ({}): must be a 4 character base62 string",
+                "Field first_service is invalid (\"{}\"): must be a 4 character base62 string",
                 self.first_service,
             )));
         }
