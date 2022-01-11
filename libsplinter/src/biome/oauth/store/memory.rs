@@ -90,8 +90,8 @@ impl OAuthUserSessionStore for MemoryOAuthUserSessionStore {
                 if session.subject() != existing_session.subject {
                     Err(OAuthUserSessionStoreError::InvalidArgument(
                         InvalidArgumentError::new(
-                            "session".to_string(),
-                            "Cannot update the 'subject' field for an OAuth user session".into(),
+                            "session",
+                            "Cannot update the 'subject' field for an OAuth user session",
                         ),
                     ))
                 } else {

@@ -42,11 +42,14 @@ impl InvalidArgumentError {
     /// ```
     /// use splinter::error::InvalidArgumentError;
     ///
-    /// let invalid_arg_error = InvalidArgumentError::new("arg1".to_string(), "argument too long".to_string());
+    /// let invalid_arg_error = InvalidArgumentError::new("arg1", "argument too long");
     /// assert_eq!(format!("{}", invalid_arg_error), "argument too long (arg1)");
     /// ```
-    pub fn new(argument: String, message: String) -> Self {
-        Self { argument, message }
+    pub fn new<T1: Into<String>, T2: Into<String>>(argument: T1, message: T2) -> Self {
+        Self {
+            argument: argument.into(),
+            message: message.into(),
+        }
     }
 
     /// Returns the name of the invalid argument.

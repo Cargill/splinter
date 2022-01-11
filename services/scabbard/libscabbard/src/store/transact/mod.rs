@@ -73,7 +73,7 @@ impl<D: Database + Clone> CommitHashStore for TransactCommitHashStore<D> {
     fn set_current_commit_hash(&self, commit_hash: &str) -> Result<(), CommitHashStoreError> {
         let current_root_bytes = hex::parse_hex(commit_hash).map_err(|e| {
             InvalidArgumentError::new(
-                "commit_hash".into(),
+                "commit_hash",
                 format!("The commit hash provided is invalid: {}", e),
             )
         })?;
