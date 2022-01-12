@@ -1,5 +1,51 @@
 # Release Notes
 
+## Changes in splinter 0.6.2
+
+### libsplinter
+
+* Correct rustdoc code links. This change corrects several rustdoc code links
+  from one struct to another in different modules, where the linked-struct is
+  not explicitly in a use statement.
+
+* Remove lock macros from documentation. These macros should not be public
+  members of the library, and may be removed in the future. Mark the doc for
+  these as "hidden" in order to remove them.
+
+* Add readme to root module rustdoc.This provides a more informative landing
+  documentation landing experience.
+
+* Add missing simple summaries for top-level mods. These fill out the module
+  summaries on the main root documentation page for splinter.
+
+* Remove SQLite PRAGMA settings related to WAL journal mode, effectively
+  reverting these settings such that the values will be set to the default
+  values based on compile-time settings.
+
+* Add sqlite migration for renamed `role` tables. When the roles table was
+  updated to be named `rbac_roles` the foreign key constraint on the
+  `role_permission` table was not updated making it impossible to insert any
+  new role:permission relations because the foreign key constraint would fail.
+
+### splinterd
+
+* Fix ability to pass comma separated values for several options to `splinterd`.
+  Previously, the values would be treated as one value, instead of multiple.
+
+* Update open API documentation to match the current endpoints. Includes several
+  bug fixes and adding missing endpoints and components
+
+### scabbard
+
+* Remove `ScabbardReceiptStore` types. Remove unnecessary `ScabbardReceiptStore`
+  types. This type was initially created so that the receipt store
+  implementation used by scabbard could change depending on whether or not the
+  `"receipt-store"` experimental feature was enabled. The `"receipt-store"`
+  feature has been stabilized and removed so the `ScabbardReceiptStore` type is
+  no longer needed.
+
+* Add transact and sawtooth migration checks to any_pending_migrations.
+
 ## Changes in splinter 0.6.1
 
 ### Highlights
