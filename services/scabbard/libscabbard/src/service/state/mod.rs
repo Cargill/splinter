@@ -848,7 +848,7 @@ mod tests {
     use sawtooth::receipt::store::diesel::DieselReceiptStore;
     use transact::{
         database::{btree::BTreeDatabase, Database},
-        families::command::workload::CommandTransactionBuilder,
+        families::command::CommandTransactionBuilder,
         protocol::command::{BytesEntry, Command, SetState},
         state::merkle::INDEXES,
     };
