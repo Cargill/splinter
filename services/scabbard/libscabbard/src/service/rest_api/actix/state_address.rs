@@ -91,7 +91,7 @@ mod tests {
         state::merkle::INDEXES,
     };
     use transact::{
-        families::command::workload::CommandTransactionBuilder,
+        families::command::CommandTransactionBuilder,
         protocol::command::{BytesEntry, Command, SetState},
     };
 
