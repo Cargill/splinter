@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #![cfg_attr(feature = "benchmark", feature(test))]
-#![doc = include_str!("../../README.md")]
 
 #[macro_use]
 extern crate log;
