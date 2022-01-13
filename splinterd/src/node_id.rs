@@ -26,7 +26,7 @@ pub fn get_node_id(
 }
 
 fn get_random_node_id() -> String {
-    format!("n{}", rand::thread_rng().gen::<u16>().to_string())
+    format!("n{}", rand::thread_rng().gen::<u16>())
 }
 
 fn get_from_store(

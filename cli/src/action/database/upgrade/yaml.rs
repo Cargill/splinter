@@ -122,7 +122,7 @@ pub fn import_yaml_state_to_database(
     info!("Processing import data... ");
     let result = import_store(db_store, &yaml_admin_service_store).map_err(|e| {
         CliError::ActionError(match e.source() {
-            Some(source) => format!("{}: {}", e.to_string(), source),
+            Some(source) => format!("{}: {}", e, source),
             None => e.to_string(),
         })
     })?;

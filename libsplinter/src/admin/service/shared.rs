@@ -373,7 +373,7 @@ impl AdminServiceShared {
                                     .map_err(|err| {
                                         AdminSharedError::SplinterStateError(format!(
                                             "Unable to convert proto Circuit to store Circuit: {}",
-                                            err.to_string()
+                                            err
                                         ))
                                     })?;
 
