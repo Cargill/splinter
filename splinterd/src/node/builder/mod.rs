@@ -244,7 +244,7 @@ impl NodeBuilder {
         let node_id = self
             .node_id
             .take()
-            .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>().to_string()));
+            .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>()));
 
         let context = Secp256k1Context::new();
 
