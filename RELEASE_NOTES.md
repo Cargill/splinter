@@ -1,5 +1,13 @@
 # Release Notes
 
+## Changes in splinter 0.6.3
+
+### scabbard
+
+* Update transact dependency to 0.4.3. This update fixes an issue where
+  Merkle-Radix addresses with leading zeros would be stored incorrectly in
+  SQLite.
+
 ## Changes in splinter 0.6.2
 
 ### libsplinter
