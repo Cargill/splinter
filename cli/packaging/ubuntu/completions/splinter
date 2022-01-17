@@ -55,6 +55,7 @@ __splinter()
     permissions
     registry
     role
+    state
     upgrade
     user
   "
@@ -122,6 +123,12 @@ __splinter()
     list
     show
     update
+  "
+
+
+  SPLINTER_STATE_OPTS="
+    $GLOBAL_OPTS
+    migrate
   "
 
   SPLINTER_UPGRADE_OPTS="
@@ -321,6 +328,19 @@ __splinter()
           COMPREPLY=($(compgen -W "$SPLINTER_ROLE_OPTS" -- "${cur}"))
           ;;
 
+      esac
+      ;;
+
+    state)
+      case "${prev}" in
+        migrate)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --force --yes --in --out \
+                      --state-dir" -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_STATE_OPTS" -- "${cur}"))
+          ;;
       esac
       ;;
 
