@@ -54,6 +54,7 @@ __splinter()
     keygen
     permissions
     registry
+    role
     upgrade
     user
   "
@@ -111,6 +112,16 @@ __splinter()
   SPLINTER_REGISTRY_OPTS="
     $GLOBAL_OPTS
     build
+  "
+
+  SPLINTER_ROLE_OPTS="
+    $GLOBAL_OPTS
+    create
+    delete
+    help
+    list
+    show
+    update
   "
 
   SPLINTER_UPGRADE_OPTS="
@@ -275,6 +286,41 @@ __splinter()
         *)
           COMPREPLY=($(compgen -W "$SPLINTER_REGISTRY_OPTS" -- "${cur}"))
           ;;
+      esac
+      ;;
+
+    role)
+      case "${prev}" in
+        create)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --dry-run --quiet
+                     --display --permission --key --url" -- "${cur}"))
+          ;;
+
+        delete)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --dry-run --quiet
+                     --key --url" -- "${cur}"))
+          ;;
+
+        list)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --format --key --url" \
+                      -- "${cur}"))
+          ;;
+
+        show)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --format --key --url \
+                      " -- "${cur}"))
+          ;;
+
+        update)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --dry-run --force \
+                      --add-perm --display --key --rm-perm --url" \
+                      -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_ROLE_OPTS" -- "${cur}"))
+          ;;
+
       esac
       ;;
 
