@@ -138,7 +138,21 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 },
             ),
             (
+                "sabre_sdk".to_string(),
+                UnnamedLoggerConfig {
+                    appenders: None,
+                    level: Some(log::Level::Trace),
+                },
+            ),
+            (
                 "sawtooth".to_string(),
+                UnnamedLoggerConfig {
+                    appenders: None,
+                    level: Some(log::Level::Trace),
+                },
+            ),
+            (
+                "sawtooth_sabre".to_string(),
                 UnnamedLoggerConfig {
                     appenders: None,
                     level: Some(log::Level::Trace),
