@@ -1,5 +1,14 @@
 # Release Notes
 
+## Changes in splinter 0.6.4
+
+### splinterd
+
+* Add `sawtooth_sabre` and `sabre_sdk` to the default loggers that include trace
+logging as a possible level. This fixes an issue where sabre logs were not
+available in the debug output without modifying the log configuration in a
+splinter daemon's configuration file.
+
 ## Changes in splinter 0.6.3
 
 ### scabbard
