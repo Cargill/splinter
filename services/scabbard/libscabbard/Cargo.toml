@@ -25,7 +25,7 @@ description = """\
 """
 
 [dependencies]
-actix-web = { version = "1.0", optional = true, default-features = false, features = ["flate2-zlib"] }
+actix-web = { version = "1.0", optional = true, default-features = false }
 cylinder = "0.2"
 diesel = { version = "1.0", features = ["r2d2", "serde_json"], optional = true }
 diesel_migrations = { version = "1.4", optional = true }
