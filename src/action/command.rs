@@ -17,7 +17,7 @@ use protobuf::{Message, RepeatedField};
 use reqwest::{blocking::Client, header};
 use serde::Deserialize;
 use transact::protocol::batch::BatchPair;
-use transact::protocol::sabre::ExecuteContractActionBuilder;
+use transact::protocol::sabre::payload::ExecuteContractActionBuilder;
 use transact::protos::FromProto;
 use transact::protos::{
     batch::{Batch, BatchHeader},
