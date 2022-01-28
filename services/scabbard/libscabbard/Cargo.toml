@@ -42,7 +42,7 @@ splinter = { path = "../../../libsplinter" }
 transact = { version = "0.4.3", features = ["sawtooth-compat", "state-merkle-sql"] }
 
 [dependencies.sawtooth]
-version = "0.7.2"
+version = "0.7.3"
 optional = true
 default-features = false
 features = ["lmdb", "transaction-receipt-store"]
