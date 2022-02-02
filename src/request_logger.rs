@@ -68,6 +68,7 @@ impl RequestLogger {
                                 &counters,
                                 last_log_time.elapsed().as_secs(),
                                 last_log_time.elapsed().subsec_nanos(),
+                                end_time,
                             );
                             last_log_time = time::Instant::now();
                         }
@@ -114,14 +115,33 @@ impl RequestLoggerShutdownSignaler {
     }
 }
 
-fn log(counters: &[Arc<HttpRequestCounter>], seconds: u64, nanoseconds: u32) {
+fn log(
+    counters: &[Arc<HttpRequestCounter>],
+    seconds: u64,
+    nanoseconds: u32,
+    end_time: Option<time::Instant>,
+) {
     let update = seconds as f64 + f64::from(nanoseconds) * 1e-9;
     for counter in counters {
-        println!(
-            "{}, Batches/s {:.3}",
-            counter,
-            counter.get_batches_per_second(update),
-        );
+        if let Some(end_time) = end_time {
+            let remaining_time = if end_time > time::Instant::now() {
+                end_time - time::Instant::now()
+            } else {
+                time::Duration::from_secs(0)
+            };
+            println!(
+                "{}, Batches/s {:.3}, time remaining {}",
+                counter,
+                counter.get_batches_per_second(update),
+                display_time(remaining_time),
+            );
+        } else {
+            println!(
+                "{}, Batches/s {:.3}",
+                counter,
+                counter.get_batches_per_second(update),
+            );
+        }
         counter.reset_sent_count();
         counter.reset_queue_full_count();
     }
@@ -129,3 +149,10 @@ fn log(counters: &[Arc<HttpRequestCounter>], seconds: u64, nanoseconds: u32) {
 
 /// Sent to a request logger to signal it should stop
 struct ShutdownMessage;
+
+fn display_time(time: time::Duration) -> String {
+    let seconds = time.as_secs() % 60;
+    let minutes = (time.as_secs() / 60) % 60;
+    let hours = (time.as_secs() / 60) / 60;
+    format!("{}:{}:{}", hours, minutes, seconds)
+}
