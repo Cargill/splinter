@@ -1,5 +1,13 @@
 # Release Notes
 
+## Changes in splinter 0.6.5
+
+### scabbard
+
+* Update sawtooth dependency version to 0.7.3 which includes a new migration to
+  add an index for the `transaction_receipt` table, which mitigates a slow-down
+  of processing after a large number of transactions.
+
 ## Changes in splinter 0.6.4
 
 ### splinterd
