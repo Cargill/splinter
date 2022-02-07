@@ -187,8 +187,11 @@ impl TryFrom<TomlUnnamedLoggerConfig> for RootConfig {
                 appenders,
                 level: level.into(),
             }),
+            (Some(appenders), None) => {
+                let level = Level::Warn;
+                Ok(Self { appenders, level })
+            }
             (None, _) => Err(ConfigError::MissingValue("root.appenders".to_string())),
-            (_, None) => Err(ConfigError::MissingValue("root.level".to_string())),
         }
     }
 }
