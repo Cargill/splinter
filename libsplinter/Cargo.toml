@@ -121,7 +121,6 @@ experimental = [
     "authorization-handler-maintenance",
     "biome-client",
     "biome-client-reqwest",
-    "biome-notifications",
     "client-reqwest",
     "https-bind",
     "registry-client",
@@ -151,7 +150,6 @@ biome-client = ["biome"]
 biome-client-reqwest = ["biome", "reqwest"]
 biome-credentials = ["bcrypt", "biome"]
 biome-key-management = ["biome"]
-biome-notifications = ["biome"]
 biome-profile = ["biome"]
 challenge-authorization = []
 circuit-template = ["admin-service", "glob"]

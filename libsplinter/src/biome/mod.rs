@@ -34,9 +34,6 @@ pub mod credentials;
 #[cfg(feature = "biome-key-management")]
 pub mod key_management;
 
-#[cfg(feature = "biome-notifications")]
-pub mod notifications;
-
 #[cfg(feature = "oauth")]
 pub mod oauth;
 
