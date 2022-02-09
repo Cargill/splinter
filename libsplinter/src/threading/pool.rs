@@ -119,12 +119,10 @@ impl ThreadPool {
     }
 
     pub fn join_all(mut self) {
-        for worker in &mut self.workers {
+        for worker in self.workers.drain(..) {
             debug!("Shutting down worker {}", worker.id);
-            if let Some(thread) = worker.thread.take() {
-                if let Err(_err) = thread.join() {
-                    warn!("Failed to cleanly join worker thread {}", worker.id);
-                }
+            if let Err(_err) = worker.thread.join() {
+                warn!("Failed to cleanly join worker thread {}", worker.id);
             }
         }
     }
@@ -165,7 +163,7 @@ impl JobExecutor {
 
 struct Worker {
     id: usize,
-    thread: Option<thread::JoinHandle<()>>,
+    thread: thread::JoinHandle<()>,
 }
 
 impl Worker {
@@ -174,43 +172,41 @@ impl Worker {
         id: usize,
         receiver: Arc<Mutex<mpsc::Receiver<Message>>>,
     ) -> Result<Worker, ThreadPoolBuildError> {
-        let thread = Some(
-            thread::Builder::new()
-                .name(format!("{}-{}", prefix, id))
-                .spawn(move || loop {
-                    let msg = {
-                        let receiver = match receiver.lock() {
-                            Ok(recv) => recv,
-                            Err(err) => {
-                                warn!(
-                                    "Attempting to recover from a poisoned lock in worker {}",
-                                    id
-                                );
-                                err.into_inner()
-                            }
-                        };
-
-                        match receiver.recv() {
-                            Ok(msg) => msg,
-                            Err(_) => break,
+        let thread = thread::Builder::new()
+            .name(format!("{}-{}", prefix, id))
+            .spawn(move || loop {
+                let msg = {
+                    let receiver = match receiver.lock() {
+                        Ok(recv) => recv,
+                        Err(err) => {
+                            warn!(
+                                "Attempting to recover from a poisoned lock in worker {}",
+                                id
+                            );
+                            err.into_inner()
                         }
                     };
 
-                    match msg {
-                        Message::NewJob(job) => {
-                            trace!("Worker {} received job; executing.", id);
-                            job.call_box();
-                        }
-                        Message::Terminate => {
-                            debug!("Worker {} received terminate cmd.", id);
-                            break;
-                        }
+                    match receiver.recv() {
+                        Ok(msg) => msg,
+                        Err(_) => break,
                     }
-                })
-                .map_err(|err| {
-                    ThreadPoolBuildError(format!("Unable to spawn worker thread: {}", err))
-                })?,
-        );
+                };
+
+                match msg {
+                    Message::NewJob(job) => {
+                        trace!("Worker {} received job; executing.", id);
+                        job.call_box();
+                    }
+                    Message::Terminate => {
+                        debug!("Worker {} received terminate cmd.", id);
+                        break;
+                    }
+                }
+            })
+            .map_err(|err| {
+                ThreadPoolBuildError(format!("Unable to spawn worker thread: {}", err))
+            })?;
 
         Ok(Worker { id, thread })
     }
