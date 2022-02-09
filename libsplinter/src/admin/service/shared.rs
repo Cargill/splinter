@@ -3634,7 +3634,7 @@ impl AdminServiceShared {
 }
 
 // This should never return an error since we recieved a message from this service id
-fn get_peer_token_from_service_id(
+pub fn get_peer_token_from_service_id(
     service_id: &str,
     local_node_id: &str,
 ) -> Result<PeerTokenPair, InternalError> {
