@@ -84,7 +84,7 @@ impl ThreadPoolBuilder {
                 }
             })?;
 
-        let prefix = self.prefix.unwrap_or_else(|| "ThreadPool-".into());
+        let prefix = self.prefix.unwrap_or_else(|| "ThreadPool".into());
 
         let (sender, receiver) = mpsc::channel();
 
