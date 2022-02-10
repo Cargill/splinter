@@ -100,7 +100,6 @@ pub mod registry;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 pub mod service;
-pub mod sets;
 #[cfg(feature = "store")]
 pub mod store;
 pub mod threading;
