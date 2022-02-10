@@ -17,3 +17,4 @@
 pub(crate) mod error;
 pub mod lifecycle;
 pub(crate) mod pacemaker;
+pub(crate) mod pool;
