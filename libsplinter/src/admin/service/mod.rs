@@ -50,9 +50,9 @@ use crate::service::{
 };
 
 use self::consensus::AdminConsensusManager;
-use self::error::{AdminError, Sha256Error};
+use self::error::{AdminError, AdminSharedError, Sha256Error};
 use self::proposal_store::{AdminServiceProposals, ProposalStore};
-use self::shared::{AdminServiceShared, PeerNodePair};
+use self::shared::{get_peer_token_from_service_id, AdminServiceShared, PeerNodePair};
 
 pub use self::builder::AdminServiceBuilder;
 pub use self::error::AdminKeyVerifierError;
@@ -772,11 +772,34 @@ impl Service for AdminService {
                     ServiceError::PoisonedLock("the admin shared lock was poisoned".into())
                 })?;
 
+                // Need to set the sender of this message to this nodes admin service id
+                // the default can't be used here incase the authorization type is challenge,
+                // the resulting sender will either be set to admin::<node_id> or
+                // admin::public_key::<remote_key>::public_key::<local_key>
+                let sender_peer_token =
+                    get_peer_token_from_service_id(&message_context.sender, &self.node_id)
+                        .map_err(|err| {
+                            ServiceError::UnableToHandleMessage(Box::new(
+                                AdminSharedError::ServiceProtocolError(format!(
+                                    "Unable to verify peer token for service id: {}",
+                                    err
+                                )),
+                            ))
+                        })?;
+                let local_sender = admin_service_id(
+                    // the id for the sender from the local nodes perspective
+                    &PeerTokenPair::new(
+                        sender_peer_token.local_id().clone(),
+                        sender_peer_token.peer_id().clone(),
+                    )
+                    .id_as_string(),
+                );
+
                 admin_service_shared
                     .network_sender()
-                    .as_ref()
+                    .clone()
                     .ok_or(ServiceError::NotStarted)?
-                    .send(&message_context.sender, &envelope_bytes)
+                    .send_with_sender(&message_context.sender, &envelope_bytes, &local_sender)
                     .map_err(|err| ServiceError::UnableToSendMessage(Box::new(err)))?;
                 admin_service_shared
                     .on_protocol_agreement(&message_context.sender, protocol)
