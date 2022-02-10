@@ -1,5 +1,23 @@
 # Release Notes
 
+## Changes in Splinter 0.6.6
+
+### libsplinter
+
+* Fix Admin service protocol response sender for challenge authorization. The
+  incorrect peer token was being added to the protocol agreement map, a trust id
+  instead of challenge. This would cause a future circuit proposal using trust
+  to fail because the admin service would think it was already connected over
+  trust authorization when it was not.
+
+### splinterd
+
+* ​​Fix an error with a missing root logger level from toml. The root logger
+  should have a default level to be consistent with the other loggers in the
+  config file, so that it can be omitted. A default level of `Warn` was added
+  for the root logger if it doesn't have a specified level. This matches the
+  default config.
+
 ## Changes in splinter 0.6.5
 
 ### scabbard
