@@ -15,7 +15,6 @@
 pub(crate) mod authorization;
 mod connection_manager;
 mod handlers;
-mod pool;
 mod state_machine;
 
 use std::collections::HashMap;
@@ -37,6 +36,9 @@ use crate::protocol::{PEER_AUTHORIZATION_PROTOCOL_MIN, PEER_AUTHORIZATION_PROTOC
 use crate::protos::network;
 use crate::protos::prelude::*;
 use crate::public_key::PublicKey;
+use crate::threading::pool::{
+    JobExecutor, ShutdownSignaler as ThreadPoolShutdownSignaller, ThreadPool, ThreadPoolBuilder,
+};
 use crate::transport::{Connection, RecvError};
 
 #[cfg(feature = "challenge-authorization")]
@@ -45,7 +47,6 @@ use self::authorization::challenge::ChallengeAuthorization;
 use self::authorization::trust::TrustAuthorization;
 use self::authorization::trust_v0::TrustV0Authorization;
 use self::handlers::AuthorizationDispatchBuilder;
-use self::pool::{ThreadPool, ThreadPoolBuilder};
 #[cfg(any(feature = "trust-authorization", feature = "challenge-authorization"))]
 pub(crate) use self::state_machine::AuthorizationInitiatingAction;
 pub(crate) use self::state_machine::{
@@ -147,7 +148,7 @@ impl AuthorizationManager {
 }
 
 pub struct ShutdownSignaler {
-    thread_pool_signaler: pool::ShutdownSignaler,
+    thread_pool_signaler: ThreadPoolShutdownSignaller,
 }
 
 impl ShutdownSignaler {
@@ -164,7 +165,7 @@ pub struct AuthorizationConnector {
     #[cfg(feature = "challenge-authorization")]
     signers: Vec<Box<dyn Signer>>,
     shared: Arc<Mutex<ManagedAuthorizations>>,
-    executor: pool::JobExecutor,
+    executor: JobExecutor,
     #[cfg(feature = "challenge-authorization")]
     verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
 }
