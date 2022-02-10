@@ -26,3 +26,14 @@ jobs:
 
       - name: Test Docker Build
         run: just docker-build
+
+      - name: Copy Artifacts
+        run: docker-compose -f docker/compose/copy-debs.yaml up
+
+      - name: Archive Artifacts
+        run: zip -r splinter-pr${{ github.event.number }}.zip build/*
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: splinter-pr${{ github.event.number }}
+          path: splinter-pr*.zip
