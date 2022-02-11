@@ -13,3 +13,4 @@
 // limitations under the License.
 
 mod resources;
+mod routes;
