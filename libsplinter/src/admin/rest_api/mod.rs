@@ -18,6 +18,8 @@
 mod actix;
 #[cfg(feature = "rest-api-actix-web-3")]
 pub mod actix_web_3;
+#[cfg(feature = "rest-api-actix-web-4")]
+pub mod actix_web_4;
 #[cfg(feature = "rest-api-actix-web-1")]
 mod error;
 mod resources;
