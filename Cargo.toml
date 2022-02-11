@@ -24,3 +24,8 @@ members = [
     "services/scabbard/cli",
     "services/scabbard/libscabbard",
 ]
+
+[patch.crates-io]
+transact = { git = "https://github.com/hyperledger/transact" }
+sabre-sdk = { git = "https://github.com/hyperledger/sawtooth-sabre" }
+sawtooth = { git = "https://github.com/hyperledger/sawtooth-lib" }

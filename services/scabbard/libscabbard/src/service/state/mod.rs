@@ -25,10 +25,6 @@ use std::time::{Duration, Instant, SystemTime};
 
 use protobuf::Message;
 use sawtooth::receipt::store::ReceiptStore;
-use sawtooth_sabre::{
-    admin::SettingsAdminPermission, handler::SabreTransactionHandler,
-    ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
-};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "events")]
 use splinter::events::{ParseBytes, ParseError};
@@ -37,11 +33,14 @@ use transact::families::command::CommandTransactionHandler;
 use transact::{
     context::manager::sync::ContextManager,
     execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor},
+    families::sabre::{
+        admin::SettingsAdminPermission, handler::SabreTransactionHandler,
+        ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
+    },
     protocol::{
         batch::BatchPair,
         receipt::{TransactionReceipt, TransactionResult},
     },
-    sawtooth::SawtoothToTransactHandlerAdapter,
     scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler},
     state::{
         merkle::{MerkleRadixLeafReadError, MerkleRadixLeafReader},
@@ -123,9 +122,9 @@ impl ScabbardState {
         let context_manager = ContextManager::new(Box::new(merkle_state.clone()));
         let mut executor = Executor::new(vec![Box::new(StaticExecutionAdapter::new_adapter(
             vec![
-                Box::new(SawtoothToTransactHandlerAdapter::new(
-                    SabreTransactionHandler::new(Box::new(SettingsAdminPermission)),
-                )),
+                Box::new(SabreTransactionHandler::new(Box::new(
+                    SettingsAdminPermission,
+                ))),
                 #[cfg(test)]
                 Box::new(CommandTransactionHandler::new()),
             ],

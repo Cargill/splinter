@@ -756,6 +756,7 @@ pub mod tests {
         }
     }
 
+    #[derive(Clone)]
     struct MockReceiptStore;
 
     impl ReceiptStore for MockReceiptStore {
@@ -803,6 +804,10 @@ pub mod tests {
             _id: Option<String>,
         ) -> Result<ReceiptIter, ReceiptStoreError> {
             unimplemented!()
+        }
+
+        fn clone_box(&self) -> Box<(dyn sawtooth::receipt::store::ReceiptStore + 'static)> {
+            Box::new(self.clone())
         }
     }
 
