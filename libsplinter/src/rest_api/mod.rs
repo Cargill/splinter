@@ -105,7 +105,6 @@ pub use actix_web_1::{
     feature = "authorization",
     feature = "biome-credentials",
     feature = "biome-key-management",
-    feature = "biome-notifications",
     feature = "oauth",
     feature = "registry",
 ))]
