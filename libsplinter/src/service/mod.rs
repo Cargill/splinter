@@ -58,6 +58,8 @@ pub mod rest_api;
 mod timer_filter;
 #[cfg(feature = "service-timer-handler")]
 mod timer_handler;
+#[cfg(feature = "service-timer-handler-factory")]
+mod timer_handler_factory;
 
 #[cfg(feature = "service-arguments-converter")]
 pub use arguments_converter::ArgumentsConverter;
@@ -81,3 +83,5 @@ pub use message_sender_factory::MessageSenderFactory;
 pub use timer_filter::TimerFilter;
 #[cfg(feature = "service-timer-handler")]
 pub use timer_handler::TimerHandler;
+#[cfg(feature = "service-timer-handler-factory")]
+pub use timer_handler_factory::TimerHandlerFactory;

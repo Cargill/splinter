@@ -137,6 +137,7 @@ experimental = [
     "service-network",
     "service-timer-filter",
     "service-timer-handler",
+    "service-timer-handler-factory",
     "store-command",
     "ws-transport",
 ]
@@ -198,6 +199,7 @@ service-message-sender-factory = ["service-message-sender"]
 service-network = []
 service-timer-filter = ["service-id"]
 service-timer-handler = ["service-id", "service-message-converter", "service-message-sender"]
+service-timer-handler-factory = ["service-timer-handler"]
 sqlite = ["diesel/sqlite", "diesel_migrations", "store"]
 store = []
 store-command = ["store"]
