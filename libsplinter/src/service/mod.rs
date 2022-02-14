@@ -46,6 +46,8 @@ mod lifecycle;
 mod message_converter;
 #[cfg(feature = "service-message-handler")]
 mod message_handler;
+#[cfg(feature = "service-message-handler-factory")]
+mod message_handler_factory;
 #[cfg(feature = "service-message-sender")]
 mod message_sender;
 #[cfg(feature = "rest-api-actix-web-1")]
@@ -65,6 +67,8 @@ pub use lifecycle::Lifecycle;
 pub use message_converter::MessageConverter;
 #[cfg(feature = "service-message-handler")]
 pub use message_handler::MessageHandler;
+#[cfg(feature = "service-message-handler-factory")]
+pub use message_handler_factory::MessageHandlerFactory;
 #[cfg(feature = "service-message-sender")]
 use message_sender::IntoMessageSender;
 #[cfg(feature = "service-message-sender")]
