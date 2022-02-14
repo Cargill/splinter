@@ -39,7 +39,7 @@ pub mod memory;
 use std::cmp::Ordering;
 use std::fmt;
 
-use self::error::RoutingTableReaderError;
+pub use self::error::RoutingTableReaderError;
 
 use crate::error::InternalError;
 use crate::error::InvalidStateError;
