@@ -71,6 +71,8 @@
 pub mod actix_web_1;
 #[cfg(feature = "rest-api-actix-web-3")]
 pub mod actix_web_3;
+#[cfg(feature = "rest-api-actix-web-4")]
+pub mod actix_web_4;
 pub mod auth;
 #[cfg(feature = "rest-api-cors")]
 pub mod cors;
