@@ -20,12 +20,22 @@ use crate::protos::circuit::{
     CircuitDirectMessage, CircuitError, CircuitError_Error, CircuitMessageType,
 };
 
+#[cfg(feature = "service-message-handler-dispatch")]
+use crate::error::InternalError;
+#[cfg(feature = "service-message-handler-dispatch")]
+use crate::{
+    runtime::service::ServiceDispatcher,
+    service::{CircuitId, FullyQualifiedServiceId, ServiceId},
+};
+
 use protobuf::Message;
 
 // Implements a handler that handles CircuitDirectMessage
 pub struct CircuitDirectMessageHandler {
     node_id: String,
     routing_table: Box<dyn RoutingTableReader>,
+    #[cfg(feature = "service-message-handler-dispatch")]
+    service_dispatcher: ServiceDispatcher,
 }
 
 impl Handler for CircuitDirectMessageHandler {
@@ -65,6 +75,30 @@ impl Handler for CircuitDirectMessageHandler {
         let msg_sender = msg.get_sender();
         let recipient = msg.get_recipient();
         let recipient_id = RoutingServiceId::new(circuit_name.to_string(), recipient.to_string());
+
+        #[cfg(feature = "service-message-handler-dispatch")]
+        {
+            let to_service = FullyQualifiedServiceId::new(
+                CircuitId::new(circuit_name)
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?,
+                ServiceId::new(msg.get_recipient())
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?,
+            );
+
+            if self.service_dispatcher.is_routable(&to_service)? {
+                let from_service = FullyQualifiedServiceId::new(
+                    CircuitId::new(circuit_name)
+                        .map_err(|e| InternalError::from_source(Box::new(e)))?,
+                    ServiceId::new(msg.get_sender())
+                        .map_err(|e| InternalError::from_source(Box::new(e)))?,
+                );
+
+                let mut msg = msg;
+                self.service_dispatcher
+                    .dispatch(to_service, from_service, msg.take_payload())?;
+                return Ok(());
+            }
+        }
 
         // msg bytes will either be message bytes of a direct message or an error message
         // the msg_recipient is either the service/node id to send the message to or is the
@@ -223,10 +257,16 @@ impl Handler for CircuitDirectMessageHandler {
 }
 
 impl CircuitDirectMessageHandler {
-    pub fn new(node_id: String, routing_table: Box<dyn RoutingTableReader>) -> Self {
+    pub fn new(
+        node_id: String,
+        routing_table: Box<dyn RoutingTableReader>,
+        #[cfg(feature = "service-message-handler-dispatch")] service_dispatcher: ServiceDispatcher,
+    ) -> Self {
         CircuitDirectMessageHandler {
             node_id,
             routing_table,
+            #[cfg(feature = "service-message-handler-dispatch")]
+            service_dispatcher,
         }
     }
 }
@@ -247,6 +287,17 @@ mod tests {
     use crate::protos::circuit::CircuitMessage;
     use crate::protos::network::NetworkMessage;
 
+    #[cfg(feature = "service-message-handler-dispatch")]
+    use crate::runtime::service::{
+        NetworkMessageSenderFactory, RoutingTableServiceTypeResolver,
+        SingleThreadedMessageHandlerTaskRunner,
+    };
+    #[cfg(feature = "service-message-handler-dispatch")]
+    use crate::service::{
+        MessageHandler, MessageHandlerFactory, MessageSender as ServiceMessageSender, Routable,
+        ServiceType,
+    };
+
     // Test that a direct message will be properly sent to the service if the message is meant for
     // a service connected to the receiving node
     #[test]
@@ -263,13 +314,13 @@ mod tests {
         let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()], None);
 
         let mut service_abc = Service::new(
-            "abc".to_string(),
+            "b0001".to_string(),
             "test".to_string(),
             "123".to_string(),
             vec![],
         );
         let mut service_def = Service::new(
-            "def".to_string(),
+            "a0001".to_string(),
             "test".to_string(),
             "345".to_string(),
             vec![],
@@ -286,7 +337,7 @@ mod tests {
 
         // Add circuit and service to splinter state
         let circuit = Circuit::new(
-            "alpha".into(),
+            "Alpha-00000".into(),
             vec![service_abc.clone(), service_def.clone()],
             vec!["123".into(), "345".into()],
             AuthorizationType::Trust,
@@ -301,14 +352,19 @@ mod tests {
             .expect("Unable to add circuits");
 
         // Add direct message handler to the the dispatcher
-        let handler = CircuitDirectMessageHandler::new("123".to_string(), reader);
+        let handler = CircuitDirectMessageHandler::new(
+            "123".to_string(),
+            reader.clone(),
+            #[cfg(feature = "service-message-handler-dispatch")]
+            new_service_dispatcher(mock_sender.clone(), reader),
+        );
         dispatcher.set_handler(Box::new(handler));
 
         // Create the direct message
         let mut direct_message = CircuitDirectMessage::new();
-        direct_message.set_circuit("alpha".into());
-        direct_message.set_sender("def".into());
-        direct_message.set_recipient("abc".into());
+        direct_message.set_circuit("Alpha-00000".into());
+        direct_message.set_sender("a0001".into());
+        direct_message.set_recipient("b0001".into());
         direct_message.set_payload(b"test".to_vec());
         direct_message.set_correlation_id("1234".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
@@ -336,9 +392,9 @@ mod tests {
             ),
             CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
             |msg: CircuitDirectMessage| {
-                assert_eq!(msg.get_sender(), "def");
-                assert_eq!(msg.get_circuit(), "alpha");
-                assert_eq!(msg.get_recipient(), "abc");
+                assert_eq!(msg.get_sender(), "a0001");
+                assert_eq!(msg.get_circuit(), "Alpha-00000");
+                assert_eq!(msg.get_recipient(), "b0001");
                 assert_eq!(msg.get_payload().to_vec(), b"test".to_vec());
                 assert_eq!(msg.get_correlation_id(), "1234");
             },
@@ -361,13 +417,13 @@ mod tests {
         let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()], None);
 
         let mut service_abc = Service::new(
-            "abc".to_string(),
+            "b0001".to_string(),
             "test".to_string(),
             "123".to_string(),
             vec![],
         );
         let mut service_def = Service::new(
-            "def".to_string(),
+            "a0001".to_string(),
             "test".to_string(),
             "345".to_string(),
             vec![],
@@ -384,7 +440,7 @@ mod tests {
 
         // Add circuit and service to splinter state
         let circuit = Circuit::new(
-            "alpha".into(),
+            "Alpha-00000".into(),
             vec![service_abc.clone(), service_def.clone()],
             vec!["123".into(), "345".into()],
             AuthorizationType::Trust,
@@ -399,15 +455,20 @@ mod tests {
             .expect("Unable to add circuits");
 
         // Add direct message handler to dispatcher
-        let handler = CircuitDirectMessageHandler::new("345".to_string(), reader);
+        let handler = CircuitDirectMessageHandler::new(
+            "345".to_string(),
+            reader.clone(),
+            #[cfg(feature = "service-message-handler-dispatch")]
+            new_service_dispatcher(mock_sender.clone(), reader),
+        );
 
         dispatcher.set_handler(Box::new(handler));
 
         // create dispatch message
         let mut direct_message = CircuitDirectMessage::new();
-        direct_message.set_circuit("alpha".into());
-        direct_message.set_sender("def".into());
-        direct_message.set_recipient("abc".into());
+        direct_message.set_circuit("Alpha-00000".into());
+        direct_message.set_sender("a0001".into());
+        direct_message.set_recipient("b0001".into());
         direct_message.set_payload(b"test".to_vec());
         direct_message.set_correlation_id("1234".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
@@ -435,9 +496,9 @@ mod tests {
             ),
             CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
             |msg: CircuitDirectMessage| {
-                assert_eq!(msg.get_sender(), "def");
-                assert_eq!(msg.get_circuit(), "alpha");
-                assert_eq!(msg.get_recipient(), "abc");
+                assert_eq!(msg.get_sender(), "a0001");
+                assert_eq!(msg.get_circuit(), "Alpha-00000");
+                assert_eq!(msg.get_recipient(), "b0001");
                 assert_eq!(msg.get_payload().to_vec(), b"test".to_vec());
                 assert_eq!(msg.get_correlation_id(), "1234");
             },
@@ -459,7 +520,7 @@ mod tests {
         let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()], None);
 
         let mut service_abc = Service::new(
-            "abc".to_string(),
+            "b0001".to_string(),
             "test".to_string(),
             "123".to_string(),
             vec![],
@@ -472,7 +533,7 @@ mod tests {
 
         // Add circuit and service to splinter state
         let circuit = Circuit::new(
-            "alpha".into(),
+            "Alpha-00000".into(),
             vec![service_abc.clone()],
             vec!["123".into(), "345".into()],
             AuthorizationType::Trust,
@@ -487,15 +548,20 @@ mod tests {
             .expect("Unable to add circuits");
 
         // add direct message handler to the dispatcher
-        let handler = CircuitDirectMessageHandler::new("123".to_string(), reader);
+        let handler = CircuitDirectMessageHandler::new(
+            "123".to_string(),
+            reader.clone(),
+            #[cfg(feature = "service-message-handler-dispatch")]
+            new_service_dispatcher(mock_sender.clone(), reader),
+        );
 
         dispatcher.set_handler(Box::new(handler));
 
         // create direct message
         let mut direct_message = CircuitDirectMessage::new();
-        direct_message.set_circuit("alpha".into());
-        direct_message.set_sender("def".into());
-        direct_message.set_recipient("abc".into());
+        direct_message.set_circuit("Alpha-00000".into());
+        direct_message.set_sender("a0001".into());
+        direct_message.set_recipient("b0001".into());
         direct_message.set_payload(b"test".to_vec());
         direct_message.set_correlation_id("1234".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
@@ -523,7 +589,7 @@ mod tests {
             ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
-                assert_eq!(msg.get_service_id(), "def");
+                assert_eq!(msg.get_service_id(), "a0001");
                 assert_eq!(
                     msg.get_error(),
                     CircuitError_Error::ERROR_SENDER_NOT_IN_CIRCUIT_ROSTER
@@ -548,7 +614,7 @@ mod tests {
         let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()], None);
 
         let mut service_def = Service::new(
-            "def".to_string(),
+            "a0001".to_string(),
             "test".to_string(),
             "345".to_string(),
             vec![],
@@ -561,7 +627,7 @@ mod tests {
 
         // Add circuit and service to splinter state
         let circuit = Circuit::new(
-            "alpha".into(),
+            "Alpha-00000".into(),
             vec![service_def.clone()],
             vec!["123".into(), "345".into()],
             AuthorizationType::Trust,
@@ -576,14 +642,19 @@ mod tests {
             .expect("Unable to add circuits");
 
         // add direct message handler
-        let handler = CircuitDirectMessageHandler::new("345".to_string(), reader);
+        let handler = CircuitDirectMessageHandler::new(
+            "345".to_string(),
+            reader.clone(),
+            #[cfg(feature = "service-message-handler-dispatch")]
+            new_service_dispatcher(mock_sender.clone(), reader),
+        );
         dispatcher.set_handler(Box::new(handler));
 
         // create direct message
         let mut direct_message = CircuitDirectMessage::new();
-        direct_message.set_circuit("alpha".into());
-        direct_message.set_sender("def".into());
-        direct_message.set_recipient("abc".into());
+        direct_message.set_circuit("Alpha-00000".into());
+        direct_message.set_sender("a0001".into());
+        direct_message.set_recipient("b0001".into());
         direct_message.set_payload(b"test".to_vec());
         direct_message.set_correlation_id("1234".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
@@ -611,7 +682,7 @@ mod tests {
             ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
-                assert_eq!(msg.get_service_id(), "def");
+                assert_eq!(msg.get_service_id(), "a0001");
                 assert_eq!(
                     msg.get_error(),
                     CircuitError_Error::ERROR_RECIPIENT_NOT_IN_CIRCUIT_ROSTER
@@ -632,14 +703,19 @@ mod tests {
         let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
 
         // add direct message handler to the dispatcher
-        let handler = CircuitDirectMessageHandler::new("345".to_string(), reader);
+        let handler = CircuitDirectMessageHandler::new(
+            "345".to_string(),
+            reader.clone(),
+            #[cfg(feature = "service-message-handler-dispatch")]
+            new_service_dispatcher(mock_sender.clone(), reader),
+        );
         dispatcher.set_handler(Box::new(handler));
 
         // create direct message
         let mut direct_message = CircuitDirectMessage::new();
-        direct_message.set_circuit("alpha".into());
-        direct_message.set_sender("def".into());
-        direct_message.set_recipient("abc".into());
+        direct_message.set_circuit("Alpha-00000".into());
+        direct_message.set_sender("a0001".into());
+        direct_message.set_recipient("b0001".into());
         direct_message.set_payload(b"test".to_vec());
         direct_message.set_correlation_id("1234".into());
         let direct_bytes = direct_message.write_to_bytes().unwrap();
@@ -667,12 +743,103 @@ mod tests {
             ),
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
-                assert_eq!(msg.get_service_id(), "def");
+                assert_eq!(msg.get_service_id(), "a0001");
                 assert_eq!(
                     msg.get_error(),
                     CircuitError_Error::ERROR_CIRCUIT_DOES_NOT_EXIST
                 );
                 assert_eq!(msg.get_correlation_id(), "1234");
+            },
+        )
+    }
+
+    #[cfg(feature = "service-message-handler-dispatch")]
+    #[test]
+    fn test_circuit_direct_message_handler_via_service_dispatcher() {
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let node_123 = CircuitNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()], None);
+        let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()], None);
+
+        let service_abc = Service::new(
+            "b0001".to_string(),
+            "testservice2".to_string(),
+            "123".to_string(),
+            vec![],
+        );
+        let service_def = Service::new(
+            "a0001".to_string(),
+            "testservice2".to_string(),
+            "345".to_string(),
+            vec![],
+        );
+
+        // Add circuit and service to splinter state
+        let circuit = Circuit::new(
+            "Alpha-00000".into(),
+            vec![service_abc.clone(), service_def.clone()],
+            vec!["123".into(), "345".into()],
+            AuthorizationType::Trust,
+        );
+
+        writer
+            .add_circuit(
+                circuit.circuit_id().into(),
+                circuit,
+                vec![node_123, node_345],
+            )
+            .expect("Unable to add circuits");
+
+        // add direct message handler to the dispatcher
+        let handler = CircuitDirectMessageHandler::new(
+            "345".to_string(),
+            reader.clone(),
+            new_service_dispatcher_with_handler(mock_sender.clone(), reader, "testservice2"),
+        );
+        dispatcher.set_handler(Box::new(handler));
+
+        // Create the direct message
+        let mut direct_message = CircuitDirectMessage::new();
+        direct_message.set_circuit("Alpha-00000".into());
+        direct_message.set_sender("b0001".into());
+        direct_message.set_recipient("a0001".into());
+        direct_message.set_payload(b"test".to_vec());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
+
+        // dispatch the direct message
+        dispatcher
+            .dispatch(
+                PeerTokenPair::new(
+                    PeerAuthorizationToken::from_peer_id("123"),
+                    PeerAuthorizationToken::from_peer_id("345"),
+                )
+                .into(),
+                &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+                direct_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            PeerTokenPair::new(
+                PeerAuthorizationToken::from_peer_id("123"),
+                PeerAuthorizationToken::from_peer_id("345"),
+            ),
+            CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+            |msg: CircuitDirectMessage| {
+                // test that the correct echo message has been sent
+                assert_eq!(msg.get_sender(), "a0001");
+                assert_eq!(msg.get_circuit(), "Alpha-00000");
+                assert_eq!(msg.get_recipient(), "b0001");
+                assert_eq!(msg.get_payload().to_vec(), b"test;out".to_vec());
             },
         )
     }
@@ -693,6 +860,43 @@ mod tests {
         let circuit_msg: M = Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         detail_assertions(circuit_msg);
+    }
+
+    #[cfg(feature = "service-message-handler-dispatch")]
+    fn new_service_dispatcher(
+        sender: MockSender,
+        routing_table_reader: Box<dyn RoutingTableReader>,
+    ) -> ServiceDispatcher {
+        ServiceDispatcher::new(
+            vec![],
+            Box::new(NetworkMessageSenderFactory::new(
+                "345",
+                sender,
+                routing_table_reader.clone(),
+            )),
+            Box::new(RoutingTableServiceTypeResolver::new(routing_table_reader)),
+            Box::new(SingleThreadedMessageHandlerTaskRunner::new()),
+        )
+    }
+
+    #[cfg(feature = "service-message-handler-dispatch")]
+    fn new_service_dispatcher_with_handler(
+        sender: MockSender,
+        routing_table_reader: Box<dyn RoutingTableReader>,
+        service_type: &'static str,
+    ) -> ServiceDispatcher {
+        ServiceDispatcher::new(
+            vec![
+                TestMessageHandlerFactory::new(ServiceType::new_static(service_type)).into_boxed(),
+            ],
+            Box::new(NetworkMessageSenderFactory::new(
+                "345",
+                sender,
+                routing_table_reader.clone(),
+            )),
+            Box::new(RoutingTableServiceTypeResolver::new(routing_table_reader)),
+            Box::new(SingleThreadedMessageHandlerTaskRunner::new()),
+        )
     }
 
     #[derive(Clone)]
@@ -720,6 +924,64 @@ mod tests {
                 .push_back((id, message));
 
             Ok(())
+        }
+    }
+
+    #[cfg(feature = "service-message-handler-dispatch")]
+    #[derive(Clone)]
+    struct TestMessageHandlerFactory {
+        service_types: Vec<ServiceType<'static>>,
+    }
+
+    #[cfg(feature = "service-message-handler-dispatch")]
+    impl TestMessageHandlerFactory {
+        fn new(service_type: ServiceType<'static>) -> Self {
+            Self {
+                service_types: vec![service_type],
+            }
+        }
+    }
+
+    #[cfg(feature = "service-message-handler-dispatch")]
+    impl MessageHandlerFactory for TestMessageHandlerFactory {
+        type MessageHandler = TestMessageHandler;
+
+        fn new_handler(&self) -> Self::MessageHandler {
+            TestMessageHandler
+        }
+
+        fn clone_boxed(
+            &self,
+        ) -> Box<dyn MessageHandlerFactory<MessageHandler = Self::MessageHandler>> {
+            Box::new(self.clone())
+        }
+    }
+
+    #[cfg(feature = "service-message-handler-dispatch")]
+    impl Routable for TestMessageHandlerFactory {
+        fn service_types(&self) -> &[ServiceType] {
+            &self.service_types
+        }
+    }
+
+    #[cfg(feature = "service-message-handler-dispatch")]
+    struct TestMessageHandler;
+
+    #[cfg(feature = "service-message-handler-dispatch")]
+    impl MessageHandler for TestMessageHandler {
+        type Message = Vec<u8>;
+
+        fn handle_message(
+            &mut self,
+            sender: &dyn ServiceMessageSender<Self::Message>,
+            _to_service: FullyQualifiedServiceId,
+            from_service: FullyQualifiedServiceId,
+            message: Self::Message,
+        ) -> Result<(), InternalError> {
+            let mut msg = message;
+            msg.extend(b";out");
+
+            sender.send(from_service.service_id(), msg)
         }
     }
 }
