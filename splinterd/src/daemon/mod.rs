@@ -43,6 +43,8 @@ use splinter::circuit::handlers::{
     CircuitMessageHandler, ServiceConnectRequestHandler, ServiceDisconnectRequestHandler,
 };
 use splinter::circuit::routing::{memory::RoutingTable, RoutingTableReader, RoutingTableWriter};
+#[cfg(feature = "service2")]
+use splinter::error::InternalError;
 use splinter::keys::insecure::AllowAllKeyPermissionManager;
 use splinter::mesh::Mesh;
 use splinter::network::auth::AuthorizationManager;
@@ -84,6 +86,11 @@ use splinter::rest_api::auth::authorization::Permission;
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
 use splinter::runtime::service::instance::{ServiceProcessor, ServiceProcessorShutdownHandle};
+#[cfg(feature = "service2")]
+use splinter::runtime::service::{
+    MessageHandlerTaskPoolBuilder, MessageHandlerTaskRunner, NetworkMessageSenderFactory,
+    RoutingTableServiceTypeResolver, ServiceDispatcher,
+};
 use splinter::service::instance::ServiceArgValidator;
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
@@ -332,6 +339,12 @@ impl SplinterDaemon {
 
         let network_sender = interconnect.new_network_sender();
 
+        #[cfg(feature = "service2")]
+        let mut message_handler_task_pool = MessageHandlerTaskPoolBuilder::new()
+            .with_size(8)
+            .build()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
         // Set up the Circuit dispatcher
         let circuit_dispatcher = set_up_circuit_dispatcher(
             network_sender.clone(),
@@ -349,6 +362,8 @@ impl SplinterDaemon {
                         err
                     ))
                 })?,
+            #[cfg(feature = "service2")]
+            message_handler_task_pool.task_runner(),
         );
         let mut circuit_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(circuit_dispatcher)
@@ -857,6 +872,17 @@ impl SplinterDaemon {
         if let Err(err) = self.mesh.clone().wait_for_shutdown() {
             error!("Unable to cleanly shut down Mesh: {}", err);
         }
+
+        #[cfg(feature = "service2")]
+        {
+            message_handler_task_pool.signal_shutdown();
+            if let Err(err) = message_handler_task_pool.wait_for_shutdown() {
+                error!(
+                    "Unable to cleanly shut down message handler task pool: {}",
+                    err
+                );
+            }
+        }
         Ok(())
     }
 
@@ -1007,8 +1033,14 @@ fn set_up_circuit_dispatcher(
     routing_reader: Box<dyn RoutingTableReader>,
     routing_writer: Box<dyn RoutingTableWriter>,
     public_keys: Vec<PublicKey>,
+    #[cfg(feature = "service2")] message_handler_task_runner: impl MessageHandlerTaskRunner
+        + Send
+        + 'static,
 ) -> Dispatcher<CircuitMessageType> {
+    #[cfg(not(feature = "service2"))]
     let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(network_sender));
+    #[cfg(feature = "service2")]
+    let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(network_sender.clone()));
 
     let service_connect_request_handler = ServiceConnectRequestHandler::new(
         node_id.to_string(),
@@ -1021,8 +1053,21 @@ fn set_up_circuit_dispatcher(
         ServiceDisconnectRequestHandler::new(routing_reader.clone(), routing_writer.clone());
     dispatcher.set_handler(Box::new(service_disconnect_request_handler));
 
-    let direct_message_handler =
-        CircuitDirectMessageHandler::new(node_id.to_string(), routing_reader.clone());
+    let direct_message_handler = CircuitDirectMessageHandler::new(
+        node_id.to_string(),
+        routing_reader.clone(),
+        #[cfg(feature = "service2")]
+        ServiceDispatcher::new(
+            vec![],
+            Box::new(NetworkMessageSenderFactory::new(
+                node_id,
+                network_sender,
+                routing_reader.clone(),
+            )),
+            Box::new(RoutingTableServiceTypeResolver::new(routing_reader.clone())),
+            Box::new(message_handler_task_runner),
+        ),
+    );
     dispatcher.set_handler(Box::new(direct_message_handler));
 
     let circuit_error_handler =
