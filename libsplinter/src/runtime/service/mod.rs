@@ -15,6 +15,8 @@
 pub mod instance;
 #[cfg(feature = "service-lifecycle-executor")]
 mod lifecycle_executor;
+#[cfg(feature = "service-message-sender-factory-peer")]
+mod network_sender_factory;
 #[cfg(feature = "service-timer")]
 mod timer;
 
@@ -30,5 +32,7 @@ pub use lifecycle_executor::{
     LifecycleService, LifecycleServiceBuilder, LifecycleStatus, LifecycleStore,
     LifecycleStoreError, LifecycleStoreFactory,
 };
+#[cfg(feature = "service-message-sender-factory-peer")]
+pub use network_sender_factory::NetworkMessageSenderFactory;
 #[cfg(feature = "service-timer")]
 pub use timer::{Timer, TimerAlarm};

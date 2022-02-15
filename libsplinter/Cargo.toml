@@ -135,6 +135,7 @@ experimental = [
     "service-message-handler-factory",
     "service-message-sender",
     "service-message-sender-factory",
+    "service-message-sender-factory-peer",
     "service-network",
     "service-routable",
     "service-timer",
@@ -201,6 +202,7 @@ service-message-handler = ["service-message-converter", "service-message-sender"
 service-message-handler-factory = ["service-message-handler"]
 service-message-sender = ["service-message-converter"]
 service-message-sender-factory = ["service-message-sender"]
+service-message-sender-factory-peer = ["service-message-sender"]
 service-network = []
 service-routable = ["service-type"]
 service-timer =[
