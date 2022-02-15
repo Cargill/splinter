@@ -50,6 +50,8 @@ mod message_handler;
 mod message_handler_factory;
 #[cfg(feature = "service-message-sender")]
 mod message_sender;
+#[cfg(feature = "service-message-sender-factory")]
+mod message_sender_factory;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
 #[cfg(feature = "service-timer-filter")]
@@ -73,6 +75,8 @@ pub use message_handler_factory::MessageHandlerFactory;
 use message_sender::IntoMessageSender;
 #[cfg(feature = "service-message-sender")]
 pub use message_sender::MessageSender;
+#[cfg(feature = "service-message-sender-factory")]
+pub use message_sender_factory::MessageSenderFactory;
 #[cfg(feature = "service-timer-filter")]
 pub use timer_filter::TimerFilter;
 #[cfg(feature = "service-timer-handler")]

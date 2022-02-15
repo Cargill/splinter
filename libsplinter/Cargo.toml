@@ -133,6 +133,7 @@ experimental = [
     "service-message-handler",
     "service-message-handler-factory",
     "service-message-sender",
+    "service-message-sender-factory",
     "service-network",
     "service-timer-filter",
     "service-timer-handler",
@@ -193,6 +194,7 @@ service-message-converter = []
 service-message-handler = ["service-id", "service-message-converter", "service-message-sender"]
 service-message-handler-factory = ["service-message-handler"]
 service-message-sender = ["service-id", "service-message-converter"]
+service-message-sender-factory = ["service-message-sender"]
 service-network = []
 service-timer-filter = ["service-id"]
 service-timer-handler = ["service-id", "service-message-converter", "service-message-sender"]
