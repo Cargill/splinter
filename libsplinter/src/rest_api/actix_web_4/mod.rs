@@ -13,3 +13,9 @@
 // limitations under the License.
 
 pub mod protocol_version;
+
+use actix_web_4::Resource;
+
+pub trait ResourceProvider: Send {
+    fn resources(&self) -> Vec<Resource>;
+}
