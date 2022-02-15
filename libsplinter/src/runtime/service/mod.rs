@@ -25,6 +25,8 @@ mod timer;
 #[cfg(feature = "service-message-handler-dispatch")]
 pub use dispatch::MessageHandlerTaskRunner;
 #[cfg(feature = "service-message-handler-dispatch")]
+pub use dispatch::RoutingTableServiceTypeResolver;
+#[cfg(feature = "service-message-handler-dispatch")]
 pub use dispatch::ServiceDispatcher;
 #[cfg(feature = "service-message-handler-dispatch")]
 pub use dispatch::ServiceTypeResolver;

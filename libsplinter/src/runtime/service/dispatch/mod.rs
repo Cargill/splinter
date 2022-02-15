@@ -17,9 +17,11 @@ mod task;
 mod task_job_executor;
 mod task_single_threaded;
 mod type_resolver;
+mod type_resolver_routing_table;
 
 pub use service_dispatcher::ServiceDispatcher;
 pub use task::MessageHandlerTaskRunner;
 pub use task_job_executor::{MessageHandlerTaskPool, MessageHandlerTaskPoolBuilder};
 pub use task_single_threaded::SingleThreadedMessageHandlerTaskRunner;
 pub use type_resolver::ServiceTypeResolver;
+pub use type_resolver_routing_table::RoutingTableServiceTypeResolver;
