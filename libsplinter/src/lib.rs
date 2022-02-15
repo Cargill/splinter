@@ -99,6 +99,8 @@ pub mod public_key;
 pub mod registry;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
+#[cfg(feature = "rest-api-actix-web-4")]
+mod rest_error;
 pub mod service;
 #[cfg(feature = "store")]
 pub mod store;
