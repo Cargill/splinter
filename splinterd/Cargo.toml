@@ -102,6 +102,7 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "actix-web-4",
     "authorization-handler-maintenance",
     "https-bind",
     "node",
@@ -109,6 +110,7 @@ experimental = [
     "ws-transport",
 ]
 
+actix-web-4 = ["splinter/rest-api-actix-web-4", "splinter/https-bind"]
 authorization = [
     "scabbard/authorization",
     "splinter/authorization",
