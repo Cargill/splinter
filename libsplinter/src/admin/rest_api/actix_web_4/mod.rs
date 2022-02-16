@@ -14,3 +14,15 @@
 
 mod resources;
 mod routes;
+
+use actix_web_4::{web, Resource};
+
+use crate::rest_api::actix_web_4::ResourceProvider;
+
+pub struct AdminResourceProvider {}
+
+impl ResourceProvider for AdminResourceProvider {
+    fn resources(&self) -> Vec<Resource> {
+        vec![web::resource("/").route(web::get().to(routes::get_admin_circuits))]
+    }
+}
