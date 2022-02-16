@@ -30,13 +30,15 @@ use std::time::Duration;
 use cylinder::{secp256k1::Secp256k1Context, Signer, SigningError, VerifierFactory};
 use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactoryBuilder;
+#[cfg(feature = "actix-web-4")]
+use splinter::admin::rest_api::actix_web_4::AdminResourceProvider;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService, AdminServiceBuilder};
-#[cfg(feature = "biome-credentials")]
+#[cfg(all(feature = "biome-credentials", not(feature = "actix-web-4")))]
 use splinter::biome::credentials::rest_api::BiomeCredentialsRestResourceProviderBuilder;
-#[cfg(feature = "biome-key-management")]
+#[cfg(all(feature = "biome-key-management", not(feature = "actix-web-4")))]
 use splinter::biome::key_management::rest_api::BiomeKeyManagementRestResourceProvider;
-#[cfg(feature = "biome-profile")]
+#[cfg(all(feature = "biome-profile", not(feature = "actix-web-4")))]
 use splinter::biome::profile::rest_api::BiomeProfileRestResourceProvider;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
@@ -64,11 +66,17 @@ use splinter::public_key::PublicKey;
 use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RwRegistry, UnifiedRegistry,
 };
+
+#[cfg(feature = "actix-web-4")]
+use splinter::rest_api::actix_web_4::builder::RestApiBuilder;
 #[cfg(feature = "authorization-handler-allow-keys")]
 use splinter::rest_api::auth::authorization::allow_keys::AllowKeysAuthorizationHandler;
-#[cfg(feature = "authorization-handler-maintenance")]
+#[cfg(all(
+    feature = "authorization-handler-maintenance",
+    not(feature = "actix-web-4")
+))]
 use splinter::rest_api::auth::authorization::maintenance::MaintenanceModeAuthorizationHandler;
-#[cfg(feature = "authorization-handler-rbac")]
+#[cfg(all(feature = "authorization-handler-rbac", not(feature = "actix-web-4")))]
 use splinter::rest_api::auth::authorization::rbac::{
     rest_api::RoleBasedAuthorizationResourceProvider, RoleBasedAuthorizationHandler,
 };
@@ -78,10 +86,13 @@ use splinter::rest_api::auth::authorization::rbac::{
     feature = "authorization-handler-allow-keys"
 ))]
 use splinter::rest_api::auth::authorization::AuthorizationHandler;
-#[cfg(feature = "authorization")]
+#[cfg(all(feature = "authorization", not(feature = "actix-web-4")))]
 use splinter::rest_api::auth::authorization::Permission;
-#[cfg(feature = "oauth")]
+use splinter::rest_api::BindConfig;
+#[cfg(all(feature = "oauth", not(feature = "actix-web-4")))]
 use splinter::rest_api::OAuthConfig;
+use splinter::rest_api::RestResourceProvider;
+#[cfg(not(feature = "actix-web-4"))]
 use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
 use splinter::service;
 use splinter::service::validation::ServiceArgValidator;
@@ -92,6 +103,7 @@ use splinter::transport::{
 };
 
 use crate::node_id::get_node_id;
+#[cfg(not(feature = "actix-web-4"))]
 use crate::routes;
 
 pub use error::{CreateError, StartError};
@@ -534,247 +546,267 @@ impl SplinterDaemon {
         #[cfg(feature = "https-bind")]
         let bind = self.build_rest_api_bind()?;
 
-        // Allowing unused_mut because rest_api_builder must be mutable if feature biome is enabled
-        #[allow(unused_mut)]
-        let mut rest_api_builder = RestApiBuilder::new()
-            .with_bind(bind)
-            .add_resources(registry.resources())
-            .add_resources(admin_service.resources())
-            .add_resources(orchestrator_resources)
-            .add_resources(circuit_resource_provider.resources());
-
-        #[cfg(feature = "authorization")]
+        #[cfg(not(feature = "actix-web-4"))]
         {
-            // Allowing unused_mut because authorization_handlers must be mutable if
-            // `authorization-handler-allow-keys` or `auth-handler-maintenance` are enabled
+            // Allowing unused_mut because rest_api_builder must be mutable if feature biome is enabled
             #[allow(unused_mut)]
-            let mut authorization_handlers = vec![
-                #[cfg(feature = "authorization-handler-allow-keys")]
-                create_allow_keys_authorization_handler(
-                    create_allow_keys_path(
-                        &self.config_dir,
-                        #[cfg(feature = "config-allow-keys")]
-                        &self.allow_keys_file,
-                        #[cfg(not(feature = "config-allow-keys"))]
-                        "allow_keys",
-                    )
-                    .to_str()
-                    .expect("path built from &str cannot be invalid"),
-                )?,
-            ];
+            let mut rest_api_builder = RestApiBuilder::new()
+                .with_bind(bind)
+                .add_resources(registry.resources())
+                .add_resources(admin_service.resources())
+                .add_resources(orchestrator_resources)
+                .add_resources(circuit_resource_provider.resources());
 
-            #[cfg(feature = "authorization-handler-rbac")]
-            let rbac_store = store_factory.get_role_based_authorization_store();
-
-            #[cfg(feature = "authorization-handler-maintenance")]
+            #[cfg(feature = "authorization")]
             {
+                // Allowing unused_mut because authorization_handlers must be mutable if
+                // `authorization-handler-allow-keys` or `auth-handler-maintenance` are enabled
+                #[allow(unused_mut)]
+                let mut authorization_handlers = vec![
+                    #[cfg(feature = "authorization-handler-allow-keys")]
+                    create_allow_keys_authorization_handler(
+                        create_allow_keys_path(
+                            &self.config_dir,
+                            #[cfg(feature = "config-allow-keys")]
+                            &self.allow_keys_file,
+                            #[cfg(not(feature = "config-allow-keys"))]
+                            "allow_keys",
+                        )
+                        .to_str()
+                        .expect("path built from &str cannot be invalid"),
+                    )?,
+                ];
+
                 #[cfg(feature = "authorization-handler-rbac")]
-                let maintenance_mode_auth_handler =
-                    MaintenanceModeAuthorizationHandler::new(Some(rbac_store.clone()));
-                #[cfg(not(feature = "authorization-handler-rbac"))]
-                let maintenance_mode_auth_handler = MaintenanceModeAuthorizationHandler::default();
-                rest_api_builder =
-                    rest_api_builder.add_resources(maintenance_mode_auth_handler.resources());
-                authorization_handlers.push(Box::new(maintenance_mode_auth_handler));
+                let rbac_store = store_factory.get_role_based_authorization_store();
+
+                #[cfg(feature = "authorization-handler-maintenance")]
+                {
+                    #[cfg(feature = "authorization-handler-rbac")]
+                    let maintenance_mode_auth_handler =
+                        MaintenanceModeAuthorizationHandler::new(Some(rbac_store.clone()));
+                    #[cfg(not(feature = "authorization-handler-rbac"))]
+                    let maintenance_mode_auth_handler =
+                        MaintenanceModeAuthorizationHandler::default();
+                    rest_api_builder =
+                        rest_api_builder.add_resources(maintenance_mode_auth_handler.resources());
+                    authorization_handlers.push(Box::new(maintenance_mode_auth_handler));
+                }
+
+                #[cfg(feature = "authorization-handler-rbac")]
+                {
+                    authorization_handlers
+                        .push(Box::new(RoleBasedAuthorizationHandler::new(rbac_store)));
+                    rest_api_builder = rest_api_builder.add_resources(
+                        RoleBasedAuthorizationResourceProvider::new(
+                            store_factory.get_role_based_authorization_store(),
+                        )
+                        .resources(),
+                    );
+                }
+
+                rest_api_builder = rest_api_builder
+                    .with_authorization_handlers(authorization_handlers)
+                    .add_resource(Resource::build("/openapi.yaml").add_method(
+                        Method::Get,
+                        Permission::AllowAuthenticated,
+                        routes::get_openapi,
+                    ))
+                    .add_resource(Resource::build("/status").add_method(
+                        Method::Get,
+                        routes::STATUS_READ_PERMISSION,
+                        move |_, _| {
+                            routes::get_status(
+                                node_id_clone.clone(),
+                                display_name.clone(),
+                                #[cfg(feature = "service-endpoint")]
+                                service_endpoint.clone(),
+                                network_endpoints.clone(),
+                                advertised_endpoints.clone(),
+                            )
+                        },
+                    ));
+            }
+            #[cfg(not(feature = "authorization"))]
+            {
+                rest_api_builder = rest_api_builder
+                    .add_resource(
+                        Resource::build("/openapi.yaml")
+                            .add_method(Method::Get, routes::get_openapi),
+                    )
+                    .add_resource(Resource::build("/status").add_method(
+                        Method::Get,
+                        move |_, _| {
+                            routes::get_status(
+                                node_id.clone(),
+                                display_name.clone(),
+                                #[cfg(feature = "service-endpoint")]
+                                service_endpoint.clone(),
+                                network_endpoints.clone(),
+                                advertised_endpoints.clone(),
+                            )
+                        },
+                    ));
             }
 
-            #[cfg(feature = "authorization-handler-rbac")]
+            #[cfg(feature = "rest-api-cors")]
             {
-                authorization_handlers
-                    .push(Box::new(RoleBasedAuthorizationHandler::new(rbac_store)));
+                if let Some(list) = &self.whitelist {
+                    debug!("Whitelisted domains added to CORS");
+                    rest_api_builder = rest_api_builder.with_whitelist(list.to_vec());
+                }
+            }
+
+            #[allow(unused_mut)]
+            let mut auth_configs = vec![
+                // Add Cylinder JWT as an auth provider
+                AuthConfig::Cylinder {
+                    verifier: auth_config_verifier,
+                },
+            ];
+
+            // Add Biome credentials as an auth provider if it's enabled
+            #[cfg(feature = "biome-credentials")]
+            if self.enable_biome_credentials {
+                let mut biome_credentials_builder: BiomeCredentialsRestResourceProviderBuilder =
+                    Default::default();
+
+                biome_credentials_builder = biome_credentials_builder
+                    .with_refresh_token_store(store_factory.get_biome_refresh_token_store())
+                    .with_credentials_store(store_factory.get_biome_credentials_store());
+
+                #[cfg(feature = "biome-key-management")]
+                {
+                    biome_credentials_builder = biome_credentials_builder
+                        .with_key_store(store_factory.get_biome_key_store())
+                }
+
+                let biome_credentials_resource_provider =
+                    biome_credentials_builder.build().map_err(|err| {
+                        StartError::RestApiError(format!(
+                            "Unable to build Biome credentials REST routes: {}",
+                            err
+                        ))
+                    })?;
+
+                auth_configs.push(AuthConfig::Biome {
+                    biome_credentials_resource_provider,
+                });
+            }
+
+            #[cfg(feature = "oauth")]
+            {
+                // Handle OAuth config. If no OAuth config values are provided, just skip this;
+                // otherwise, require that all are set.
+                let any_oauth_args_provided = self.oauth_provider.is_some()
+                    || self.oauth_client_id.is_some()
+                    || self.oauth_client_secret.is_some()
+                    || self.oauth_redirect_url.is_some();
+                if any_oauth_args_provided {
+                    let oauth_provider = self.oauth_provider.as_deref().ok_or_else(|| {
+                        StartError::RestApiError("missing OAuth provider configuration".into())
+                    })?;
+                    let client_id = self.oauth_client_id.clone().ok_or_else(|| {
+                        StartError::RestApiError("missing OAuth client ID configuration".into())
+                    })?;
+                    let client_secret = self.oauth_client_secret.clone().ok_or_else(|| {
+                        StartError::RestApiError("missing OAuth client secret configuration".into())
+                    })?;
+                    let redirect_url = self.oauth_redirect_url.clone().ok_or_else(|| {
+                        StartError::RestApiError("missing OAuth redirect URL configuration".into())
+                    })?;
+                    let oauth_config = match oauth_provider {
+                        "azure" => OAuthConfig::Azure {
+                            client_id,
+                            client_secret,
+                            redirect_url,
+                            oauth_openid_url: self.oauth_openid_url.clone().ok_or_else(|| {
+                                StartError::RestApiError(
+                                    "missing OAuth OpenID discovery document URL configuration"
+                                        .into(),
+                                )
+                            })?,
+                            inflight_request_store: store_factory
+                                .get_oauth_inflight_request_store(),
+                        },
+                        "github" => OAuthConfig::GitHub {
+                            client_id,
+                            client_secret,
+                            redirect_url,
+                            inflight_request_store: store_factory
+                                .get_oauth_inflight_request_store(),
+                        },
+                        "google" => OAuthConfig::Google {
+                            client_id,
+                            client_secret,
+                            redirect_url,
+                            inflight_request_store: store_factory
+                                .get_oauth_inflight_request_store(),
+                        },
+                        "openid" => OAuthConfig::OpenId {
+                            client_id,
+                            client_secret,
+                            redirect_url,
+                            oauth_openid_url: self.oauth_openid_url.clone().ok_or_else(|| {
+                                StartError::RestApiError(
+                                    "missing OAuth OpenID discovery document URL configuration"
+                                        .into(),
+                                )
+                            })?,
+                            auth_params: self.oauth_openid_auth_params.clone(),
+                            scopes: self.oauth_openid_scopes.clone(),
+                            inflight_request_store: store_factory
+                                .get_oauth_inflight_request_store(),
+                        },
+                        other_provider => {
+                            return Err(StartError::RestApiError(format!(
+                                "invalid OAuth provider: {}",
+                                other_provider
+                            )))
+                        }
+                    };
+
+                    auth_configs.push(AuthConfig::OAuth {
+                        oauth_config,
+                        oauth_user_session_store: store_factory
+                            .get_biome_oauth_user_session_store(),
+                        #[cfg(feature = "biome-profile")]
+                        user_profile_store: store_factory.get_biome_user_profile_store(),
+                    });
+                }
+            }
+
+            rest_api_builder = rest_api_builder.with_auth_configs(auth_configs);
+
+            #[cfg(feature = "biome-key-management")]
+            {
                 rest_api_builder = rest_api_builder.add_resources(
-                    RoleBasedAuthorizationResourceProvider::new(
-                        store_factory.get_role_based_authorization_store(),
-                    )
+                    BiomeKeyManagementRestResourceProvider::new(Arc::new(
+                        store_factory.get_biome_key_store(),
+                    ))
                     .resources(),
                 );
             }
 
-            rest_api_builder = rest_api_builder
-                .with_authorization_handlers(authorization_handlers)
-                .add_resource(Resource::build("/openapi.yaml").add_method(
-                    Method::Get,
-                    Permission::AllowAuthenticated,
-                    routes::get_openapi,
-                ))
-                .add_resource(Resource::build("/status").add_method(
-                    Method::Get,
-                    routes::STATUS_READ_PERMISSION,
-                    move |_, _| {
-                        routes::get_status(
-                            node_id_clone.clone(),
-                            display_name.clone(),
-                            #[cfg(feature = "service-endpoint")]
-                            service_endpoint.clone(),
-                            network_endpoints.clone(),
-                            advertised_endpoints.clone(),
-                        )
-                    },
-                ));
-        }
-        #[cfg(not(feature = "authorization"))]
-        {
-            rest_api_builder = rest_api_builder
-                .add_resource(
-                    Resource::build("/openapi.yaml").add_method(Method::Get, routes::get_openapi),
-                )
-                .add_resource(
-                    Resource::build("/status").add_method(Method::Get, move |_, _| {
-                        routes::get_status(
-                            node_id.clone(),
-                            display_name.clone(),
-                            #[cfg(feature = "service-endpoint")]
-                            service_endpoint.clone(),
-                            network_endpoints.clone(),
-                            advertised_endpoints.clone(),
-                        )
-                    }),
-                );
-        }
-
-        #[cfg(feature = "rest-api-cors")]
-        {
-            if let Some(list) = &self.whitelist {
-                debug!("Whitelisted domains added to CORS");
-                rest_api_builder = rest_api_builder.with_whitelist(list.to_vec());
-            }
-        }
-
-        #[allow(unused_mut)]
-        let mut auth_configs = vec![
-            // Add Cylinder JWT as an auth provider
-            AuthConfig::Cylinder {
-                verifier: auth_config_verifier,
-            },
-        ];
-
-        // Add Biome credentials as an auth provider if it's enabled
-        #[cfg(feature = "biome-credentials")]
-        if self.enable_biome_credentials {
-            let mut biome_credentials_builder: BiomeCredentialsRestResourceProviderBuilder =
-                Default::default();
-
-            biome_credentials_builder = biome_credentials_builder
-                .with_refresh_token_store(store_factory.get_biome_refresh_token_store())
-                .with_credentials_store(store_factory.get_biome_credentials_store());
-
-            #[cfg(feature = "biome-key-management")]
+            #[cfg(feature = "biome-profile")]
             {
-                biome_credentials_builder =
-                    biome_credentials_builder.with_key_store(store_factory.get_biome_key_store())
-            }
-
-            let biome_credentials_resource_provider =
-                biome_credentials_builder.build().map_err(|err| {
-                    StartError::RestApiError(format!(
-                        "Unable to build Biome credentials REST routes: {}",
-                        err
+                rest_api_builder = rest_api_builder.add_resources(
+                    BiomeProfileRestResourceProvider::new(Arc::new(
+                        store_factory.get_biome_user_profile_store(),
                     ))
-                })?;
-
-            auth_configs.push(AuthConfig::Biome {
-                biome_credentials_resource_provider,
-            });
-        }
-
-        #[cfg(feature = "oauth")]
-        {
-            // Handle OAuth config. If no OAuth config values are provided, just skip this;
-            // otherwise, require that all are set.
-            let any_oauth_args_provided = self.oauth_provider.is_some()
-                || self.oauth_client_id.is_some()
-                || self.oauth_client_secret.is_some()
-                || self.oauth_redirect_url.is_some();
-            if any_oauth_args_provided {
-                let oauth_provider = self.oauth_provider.as_deref().ok_or_else(|| {
-                    StartError::RestApiError("missing OAuth provider configuration".into())
-                })?;
-                let client_id = self.oauth_client_id.clone().ok_or_else(|| {
-                    StartError::RestApiError("missing OAuth client ID configuration".into())
-                })?;
-                let client_secret = self.oauth_client_secret.clone().ok_or_else(|| {
-                    StartError::RestApiError("missing OAuth client secret configuration".into())
-                })?;
-                let redirect_url = self.oauth_redirect_url.clone().ok_or_else(|| {
-                    StartError::RestApiError("missing OAuth redirect URL configuration".into())
-                })?;
-                let oauth_config = match oauth_provider {
-                    "azure" => OAuthConfig::Azure {
-                        client_id,
-                        client_secret,
-                        redirect_url,
-                        oauth_openid_url: self.oauth_openid_url.clone().ok_or_else(|| {
-                            StartError::RestApiError(
-                                "missing OAuth OpenID discovery document URL configuration".into(),
-                            )
-                        })?,
-                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
-                    },
-                    "github" => OAuthConfig::GitHub {
-                        client_id,
-                        client_secret,
-                        redirect_url,
-                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
-                    },
-                    "google" => OAuthConfig::Google {
-                        client_id,
-                        client_secret,
-                        redirect_url,
-                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
-                    },
-                    "openid" => OAuthConfig::OpenId {
-                        client_id,
-                        client_secret,
-                        redirect_url,
-                        oauth_openid_url: self.oauth_openid_url.clone().ok_or_else(|| {
-                            StartError::RestApiError(
-                                "missing OAuth OpenID discovery document URL configuration".into(),
-                            )
-                        })?,
-                        auth_params: self.oauth_openid_auth_params.clone(),
-                        scopes: self.oauth_openid_scopes.clone(),
-                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
-                    },
-                    other_provider => {
-                        return Err(StartError::RestApiError(format!(
-                            "invalid OAuth provider: {}",
-                            other_provider
-                        )))
-                    }
-                };
-
-                auth_configs.push(AuthConfig::OAuth {
-                    oauth_config,
-                    oauth_user_session_store: store_factory.get_biome_oauth_user_session_store(),
-                    #[cfg(feature = "biome-profile")]
-                    user_profile_store: store_factory.get_biome_user_profile_store(),
-                });
+                    .resources(),
+                );
             }
+
+            let (rest_api_shutdown_handle, rest_api_join_handle) =
+                rest_api_builder.build()?.run()?;
         }
 
-        rest_api_builder = rest_api_builder.with_auth_configs(auth_configs);
-
-        #[cfg(feature = "biome-key-management")]
-        {
-            rest_api_builder = rest_api_builder.add_resources(
-                BiomeKeyManagementRestResourceProvider::new(Arc::new(
-                    store_factory.get_biome_key_store(),
-                ))
-                .resources(),
-            );
-        }
-
-        #[cfg(feature = "biome-profile")]
-        {
-            rest_api_builder = rest_api_builder.add_resources(
-                BiomeProfileRestResourceProvider::new(Arc::new(
-                    store_factory.get_biome_user_profile_store(),
-                ))
-                .resources(),
-            );
-        }
-
-        let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api_builder.build()?.run()?;
+        let rest_api_builder = RestApiBuilder::new()
+            .with_bind(BindConfig::Http(bind.to_string()))
+            .with_store_factory(store_factory)
+            .add_resource_provider(Box::new(AdminResourceProvider {}));
+        let mut rest_api = rest_api_builder.build()?.run()?;
 
         let mut admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
 
@@ -805,9 +837,7 @@ impl SplinterDaemon {
             error!("Unable to cleanly shut down Orchestrator service: {}", err);
         }
 
-        if let Err(err) = rest_api_shutdown_handle.shutdown() {
-            error!("Unable to cleanly shut down REST API server: {}", err);
-        }
+        rest_api.signal_shutdown();
         circuit_dispatch_loop.signal_shutdown();
         network_dispatch_loop.signal_shutdown();
 
@@ -819,6 +849,10 @@ impl SplinterDaemon {
             error!("Unable to cleanly shut down network dispatch loop: {}", err);
         }
 
+        if let Err(err) = rest_api.wait_for_shutdown() {
+            error!("Unable to cleanly shut down REST API server: {}", err);
+        }
+
         registry_shutdown.signal_shutdown();
         if let Err(err) = registry_shutdown.wait_for_shutdown() {
             error!("Unable to cleanly shut down network dispatch loop: {}", err);
@@ -827,7 +861,6 @@ impl SplinterDaemon {
         interconnect.signal_shutdown();
 
         // Join threads and shutdown network components
-        let _ = rest_api_join_handle.join();
 
         peer_manager.signal_shutdown();
         if let Err(err) = peer_manager.wait_for_shutdown() {
