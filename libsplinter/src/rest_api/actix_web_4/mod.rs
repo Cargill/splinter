@@ -14,6 +14,9 @@
 
 pub mod api;
 pub mod protocol_version;
+pub mod runnable;
+
+pub use api::RestApi;
 
 use actix_web_4::Resource;
 
