@@ -13,11 +13,13 @@
 // limitations under the License.
 
 pub mod api;
+pub mod auth;
 pub mod builder;
 pub mod protocol_version;
 pub mod runnable;
 
 pub use api::RestApi;
+pub use auth::AuthConfig;
 pub use runnable::RunnableRestApi;
 
 use actix_web_4::Resource;

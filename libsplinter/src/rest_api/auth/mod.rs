@@ -62,7 +62,7 @@ enum AuthorizationResult {
 /// * `identity_providers` - The identity providers that will be used to check the client's identity
 /// * `authorization_handlers` - The authorization handlers that will be used to check the client's
 ///   permissions
-#[cfg(feature = "rest-api-actix-web-1")]
+#[cfg(any(feature = "rest-api-actix-web-1", feature = "actix-web-4"))]
 fn authorize(
     #[cfg(feature = "authorization")] method: &Method,
     #[cfg(any(
