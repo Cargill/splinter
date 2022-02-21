@@ -1,5 +1,14 @@
 # Release Notes
 
+## Changes in Splinter 0.6.7
+
+### libsplinter
+
+* Remove the `"biome-notifications"` feature for now as it is not going to be
+  finished at this time.
+* Add panic recovery to the internal thread pool implementation. If a job
+  panics, a supervisor thread will start a new worker as a replacement.
+
 ## Changes in Splinter 0.6.6
 
 ### libsplinter
