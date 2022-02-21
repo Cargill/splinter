@@ -92,6 +92,24 @@ impl fmt::Display for RequestError {
     }
 }
 
+#[cfg(feature = "actix-web-4")]
+impl actix_web_4::error::ResponseError for RequestError {
+    fn status_code(&self) -> actix_web_4::http::StatusCode {
+        actix_web_4::http::StatusCode::BAD_REQUEST
+    }
+
+    fn error_response(&self) -> actix_web_4::HttpResponse<actix_web_4::body::BoxBody> {
+        match self {
+            RequestError::MissingHeader(s) => {
+                actix_web_4::HttpResponse::build(self.status_code()).body(s.clone())
+            }
+            RequestError::InvalidHeaderValue(s) => {
+                actix_web_4::HttpResponse::build(self.status_code()).body(s.clone())
+            }
+        }
+    }
+}
+
 #[cfg(feature = "https-bind")]
 impl From<openssl::error::ErrorStack> for RestApiServerError {
     fn from(err: openssl::error::ErrorStack) -> Self {
