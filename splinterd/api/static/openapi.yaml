@@ -2590,6 +2590,7 @@ components:
                       type: array
                       items:
                         type: integer
+                        description: Byte array for arbitrary error data. Each byte is represented as an unsigned integer ranging from 0-255.
 
     Circuit:
       type: object
