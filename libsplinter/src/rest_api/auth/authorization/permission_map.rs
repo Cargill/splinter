@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::rest_api::Method;
+#[cfg(not(feature = "actix-web-4"))]
+use crate::rest_api::Method as SuperMethod;
+#[cfg(feature = "actix-web-4")]
+use actix_web_4::http::Method as ActixMethod;
 
 use super::Permission;
 
@@ -35,17 +38,23 @@ impl PermissionMap {
 
     /// Sets the permission for the given (method, endpoint) pair. The endpoint may contain path
     /// variables surrounded by `{}`.
-    pub fn add_permission(&mut self, method: Method, endpoint: &str, permission: Permission) {
+    pub fn add_permission<M>(&mut self, method: M, endpoint: &str, permission: Permission)
+    where
+        M: Into<Method>,
+    {
         self.internal
-            .push((RequestDefinition::new(method, endpoint), permission));
+            .push((RequestDefinition::new(method.into(), endpoint), permission));
     }
 
     /// Gets the permission for a request. This will attempt to match the method and endpoint to a
     /// known (method, endpoint) pair, considering path variables of known endpoints.
-    pub fn get_permission(&self, method: &Method, endpoint: &str) -> Option<&Permission> {
+    pub fn get_permission<M>(&self, method: M, endpoint: &str) -> Option<&Permission>
+    where
+        M: Into<Method> + Clone + Copy,
+    {
         self.internal
             .iter()
-            .find(|(req, _)| req.matches(method, endpoint))
+            .find(|(req, _)| req.matches(&method.into(), endpoint))
             .map(|(_, perm)| perm)
     }
 
@@ -53,6 +62,83 @@ impl PermissionMap {
     /// contents of the other map.
     pub fn append(&mut self, other: &mut PermissionMap) {
         self.internal.append(&mut other.internal)
+    }
+}
+
+#[derive(PartialEq, Clone)]
+pub enum Method {
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
+    Head,
+    Options,
+    Connect,
+    Trace,
+    Extension(String),
+}
+
+#[cfg(feature = "actix-web-4")]
+impl From<ActixMethod> for Method {
+    fn from(source: ActixMethod) -> Self {
+        match source.as_str() {
+            "OPTIONS" => Method::Options,
+            "GET" => Method::Get,
+            "POST" => Method::Post,
+            "PUT" => Method::Put,
+            "DELETE" => Method::Delete,
+            "HEAD" => Method::Head,
+            "TRACE" => Method::Trace,
+            "CONNECT" => Method::Connect,
+            "PATCH" => Method::Patch,
+            other => Method::Extension(other.to_string()),
+        }
+    }
+}
+
+/*
+#[cfg(not(feature = "actix-web-4"))]
+impl From<SuperMethod> for Method {
+    fn from(source: SuperMethod) -> Self {
+        Self {}
+    }
+}
+
+ */
+#[cfg(feature = "actix-web-4")]
+impl From<&reqwest::Method> for Method {
+    fn from(source: &reqwest::Method) -> Self {
+        match source.as_str() {
+            "OPTIONS" => Method::Options,
+            "GET" => Method::Get,
+            "POST" => Method::Post,
+            "PUT" => Method::Put,
+            "DELETE" => Method::Delete,
+            "HEAD" => Method::Head,
+            "TRACE" => Method::Trace,
+            "CONNECT" => Method::Connect,
+            "PATCH" => Method::Patch,
+            other => Method::Extension(other.to_string()),
+        }
+    }
+}
+
+impl From<&crate::rest_api::actix_web_1::Method> for Method {
+    fn from(source: &crate::rest_api::actix_web_1::Method) -> Self {
+        match source {
+            crate::rest_api::actix_web_1::Method::Get => Method::Get,
+            crate::rest_api::actix_web_1::Method::Post => Method::Post,
+            crate::rest_api::actix_web_1::Method::Put => Method::Put,
+            crate::rest_api::actix_web_1::Method::Patch => Method::Patch,
+            crate::rest_api::actix_web_1::Method::Delete => Method::Delete,
+            crate::rest_api::actix_web_1::Method::Head => Method::Head,
+        }
+    }
+}
+impl From<crate::rest_api::actix_web_1::Method> for Method {
+    fn from(source: crate::rest_api::actix_web_1::Method) -> Self {
+        (&source).into()
     }
 }
 
