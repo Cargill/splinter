@@ -46,6 +46,7 @@ __splinter()
   SPLINTER_OPTS="
     $GLOBAL_OPTS
     --version
+    authid
     cert
     circuit
     database
@@ -53,8 +54,20 @@ __splinter()
     keygen
     permissions
     registry
+    role
+    state
     upgrade
     user
+  "
+
+  SPLINTER_AUTHID_OPTS="
+    $GLOBAL_OPTS
+    create
+    delete
+    help
+    list
+    show
+    update
   "
 
   SPLINTER_CERT_OPTS="
@@ -102,6 +115,22 @@ __splinter()
     build
   "
 
+  SPLINTER_ROLE_OPTS="
+    $GLOBAL_OPTS
+    create
+    delete
+    help
+    list
+    show
+    update
+  "
+
+
+  SPLINTER_STATE_OPTS="
+    $GLOBAL_OPTS
+    migrate
+  "
+
   SPLINTER_UPGRADE_OPTS="
     $GLOBAL_OPTS
     --connect
@@ -114,6 +143,41 @@ __splinter()
   "
 
   case "${subcommand}" in
+
+    authid)
+      case "${prev}" in
+        create)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --dry-run --quiet
+                     --id-key --id-user --role" -- "${cur}"))
+          ;;
+
+        delete)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --dry-run --quiet
+                     --id-key --id-user" -- "${cur}"))
+          ;;
+
+        list)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --format" \
+                      -- "${cur}"))
+          ;;
+
+        show)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --format --id-key --id-user \
+                      " -- "${cur}"))
+          ;;
+
+        update)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --dry-run --force \
+                      --rm-all --id-key --id-user --rm-role" \
+                      -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_AUTHID_OPTS" -- "${cur}"))
+          ;;
+
+      esac
+      ;;
 
     cert)
       case "${prev}" in
@@ -228,6 +292,54 @@ __splinter()
 
         *)
           COMPREPLY=($(compgen -W "$SPLINTER_REGISTRY_OPTS" -- "${cur}"))
+          ;;
+      esac
+      ;;
+
+    role)
+      case "${prev}" in
+        create)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --dry-run --quiet
+                     --display --permission --key --url" -- "${cur}"))
+          ;;
+
+        delete)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --dry-run --quiet
+                     --key --url" -- "${cur}"))
+          ;;
+
+        list)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --format --key --url" \
+                      -- "${cur}"))
+          ;;
+
+        show)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --format --key --url \
+                      " -- "${cur}"))
+          ;;
+
+        update)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --dry-run --force \
+                      --add-perm --display --key --rm-perm --url" \
+                      -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_ROLE_OPTS" -- "${cur}"))
+          ;;
+
+      esac
+      ;;
+
+    state)
+      case "${prev}" in
+        migrate)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --force --yes --in --out \
+                      --state-dir" -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_STATE_OPTS" -- "${cur}"))
           ;;
       esac
       ;;
