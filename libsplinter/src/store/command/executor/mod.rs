@@ -1,4 +1,4 @@
-// Copyright 2022 Cargill Incorporated
+// Copyright 2018-2022 Cargill Incorporated
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! StoreCommand trait
-mod executor;
-
-pub use executor::StoreCommandExecutor;
-
 use crate::error::InternalError;
+use crate::store::command::StoreCommand;
 
-/// Trait for defining a command
-///
-/// A command will contain information that is to be applied to a database
-pub trait StoreCommand {
+/// Provides an API for executing `StoreCommand`s
+pub trait StoreCommandExecutor {
     type Context;
 
-    fn execute(&self, conn: &Self::Context) -> Result<(), InternalError>;
+    fn execute<C: StoreCommand<Context = Self::Context>>(
+        &self,
+        store_commands: Vec<C>,
+    ) -> Result<(), InternalError>;
 }
