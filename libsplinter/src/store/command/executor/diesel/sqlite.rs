@@ -12,21 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
-mod diesel;
+use diesel::{sqlite::SqliteConnection, Connection};
 
 use crate::error::InternalError;
-use crate::store::command::StoreCommand;
+use crate::store::command::{DieselStoreCommandExecutor, StoreCommand, StoreCommandExecutor};
 
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
-pub use self::diesel::DieselStoreCommandExecutor;
-
-/// Provides an API for executing `StoreCommand`s
-pub trait StoreCommandExecutor {
-    type Context;
+impl StoreCommandExecutor for DieselStoreCommandExecutor<SqliteConnection> {
+    type Context = SqliteConnection;
 
     fn execute<C: StoreCommand<Context = Self::Context>>(
         &self,
         store_commands: Vec<C>,
-    ) -> Result<(), InternalError>;
+    ) -> Result<(), InternalError> {
+        let conn = &*self
+            .conn
+            .get()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        conn.transaction::<(), InternalError, _>(|| {
+            for cmd in store_commands {
+                cmd.execute(conn)?;
+            }
+            Ok(())
+        })
+    }
 }

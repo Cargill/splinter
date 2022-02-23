@@ -12,21 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
-mod diesel;
+mod error;
+#[cfg(feature = "postgres")]
+mod postgres;
+#[cfg(feature = "sqlite")]
+mod sqlite;
 
-use crate::error::InternalError;
-use crate::store::command::StoreCommand;
+use ::diesel::r2d2::{ConnectionManager, Pool};
 
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
-pub use self::diesel::DieselStoreCommandExecutor;
+pub struct DieselStoreCommandExecutor<C: diesel::Connection + 'static> {
+    conn: Pool<ConnectionManager<C>>,
+}
 
-/// Provides an API for executing `StoreCommand`s
-pub trait StoreCommandExecutor {
-    type Context;
-
-    fn execute<C: StoreCommand<Context = Self::Context>>(
-        &self,
-        store_commands: Vec<C>,
-    ) -> Result<(), InternalError>;
+impl<C: diesel::Connection> DieselStoreCommandExecutor<C> {
+    pub fn new(conn: Pool<ConnectionManager<C>>) -> Self {
+        DieselStoreCommandExecutor { conn }
+    }
 }

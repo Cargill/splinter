@@ -12,21 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
-mod diesel;
-
 use crate::error::InternalError;
-use crate::store::command::StoreCommand;
 
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
-pub use self::diesel::DieselStoreCommandExecutor;
-
-/// Provides an API for executing `StoreCommand`s
-pub trait StoreCommandExecutor {
-    type Context;
-
-    fn execute<C: StoreCommand<Context = Self::Context>>(
-        &self,
-        store_commands: Vec<C>,
-    ) -> Result<(), InternalError>;
+impl From<diesel::result::Error> for InternalError {
+    fn from(err: diesel::result::Error) -> Self {
+        InternalError::from_source(Box::new(err))
+    }
 }

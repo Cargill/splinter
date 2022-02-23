@@ -15,6 +15,8 @@
 //! StoreCommand trait
 mod executor;
 
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+pub use executor::DieselStoreCommandExecutor;
 pub use executor::StoreCommandExecutor;
 
 use crate::error::InternalError;
