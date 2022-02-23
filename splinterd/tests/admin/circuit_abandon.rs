@@ -26,6 +26,7 @@ use crate::admin::{
     payload::{make_circuit_abandon_payload, make_create_contract_registry_batch},
 };
 use crate::framework::network::Network;
+use crate::framework::timeout::timeout;
 
 /// This test validates the process of committing a circuit between 2 nodes and the process of both
 /// nodes abandoning the committed circuit. The test also validates that Splinter service
@@ -258,242 +259,250 @@ pub fn test_2_party_circuit_abandon() {
 ///    validate this transaction completes successfully.
 #[test]
 pub fn test_3_party_circuit_abandon() {
-    // Start a 3-node network
-    let mut network = Network::new()
-        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
-        .add_nodes_with_defaults(3)
-        .expect("Unable to start 3-node ActixWeb1 network");
-    // Get the first node in the network
-    let node_a = network.node(0).expect("Unable to get first node");
-    // Get the second node in the network
-    let node_b = network.node(1).expect("Unable to get second node");
-    // Get the third node from the network
-    let node_c = network.node(2).expect("Unable to get third node");
+    tracing_subscriber::fmt()
+        .with_test_writer()
+        .with_max_level(tracing::Level::TRACE)
+        .try_init()
+        .ok();
 
-    let circuit_id = "ABCDE-01234";
-    // Commit a circuit to state
-    commit_3_party_circuit(
-        &circuit_id,
-        node_a,
-        node_b,
-        node_c,
-        AuthorizationType::Trust,
-    );
+    timeout(Duration::from_secs(300), || {
+        // Start a 3-node network
+        let mut network = Network::new()
+            .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+            .add_nodes_with_defaults(3)
+            .expect("Unable to start 3-node ActixWeb1 network");
+        // Get the first node in the network
+        let node_a = network.node(0).expect("Unable to get first node");
+        // Get the second node in the network
+        let node_b = network.node(1).expect("Unable to get second node");
+        // Get the third node from the network
+        let node_c = network.node(2).expect("Unable to get third node");
 
-    // Create the `ServiceId` struct based on the first node's associated `service_id` and the
-    // committed `circuit_id`
-    let service_id_a = get_node_service_id(&circuit_id, node_a);
-    // Submit a `CreateContractRegistryAction` to validate the service transaction is
-    // valid on the active circuit
-    let scabbard_batch =
-        make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
-            .expect("Unable to build `CreateContractRegistryAction`");
-    node_a
-        .scabbard_client()
-        .expect("Unable to get first node's ScabbardClient")
-        .submit(
-            &service_id_a,
-            vec![scabbard_batch],
-            Some(Duration::from_secs(5)),
-        )
-        .expect("Unable to submit batch to scabbard");
+        let circuit_id = "ABCDE-01234";
+        // Commit a circuit to state
+        commit_3_party_circuit(
+            &circuit_id,
+            node_a,
+            node_b,
+            node_c,
+            AuthorizationType::Trust,
+        );
 
-    // Commit a circuit between the nodes that will remain active while the other circuit is
-    // abandoned
-    let active_circuit_id = "FGHIJ-56789";
-    // Commit the circuit to state
-    commit_3_party_circuit(
-        &active_circuit_id,
-        node_a,
-        node_b,
-        node_c,
-        AuthorizationType::Trust,
-    );
+        // Create the `ServiceId` struct based on the first node's associated `service_id` and the
+        // committed `circuit_id`
+        let service_id_a = get_node_service_id(&circuit_id, node_a);
+        // Submit a `CreateContractRegistryAction` to validate the service transaction is
+        // valid on the active circuit
+        let scabbard_batch =
+            make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
+                .expect("Unable to build `CreateContractRegistryAction`");
+        node_a
+            .scabbard_client()
+            .expect("Unable to get first node's ScabbardClient")
+            .submit(
+                &service_id_a,
+                vec![scabbard_batch],
+                Some(Duration::from_secs(5)),
+            )
+            .expect("Unable to submit batch to scabbard");
 
-    // Create the `ServiceId` struct based on the first node's associated `service_id` and the
-    // committed `circuit_id`
-    let active_service_id_a = get_node_service_id(&active_circuit_id, node_a);
-    // Submit a `CreateContractRegistryAction` to validate the service transaction is
-    // valid on the active circuit
-    let scabbard_batch =
-        make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
-            .expect("Unable to build `CreateContractRegistryAction`");
-    node_a
-        .scabbard_client()
-        .expect("Unable to get first node's ScabbardClient")
-        .submit(
-            &active_service_id_a,
-            vec![scabbard_batch],
-            Some(Duration::from_secs(5)),
-        )
-        .expect("Unable to submit batch to scabbard");
+        // Commit a circuit between the nodes that will remain active while the other circuit is
+        // abandoned
+        let active_circuit_id = "FGHIJ-56789";
+        // Commit the circuit to state
+        commit_3_party_circuit(
+            &active_circuit_id,
+            node_a,
+            node_b,
+            node_c,
+            AuthorizationType::Trust,
+        );
 
-    // Create the abandon request to be sent from the first node
-    let abandon_payload = make_circuit_abandon_payload(
-        &circuit_id,
-        node_a.node_id(),
-        &*node_a.admin_signer().clone_box(),
-    );
-    // Submit the `CircuitManagementPayload` to the first node
-    if let Ok(()) = node_a
-        .admin_service_client()
-        .submit_admin_payload(abandon_payload)
-    {
-        let abandoned_circuits = node_a
+        // Create the `ServiceId` struct based on the first node's associated `service_id` and the
+        // committed `circuit_id`
+        let active_service_id_a = get_node_service_id(&active_circuit_id, node_a);
+        // Submit a `CreateContractRegistryAction` to validate the service transaction is
+        // valid on the active circuit
+        let scabbard_batch =
+            make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer())
+                .expect("Unable to build `CreateContractRegistryAction`");
+        node_a
+            .scabbard_client()
+            .expect("Unable to get first node's ScabbardClient")
+            .submit(
+                &active_service_id_a,
+                vec![scabbard_batch],
+                Some(Duration::from_secs(5)),
+            )
+            .expect("Unable to submit batch to scabbard");
+
+        // Create the abandon request to be sent from the first node
+        let abandon_payload = make_circuit_abandon_payload(
+            &circuit_id,
+            node_a.node_id(),
+            &*node_a.admin_signer().clone_box(),
+        );
+        // Submit the `CircuitManagementPayload` to the first node
+        if let Ok(()) = node_a
             .admin_service_client()
-            .list_circuits(Some("status=abandoned"))
-            .expect("Failed to list circuits")
-            .data;
-        assert_eq!(abandoned_circuits.len(), 1);
-    } else {
-        panic!("Failed to submit `CircuitAbandon` payload to node");
-    }
+            .submit_admin_payload(abandon_payload)
+        {
+            let abandoned_circuits = node_a
+                .admin_service_client()
+                .list_circuits(Some("status=abandoned"))
+                .expect("Failed to list circuits")
+                .data;
+            assert_eq!(abandoned_circuits.len(), 1);
+        } else {
+            panic!("Failed to submit `CircuitAbandon` payload to node");
+        }
 
-    // Create the `ServiceId` struct based on the second node's associated `service_id` and the
-    // committed `circuit_id`
-    let service_id_b = get_node_service_id(&circuit_id, node_b);
-    // Submit a `CreateContractRegistryAction` to validate the service transaction, though valid,
-    // is not able to be committed as a node has abandoned the specified circuit.
-    let scabbard_batch =
-        make_create_contract_registry_batch("contract_registry_1", &*node_b.admin_signer())
-            .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_b
-        .scabbard_client()
-        .expect("Unable to get second node's ScabbardClient")
-        .submit(
-            &service_id_b,
-            vec![scabbard_batch],
-            Some(Duration::from_secs(5)),
-        )
-        .is_err());
+        // Create the `ServiceId` struct based on the second node's associated `service_id` and the
+        // committed `circuit_id`
+        let service_id_b = get_node_service_id(&circuit_id, node_b);
+        // Submit a `CreateContractRegistryAction` to validate the service transaction, though valid,
+        // is not able to be committed as a node has abandoned the specified circuit.
+        let scabbard_batch =
+            make_create_contract_registry_batch("contract_registry_1", &*node_b.admin_signer())
+                .expect("Unable to build `CreateContractRegistryAction`");
+        assert!(node_b
+            .scabbard_client()
+            .expect("Unable to get second node's ScabbardClient")
+            .submit(
+                &service_id_b,
+                vec![scabbard_batch],
+                Some(Duration::from_secs(5)),
+            )
+            .is_err());
 
-    // Create the `ServiceId` struct based on the first node's associated `service_id` and the
-    // committed `circuit_id`
-    let active_service_id_b = get_node_service_id(&active_circuit_id, node_b);
-    // Submit a `CreateContractRegistryAction` to validate the service transaction is
-    // valid on the active circuit
-    let scabbard_batch =
-        make_create_contract_registry_batch("contract_registry_1", &*node_b.admin_signer())
-            .expect("Unable to build `CreateContractRegistryAction`");
-    node_b
-        .scabbard_client()
-        .expect("Unable to get first node's ScabbardClient")
-        .submit(
-            &active_service_id_b,
-            vec![scabbard_batch],
-            Some(Duration::from_secs(5)),
-        )
-        .expect("Unable to submit batch to scabbard");
+        // Create the `ServiceId` struct based on the first node's associated `service_id` and the
+        // committed `circuit_id`
+        let active_service_id_b = get_node_service_id(&active_circuit_id, node_b);
+        // Submit a `CreateContractRegistryAction` to validate the service transaction is
+        // valid on the active circuit
+        let scabbard_batch =
+            make_create_contract_registry_batch("contract_registry_1", &*node_b.admin_signer())
+                .expect("Unable to build `CreateContractRegistryAction`");
+        node_b
+            .scabbard_client()
+            .expect("Unable to get first node's ScabbardClient")
+            .submit(
+                &active_service_id_b,
+                vec![scabbard_batch],
+                Some(Duration::from_secs(5)),
+            )
+            .expect("Unable to submit batch to scabbard");
 
-    // Create the abandon request to be sent from the second node
-    let abandon_payload = make_circuit_abandon_payload(
-        &circuit_id,
-        node_b.node_id(),
-        &*node_b.admin_signer().clone_box(),
-    );
-    // Submit the `CircuitManagementPayload` to the second node
-    if let Ok(()) = node_b
-        .admin_service_client()
-        .submit_admin_payload(abandon_payload)
-    {
-        let circuits = node_b
+        // Create the abandon request to be sent from the second node
+        let abandon_payload = make_circuit_abandon_payload(
+            &circuit_id,
+            node_b.node_id(),
+            &*node_b.admin_signer().clone_box(),
+        );
+        // Submit the `CircuitManagementPayload` to the second node
+        if let Ok(()) = node_b
             .admin_service_client()
-            .list_circuits(Some("status=abandoned"))
-            .expect("Unable to list abandoned circuits")
-            .data;
-        assert_eq!(circuits.len(), 1);
-    } else {
-        panic!("Failed to abandon circuit from node");
-    }
+            .submit_admin_payload(abandon_payload)
+        {
+            let circuits = node_b
+                .admin_service_client()
+                .list_circuits(Some("status=abandoned"))
+                .expect("Unable to list abandoned circuits")
+                .data;
+            assert_eq!(circuits.len(), 1);
+        } else {
+            panic!("Failed to abandon circuit from node");
+        }
 
-    // Create the `ServiceId` struct based on the third node's associated `service_id` and the
-    // committed `circuit_id`
-    let service_id_c = get_node_service_id(&circuit_id, node_c);
-    // Submit a `CreateContractRegistryAction` to validate the service transaction, though valid,
-    // is not able to be committed as a node has abandoned the specified circuit.
-    let scabbard_batch =
-        make_create_contract_registry_batch("contract_registry_2", &*node_c.admin_signer())
-            .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_c
-        .scabbard_client()
-        .expect("Unable to get third node's ScabbardClient")
-        .submit(
-            &service_id_c,
-            vec![scabbard_batch],
-            Some(Duration::from_secs(5)),
-        )
-        .is_err());
+        // Create the `ServiceId` struct based on the third node's associated `service_id` and the
+        // committed `circuit_id`
+        let service_id_c = get_node_service_id(&circuit_id, node_c);
+        // Submit a `CreateContractRegistryAction` to validate the service transaction, though valid,
+        // is not able to be committed as a node has abandoned the specified circuit.
+        let scabbard_batch =
+            make_create_contract_registry_batch("contract_registry_2", &*node_c.admin_signer())
+                .expect("Unable to build `CreateContractRegistryAction`");
+        assert!(node_c
+            .scabbard_client()
+            .expect("Unable to get third node's ScabbardClient")
+            .submit(
+                &service_id_c,
+                vec![scabbard_batch],
+                Some(Duration::from_secs(5)),
+            )
+            .is_err());
 
-    // Create the `ServiceId` struct based on the third node's associated `service_id` and the
-    // committed `circuit_id` for the circuit that is still active
-    let active_service_id_c = get_node_service_id(&active_circuit_id, node_c);
-    // Submit a `CreateContractRegistryAction` to validate the service transaction is
-    // valid on the active circuit
-    let scabbard_batch =
-        make_create_contract_registry_batch("contract_registry_2", &*node_c.admin_signer())
-            .expect("Unable to build `CreateContractRegistryAction`");
-    node_c
-        .scabbard_client()
-        .expect("Unable to get first node's ScabbardClient")
-        .submit(
-            &active_service_id_c,
-            vec![scabbard_batch],
-            Some(Duration::from_secs(5)),
-        )
-        .expect("Unable to submit batch to scabbard");
+        // Create the `ServiceId` struct based on the third node's associated `service_id` and the
+        // committed `circuit_id` for the circuit that is still active
+        let active_service_id_c = get_node_service_id(&active_circuit_id, node_c);
+        // Submit a `CreateContractRegistryAction` to validate the service transaction is
+        // valid on the active circuit
+        let scabbard_batch =
+            make_create_contract_registry_batch("contract_registry_2", &*node_c.admin_signer())
+                .expect("Unable to build `CreateContractRegistryAction`");
+        node_c
+            .scabbard_client()
+            .expect("Unable to get first node's ScabbardClient")
+            .submit(
+                &active_service_id_c,
+                vec![scabbard_batch],
+                Some(Duration::from_secs(5)),
+            )
+            .expect("Unable to submit batch to scabbard");
 
-    // Create the abandon request to be sent from the third node
-    let abandon_payload = make_circuit_abandon_payload(
-        &circuit_id,
-        node_c.node_id(),
-        &*node_c.admin_signer().clone_box(),
-    );
-    // Submit the `CircuitManagementPayload` to the third node
-    if let Ok(()) = node_c
-        .admin_service_client()
-        .submit_admin_payload(abandon_payload)
-    {
-        let circuits = node_c
+        // Create the abandon request to be sent from the third node
+        let abandon_payload = make_circuit_abandon_payload(
+            &circuit_id,
+            node_c.node_id(),
+            &*node_c.admin_signer().clone_box(),
+        );
+        // Submit the `CircuitManagementPayload` to the third node
+        if let Ok(()) = node_c
             .admin_service_client()
-            .list_circuits(Some("status=abandoned"))
-            .expect("Unable to list abandoned circuits")
-            .data;
-        assert_eq!(circuits.len(), 1);
-    } else {
-        panic!("Failed to abandon circuit from node");
-    }
+            .submit_admin_payload(abandon_payload)
+        {
+            let circuits = node_c
+                .admin_service_client()
+                .list_circuits(Some("status=abandoned"))
+                .expect("Unable to list abandoned circuits")
+                .data;
+            assert_eq!(circuits.len(), 1);
+        } else {
+            panic!("Failed to abandon circuit from node");
+        }
 
-    // Submit a `CreateContractRegistryAction` to validate the service transaction, though valid,
-    // is not able to be committed as nodes have abandoned the specified circuit.
-    let scabbard_batch =
-        make_create_contract_registry_batch("contract_registry_3", &*node_c.admin_signer())
-            .expect("Unable to build `CreateContractRegistryAction`");
-    assert!(node_c
-        .scabbard_client()
-        .expect("Unable to get third node's ScabbardClient")
-        .submit(
-            &service_id_c,
-            vec![scabbard_batch],
-            Some(Duration::from_secs(5)),
-        )
-        .is_err());
+        // Submit a `CreateContractRegistryAction` to validate the service transaction, though valid,
+        // is not able to be committed as nodes have abandoned the specified circuit.
+        let scabbard_batch =
+            make_create_contract_registry_batch("contract_registry_3", &*node_c.admin_signer())
+                .expect("Unable to build `CreateContractRegistryAction`");
+        assert!(node_c
+            .scabbard_client()
+            .expect("Unable to get third node's ScabbardClient")
+            .submit(
+                &service_id_c,
+                vec![scabbard_batch],
+                Some(Duration::from_secs(5)),
+            )
+            .is_err());
 
-    // Submit a `CreateContractRegistryAction` to validate the service transaction is
-    // valid on the active circuit.
-    let scabbard_batch =
-        make_create_contract_registry_batch("contract_registry_3", &*node_c.admin_signer())
-            .expect("Unable to build `CreateContractRegistryAction`");
-    node_c
-        .scabbard_client()
-        .expect("Unable to get first node's ScabbardClient")
-        .submit(
-            &active_service_id_c,
-            vec![scabbard_batch],
-            Some(Duration::from_secs(5)),
-        )
-        .expect("Unable to submit batch to scabbard");
+        // Submit a `CreateContractRegistryAction` to validate the service transaction is
+        // valid on the active circuit.
+        let scabbard_batch =
+            make_create_contract_registry_batch("contract_registry_3", &*node_c.admin_signer())
+                .expect("Unable to build `CreateContractRegistryAction`");
+        node_c
+            .scabbard_client()
+            .expect("Unable to get first node's ScabbardClient")
+            .submit(
+                &active_service_id_c,
+                vec![scabbard_batch],
+                Some(Duration::from_secs(5)),
+            )
+            .expect("Unable to submit batch to scabbard");
 
-    shutdown!(network).expect("Unable to shutdown network");
+        shutdown!(network).expect("Unable to shutdown network");
+    })
 }
 
 /// This test validates the process of committing a circuit between 2 nodes and the process of both
@@ -657,185 +666,193 @@ pub fn test_2_party_circuit_abandon_stop() {
 ///     on the circuit's status (`status=abandoned`)
 #[test]
 pub fn test_3_party_circuit_abandon_stop() {
-    // Start a 3-node network
-    let mut network = Network::new()
-        .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
-        .add_nodes_with_defaults(3)
-        .expect("Unable to start 3-node ActixWeb1 network");
-    // Get the first node in the network
-    let mut node_a = network.node(0).expect("Unable to get first node");
-    // Get the second node in the network
-    let mut node_b = network.node(1).expect("Unable to get second node");
-    // Get the third node from the network
-    let mut node_c = network.node(2).expect("Unable to get third node");
+    tracing_subscriber::fmt()
+        .with_test_writer()
+        .with_max_level(tracing::Level::TRACE)
+        .try_init()
+        .ok();
 
-    let circuit_id = "ABCDE-01234";
-    // Commit a circuit to state
-    commit_3_party_circuit(
-        &circuit_id,
-        node_a,
-        node_b,
-        node_c,
-        AuthorizationType::Trust,
-    );
-    // Commit a circuit between the nodes that will remain active while the other circuit is
-    // abandoned
-    let active_circuit_id = "FGHIJ-56789";
-    // Commit the circuit to state
-    commit_3_party_circuit(
-        &active_circuit_id,
-        node_a,
-        node_b,
-        node_c,
-        AuthorizationType::Trust,
-    );
+    timeout(Duration::from_secs(300), || {
+        // Start a 3-node network
+        let mut network = Network::new()
+            .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
+            .add_nodes_with_defaults(3)
+            .expect("Unable to start 3-node ActixWeb1 network");
+        // Get the first node in the network
+        let mut node_a = network.node(0).expect("Unable to get first node");
+        // Get the second node in the network
+        let mut node_b = network.node(1).expect("Unable to get second node");
+        // Get the third node from the network
+        let mut node_c = network.node(2).expect("Unable to get third node");
 
-    // Stop the second node in the network
-    network = network.stop(1).expect("Unable to stop second node");
-    node_a = network.node(0).expect("Unable to get first node");
+        let circuit_id = "ABCDE-01234";
+        // Commit a circuit to state
+        commit_3_party_circuit(
+            &circuit_id,
+            node_a,
+            node_b,
+            node_c,
+            AuthorizationType::Trust,
+        );
+        // Commit a circuit between the nodes that will remain active while the other circuit is
+        // abandoned
+        let active_circuit_id = "FGHIJ-56789";
+        // Commit the circuit to state
+        commit_3_party_circuit(
+            &active_circuit_id,
+            node_a,
+            node_b,
+            node_c,
+            AuthorizationType::Trust,
+        );
 
-    // Create the abandon request to be sent from the first node
-    let abandon_payload = make_circuit_abandon_payload(
-        &circuit_id,
-        node_a.node_id(),
-        &*node_a.admin_signer().clone_box(),
-    );
-    node_a
-        .admin_service_client()
-        .submit_admin_payload(abandon_payload)
-        .expect("Unable to submit admin payload to admin service");
+        // Stop the second node in the network
+        network = network.stop(1).expect("Unable to stop second node");
+        node_a = network.node(0).expect("Unable to get first node");
 
-    // Restart the second node in the network
-    network = network.start(1).expect("Unable to start second node");
-    node_a = network.node(0).expect("Unable to get first node");
-    node_b = network.node(1).expect("Unable to get second node");
-    node_c = network.node(2).expect("Unable to get third node");
-
-    assert_eq!(
+        // Create the abandon request to be sent from the first node
+        let abandon_payload = make_circuit_abandon_payload(
+            &circuit_id,
+            node_a.node_id(),
+            &*node_a.admin_signer().clone_box(),
+        );
         node_a
             .admin_service_client()
-            .list_circuits(Some("status=abandoned"))
-            .expect("Unable to list circuits")
-            .data
-            .len(),
-        1
-    );
-    assert_eq!(
+            .submit_admin_payload(abandon_payload)
+            .expect("Unable to submit admin payload to admin service");
+
+        // Restart the second node in the network
+        network = network.start(1).expect("Unable to start second node");
+        node_a = network.node(0).expect("Unable to get first node");
+        node_b = network.node(1).expect("Unable to get second node");
+        node_c = network.node(2).expect("Unable to get third node");
+
+        assert_eq!(
+            node_a
+                .admin_service_client()
+                .list_circuits(Some("status=abandoned"))
+                .expect("Unable to list circuits")
+                .data
+                .len(),
+            1
+        );
+        assert_eq!(
+            node_b
+                .admin_service_client()
+                .list_circuits(None)
+                .expect("Unable to list circuits")
+                .data
+                .len(),
+            2
+        );
+        assert_eq!(
+            node_c
+                .admin_service_client()
+                .list_circuits(None)
+                .expect("Unable to list circuits")
+                .data
+                .len(),
+            2
+        );
+
+        // Stop the third node in the network
+        network = network.stop(2).expect("Unable to stop third node");
+        node_b = network.node(1).expect("Unable to get second node");
+
+        // Create the abandon request to be sent from the second node
+        let abandon_payload = make_circuit_abandon_payload(
+            &circuit_id,
+            node_b.node_id(),
+            &*node_b.admin_signer().clone_box(),
+        );
         node_b
             .admin_service_client()
-            .list_circuits(None)
-            .expect("Unable to list circuits")
-            .data
-            .len(),
-        2
-    );
-    assert_eq!(
+            .submit_admin_payload(abandon_payload)
+            .expect("Unable to submit admin payload to admin service");
+
+        // Restart the third node in the network
+        network = network.start(2).expect("Unable to start third node");
+        node_a = network.node(0).expect("Unable to get first node");
+        node_b = network.node(1).expect("Unable to get second node");
+        node_c = network.node(2).expect("Unable to get third node");
+
+        assert_eq!(
+            node_a
+                .admin_service_client()
+                .list_circuits(Some("status=abandoned"))
+                .expect("Unable to list circuits")
+                .data
+                .len(),
+            1
+        );
+        assert_eq!(
+            node_b
+                .admin_service_client()
+                .list_circuits(Some("status=abandoned"))
+                .expect("Unable to list circuits")
+                .data
+                .len(),
+            1
+        );
+        assert_eq!(
+            node_c
+                .admin_service_client()
+                .list_circuits(None)
+                .expect("Unable to list circuits")
+                .data
+                .len(),
+            2
+        );
+
+        // Stop the first node in the network
+        network = network.stop(0).expect("Unable to stop first node");
+        node_c = network.node(2).expect("Unable to get third node");
+
+        // Create the abandon request to be sent from the third node
+        let abandon_payload = make_circuit_abandon_payload(
+            &circuit_id,
+            node_c.node_id(),
+            &*node_c.admin_signer().clone_box(),
+        );
         node_c
             .admin_service_client()
-            .list_circuits(None)
-            .expect("Unable to list circuits")
-            .data
-            .len(),
-        2
-    );
+            .submit_admin_payload(abandon_payload)
+            .expect("Unable to submit admin payload to admin service");
 
-    // Stop the third node in the network
-    network = network.stop(2).expect("Unable to stop third node");
-    node_b = network.node(1).expect("Unable to get second node");
+        // Restart the first node in the network
+        network = network.start(0).expect("Unable to start first node");
+        node_a = network.node(0).expect("Unable to get first node");
+        node_b = network.node(1).expect("Unable to get second node");
+        node_c = network.node(2).expect("Unable to get third node");
 
-    // Create the abandon request to be sent from the second node
-    let abandon_payload = make_circuit_abandon_payload(
-        &circuit_id,
-        node_b.node_id(),
-        &*node_b.admin_signer().clone_box(),
-    );
-    node_b
-        .admin_service_client()
-        .submit_admin_payload(abandon_payload)
-        .expect("Unable to submit admin payload to admin service");
+        assert_eq!(
+            node_a
+                .admin_service_client()
+                .list_circuits(Some("status=abandoned"))
+                .expect("Unable to list circuits")
+                .data
+                .len(),
+            1
+        );
+        assert_eq!(
+            node_b
+                .admin_service_client()
+                .list_circuits(Some("status=abandoned"))
+                .expect("Unable to list circuits")
+                .data
+                .len(),
+            1
+        );
+        assert_eq!(
+            node_c
+                .admin_service_client()
+                .list_circuits(Some("status=abandoned"))
+                .expect("Unable to list circuits")
+                .data
+                .len(),
+            1
+        );
 
-    // Restart the third node in the network
-    network = network.start(2).expect("Unable to start third node");
-    node_a = network.node(0).expect("Unable to get first node");
-    node_b = network.node(1).expect("Unable to get second node");
-    node_c = network.node(2).expect("Unable to get third node");
-
-    assert_eq!(
-        node_a
-            .admin_service_client()
-            .list_circuits(Some("status=abandoned"))
-            .expect("Unable to list circuits")
-            .data
-            .len(),
-        1
-    );
-    assert_eq!(
-        node_b
-            .admin_service_client()
-            .list_circuits(Some("status=abandoned"))
-            .expect("Unable to list circuits")
-            .data
-            .len(),
-        1
-    );
-    assert_eq!(
-        node_c
-            .admin_service_client()
-            .list_circuits(None)
-            .expect("Unable to list circuits")
-            .data
-            .len(),
-        2
-    );
-
-    // Stop the first node in the network
-    network = network.stop(0).expect("Unable to stop first node");
-    node_c = network.node(2).expect("Unable to get third node");
-
-    // Create the abandon request to be sent from the third node
-    let abandon_payload = make_circuit_abandon_payload(
-        &circuit_id,
-        node_c.node_id(),
-        &*node_c.admin_signer().clone_box(),
-    );
-    node_c
-        .admin_service_client()
-        .submit_admin_payload(abandon_payload)
-        .expect("Unable to submit admin payload to admin service");
-
-    // Restart the first node in the network
-    network = network.start(0).expect("Unable to start first node");
-    node_a = network.node(0).expect("Unable to get first node");
-    node_b = network.node(1).expect("Unable to get second node");
-    node_c = network.node(2).expect("Unable to get third node");
-
-    assert_eq!(
-        node_a
-            .admin_service_client()
-            .list_circuits(Some("status=abandoned"))
-            .expect("Unable to list circuits")
-            .data
-            .len(),
-        1
-    );
-    assert_eq!(
-        node_b
-            .admin_service_client()
-            .list_circuits(Some("status=abandoned"))
-            .expect("Unable to list circuits")
-            .data
-            .len(),
-        1
-    );
-    assert_eq!(
-        node_c
-            .admin_service_client()
-            .list_circuits(Some("status=abandoned"))
-            .expect("Unable to list circuits")
-            .data
-            .len(),
-        1
-    );
-
-    shutdown!(network).expect("Unable to shutdown network");
+        shutdown!(network).expect("Unable to shutdown network");
+    })
 }

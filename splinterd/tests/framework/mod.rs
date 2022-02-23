@@ -22,3 +22,5 @@ pub mod network;
 pub mod shutdown;
 #[cfg(feature = "node")]
 pub mod circuit_builder;
+#[cfg(feature = "node")]
+pub mod timeout;
