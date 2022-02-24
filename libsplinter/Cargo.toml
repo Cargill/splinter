@@ -126,6 +126,7 @@ experimental = [
     "registry-client",
     "registry-client-reqwest",
     "rest-api-actix-web-3",
+    "service-arguments-converter",
     "service-id",
     "service-message-converter",
     "service-message-handler",
@@ -181,6 +182,7 @@ rest-api-actix-web-1 = [
 ]
 rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
+service-arguments-converter = []
 service-id = []
 service-message-converter = []
 service-message-handler = ["service-id", "service-message-converter", "service-message-sender"]

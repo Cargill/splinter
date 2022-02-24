@@ -35,6 +35,8 @@
 //!  lower-level messaging and networking needs to talk to applications that implement Splinter
 //!  node capabilities, such as the Splinter daemon.
 
+#[cfg(feature = "service-arguments-converter")]
+mod arguments_converter;
 #[cfg(feature = "service-id")]
 mod id;
 pub mod instance;
@@ -47,6 +49,8 @@ mod message_sender;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
 
+#[cfg(feature = "service-arguments-converter")]
+pub use arguments_converter::ArgumentsConverter;
 #[cfg(feature = "service-id")]
 pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};
 #[cfg(feature = "service-message-converter")]
