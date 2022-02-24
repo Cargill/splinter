@@ -55,7 +55,7 @@ fn add_fetch_profile_method(profile_store: Arc<dyn UserProfileStore>) -> Handler
             return Box::new(
                 HttpResponse::BadRequest()
                     .json(ErrorResponse::bad_request(
-                        &"Failed to process request: no user id".to_string(),
+                        "Failed to process request: no user id",
                     ))
                     .into_future(),
             );

@@ -341,7 +341,7 @@ fn handle_fetch(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
                 return Box::new(
                     HttpResponse::BadRequest()
                         .json(ErrorResponse::bad_request(
-                            &"Failed to process request: no public key".to_string(),
+                            "Failed to process request: no public key",
                         ))
                         .into_future(),
                 );
@@ -399,7 +399,7 @@ fn handle_delete(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
                 return Box::new(
                     HttpResponse::BadRequest()
                         .json(ErrorResponse::bad_request(
-                            &"Failed to process request: no public key".to_string(),
+                            "Failed to process request: no public key",
                         ))
                         .into_future(),
                 );

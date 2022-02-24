@@ -851,15 +851,18 @@ impl Config {
                 debug!("Config: influx_password: <HIDDEN> (source: {:?})", source,);
             }
         }
-        let loggers = self.loggers.as_ref().unwrap_or(&vec![]).to_owned();
-        for logger in loggers {
-            debug!("Config: logger: {:?} (source: {:?})", logger.0, logger.1);
+        if let Some(loggers) = &self.loggers {
+            for logger in loggers {
+                debug!("Config: logger: {:?} (source: {:?})", logger.0, logger.1);
+            }
         }
-        for appender in self.appenders.as_ref().unwrap_or(&vec![]).to_owned() {
-            debug!(
-                "Config: appender: {:?} (source: {:?})",
-                appender.0, appender.1
-            );
+        if let Some(appenders) = &self.appenders {
+            for appender in appenders {
+                debug!(
+                    "Config: appender: {:?} (source: {:?})",
+                    appender.0, appender.1
+                );
+            }
         }
         debug!(
             "Config: root_logger: {:?} (source: {:?})",
