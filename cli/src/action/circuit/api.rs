@@ -276,7 +276,7 @@ impl fmt::Display for CircuitSlice {
                 display_string += &format!("        Public Key: {}\n", public_key);
             }
 
-            display_string += &"        Endpoints:\n".to_string();
+            display_string += "        Endpoints:\n";
             for endpoint in member.endpoints.iter() {
                 display_string += &format!("            {}\n", endpoint);
             }
@@ -344,12 +344,11 @@ pub struct ProposalSlice {
 
 impl fmt::Display for ProposalSlice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut display_string;
-        if self.proposal_type == "Disband" {
-            display_string = format!("Proposal to disband: {}\n    ", self.circuit_id);
+        let mut display_string = if self.proposal_type == "Disband" {
+            format!("Proposal to disband: {}\n    ", self.circuit_id)
         } else {
-            display_string = format!("Proposal to create: {}\n    ", self.circuit_id);
-        }
+            format!("Proposal to create: {}\n    ", self.circuit_id)
+        };
 
         if let Some(display_name) = &self.circuit.display_name {
             display_string += &format!("Display Name: {}\n    ", display_name);
@@ -374,7 +373,7 @@ impl fmt::Display for ProposalSlice {
                 display_string += &format!("        Public Key: {}\n", public_key);
             }
             if member.node_id == self.requester_node_id {
-                display_string += &"        Vote: ACCEPT (implied as requester):\n".to_string();
+                display_string += "        Vote: ACCEPT (implied as requester):\n";
                 display_string += &format!("            {}\n", self.requester);
             } else {
                 let mut vote_string = "        Vote: PENDING".to_string();
@@ -386,7 +385,7 @@ impl fmt::Display for ProposalSlice {
                 }
                 display_string += &format!("{}\n", vote_string);
             }
-            display_string += &"        Endpoints:\n".to_string();
+            display_string += "        Endpoints:\n";
             for endpoint in member.endpoints.iter() {
                 display_string += &format!("            {}\n", endpoint);
             }

@@ -130,8 +130,8 @@ impl From<v1::CreateServices> for CreateServices {
             service_type: yaml_create_services.service_type().to_string(),
             service_args: yaml_create_services
                 .service_args()
-                .to_owned()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(ServiceArgument::from)
                 .collect(),
             first_service: yaml_create_services.first_service().to_string(),

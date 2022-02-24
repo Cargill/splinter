@@ -1554,14 +1554,14 @@ impl From<ProposedCircuit> for YamlProposedCircuit {
             circuit_id: circuit.circuit_id().into(),
             roster: circuit
                 .roster()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(YamlProposedService::from)
                 .collect(),
             members: circuit
                 .members()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(YamlProposedNode::from)
                 .collect(),
             authorization_type: circuit.authorization_type().clone().into(),

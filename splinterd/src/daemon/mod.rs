@@ -551,7 +551,7 @@ impl SplinterDaemon {
             let mut authorization_handlers = vec![
                 #[cfg(feature = "authorization-handler-allow-keys")]
                 create_allow_keys_authorization_handler(
-                    &create_allow_keys_path(
+                    create_allow_keys_path(
                         &self.config_dir,
                         #[cfg(feature = "config-allow-keys")]
                         &self.allow_keys_file,
@@ -559,8 +559,7 @@ impl SplinterDaemon {
                         "allow_keys",
                     )
                     .to_str()
-                    .expect("path built from &str cannot be invalid")
-                    .to_string(),
+                    .expect("path built from &str cannot be invalid"),
                 )?,
             ];
 
