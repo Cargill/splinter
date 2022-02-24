@@ -96,7 +96,7 @@ impl LoggerFactory {
             .level
             .map(|l| l.to_level_filter())
             .unwrap_or_else(|| self.default.level.to_level_filter());
-        let appenders = config.appenders.unwrap_or_else(Vec::new);
+        let appenders = config.appenders.unwrap_or_default();
         Logger::builder()
             .appenders(appenders)
             .build(config.name, level)
