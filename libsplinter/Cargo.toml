@@ -127,6 +127,7 @@ experimental = [
     "registry-client-reqwest",
     "rest-api-actix-web-3",
     "service-id",
+    "service-message-converter",
     "service-network",
     "store-command",
     "ws-transport",
@@ -179,6 +180,7 @@ rest-api-actix-web-1 = [
 rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
 service-id = []
+service-message-converter = []
 service-network = []
 sqlite = ["diesel/sqlite", "diesel_migrations", "store"]
 store = []

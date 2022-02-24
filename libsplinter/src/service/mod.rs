@@ -38,8 +38,12 @@
 #[cfg(feature = "service-id")]
 mod id;
 pub mod instance;
+#[cfg(feature = "service-message-converter")]
+mod message_converter;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
 
 #[cfg(feature = "service-id")]
 pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};
+#[cfg(feature = "service-message-converter")]
+pub use message_converter::MessageConverter;
