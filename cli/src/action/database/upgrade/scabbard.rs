@@ -51,25 +51,22 @@ pub(super) fn upgrade_scabbard_commit_hash_state(
         .list_circuits(&[])
         .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
-    let local_services = circuits
-        .into_iter()
-        .map(|circuit| {
-            circuit
-                .roster()
-                .iter()
-                .filter_map(|svc| {
-                    if svc.node_id() == node_id && svc.service_type() == "scabbard" {
-                        Some((
-                            circuit.circuit_id().to_string(),
-                            svc.service_id().to_string(),
-                        ))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
-        })
-        .flatten();
+    let local_services = circuits.into_iter().flat_map(|circuit| {
+        circuit
+            .roster()
+            .iter()
+            .filter_map(|svc| {
+                if svc.node_id() == node_id && svc.service_type() == "scabbard" {
+                    Some((
+                        circuit.circuit_id().to_string(),
+                        svc.service_id().to_string(),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+    });
 
     for (circuit_id, service_id) in local_services {
         let lmdb_commit_hash_store =
