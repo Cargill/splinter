@@ -49,9 +49,15 @@ RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
 # Install cargo deb
  && cargo install cargo-deb \
 # Install protoc
- && curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/protoc-3.7.1-linux-x86_64.zip \
-    && unzip -o protoc-3.7.1-linux-x86_64.zip -d /usr/local \
-    && rm protoc-3.7.1-linux-x86_64.zip \
+ && TARGET_ARCH=$(dpkg --print-architecture) \
+ && if [[ $TARGET_ARCH == "arm64" ]]; then \
+      PROTOC_ARCH="aarch_64"; \
+    elif [[ $TARGET_ARCH == "amd64" ]]; then \
+      PROTOC_ARCH="x86_64"; \
+    fi \
+ && curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/protoc-3.7.1-linux-$PROTOC_ARCH.zip \
+      && unzip -o protoc-3.7.1-linux-$PROTOC_ARCH.zip -d /usr/local \
+      && rm protoc-3.7.1-linux-$PROTOC_ARCH.zip \
 # Install just
  && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
 
