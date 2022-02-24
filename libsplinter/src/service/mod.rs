@@ -48,6 +48,8 @@ mod message_handler;
 mod message_sender;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
+#[cfg(feature = "service-timer-filter")]
+mod timer_filter;
 
 #[cfg(feature = "service-arguments-converter")]
 pub use arguments_converter::ArgumentsConverter;
@@ -61,3 +63,5 @@ pub use message_handler::MessageHandler;
 use message_sender::IntoMessageSender;
 #[cfg(feature = "service-message-sender")]
 pub use message_sender::MessageSender;
+#[cfg(feature = "service-timer-filter")]
+pub use timer_filter::TimerFilter;
