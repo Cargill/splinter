@@ -275,6 +275,12 @@ impl fmt::Display for CircuitSlice {
             if let Some(public_key) = &member.public_key {
                 display_string += &format!("        Public Key: {}\n", public_key);
             }
+
+            display_string += "        Endpoints:\n";
+            for endpoint in member.endpoints.iter() {
+                display_string += &format!("            {}\n", endpoint);
+            }
+
             for service in self.roster.iter() {
                 if member.node_id == service.node_id {
                     display_string += &format!(
