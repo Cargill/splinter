@@ -50,6 +50,8 @@ mod message_sender;
 pub mod rest_api;
 #[cfg(feature = "service-timer-filter")]
 mod timer_filter;
+#[cfg(feature = "service-timer-handler")]
+mod timer_handler;
 
 #[cfg(feature = "service-arguments-converter")]
 pub use arguments_converter::ArgumentsConverter;
@@ -65,3 +67,5 @@ use message_sender::IntoMessageSender;
 pub use message_sender::MessageSender;
 #[cfg(feature = "service-timer-filter")]
 pub use timer_filter::TimerFilter;
+#[cfg(feature = "service-timer-handler")]
+pub use timer_handler::TimerHandler;
