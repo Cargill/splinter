@@ -52,25 +52,22 @@ pub(super) fn upgrade_scabbard_receipt_store(
         info!("Skipping scabbard receipt store upgrade, no circuits found");
         Ok(())
     } else {
-        let local_services = circuits
-            .into_iter()
-            .map(|circuit| {
-                circuit
-                    .roster()
-                    .iter()
-                    .filter_map(|svc| {
-                        if svc.node_id() == node_id && svc.service_type() == "scabbard" {
-                            Some((
-                                circuit.circuit_id().to_string(),
-                                svc.service_id().to_string(),
-                            ))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .flatten();
+        let local_services = circuits.into_iter().flat_map(|circuit| {
+            circuit
+                .roster()
+                .iter()
+                .filter_map(|svc| {
+                    if svc.node_id() == node_id && svc.service_type() == "scabbard" {
+                        Some((
+                            circuit.circuit_id().to_string(),
+                            svc.service_id().to_string(),
+                        ))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
 
         let local_services_with_file: Vec<(String, String, String)> = local_services
             .map(|(circuit_id, service_id)| {

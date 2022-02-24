@@ -271,7 +271,7 @@ impl Internal {
                 })?;
 
             let nodes: Vec<Node> = yaml_nodes
-                .unwrap_or_else(Vec::new)
+                .unwrap_or_default()
                 .into_iter()
                 .map(Node::try_from)
                 .collect::<Result<Vec<Node>, InvalidNodeError>>()
