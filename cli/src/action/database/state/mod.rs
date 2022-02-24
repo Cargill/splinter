@@ -169,25 +169,22 @@ impl Action for StateMigrateAction {
             info!("Skipping scabbard state migrate, no circuits found");
             Ok(())
         } else {
-            let local_services = circuits
-                .into_iter()
-                .map(|circuit| {
-                    circuit
-                        .roster()
-                        .iter()
-                        .filter_map(|svc| {
-                            if svc.node_id() == node_id && svc.service_type() == "scabbard" {
-                                Some((
-                                    circuit.circuit_id().to_string(),
-                                    svc.service_id().to_string(),
-                                ))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .flatten();
+            let local_services = circuits.into_iter().flat_map(|circuit| {
+                circuit
+                    .roster()
+                    .iter()
+                    .filter_map(|svc| {
+                        if svc.node_id() == node_id && svc.service_type() == "scabbard" {
+                            Some((
+                                circuit.circuit_id().to_string(),
+                                svc.service_id().to_string(),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            });
 
             for (circuit_id, service_id) in local_services {
                 info!("Migrating state data for {}::{}", circuit_id, service_id);
