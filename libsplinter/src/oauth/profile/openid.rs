@@ -74,7 +74,7 @@ impl ProfileProvider for OpenIdProfileProvider {
                 Ok(res) => {
                     if res.status().is_success() {
                         match res.bytes() {
-                            Ok(image_data) => Some(encode(image_data.to_vec())),
+                            Ok(image_data) => Some(encode(image_data)),
                             Err(_) => {
                                 warn!("Failed to get bytes from microsoft graph HTTP response");
                                 Some("".into())

@@ -276,7 +276,7 @@ impl fmt::Display for CircuitSlice {
                 display_string += &format!("        Public Key: {}\n", public_key);
             }
 
-            display_string += &"        Endpoints:\n".to_string();
+            display_string += "        Endpoints:\n";
             for endpoint in member.endpoints.iter() {
                 display_string += &format!("            {}\n", endpoint);
             }
@@ -374,7 +374,7 @@ impl fmt::Display for ProposalSlice {
                 display_string += &format!("        Public Key: {}\n", public_key);
             }
             if member.node_id == self.requester_node_id {
-                display_string += &"        Vote: ACCEPT (implied as requester):\n".to_string();
+                display_string += "        Vote: ACCEPT (implied as requester):\n";
                 display_string += &format!("            {}\n", self.requester);
             } else {
                 let mut vote_string = "        Vote: PENDING".to_string();
@@ -386,7 +386,7 @@ impl fmt::Display for ProposalSlice {
                 }
                 display_string += &format!("{}\n", vote_string);
             }
-            display_string += &"        Endpoints:\n".to_string();
+            display_string += "        Endpoints:\n";
             for endpoint in member.endpoints.iter() {
                 display_string += &format!("            {}\n", endpoint);
             }
