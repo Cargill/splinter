@@ -109,7 +109,7 @@ impl Reactor {
                             "An Error occurred while shutting down Reactor".to_string(),
                         )
                     })
-                    .and_then(|_| {
+                    .and({
                         if shutdown_errors.is_empty() {
                             Ok(())
                         } else {
