@@ -281,8 +281,6 @@ fn handle_skip(
     let rest_api_key_path = private_cert_path.join(REST_API_KEY);
 
     let cert_path = cert_dir;
-    let mut ca;
-
     if (ca_cert_path.exists() || ca_key_path.exists())
         && !(ca_cert_path.exists() && ca_key_path.exists())
     {
@@ -361,7 +359,7 @@ fn handle_skip(
     }
 
     // if ca files exists, log and read the cert and key from the file
-    if ca_cert_path.exists() && ca_key_path.exists() {
+    let ca = if ca_cert_path.exists() && ca_key_path.exists() {
         info!(
             "CA certificate exists, skipping: {}",
             absolute_path(&ca_cert_path)?,
@@ -369,12 +367,12 @@ fn handle_skip(
         info!("CA key exists, skipping: {}", absolute_path(&ca_key_path)?);
         let ca_cert = get_ca_cert(&ca_cert_path)?;
         let ca_key = get_ca_key(&ca_key_path)?;
-        ca = Some((ca_key, ca_cert));
+        Some((ca_key, ca_cert))
     } else {
         // if the ca files do not exist, generate them
         let (genearte_ca_key, generate_ca_cert) = write_ca(&cert_path, &private_cert_path)?;
-        ca = Some((genearte_ca_key, generate_ca_cert));
-    }
+        Some((genearte_ca_key, generate_ca_cert))
+    };
 
     // if the client files exist log
     if client_cert_path.exists() && client_key_path.exists() {
@@ -388,17 +386,16 @@ fn handle_skip(
         );
     } else {
         // if the client files do not exist, generate them using the ca
-        if let Some((ca_key, ca_cert)) = ca {
+        if let Some((ca_key, ca_cert)) = &ca {
             write_cert_and_key(
                 &cert_path,
                 &private_cert_path,
-                &ca_key,
-                &ca_cert,
+                ca_key,
+                ca_cert,
                 CLIENT_CERT,
                 CLIENT_KEY,
                 server_common_name,
             )?;
-            ca = Some((ca_key, ca_cert));
         } else {
             // this should never happen
             return Err(CliError::ActionError("CA does not exist".into()));
