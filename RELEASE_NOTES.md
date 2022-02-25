@@ -1,5 +1,13 @@
 # Release Notes
 
+## Changes in Splinter 0.6.8
+
+### splinter CLI
+
+* Add additional bash completions for `state`, `role` and `authid` subcommands.
+* Update `splinter circuit show` to include member endpoints on committed
+  circuits. This change matches the output of proposals with the same command.
+
 ## Changes in Splinter 0.6.7
 
 ### libsplinter
