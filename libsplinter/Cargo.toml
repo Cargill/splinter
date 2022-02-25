@@ -127,6 +127,7 @@ experimental = [
     "registry-client-reqwest",
     "rest-api-actix-web-3",
     "service-network",
+    "store-command",
     "ws-transport",
 ]
 
@@ -179,6 +180,7 @@ rest-api-cors = []
 service-network = []
 sqlite = ["diesel/sqlite", "diesel_migrations", "store"]
 store = []
+store-command = ["store"]
 store-factory = ["store"]
 tap = ["chrono", "futures-0-3", "influxdb", "metrics", "tokio-1"]
 trust-authorization = []
