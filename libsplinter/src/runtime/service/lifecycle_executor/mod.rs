@@ -17,6 +17,7 @@
 #[cfg(feature = "service-lifecycle-store")]
 mod store;
 
+mod commands;
 #[cfg(all(feature = "service-lifecycle-store", feature = "postgres"))]
 pub use store::diesel::factory::PostgresLifecycleStoreFactory;
 #[cfg(all(feature = "service-lifecycle-store", feature = "sqlite"))]
@@ -29,3 +30,5 @@ pub use store::{
     service::{LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus},
     LifecycleStore, LifecycleStoreFactory,
 };
+
+pub use commands::LifecycleCommandGenerator;

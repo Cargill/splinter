@@ -24,6 +24,6 @@ pub use lifecycle_executor::PostgresLifecycleStoreFactory;
 pub use lifecycle_executor::SqliteLifecycleStoreFactory;
 #[cfg(feature = "service-lifecycle-executor")]
 pub use lifecycle_executor::{
-    LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus, LifecycleStore,
-    LifecycleStoreError, LifecycleStoreFactory,
+    LifecycleCommand, LifecycleCommandGenerator, LifecycleService, LifecycleServiceBuilder,
+    LifecycleStatus, LifecycleStore, LifecycleStoreError, LifecycleStoreFactory,
 };
