@@ -92,13 +92,13 @@ impl std::str::FromStr for Time {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.parse::<f64>().is_err() && !s.contains('/') {
             let (duration_string, unit) = if s.contains('s') {
-                (s.replacen("s", "", 1), TimeUnit::Second)
+                (s.replacen('s', "", 1), TimeUnit::Second)
             } else if s.contains('m') {
-                (s.replacen("m", "", 1), TimeUnit::Minute)
+                (s.replacen('m', "", 1), TimeUnit::Minute)
             } else if s.contains('h') {
-                (s.replacen("h", "", 1), TimeUnit::Hour)
+                (s.replacen('h', "", 1), TimeUnit::Hour)
             } else if s.contains('d') {
-                (s.replacen("d", "", 1), TimeUnit::Day)
+                (s.replacen('d', "", 1), TimeUnit::Day)
             } else {
                 return Err(TimeParseError {
                     msg: "could not parse duration due to incorrect formatting".into(),
