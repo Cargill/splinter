@@ -17,12 +17,14 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, RwLock};
 
+use actix_web_4::http::Method;
 use actix_web_4::rt::System as ActixSystem;
 use actix_web_4::{dev::ServerHandle, middleware, App, HttpServer};
 use futures_0_3::executor::block_on;
 use openssl::ssl::SslAcceptorBuilder;
 
 use crate::error::InternalError;
+use crate::rest_api::auth::authorization::Permission;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::{AuthorizationHandler, PermissionMap};
 #[cfg(feature = "authorization")]
@@ -64,6 +66,10 @@ impl RestApi {
     ) -> Result<Self, RestApiServerError> {
         let providers: Arc<Mutex<Vec<_>>> = Arc::new(Mutex::new(resource_providers));
         let permission_map = Arc::new(RwLock::new(PermissionMap::new()));
+        {
+            let mut map = permission_map.write().unwrap();
+            map.add_permission(Method::GET, "/", Permission::AllowUnauthenticated);
+        }
         let sys = ActixSystem::new();
         #[cfg(feature = "store-factory")]
         let store_factory = store_factory.map(|factory| Arc::new(Mutex::new(factory)));
