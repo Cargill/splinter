@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "service-lifecycle-executor")]
+pub mod sync;
+
 use std::collections::HashMap;
 
 use crate::error::InternalError;
