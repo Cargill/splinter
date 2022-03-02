@@ -431,6 +431,12 @@ impl ConfigBuilder {
                 .iter()
                 .find_map(|p| p.scabbard_state().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("scabbard_state".to_string()))?,
+            #[cfg(feature = "service2")]
+            service_timer_interval: self
+                .partial_configs
+                .iter()
+                .find_map(|p| p.service_timer_interval().map(|v| (v, p.source())))
+                .ok_or_else(|| ConfigError::MissingValue("service_timer_interval".to_string()))?,
         })
     }
 }

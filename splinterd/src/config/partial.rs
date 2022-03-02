@@ -100,6 +100,8 @@ pub struct PartialConfig {
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: Option<String>,
     scabbard_state: Option<ScabbardState>,
+    #[cfg(feature = "service2")]
+    service_timer_interval: Option<Duration>,
 }
 
 impl PartialConfig {
@@ -170,6 +172,8 @@ impl PartialConfig {
             #[cfg(feature = "config-allow-keys")]
             allow_keys_file: None,
             scabbard_state: None,
+            #[cfg(feature = "service2")]
+            service_timer_interval: None,
         }
     }
 
@@ -376,6 +380,11 @@ impl PartialConfig {
 
     pub fn scabbard_state(&self) -> Option<ScabbardState> {
         self.scabbard_state
+    }
+
+    #[cfg(feature = "service2")]
+    pub fn service_timer_interval(&self) -> Option<Duration> {
+        self.service_timer_interval
     }
 
     /// Adds a `config_dir` value to the `PartialConfig` object.
@@ -910,6 +919,12 @@ impl PartialConfig {
     ///
     pub fn with_scabbard_state(mut self, scabbard_state: Option<ScabbardState>) -> Self {
         self.scabbard_state = scabbard_state;
+        self
+    }
+
+    #[cfg(feature = "service2")]
+    pub fn with_service_timer_interval(mut self, service_timer_interval: Option<Duration>) -> Self {
+        self.service_timer_interval = service_timer_interval;
         self
     }
 }

@@ -56,6 +56,9 @@ const PEERING_KEY_NAME: &str = "splinterd";
 #[cfg(feature = "config-allow-keys")]
 const ALLOW_KEYS_FILE: &str = "allow_keys";
 
+#[cfg(feature = "service2")]
+const SERVICE_TIMER_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
 pub struct DefaultPartialConfigBuilder;
 
 impl DefaultPartialConfigBuilder {
@@ -196,6 +199,12 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 partial_config.with_allow_keys_file(Some(String::from(ALLOW_KEYS_FILE)))
         }
 
+        #[cfg(feature = "service2")]
+        {
+            partial_config =
+                partial_config.with_service_timer_interval(Some(SERVICE_TIMER_INTERVAL));
+        }
+
         Ok(partial_config)
     }
 }
@@ -262,6 +271,11 @@ mod tests {
         assert_eq!(config.state_dir(), Some(String::from(STATE_DIR)));
         assert_eq!(config.tls_insecure(), Some(false));
         assert_eq!(config.no_tls(), Some(false));
+        #[cfg(feature = "service2")]
+        assert_eq!(
+            config.service_timer_interval(),
+            Some(SERVICE_TIMER_INTERVAL)
+        );
         // Assert the source is correctly identified for this `PartialConfig` object.
         assert_eq!(config.source(), ConfigSource::Default);
     }

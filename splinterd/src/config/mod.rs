@@ -109,6 +109,8 @@ pub struct Config {
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: (String, ConfigSource),
     scabbard_state: (ScabbardState, ConfigSource),
+    #[cfg(feature = "service2")]
+    service_timer_interval: (Duration, ConfigSource),
 }
 
 impl Config {
@@ -342,6 +344,11 @@ impl Config {
 
     pub fn peering_key(&self) -> &str {
         &self.peering_key.0
+    }
+
+    #[cfg(feature = "service2")]
+    pub fn service_timer_interval(&self) -> Duration {
+        self.service_timer_interval.0
     }
 
     pub fn config_dir_source(&self) -> &ConfigSource {
@@ -620,6 +627,11 @@ impl Config {
 
     pub fn scabbard_state_source(&self) -> &ConfigSource {
         &self.scabbard_state.1
+    }
+
+    #[cfg(feature = "service2")]
+    pub fn service_timer_interval_source(&self) -> &ConfigSource {
+        &self.service_timer_interval.1
     }
 
     #[allow(clippy::cognitive_complexity)]
