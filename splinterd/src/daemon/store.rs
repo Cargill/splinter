@@ -78,7 +78,7 @@ pub fn create_connection_pool(
 ///   created by the resulting factory
 pub fn create_store_factory(
     connection_pool: &ConnectionPool,
-) -> Result<Box<dyn StoreFactory>, InternalError> {
+) -> Result<Box<dyn StoreFactory + Send>, InternalError> {
     match connection_pool {
         #[cfg(feature = "database-postgres")]
         ConnectionPool::Postgres { pool } => {
