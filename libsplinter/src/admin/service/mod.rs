@@ -30,13 +30,13 @@ use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::{self, Message};
 
+use crate::admin::lifecycle::LifecycleDispatch;
 use crate::admin::store::{self, AdminServiceStore};
 use crate::admin::token::PeerAuthorizationTokenReader;
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::Proposal;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
-use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
 use crate::peer::{PeerManagerConnector, PeerManagerNotification, PeerTokenPair};
 use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
@@ -139,7 +139,6 @@ pub struct AdminService {
     service_id: String,
     node_id: String,
     admin_service_shared: Arc<Mutex<AdminServiceShared>>,
-    orchestrator: Arc<Mutex<ServiceOrchestrator>>,
     /// The coordinator timeout for the two-phase commit consensus engine
     coordinator_timeout: Duration,
     consensus: Option<AdminConsensusManager>,
@@ -153,7 +152,7 @@ impl AdminService {
     #[deprecated(since = "0.5.1", note = "please use `AdminServiceBuilder` instead")]
     pub fn new(
         node_id: &str,
-        orchestrator: ServiceOrchestrator,
+        lifecycle_dispatch: Vec<Box<dyn LifecycleDispatch>>,
         service_arg_validators: HashMap<String, Box<dyn ServiceArgValidator + Send>>,
         peer_connector: PeerManagerConnector,
         admin_store: Box<dyn AdminServiceStore>,
@@ -168,7 +167,7 @@ impl AdminService {
     ) -> Result<Self, ServiceError> {
         let mut builder = builder::AdminServiceBuilder::new()
             .with_node_id(node_id.to_string())
-            .with_service_orchestrator(orchestrator)
+            .with_lifecycle_dispatch(lifecycle_dispatch)
             .with_peer_manager_connector(peer_connector)
             .with_admin_service_store(admin_store)
             .with_signature_verifier(signature_verifier)
@@ -239,9 +238,6 @@ impl AdminService {
             }
         }
 
-        let orchestrator = self.orchestrator.lock().map_err(|_| {
-            ServiceStartError::PoisonedLock("the admin orchestrator lock was poisoned".into())
-        })?;
         let mut peer_refs = vec![];
         // start all services of the supported types
         let mut writer = self
@@ -311,8 +307,6 @@ impl AdminService {
                 }
             }
 
-            // Get all services this node is allowed to run and the orchestrator has a factory for
-
             let routing_services = circuit
                 .roster()
                 .iter()
@@ -325,17 +319,6 @@ impl AdminService {
                     )
                 })
                 .collect();
-
-            let services = circuit
-                .roster()
-                .iter()
-                .filter(|service| {
-                    service.node_id() == self.node_id
-                        && orchestrator
-                            .supported_service_types()
-                            .contains(&service.service_type().to_string())
-                })
-                .collect::<Vec<_>>();
 
             let routing_members = circuit
                 .members()
@@ -367,67 +350,76 @@ impl AdminService {
                 .map_err(|err| ServiceStartError::Internal(err.reduce_to_string()))?;
 
             // Start all services
-            for service in services {
-                let service_definition = ServiceDefinition {
-                    circuit: circuit.circuit_id().into(),
-                    service_id: service.service_id().into(),
-                    service_type: service.service_type().into(),
-                };
+            for service in circuit.roster() {
+                if service.node_id() != self.node_id {
+                    continue;
+                }
 
-                let service_arguments = service
-                    .arguments()
-                    .iter()
-                    .map(|(key, value)| (key.clone(), value.clone()))
-                    .collect();
-
-                if let Err(err) =
-                    orchestrator.initialize_service(service_definition.clone(), service_arguments)
+                for dispatch in self
+                    .admin_service_shared
+                    .lock()
+                    .map_err(|_| {
+                        ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+                    })?
+                    .lifecycle_dispatch()
                 {
-                    error!(
-                        "Unable to start service {} on circuit {}: {}",
-                        service.service_id(),
+                    let service_arguments = service
+                        .arguments()
+                        .iter()
+                        .map(|(key, value)| (key.clone(), value.clone()))
+                        .collect();
+
+                    if let Err(err) = dispatch.add_service(
                         circuit.circuit_id(),
-                        err
-                    );
+                        service.service_id(),
+                        service.service_type(),
+                        service_arguments,
+                    ) {
+                        error!(
+                            "Unable to start service {} on circuit {}: {}",
+                            service.service_id(),
+                            circuit.circuit_id(),
+                            err
+                        );
+                    }
                 }
             }
         }
 
         for circuit in inactive_circuits {
             // Get all services this node is allowed to run and the orchestrator has a factory for
-            let services = circuit
-                .roster()
-                .iter()
-                .filter(|service| {
-                    service.node_id() == self.node_id
-                        && orchestrator
-                            .supported_service_types()
-                            .contains(&service.service_type().to_string())
-                })
-                .collect::<Vec<_>>();
-            // Add all services from the inactive circuits to the orchestrator
-            for service in services {
-                let service_definition = ServiceDefinition {
-                    circuit: circuit.circuit_id().into(),
-                    service_id: service.service_id().into(),
-                    service_type: service.service_type().into(),
-                };
+            for service in circuit.roster() {
+                if service.node_id() != self.node_id {
+                    continue;
+                }
 
-                let service_arguments = service
-                    .arguments()
-                    .iter()
-                    .map(|(key, value)| (key.clone(), value.clone()))
-                    .collect();
-
-                if let Err(err) =
-                    orchestrator.add_stopped_service(service_definition.clone(), service_arguments)
+                for dispatch in self
+                    .admin_service_shared
+                    .lock()
+                    .map_err(|_| {
+                        ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+                    })?
+                    .lifecycle_dispatch()
                 {
-                    error!(
-                        "Unable to add service {} from circuit {}: {}",
-                        service.service_id(),
+                    let service_arguments = service
+                        .arguments()
+                        .iter()
+                        .map(|(key, value)| (key.clone(), value.clone()))
+                        .collect();
+
+                    if let Err(err) = dispatch.add_stopped_service(
                         circuit.circuit_id(),
-                        err
-                    );
+                        service.service_id(),
+                        service.service_type(),
+                        service_arguments,
+                    ) {
+                        error!(
+                            "Unable to start service {} on circuit {}: {}",
+                            service.service_id(),
+                            circuit.circuit_id(),
+                            err
+                        );
+                    }
                 }
             }
         }
@@ -650,13 +642,12 @@ impl ServiceInstance for AdminService {
             })?
             .set_network_sender(None);
 
-        self.orchestrator
+        self.admin_service_shared
             .lock()
             .map_err(|_| {
-                ServiceStopError::PoisonedLock("the admin orchestrator lock was poisoned".into())
+                ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
             })?
-            .shutdown_all_services()
-            .map_err(|err| ServiceStopError::Internal(Box::new(err)))?;
+            .shutdown_all_services();
 
         self.admin_service_shared
             .lock()
@@ -1113,7 +1104,7 @@ mod tests {
 
         admin_service_builder = admin_service_builder
             .with_node_id("test-node".into())
-            .with_service_orchestrator(orchestrator)
+            .with_lifecycle_dispatch(vec![Box::new(orchestrator)])
             .with_peer_manager_connector(peer_connector)
             .with_admin_service_store(store)
             .with_signature_verifier(signature_verifier)
