@@ -47,13 +47,13 @@ rand = "0.8"
 sawtooth = { version = "0.7", default-features = false, optional = true }
 serde = "1.0.80"
 serde_derive = "1.0.80"
-tempdir = "0.3"
 toml = "0.5"
 
 [dev-dependencies]
 openssl = { version = "0.10" }
 reqwest = { version = "0.11", features = ["blocking"] }
 sabre-sdk = "0.9"
+tempfile = "3"
 transact = "0.5"
 
 [dependencies.scabbard]

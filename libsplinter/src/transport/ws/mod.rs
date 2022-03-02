@@ -35,7 +35,7 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
-    use tempdir::TempDir;
+    use tempfile::{Builder, TempDir};
 
     fn write_file(mut temp_dir: PathBuf, file_name: &str, bytes: &[u8]) -> String {
         temp_dir.push(file_name);
@@ -132,7 +132,10 @@ mod tests {
 
     #[test]
     fn test_wss_transport() {
-        let temp_dir = TempDir::new("test-wss-transport").unwrap();
+        let temp_dir = Builder::new()
+            .prefix("test-wss-transport")
+            .tempdir()
+            .unwrap();
         let config = create_test_tls_config(&temp_dir, true);
         let transport = WsTransport::new(Some(&config)).unwrap();
         tests::test_transport(transport, "wss://127.0.0.1:18082");
@@ -140,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_wss_poll() {
-        let temp_dir = TempDir::new("test-wss-poll").unwrap();
+        let temp_dir = Builder::new().prefix("test-wss-poll").tempdir().unwrap();
         let config = create_test_tls_config(&temp_dir, false);
         let transport = WsTransport::new(Some(&config)).unwrap();
         tests::test_poll(transport, "wss://127.0.0.1:18083");

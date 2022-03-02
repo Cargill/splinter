@@ -24,7 +24,7 @@ use splinter::threading::lifecycle::ShutdownHandle;
 use splinterd::node::{
     Node, NodeBuilder, PermissionConfig, RestApiVariant, RunnableNode, ScabbardConfigBuilder,
 };
-use tempdir::TempDir;
+use tempfile::{Builder, TempDir};
 
 use super::circuit_builder::CircuitBuilder;
 
@@ -81,7 +81,9 @@ impl Network {
             let public_key = admin_signer
                 .public_key()
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
-            let temp_dir = TempDir::new("scabbard_data")
+            let temp_dir = Builder::new()
+                .prefix("scabbard_data")
+                .tempdir()
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
             let temp_db_path = temp_dir.path().join("sqlite_receipt_store.db");
 

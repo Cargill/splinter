@@ -352,7 +352,7 @@ mod test {
     use std::io::Write;
     use std::path::PathBuf;
 
-    use tempdir::TempDir;
+    use tempfile::Builder;
 
     use crate::admin::messages::SplinterService;
 
@@ -402,7 +402,10 @@ rules:
     /// applied successfully to the `arguments`.
     #[test]
     fn test_builds_template_v1() {
-        let temp_dir = TempDir::new("test_builds_template_v1").unwrap();
+        let temp_dir = Builder::new()
+            .prefix("test_builds_template_v1")
+            .tempdir()
+            .unwrap();
         let temp_dir = temp_dir.path().to_path_buf();
         let file_path = get_file_path(temp_dir);
 
@@ -498,9 +501,9 @@ rules:
     /// find the correct template file.
     #[test]
     fn test_multiple_template_paths() {
-        let temp_dir1 = TempDir::new("test1").unwrap();
+        let temp_dir1 = Builder::new().prefix("test1").tempdir().unwrap();
         let temp_dir1 = temp_dir1.path().to_path_buf();
-        let temp_dir2 = TempDir::new("test2").unwrap();
+        let temp_dir2 = Builder::new().prefix("test2").tempdir().unwrap();
         let temp_dir2 = temp_dir2.path().to_path_buf();
 
         let manager = CircuitTemplateManager::new(&[
@@ -547,9 +550,9 @@ rules:
     /// the `CircuitTemplateManager` is able to locate multiple template files.
     #[test]
     fn test_list_available_templates() {
-        let temp_dir1 = TempDir::new("test1").unwrap();
+        let temp_dir1 = Builder::new().prefix("test1").tempdir().unwrap();
         let temp_dir1 = temp_dir1.path().to_path_buf();
-        let temp_dir2 = TempDir::new("test2").unwrap();
+        let temp_dir2 = Builder::new().prefix("test2").tempdir().unwrap();
         let temp_dir2 = temp_dir2.path().to_path_buf();
 
         // Create the manager with the multiple temporary directories.
@@ -615,7 +618,7 @@ rules:
     /// the `CircuitTemplateManager` is able to load the raw YAML from a template file.
     #[test]
     fn test_raw_yaml_string() {
-        let temp_dir1 = TempDir::new("test1").unwrap();
+        let temp_dir1 = Builder::new().prefix("test1").tempdir().unwrap();
         let temp_dir1 = temp_dir1.path().to_path_buf();
 
         // Create the manager with the temporary directory.

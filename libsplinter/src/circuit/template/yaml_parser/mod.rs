@@ -93,7 +93,7 @@ mod test {
     use std::io::Write;
     use std::path::PathBuf;
 
-    use tempdir::TempDir;
+    use tempfile::Builder;
 
     /// Example circuit template YAML file.
     const EXAMPLE_TEMPLATE_YAML: &[u8] = br##"version: v1
@@ -134,7 +134,10 @@ rules:
     /// expected values and that all are correctly constructed.
     #[test]
     fn test_parse_template_v1() {
-        let temp_dir = TempDir::new("test_parse_template_v1").unwrap();
+        let temp_dir = Builder::new()
+            .prefix("test_parse_template_v1")
+            .tempdir()
+            .unwrap();
         let temp_dir = temp_dir.path().to_path_buf();
         let file_path = get_file_path(temp_dir);
 
