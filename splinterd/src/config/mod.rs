@@ -900,6 +900,15 @@ impl Config {
             self.scabbard_state(),
             self.scabbard_state_source()
         );
+
+        #[cfg(feature = "service2")]
+        {
+            debug!(
+                "Config: service_timer_interval: {:?}, (source: {:?})",
+                self.service_timer_interval(),
+                self.service_timer_interval_source(),
+            );
+        }
     }
 
     #[cfg(feature = "rest-api-cors")]

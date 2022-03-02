@@ -404,6 +404,8 @@ impl SplinterDaemonBuilder {
             signers,
             peering_token,
             enable_lmdb_state: self.enable_lmdb_state,
+            #[cfg(feature = "service2")]
+            service_timer_interval,
         })
     }
 }

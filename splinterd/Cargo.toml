@@ -161,7 +161,8 @@ service-timer-interval = []
 service2 = [
   "splinter/service-message-handler-dispatch",
   "splinter/service-message-sender-factory-peer",
-  "splinter/service-message-sender-factory"
+  "splinter/service-message-sender-factory",
+  "splinter/service-timer"
 ]
 trust-authorization = ["splinter/trust-authorization"]
 ws-transport = ["splinter/ws-transport"]
