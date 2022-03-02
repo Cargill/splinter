@@ -15,6 +15,7 @@
 use std::error::Error;
 use std::fmt;
 
+use splinter::error::InternalError;
 use splinter::rest_api::RestApiServerError;
 use splinter::transport::{AcceptError, ConnectError, ListenError};
 
@@ -50,6 +51,7 @@ pub enum StartError {
     HealthServiceError(String),
     OrchestratorError(String),
     UserError(String),
+    InternalError(String),
 }
 
 impl Error for StartError {}
@@ -75,6 +77,7 @@ impl fmt::Display for StartError {
             StartError::UserError(msg) => {
                 write!(f, "there has been a user error: {}", msg)
             }
+            StartError::InternalError(err) => f.write_str(err),
         }
     }
 }
@@ -112,5 +115,11 @@ impl From<ConnectError> for StartError {
 impl From<protobuf::ProtobufError> for StartError {
     fn from(err: protobuf::ProtobufError) -> Self {
         StartError::ProtocolError(err.to_string())
+    }
+}
+
+impl From<InternalError> for StartError {
+    fn from(err: InternalError) -> Self {
+        StartError::InternalError(err.to_string())
     }
 }
