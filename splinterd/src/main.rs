@@ -707,6 +707,12 @@ fn start_daemon(matches: ArgMatches, log_handle: Handle) -> Result<(), UserError
         .with_signers(signers)
         .with_peering_token(peering_token);
 
+    #[cfg(feature = "service2")]
+    {
+        daemon_builder =
+            daemon_builder.with_service_timer_interval(config.service_timer_interval());
+    }
+
     let mut node = daemon_builder.build().map_err(|err| {
         UserError::daemon_err_with_source("unable to build the Splinter daemon", Box::new(err))
     })?;
