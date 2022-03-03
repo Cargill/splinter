@@ -46,8 +46,8 @@ use crate::registry::RegistryReader;
 use crate::service::validation::ServiceArgValidator;
 use crate::service::{
     error::{ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError},
-    instance::ServiceInstance,
-    ServiceMessageContext, ServiceNetworkRegistry,
+    instance::{ServiceInstance, ServiceMessageContext},
+    ServiceNetworkRegistry,
 };
 
 use self::consensus::AdminConsensusManager;

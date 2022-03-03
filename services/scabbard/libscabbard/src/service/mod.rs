@@ -37,8 +37,9 @@ use splinter::{
     consensus::{Proposal, ProposalUpdate},
     orchestrator::OrchestratableService,
     service::{
-        instance::ServiceInstance, ServiceDestroyError, ServiceError, ServiceMessageContext,
-        ServiceNetworkRegistry, ServiceStartError, ServiceStopError,
+        instance::{ServiceInstance, ServiceMessageContext},
+        ServiceDestroyError, ServiceError, ServiceNetworkRegistry, ServiceStartError,
+        ServiceStopError,
     },
 };
 use transact::{
@@ -530,7 +531,7 @@ pub mod tests {
     use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
     use sawtooth::receipt::store::{ReceiptIter, ReceiptStoreError};
     use splinter::service::{
-        ServiceConnectionError, ServiceDisconnectionError, ServiceMessageContext,
+        instance::ServiceMessageContext, ServiceConnectionError, ServiceDisconnectionError,
         ServiceNetworkSender, ServiceSendError,
     };
     use transact::protocol::receipt::TransactionReceipt;

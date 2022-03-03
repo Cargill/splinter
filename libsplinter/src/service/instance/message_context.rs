@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod message_context;
-mod service_instance;
-
-pub use message_context::ServiceMessageContext;
-pub use service_instance::ServiceInstance;
+/// The ServiceMessageContext is a struct that provides information about an incoming message.
+#[derive(Clone, Debug)]
+pub struct ServiceMessageContext {
+    pub sender: String,
+    pub circuit: String,
+    pub correlation_id: String,
+}

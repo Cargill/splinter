@@ -50,6 +50,7 @@ pub mod validation;
 pub use factory::ServiceFactory;
 #[cfg(feature = "service-id")]
 pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};
+use instance::ServiceMessageContext;
 pub use processor::registry::StandardServiceNetworkRegistry;
 pub use processor::JoinHandles;
 pub use processor::ServiceProcessor;
@@ -60,14 +61,6 @@ pub use error::{
     FactoryCreateError, ServiceConnectionError, ServiceDestroyError, ServiceDisconnectionError,
     ServiceError, ServiceProcessorError, ServiceSendError, ServiceStartError, ServiceStopError,
 };
-
-/// The ServiceMessageContext is a struct that provides information about an incoming message.
-#[derive(Clone, Debug)]
-pub struct ServiceMessageContext {
-    pub sender: String,
-    pub circuit: String,
-    pub correlation_id: String,
-}
 
 /// The ServiceNetworkRegistry trait provides functions to register and unregister the service on
 /// the network.  It does not expose the circuit membership information directly.

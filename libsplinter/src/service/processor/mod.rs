@@ -36,7 +36,7 @@ use crate::protos::circuit::{
 };
 use crate::protos::prelude::*;
 use crate::service::error::ServiceProcessorError;
-use crate::service::{instance::ServiceInstance, ServiceMessageContext};
+use crate::service::instance::{ServiceInstance, ServiceMessageContext};
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;
 use crate::{rwlock_read_unwrap, rwlock_write_unwrap};

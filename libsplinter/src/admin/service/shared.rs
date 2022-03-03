@@ -3752,7 +3752,7 @@ mod tests {
     };
     use crate::protos::network;
     use crate::protos::prelude::*;
-    use crate::service::{ServiceMessageContext, ServiceSendError};
+    use crate::service::{instance::ServiceMessageContext, ServiceSendError};
     use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{
         inproc::InprocTransport, ConnectError, Connection, DisconnectError, RecvError, SendError,
