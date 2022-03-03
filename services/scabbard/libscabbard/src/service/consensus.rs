@@ -406,7 +406,8 @@ mod tests {
 
     use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
     use splinter::service::{
-        instance::ServiceMessageContext, ServiceNetworkSender, ServiceSendError,
+        instance::{ServiceMessageContext, ServiceNetworkSender},
+        ServiceSendError,
     };
 
     /// Tests that the network sender properly creates messages and sends them using the

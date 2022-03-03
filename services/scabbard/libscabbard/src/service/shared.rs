@@ -23,7 +23,7 @@ use transact::protos::FromBytes;
 
 use splinter::{
     consensus::{PeerId, Proposal, ProposalId},
-    service::ServiceNetworkSender,
+    service::instance::ServiceNetworkSender,
 };
 
 use crate::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};

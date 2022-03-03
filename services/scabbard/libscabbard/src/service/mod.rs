@@ -530,8 +530,8 @@ pub mod tests {
     use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
     use sawtooth::receipt::store::{ReceiptIter, ReceiptStoreError};
     use splinter::service::{
-        instance::ServiceMessageContext, ServiceConnectionError, ServiceDisconnectionError,
-        ServiceNetworkSender, ServiceSendError,
+        instance::{ServiceMessageContext, ServiceNetworkSender},
+        ServiceConnectionError, ServiceDisconnectionError, ServiceSendError,
     };
     use transact::protocol::receipt::TransactionReceipt;
     use transact::{

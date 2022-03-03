@@ -22,7 +22,7 @@ use crate::protos::circuit::{
     ServiceDisconnectResponse_Status,
 };
 use crate::service::error::{ServiceConnectionError, ServiceDisconnectionError};
-use crate::service::{instance::ServiceNetworkRegistry, ServiceNetworkSender};
+use crate::service::instance::{ServiceNetworkRegistry, ServiceNetworkSender};
 
 use super::sender::create_message;
 use super::sender::{AdminServiceNetworkSender, StandardServiceNetworkSender};

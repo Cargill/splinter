@@ -50,7 +50,6 @@ pub mod validation;
 pub use factory::ServiceFactory;
 #[cfg(feature = "service-id")]
 pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};
-use instance::ServiceMessageContext;
 pub use processor::registry::StandardServiceNetworkRegistry;
 pub use processor::JoinHandles;
 pub use processor::ServiceProcessor;
@@ -61,40 +60,3 @@ pub use error::{
     FactoryCreateError, ServiceConnectionError, ServiceDestroyError, ServiceDisconnectionError,
     ServiceError, ServiceProcessorError, ServiceSendError, ServiceStartError, ServiceStopError,
 };
-
-/// The ServiceNetworkSender trait allows a service to send its own messages, such as replies to
-/// the original message or forwarding the message to other services on the same circuit.  It does
-/// not expose the circuit information directly.
-pub trait ServiceNetworkSender: Send {
-    /// Send the message bytes to the given recipient (another service)
-    fn send(&self, recipient: &str, message: &[u8]) -> Result<(), ServiceSendError>;
-
-    /// Send the message bytes to the given recipient (another service) and await the reply.  This
-    /// function blocks until the reply is returned.
-    fn send_and_await(&self, recipient: &str, message: &[u8]) -> Result<Vec<u8>, ServiceSendError>;
-
-    /// Send the message bytes back to the origin specified in the given message context.
-    fn reply(
-        &self,
-        message_origin: &ServiceMessageContext,
-        message: &[u8],
-    ) -> Result<(), ServiceSendError>;
-
-    /// Clone this instance into Boxed, dynamic trait
-    fn clone_box(&self) -> Box<dyn ServiceNetworkSender>;
-
-    /// Send the message bytes to the given recipient (another service) with a configurable
-    /// message sender
-    fn send_with_sender(
-        &mut self,
-        recipient: &str,
-        message: &[u8],
-        sender: &str,
-    ) -> Result<(), ServiceSendError>;
-}
-
-impl Clone for Box<dyn ServiceNetworkSender> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
-}

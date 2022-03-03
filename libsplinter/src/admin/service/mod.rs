@@ -1015,7 +1015,10 @@ mod tests {
     use crate::orchestrator::ServiceOrchestratorBuilder;
     use crate::peer::PeerManager;
     use crate::protos::admin;
-    use crate::service::{error, instance::ServiceNetworkRegistry, ServiceNetworkSender};
+    use crate::service::{
+        error,
+        instance::{ServiceNetworkRegistry, ServiceNetworkSender},
+    };
     use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Transport};
 

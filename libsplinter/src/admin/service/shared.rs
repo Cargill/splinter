@@ -49,7 +49,7 @@ use crate::public_key;
 use crate::service::error::ServiceError;
 use crate::service::validation::ServiceArgValidator;
 
-use crate::service::ServiceNetworkSender;
+use crate::service::instance::ServiceNetworkSender;
 
 use super::error::{AdminSharedError, MarshallingError};
 use super::messages;

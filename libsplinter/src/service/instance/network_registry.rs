@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::service::{ServiceConnectionError, ServiceDisconnectionError, ServiceNetworkSender};
+use crate::service::{ServiceConnectionError, ServiceDisconnectionError};
+
+use super::ServiceNetworkSender;
 
 /// The ServiceNetworkRegistry trait provides functions to register and unregister the service on
 /// the network.  It does not expose the circuit membership information directly.
