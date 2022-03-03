@@ -127,6 +127,8 @@ const ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 const ADMIN_SERVICE_LIFECYCLE_TIMEOUT: u64 = 30;
 #[cfg(feature = "scabbardv3")]
 const SCABBARD_SERVICE_TYPE: ServiceType = ServiceType::new_static("scabbard:v3");
+#[cfg(feature = "service-echo")]
+const ECHO_SERVICE_TYPE: ServiceType = ServiceType::new_static("echo");
 
 #[cfg(feature = "service2")]
 type BoxedByteMessageHandlerFactory =
@@ -580,6 +582,8 @@ impl SplinterDaemon {
         let supported_types = vec![
             #[cfg(feature = "scabbardv3")]
             SCABBARD_SERVICE_TYPE.to_string(),
+            #[cfg(feature = "service-echo")]
+            ECHO_SERVICE_TYPE.to_string(),
         ];
         #[cfg(feature = "service2")]
         lifecycle_dispatches.push(Box::new(SyncLifecycleInterface::new(
