@@ -62,16 +62,6 @@ pub use error::{
     ServiceError, ServiceProcessorError, ServiceSendError, ServiceStartError, ServiceStopError,
 };
 
-/// The ServiceNetworkRegistry trait provides functions to register and unregister the service on
-/// the network.  It does not expose the circuit membership information directly.
-pub trait ServiceNetworkRegistry: Send {
-    fn connect(
-        &self,
-        service_id: &str,
-    ) -> Result<Box<dyn ServiceNetworkSender>, ServiceConnectionError>;
-    fn disconnect(&self, service_id: &str) -> Result<(), ServiceDisconnectionError>;
-}
-
 /// The ServiceNetworkSender trait allows a service to send its own messages, such as replies to
 /// the original message or forwarding the message to other services on the same circuit.  It does
 /// not expose the circuit information directly.

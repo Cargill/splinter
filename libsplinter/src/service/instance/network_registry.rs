@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod message_context;
-mod network_registry;
-mod service_instance;
+use crate::service::{ServiceConnectionError, ServiceDisconnectionError, ServiceNetworkSender};
 
-pub use message_context::ServiceMessageContext;
-pub use network_registry::ServiceNetworkRegistry;
-pub use service_instance::ServiceInstance;
+/// The ServiceNetworkRegistry trait provides functions to register and unregister the service on
+/// the network.  It does not expose the circuit membership information directly.
+pub trait ServiceNetworkRegistry: Send {
+    fn connect(
+        &self,
+        service_id: &str,
+    ) -> Result<Box<dyn ServiceNetworkSender>, ServiceConnectionError>;
+    fn disconnect(&self, service_id: &str) -> Result<(), ServiceDisconnectionError>;
+}

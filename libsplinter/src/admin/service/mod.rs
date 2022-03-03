@@ -46,8 +46,7 @@ use crate::registry::RegistryReader;
 use crate::service::validation::ServiceArgValidator;
 use crate::service::{
     error::{ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError},
-    instance::{ServiceInstance, ServiceMessageContext},
-    ServiceNetworkRegistry,
+    instance::{ServiceInstance, ServiceMessageContext, ServiceNetworkRegistry},
 };
 
 use self::consensus::AdminConsensusManager;
@@ -1016,7 +1015,7 @@ mod tests {
     use crate::orchestrator::ServiceOrchestratorBuilder;
     use crate::peer::PeerManager;
     use crate::protos::admin;
-    use crate::service::{error, ServiceNetworkRegistry, ServiceNetworkSender};
+    use crate::service::{error, instance::ServiceNetworkRegistry, ServiceNetworkSender};
     use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Transport};
 

@@ -37,9 +37,8 @@ use splinter::{
     consensus::{Proposal, ProposalUpdate},
     orchestrator::OrchestratableService,
     service::{
-        instance::{ServiceInstance, ServiceMessageContext},
-        ServiceDestroyError, ServiceError, ServiceNetworkRegistry, ServiceStartError,
-        ServiceStopError,
+        instance::{ServiceInstance, ServiceMessageContext, ServiceNetworkRegistry},
+        ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError,
     },
 };
 use transact::{
