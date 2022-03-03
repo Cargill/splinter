@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod arguments;
+mod arguments_converter;
 mod lifecycle;
 mod message;
 mod message_handler;
@@ -22,6 +23,7 @@ mod timer_filter;
 mod timer_handler;
 
 pub use arguments::{EchoArguments, EchoArgumentsBuilder};
+pub use arguments_converter::EchoArgumentsVecConverter;
 pub use lifecycle::EchoLifecycle;
 pub use message::EchoMessage;
 pub use message_handler::EchoMessageHandler;
