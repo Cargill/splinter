@@ -12,21 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[workspace]
+[package]
+name = "splinter-rest-api-actix-web-1"
+version = "0.7.1"
+authors = ["Cargill Incorporated"]
+edition = "2021"
+license = "Apache-2.0"
+description = """\
+    Splinter REST API implementation written using Actix Web v1.
+"""
 
-members = [
-    "cli",
-    "libsplinter",
-    "splinterd",
-    "rest_api/actix_web_1",
-    "examples/gameroom/cli",
-    "examples/gameroom/database",
-    "examples/gameroom/daemon",
-    "services/scabbard/cli",
-    "services/scabbard/libscabbard",
+[dependencies]
+
+[features]
+default = []
+
+stable = [
+    # The stable feature extends default:
+    "default"
+    # The following features are stable:
 ]
 
-[patch.crates-io]
-transact = { git = "https://github.com/hyperledger/transact" }
-sabre-sdk = { git = "https://github.com/hyperledger/sawtooth-sabre" }
-sawtooth = { git = "https://github.com/hyperledger/sawtooth-lib" }
+experimental = [
+    # The experimental feature extends stable:
+    "stable",
+    # The following features are experimental:
+]

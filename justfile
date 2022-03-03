@@ -16,6 +16,7 @@ crates := '\
     libsplinter \
     splinterd \
     cli \
+    rest_api/actix_web_1 \
     services/scabbard/cli \
     services/scabbard/libscabbard \
     examples/gameroom/database \
@@ -27,6 +28,7 @@ crates_quick := '\
     libsplinter \
     splinterd \
     cli \
+    rest_api/actix_web_1 \
     services/scabbard/cli \
     services/scabbard/libscabbard \
     '
