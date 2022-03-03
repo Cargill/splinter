@@ -36,7 +36,7 @@ use crate::protos::circuit::{
 };
 use crate::protos::prelude::*;
 use crate::service::error::ServiceProcessorError;
-use crate::service::{Service, ServiceMessageContext};
+use crate::service::{instance::ServiceInstance, ServiceMessageContext};
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;
 use crate::{rwlock_read_unwrap, rwlock_write_unwrap};
@@ -80,7 +80,7 @@ type ShutdownSignalFn = Box<dyn Fn() -> Result<(), ServiceProcessorError> + Send
 /// direct messages to the correct service.
 pub struct ServiceProcessor {
     shared_state: Arc<RwLock<SharedState>>,
-    services: Vec<Box<dyn Service>>,
+    services: Vec<Box<dyn ServiceInstance>>,
     mesh: Mesh,
     circuit: String,
     node_mesh_id: String,
@@ -124,7 +124,10 @@ impl ServiceProcessor {
     /// add_service takes a Service and sets up the thread that the service will run in.
     /// The service will be started, including registration and then messages are routed to the
     /// the services using a channel.
-    pub fn add_service(&mut self, service: Box<dyn Service>) -> Result<(), ServiceProcessorError> {
+    pub fn add_service(
+        &mut self,
+        service: Box<dyn ServiceInstance>,
+    ) -> Result<(), ServiceProcessorError> {
         if self
             .services
             .iter()
@@ -527,7 +530,7 @@ impl ShutdownHandle for ServiceProcessorShutdownHandle {
 
 fn run_service_loop(
     circuit: String,
-    mut service: Box<dyn Service>,
+    mut service: Box<dyn ServiceInstance>,
     network_sender: Sender<Vec<u8>>,
     service_recv: Receiver<ProcessorMessage>,
     inbound_router: InboundRouter<CircuitMessageType>,
@@ -919,7 +922,7 @@ pub mod tests {
         }
     }
 
-    impl Service for MockService {
+    impl ServiceInstance for MockService {
         /// This service's id
         fn service_id(&self) -> &str {
             &self.service_id
@@ -1010,7 +1013,7 @@ pub mod tests {
         }
     }
 
-    impl Service for MockAdminService {
+    impl ServiceInstance for MockAdminService {
         /// This service's id
         fn service_id(&self) -> &str {
             &self.service_id

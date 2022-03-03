@@ -130,7 +130,7 @@ mod tests {
             },
             AuthConfig, Resource, RestApiBuilder, RestApiServerError, RestApiShutdownHandle,
         },
-        service::Service,
+        service::instance::ServiceInstance,
     };
 
     use crate::service::state::merkle_state::{MerkleState, MerkleStateConfig};
@@ -352,7 +352,7 @@ mod tests {
 
     fn resource_from_service_endpoint(
         service_endpoint: ServiceEndpoint,
-        service: Arc<Mutex<dyn Service>>,
+        service: Arc<Mutex<dyn ServiceInstance>>,
     ) -> Resource {
         let mut resource = Resource::build(&service_endpoint.route);
         for request_guard in service_endpoint.request_guards.into_iter() {

@@ -37,7 +37,7 @@ use splinter::error::InternalError;
 use splinter::error::{InvalidArgumentError, InvalidStateError};
 use splinter::orchestrator::{OrchestratableService, OrchestratableServiceFactory};
 use splinter::service::validation::ServiceArgValidator;
-use splinter::service::{FactoryCreateError, Service, ServiceFactory};
+use splinter::service::{instance::ServiceInstance, FactoryCreateError, ServiceFactory};
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 use transact::database::Database;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
@@ -561,7 +561,7 @@ impl ServiceFactory for ScabbardFactory {
         _service_type: &str,
         circuit_id: &str,
         args: HashMap<String, String>,
-    ) -> Result<Box<dyn Service>, FactoryCreateError> {
+    ) -> Result<Box<dyn ServiceInstance>, FactoryCreateError> {
         Ok(Box::new(
             self.create_scabbard(service_id, circuit_id, args)?,
         ))
@@ -574,7 +574,7 @@ impl ServiceFactory for ScabbardFactory {
         _service_type: &str,
         _circuit_id: &str,
         _args: HashMap<String, String>,
-    ) -> Result<Box<dyn Service>, FactoryCreateError> {
+    ) -> Result<Box<dyn ServiceInstance>, FactoryCreateError> {
         // As the factory cannot be created under these conditions, this function is not reachable.
         unreachable!()
     }

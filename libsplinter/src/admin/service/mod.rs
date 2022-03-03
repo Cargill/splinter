@@ -46,7 +46,8 @@ use crate::registry::RegistryReader;
 use crate::service::validation::ServiceArgValidator;
 use crate::service::{
     error::{ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError},
-    Service, ServiceMessageContext, ServiceNetworkRegistry,
+    instance::ServiceInstance,
+    ServiceMessageContext, ServiceNetworkRegistry,
 };
 
 use self::consensus::AdminConsensusManager;
@@ -523,7 +524,7 @@ impl AdminService {
     }
 }
 
-impl Service for AdminService {
+impl ServiceInstance for AdminService {
     fn service_id(&self) -> &str {
         &self.service_id
     }

@@ -40,7 +40,7 @@ use crate::protos::circuit::{
 };
 use crate::protos::prelude::*;
 use crate::service::{
-    FactoryCreateError, Service, ServiceFactory, ServiceMessageContext,
+    instance::ServiceInstance, FactoryCreateError, ServiceFactory, ServiceMessageContext,
     StandardServiceNetworkRegistry,
 };
 use crate::threading::lifecycle::ShutdownHandle;
@@ -78,10 +78,10 @@ impl std::fmt::Display for ServiceDefinition {
 ///
 /// This service has several stronger requirements, mainly required moving and sharing a service
 /// instance among threads.
-pub trait OrchestratableService: Service {
+pub trait OrchestratableService: ServiceInstance {
     fn clone_box(&self) -> Box<dyn OrchestratableService>;
 
-    fn as_service(&self) -> &dyn Service;
+    fn as_service(&self) -> &dyn ServiceInstance;
 }
 
 impl Clone for Box<dyn OrchestratableService> {

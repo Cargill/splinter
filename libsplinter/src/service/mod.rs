@@ -39,16 +39,13 @@ pub mod error;
 mod factory;
 #[cfg(feature = "service-id")]
 mod id;
+pub mod instance;
 #[cfg(feature = "service-network")]
 pub mod network;
 mod processor;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
 pub mod validation;
-
-use std::any::Any;
-
-use crate::error::InternalError;
 
 pub use factory::ServiceFactory;
 #[cfg(feature = "service-id")]
@@ -117,57 +114,4 @@ impl Clone for Box<dyn ServiceNetworkSender> {
     fn clone(&self) -> Self {
         self.clone_box()
     }
-}
-
-/// A Service provides message handling for a given service type.
-pub trait Service: Send {
-    /// This service's ID
-    ///
-    /// This ID must be unique within the context of a circuit, but not necessarily unique within
-    /// the context of a splinter node, as a whole.
-    fn service_id(&self) -> &str;
-
-    /// This service's type
-    ///
-    /// A service type broadly identifies the kinds of messages that this service handles or emits.
-    fn service_type(&self) -> &str;
-
-    /// Starts the service
-    ///
-    /// At start time, the service should register itself with the network when its ready to
-    /// receive messages.
-    fn start(
-        &mut self,
-        service_registry: &dyn ServiceNetworkRegistry,
-    ) -> Result<(), ServiceStartError>;
-
-    /// Stops Starts the service
-    ///
-    /// The service should unregister itself with the network.
-    fn stop(
-        &mut self,
-        service_registry: &dyn ServiceNetworkRegistry,
-    ) -> Result<(), ServiceStopError>;
-
-    /// Clean-up any resources before the service is removed.
-    /// Consumes the service (which, given the use of dyn traits,
-    /// this must take a boxed Service instance).
-    fn destroy(self: Box<Self>) -> Result<(), ServiceDestroyError>;
-
-    /// Purge any persistent state maintained by this service.
-    fn purge(&mut self) -> Result<(), InternalError>;
-
-    /// Handle any incoming message intended for this service instance.
-    ///
-    /// Messages recevied by this service are provided in raw bytes.  The format of the service
-    fn handle_message(
-        &self,
-        message_bytes: &[u8],
-        message_context: &ServiceMessageContext,
-    ) -> Result<(), ServiceError>;
-
-    /// Cast the service as `&dyn Any`.
-    ///
-    /// This allows for downcasting the `Service` to a specific implementation.
-    fn as_any(&self) -> &dyn Any;
 }
