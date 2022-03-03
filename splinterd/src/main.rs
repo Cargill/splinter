@@ -723,6 +723,9 @@ fn start_daemon(matches: ArgMatches, log_handle: Handle) -> Result<(), UserError
     {
         daemon_builder =
             daemon_builder.with_service_timer_interval(config.service_timer_interval());
+
+        daemon_builder =
+            daemon_builder.with_lifecycle_executor_interval(config.lifecycle_executor_interval());
     }
 
     let mut node = daemon_builder.build().map_err(|err| {

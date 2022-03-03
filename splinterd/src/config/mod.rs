@@ -111,6 +111,8 @@ pub struct Config {
     scabbard_state: (ScabbardState, ConfigSource),
     #[cfg(feature = "service2")]
     service_timer_interval: (Duration, ConfigSource),
+    #[cfg(feature = "service2")]
+    lifecycle_executor_interval: (Duration, ConfigSource),
 }
 
 impl Config {
@@ -349,6 +351,11 @@ impl Config {
     #[cfg(feature = "service2")]
     pub fn service_timer_interval(&self) -> Duration {
         self.service_timer_interval.0
+    }
+
+    #[cfg(feature = "service2")]
+    pub fn lifecycle_executor_interval(&self) -> Duration {
+        self.lifecycle_executor_interval.0
     }
 
     pub fn config_dir_source(&self) -> &ConfigSource {
@@ -634,6 +641,11 @@ impl Config {
         &self.service_timer_interval.1
     }
 
+    #[cfg(feature = "service2")]
+    pub fn lifecycle_executor_interval_source(&self) -> &ConfigSource {
+        &self.lifecycle_executor_interval.1
+    }
+
     #[allow(clippy::cognitive_complexity)]
     /// Displays the configuration value along with where the value was sourced from.
     pub fn log_as_debug(&self) {
@@ -906,7 +918,13 @@ impl Config {
             debug!(
                 "Config: service_timer_interval: {:?}, (source: {:?})",
                 self.service_timer_interval(),
-                self.service_timer_interval_source(),
+                self.service_timer_interval_source()
+            );
+
+            debug!(
+                "Config: lifecycle_executor_interval: {:?}, (source: {:?})",
+                self.lifecycle_executor_interval(),
+                self.lifecycle_executor_interval_source()
             );
         }
     }

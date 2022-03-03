@@ -59,6 +59,9 @@ const ALLOW_KEYS_FILE: &str = "allow_keys";
 #[cfg(feature = "service2")]
 const SERVICE_TIMER_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
+#[cfg(feature = "service2")]
+const LIFECYCLE_EXECUTOR_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
+
 pub struct DefaultPartialConfigBuilder;
 
 impl DefaultPartialConfigBuilder {
@@ -203,6 +206,9 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         {
             partial_config =
                 partial_config.with_service_timer_interval(Some(SERVICE_TIMER_INTERVAL));
+
+            partial_config =
+                partial_config.with_lifecycle_executor_interval(Some(LIFECYCLE_EXECUTOR_INTERVAL));
         }
 
         Ok(partial_config)

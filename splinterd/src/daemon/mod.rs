@@ -156,6 +156,8 @@ pub struct SplinterDaemon {
     enable_lmdb_state: bool,
     #[cfg(feature = "service2")]
     service_timer_interval: Duration,
+    #[cfg(feature = "service2")]
+    lifecycle_executor_interval: Duration,
 }
 
 impl SplinterDaemon {

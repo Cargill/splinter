@@ -68,6 +68,8 @@ pub struct SplinterDaemonBuilder {
     enable_lmdb_state: bool,
     #[cfg(feature = "service2")]
     service_timer_interval: Option<Duration>,
+    #[cfg(feature = "service2")]
+    lifecycle_executor_interval: Option<Duration>,
 }
 
 impl SplinterDaemonBuilder {
@@ -252,6 +254,15 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "service2")]
+    pub fn with_lifecycle_executor_interval(
+        mut self,
+        lifecycle_executor_interval: Duration,
+    ) -> Self {
+        self.lifecycle_executor_interval = Some(lifecycle_executor_interval);
+        self
+    }
+
     pub fn build(self) -> Result<SplinterDaemon, CreateError> {
         let heartbeat = self.heartbeat.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
@@ -361,6 +372,13 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: service_timer_interval".to_string())
         })?;
 
+        #[cfg(feature = "service2")]
+        let lifecycle_executor_interval = self.lifecycle_executor_interval.ok_or_else(|| {
+            CreateError::MissingRequiredField(
+                "Missing field: lifecycle_executor_interval".to_string(),
+            )
+        })?;
+
         Ok(SplinterDaemon {
             #[cfg(feature = "authorization-handler-allow-keys")]
             config_dir,
@@ -406,6 +424,8 @@ impl SplinterDaemonBuilder {
             enable_lmdb_state: self.enable_lmdb_state,
             #[cfg(feature = "service2")]
             service_timer_interval,
+            #[cfg(feature = "service2")]
+            lifecycle_executor_interval,
         })
     }
 }

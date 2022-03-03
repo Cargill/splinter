@@ -437,6 +437,14 @@ impl ConfigBuilder {
                 .iter()
                 .find_map(|p| p.service_timer_interval().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("service_timer_interval".to_string()))?,
+            #[cfg(feature = "service2")]
+            lifecycle_executor_interval: self
+                .partial_configs
+                .iter()
+                .find_map(|p| p.lifecycle_executor_interval().map(|v| (v, p.source())))
+                .ok_or_else(|| {
+                    ConfigError::MissingValue("lifecycle_executor_interval".to_string())
+                })?,
         })
     }
 }
