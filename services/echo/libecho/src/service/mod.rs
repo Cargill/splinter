@@ -21,7 +21,7 @@ mod status;
 mod timer_filter;
 mod timer_handler;
 
-pub use arguments::EchoArguments;
+pub use arguments::{EchoArguments, EchoArgumentsBuilder};
 pub use lifecycle::EchoLifecycle;
 pub use message::EchoMessage;
 pub use message_handler::EchoMessageHandler;
