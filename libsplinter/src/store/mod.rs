@@ -64,4 +64,7 @@ pub trait StoreFactory {
 
     #[cfg(feature = "node-id-store")]
     fn get_node_id_store(&self) -> Box<dyn crate::node_id::store::NodeIdStore>;
+
+    #[cfg(feature = "service-lifecycle-store")]
+    fn get_lifecycle_store(&self) -> Box<dyn crate::runtime::service::LifecycleStore + Send>;
 }

@@ -190,6 +190,15 @@ impl StoreFactory for SqliteStoreFactory {
             ),
         )
     }
+
+    #[cfg(feature = "service-lifecycle-store")]
+    fn get_lifecycle_store(&self) -> Box<dyn crate::runtime::service::LifecycleStore + Send> {
+        Box::new(
+            crate::runtime::service::DieselLifecycleStore::new_with_write_exclusivity(
+                self.pool.clone(),
+            ),
+        )
+    }
 }
 
 #[derive(Default, Debug)]

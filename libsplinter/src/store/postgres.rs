@@ -138,4 +138,11 @@ impl StoreFactory for PgStoreFactory {
             self.pool.clone(),
         ))
     }
+
+    #[cfg(feature = "service-lifecycle-store")]
+    fn get_lifecycle_store(&self) -> Box<dyn crate::runtime::service::LifecycleStore + Send> {
+        Box::new(crate::runtime::service::DieselLifecycleStore::new(
+            self.pool.clone(),
+        ))
+    }
 }
