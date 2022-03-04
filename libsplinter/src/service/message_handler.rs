@@ -78,3 +78,17 @@ where
             .handle_message(&left_sender, to_service, from_service, left_message)
     }
 }
+
+impl<T> MessageHandler for Box<dyn MessageHandler<Message = T>> {
+    type Message = T;
+
+    fn handle_message(
+        &mut self,
+        sender: &dyn MessageSender<Self::Message>,
+        to_service: FullyQualifiedServiceId,
+        from_service: FullyQualifiedServiceId,
+        message: Self::Message,
+    ) -> Result<(), InternalError> {
+        (&mut **self).handle_message(sender, to_service, from_service, message)
+    }
+}
