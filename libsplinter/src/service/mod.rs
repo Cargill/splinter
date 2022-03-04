@@ -36,27 +36,19 @@
 //!  node capabilities, such as the Splinter daemon.
 
 pub mod error;
-mod factory;
 #[cfg(feature = "service-id")]
 mod id;
 pub mod instance;
 #[cfg(feature = "service-network")]
 pub mod network;
-mod processor;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
 pub mod validation;
 
-pub use factory::ServiceFactory;
 #[cfg(feature = "service-id")]
 pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};
-pub use processor::registry::StandardServiceNetworkRegistry;
-pub use processor::JoinHandles;
-pub use processor::ServiceProcessor;
-pub use processor::ServiceProcessorBuilder;
-pub use processor::ServiceProcessorShutdownHandle;
 
 pub use error::{
     FactoryCreateError, ServiceConnectionError, ServiceDestroyError, ServiceDisconnectionError,
-    ServiceError, ServiceProcessorError, ServiceSendError, ServiceStartError, ServiceStopError,
+    ServiceError, ServiceSendError, ServiceStartError, ServiceStopError,
 };

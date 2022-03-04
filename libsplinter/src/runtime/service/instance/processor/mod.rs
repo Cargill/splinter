@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod builder;
+mod error;
 pub(crate) mod registry;
 mod sender;
 
@@ -35,7 +36,6 @@ use crate::protos::circuit::{
     ServiceConnectResponse, ServiceDisconnectResponse,
 };
 use crate::protos::prelude::*;
-use crate::service::error::ServiceProcessorError;
 use crate::service::instance::{ServiceInstance, ServiceMessageContext};
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;
@@ -45,6 +45,7 @@ use self::registry::StandardServiceNetworkRegistry;
 use self::sender::{ProcessorMessage, ServiceMessage};
 
 pub use builder::ServiceProcessorBuilder;
+pub use error::ServiceProcessorError;
 
 // Recv timeout in secs
 const TIMEOUT_SEC: u64 = 2;

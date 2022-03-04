@@ -83,7 +83,7 @@ use splinter::rest_api::auth::authorization::Permission;
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
-use splinter::service;
+use splinter::runtime::service::instance::{ServiceProcessor, ServiceProcessorShutdownHandle};
 use splinter::service::validation::ServiceArgValidator;
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
@@ -935,8 +935,8 @@ impl SplinterDaemon {
     fn start_admin_service(
         connection: Box<dyn Connection>,
         admin_service: AdminService,
-    ) -> Result<service::ServiceProcessorShutdownHandle, StartError> {
-        let mut admin_service_processor = service::ServiceProcessor::new(
+    ) -> Result<ServiceProcessorShutdownHandle, StartError> {
+        let mut admin_service_processor = ServiceProcessor::new(
             connection,
             "admin".into(),
             ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY,

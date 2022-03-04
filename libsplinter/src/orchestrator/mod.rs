@@ -39,9 +39,10 @@ use crate::protos::circuit::{
     ServiceConnectResponse, ServiceDisconnectResponse,
 };
 use crate::protos::prelude::*;
+use crate::runtime::service::instance::StandardServiceNetworkRegistry;
 use crate::service::{
-    instance::{ServiceInstance, ServiceMessageContext},
-    FactoryCreateError, ServiceFactory, StandardServiceNetworkRegistry,
+    instance::{ServiceFactory, ServiceInstance, ServiceMessageContext},
+    FactoryCreateError,
 };
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;

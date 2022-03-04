@@ -28,7 +28,7 @@ use splinter::peer::PeerManagerConnector;
 use splinter::public_key::PublicKey;
 use splinter::registry::{LocalYamlRegistry, RegistryReader, UnifiedRegistry};
 use splinter::rest_api::actix_web_1::RestResourceProvider as _;
-use splinter::service::ServiceProcessorBuilder;
+use splinter::runtime::service::instance::ServiceProcessorBuilder;
 use splinter::store::StoreFactory;
 use splinter::transport::{inproc::InprocTransport, Transport};
 
