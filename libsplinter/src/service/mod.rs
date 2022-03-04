@@ -37,6 +37,8 @@
 
 pub mod error;
 mod factory;
+#[cfg(feature = "service-id")]
+mod id;
 #[cfg(feature = "service-network")]
 pub mod network;
 mod processor;
@@ -49,6 +51,8 @@ use std::any::Any;
 use crate::error::InternalError;
 
 pub use factory::ServiceFactory;
+#[cfg(feature = "service-id")]
+pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};
 pub use processor::registry::StandardServiceNetworkRegistry;
 pub use processor::JoinHandles;
 pub use processor::ServiceProcessor;
