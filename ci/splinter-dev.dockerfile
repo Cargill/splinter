@@ -65,6 +65,9 @@ RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
 WORKDIR /build
 RUN USER=root cargo new --bin cli \
  && USER=root cargo new --lib libsplinter \
+ && USER=root cargo new --lib rest_api/actix_web_1 \
+ && USER=root cargo new --lib rest_api/actix_web_4 \
+ && USER=root cargo new --lib rest_api/common \
  && USER=root cargo new --bin splinterd \
  && cp libsplinter/src/lib.rs splinterd/src/lib.rs \
 # Create empty Cargo projects for gameroom
@@ -81,6 +84,9 @@ COPY cli/Cargo.toml /build/cli/Cargo.toml
 COPY libsplinter/build.rs /build/libsplinter/build.rs
 COPY libsplinter/Cargo.toml /build/libsplinter/Cargo.toml
 COPY libsplinter/protos /build/libsplinter/protos
+COPY rest_api/actix_web_1/Cargo.toml /build/rest_api/actix_web_1/Cargo.toml
+COPY rest_api/actix_web_4/Cargo.toml /build/rest_api/actix_web_4/Cargo.toml
+COPY rest_api/common/Cargo.toml /build/rest_api/common/Cargo.toml
 COPY splinterd/Cargo.toml /build/splinterd/Cargo.toml
 COPY services/scabbard/cli/Cargo.toml /build/services/scabbard/cli/Cargo.toml
 COPY services/scabbard/libscabbard/build.rs /build/services/scabbard/libscabbard/build.rs
