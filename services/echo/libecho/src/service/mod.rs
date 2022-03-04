@@ -22,6 +22,7 @@ mod request;
 mod status;
 mod timer_filter;
 mod timer_handler;
+mod timer_handler_factory;
 
 pub use arguments::{EchoArguments, EchoArgumentsBuilder};
 pub use arguments_converter::EchoArgumentsVecConverter;
@@ -33,3 +34,4 @@ pub use request::{EchoRequest, RequestStatus};
 pub use status::EchoServiceStatus;
 pub use timer_filter::EchoTimerFilter;
 pub use timer_handler::EchoTimerHandler;
+pub use timer_handler_factory::{EchoTimerHandlerFactory, EchoTimerHandlerFactoryBuilder};
