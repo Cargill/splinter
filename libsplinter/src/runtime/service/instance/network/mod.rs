@@ -193,7 +193,7 @@ impl ServiceConnectionManager {
     /// # use splinter::mesh::Mesh;
     /// # use splinter::network::auth::AuthorizationManager;
     /// # use splinter::network::connection_manager::{Authorizer, ConnectionManager};
-    /// # use splinter::service::network::ServiceConnectionManager;
+    /// # use splinter::runtime::service::instance::network::ServiceConnectionManager;
     /// # use splinter::transport::inproc::InprocTransport;
     /// # let transport = InprocTransport::default();
     /// # let mesh = Mesh::new(1, 1);

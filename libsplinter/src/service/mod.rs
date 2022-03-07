@@ -39,8 +39,6 @@ pub mod error;
 #[cfg(feature = "service-id")]
 mod id;
 pub mod instance;
-#[cfg(feature = "service-network")]
-pub mod network;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
 pub mod validation;

@@ -16,7 +16,7 @@
 
 use crate::circuit::routing::{RoutingTableReader, RoutingTableWriter, Service, ServiceId};
 use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
-use crate::service::network::handlers::{
+use crate::runtime::service::instance::network::handlers::{
     ServiceAddInstanceError, ServiceInstances, ServiceRemoveInstanceError,
 };
 
