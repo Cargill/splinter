@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM splintercommunity/splinter-dev:v9
+FROM splintercommunity/splinter-dev:v10
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -24,6 +24,9 @@ COPY README.md /build/README.md
 COPY libsplinter /build/libsplinter
 COPY splinterd /build/splinterd
 COPY cli /build/cli
+COPY rest_api/actix_web_1/Cargo.toml /build/rest_api/actix_web_1/Cargo.toml
+COPY rest_api/actix_web_4/Cargo.toml /build/rest_api/actix_web_4/Cargo.toml
+COPY rest_api/common/Cargo.toml /build/rest_api/common/Cargo.toml
 COPY services/scabbard/cli /build/services/scabbard/cli
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
 COPY examples/gameroom/database /build/examples/gameroom/database

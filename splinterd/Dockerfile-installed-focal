@@ -14,7 +14,7 @@
 
 # -------------=== splinterd docker build ===-------------
 
-FROM splintercommunity/splinter-dev:v9 as BUILDER
+FROM splintercommunity/splinter-dev:v10 as BUILDER
 
 ENV SPLINTER_FORCE_PANDOC=true
 
@@ -25,6 +25,9 @@ COPY cli/Cargo.toml /build/cli/Cargo.toml
 COPY libsplinter/build.rs /build/libsplinter/build.rs
 COPY libsplinter/Cargo.toml /build/libsplinter/Cargo.toml
 COPY libsplinter/protos /build/libsplinter/protos
+COPY rest_api/actix_web_1/Cargo.toml /build/rest_api/actix_web_1/Cargo.toml
+COPY rest_api/actix_web_4/Cargo.toml /build/rest_api/actix_web_4/Cargo.toml
+COPY rest_api/common/Cargo.toml /build/rest_api/common/Cargo.toml
 COPY splinterd/Cargo.toml /build/splinterd/Cargo.toml
 COPY services/scabbard/cli/Cargo.toml /build/services/scabbard/cli/Cargo.toml
 COPY services/scabbard/libscabbard/build.rs /build/services/scabbard/libscabbard/build.rs
