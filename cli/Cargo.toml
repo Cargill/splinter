@@ -60,6 +60,11 @@ path = "../services/scabbard/libscabbard"
 default-features = false
 optional = true
 
+[dependencies.splinter-echo]
+path = "../services/echo/libecho"
+features = ["experimental"]
+optional = true
+
 [dev-dependencies]
 gag = "1"
 serial_test = "0.5"
@@ -85,6 +90,7 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization-handler-maintenance",
+    "echo",
     "https-certs",
     "registry",
 ]
@@ -93,6 +99,7 @@ authorization-handler-maintenance = []
 authorization-handler-rbac = []
 circuit-template = ["splinter/circuit-template"]
 database = ["diesel"]
+echo = ["splinter-echo"]
 https-certs = []
 postgres = [
     "diesel/postgres",

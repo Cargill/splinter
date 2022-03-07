@@ -96,6 +96,17 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
         ))
     })?;
 
+    #[cfg(feature = "echo")]
+    splinter_echo::migrations::run_sqlite_migrations(&*pool.get().map_err(|_| {
+        CliError::ActionError("Failed to get connection for migrations".to_string())
+    })?)
+    .map_err(|err| {
+        CliError::ActionError(format!(
+            "Unable to run Postgres migrations for echo: {}",
+            err
+        ))
+    })?;
+
     Ok(())
 }
 
