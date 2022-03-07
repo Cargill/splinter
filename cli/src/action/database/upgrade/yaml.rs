@@ -192,7 +192,7 @@ mod action_tests {
     use std::io::Write;
     use std::path::Path;
 
-    use tempdir::TempDir;
+    use tempfile::{Builder, TempDir};
 
     use diesel::r2d2::{ConnectionManager, Pool};
     use diesel::sqlite::SqliteConnection;
@@ -330,7 +330,10 @@ proposals:
     #[test]
     fn test_import_command_files_do_not_exist_aborts() {
         // Create only the temporary directory, but no state files
-        let temp_dir = TempDir::new("test_no_files").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_no_files")
+            .tempdir()
+            .expect("Failed to create temp dir");
 
         let pool = create_connection_pool_and_migrate();
         let db_store = DieselAdminServiceStore::new(pool);
@@ -358,7 +361,10 @@ proposals:
     }
 
     fn create_temp_files_from_data(circuits: &[u8], proposals: &[u8]) -> TempData {
-        let temp_dir = TempDir::new("test_read_existing_files").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_read_existing_files")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let circuits_path = temp_dir
             .path()
             .join(CIRCUITS_FILE)

@@ -96,7 +96,7 @@ mod tests {
 
     use splinter::error::InternalError;
     use splinter::node_id::store::{error::NodeIdStoreError, NodeIdStore};
-    use tempdir::TempDir;
+    use tempfile::Builder;
 
     use super::*;
 
@@ -201,7 +201,10 @@ mod tests {
     #[test]
     // Test reading from the node_id file works as intended.
     fn test_migrate_to_db_with_file() {
-        let directory = TempDir::new("test").expect("could not create temp directory");
+        let directory = Builder::new()
+            .prefix("test")
+            .tempdir()
+            .expect("could not create temp directory");
         let path = directory.path();
         let mut file = File::create(path.join("node_id")).expect("could not open node_id file");
         write!(file, "{}", NODE_ID).expect("could not write to node_id file");
@@ -220,7 +223,10 @@ mod tests {
     #[test]
     // Test reading from an empty node_id file fails how we expect it to.
     fn test_migrate_from_empty_file() {
-        let directory = TempDir::new("test").expect("could not create temp directory");
+        let directory = Builder::new()
+            .prefix("test")
+            .tempdir()
+            .expect("could not create temp directory");
         let path = directory.path();
         File::create(path.join("node_id")).expect("could not open node_id file");
         let empty_store = MockNodeIdStore::new(None);
@@ -238,7 +244,10 @@ mod tests {
     // Test migrating to a store with values doesn't overwrite its contained value or move the
     // node_id file.
     fn test_migrate_to_store_with_value() {
-        let directory = TempDir::new("test").expect("could not create temp directory");
+        let directory = Builder::new()
+            .prefix("test")
+            .tempdir()
+            .expect("could not create temp directory");
         let path = directory.path();
         let mut file = File::create(path.join("node_id")).expect("could not open node_id file");
         write!(file, "{}", NODE_ID).expect("could not write to node_id file");

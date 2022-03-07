@@ -352,7 +352,7 @@ pub(crate) mod tests {
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
-    use tempdir::TempDir;
+    use tempfile::Builder;
 
     fn write_file(mut temp_dir: PathBuf, file_name: &str, bytes: &[u8]) -> String {
         temp_dir.push(file_name);
@@ -368,7 +368,10 @@ pub(crate) mod tests {
         let (ca_key, ca_cert) = make_ca_cert();
 
         // create temp directory to store ca.cert
-        let temp_dir = TempDir::new("tls-transport-test").unwrap();
+        let temp_dir = Builder::new()
+            .prefix("tls-transport-test")
+            .tempdir()
+            .unwrap();
         let temp_dir_path = temp_dir.path();
         let ca_path_file = {
             if insecure {

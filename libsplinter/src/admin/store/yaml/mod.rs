@@ -1853,7 +1853,7 @@ impl From<YamlCircuitStatus> for CircuitStatus {
 mod tests {
     use std::io::Read;
 
-    use tempdir::TempDir;
+    use tempfile::Builder;
 
     use super::*;
 
@@ -1954,7 +1954,10 @@ proposals:
     // 3. Validate that the circuit and proposals YAMLfiles were created in the temp dir.
     #[test]
     fn test_write_new_files() {
-        let temp_dir = TempDir::new("test_write_new_files").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_write_new_files")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let circuit_path = temp_dir
             .path()
             .join("circuits.yaml")
@@ -1991,7 +1994,10 @@ proposals:
     #[test]
     fn test_read_existing_files() {
         // create temp dir
-        let temp_dir = TempDir::new("test_read_existing_files").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_read_existing_files")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let circuit_path = temp_dir
             .path()
             .join("circuits.yaml")
@@ -2039,7 +2045,10 @@ proposals:
     #[test]
     fn test_proposals() {
         // create temp dir
-        let temp_dir = TempDir::new("test_proposals").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_proposals")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let circuit_path = temp_dir
             .path()
             .join("circuits.yaml")
@@ -2155,7 +2164,10 @@ proposals:
     #[test]
     fn test_circuit() {
         // create temp dir
-        let temp_dir = TempDir::new("test_circuit").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_circuit")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let circuit_path = temp_dir
             .path()
             .join("circuits.yaml")
@@ -2321,7 +2333,10 @@ proposals:
     #[test]
     fn test_node() {
         // create temp dir
-        let temp_dir = TempDir::new("test_node").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_node")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let circuit_path = temp_dir
             .path()
             .join("circuits.yaml")
@@ -2383,7 +2398,10 @@ proposals:
     #[test]
     fn test_service() {
         // create temp dir
-        let temp_dir = TempDir::new("test_service").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_service")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let circuit_path = temp_dir
             .path()
             .join("circuits.yaml")
@@ -2474,8 +2492,10 @@ proposals:
     #[test]
     fn test_upgrading_proposals_to_circuit() {
         // create temp dir
-        let temp_dir =
-            TempDir::new("est_upgrading_proposals_to_circuit").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("est_upgrading_proposals_to_circuit")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let circuit_path = temp_dir
             .path()
             .join("circuits.yaml")

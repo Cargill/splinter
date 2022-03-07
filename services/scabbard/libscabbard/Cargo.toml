@@ -47,7 +47,6 @@ default-features = false
 features = ["lmdb", "transaction-receipt-store"]
 
 [dev-dependencies]
-tempdir = "0.3"
 transact = { version = "0.5", features = ["family-command", "family-command-transaction-builder", "state-merkle-sql"] }
 
 [build-dependencies]

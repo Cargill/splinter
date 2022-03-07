@@ -349,13 +349,15 @@ mod test {
 
     use std::fs::{remove_file, File};
 
-    use tempdir::TempDir;
+    use tempfile::Builder;
 
     ///
     /// Verifies that reading from an empty YAML file still successfully returns an empty result
     #[test]
     fn test_read_empty_yaml_file() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = TempDir::new("test_read_yaml_duplicate_identity_error")?;
+        let temp_dir = Builder::new()
+            .prefix("test_read_yaml_duplicate_identity_error")
+            .tempdir()?;
 
         let path = temp_dir
             .path()
@@ -378,7 +380,9 @@ mod test {
     ///
     #[test]
     fn test_read_yaml_duplicate_identity_error() {
-        let temp_dir = TempDir::new("test_read_yaml_duplicate_identity_error")
+        let temp_dir = Builder::new()
+            .prefix("test_read_yaml_duplicate_identity_error")
+            .tempdir()
             .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -410,7 +414,9 @@ mod test {
     ///
     #[test]
     fn test_read_yaml_duplicate_endpoint_error() {
-        let temp_dir = TempDir::new("test_read_yaml_duplicate_endpoint_error")
+        let temp_dir = Builder::new()
+            .prefix("test_read_yaml_duplicate_endpoint_error")
+            .tempdir()
             .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -442,8 +448,10 @@ mod test {
     ///
     #[test]
     fn test_read_yaml_empty_identity_error() {
-        let temp_dir =
-            TempDir::new("test_read_yaml_empty_identity_error").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_read_yaml_empty_identity_error")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -473,8 +481,10 @@ mod test {
     ///
     #[test]
     fn test_read_yaml_empty_endpoint_error() {
-        let temp_dir =
-            TempDir::new("test_read_yaml_empty_endpoint_error").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_read_yaml_empty_endpoint_error")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -504,7 +514,9 @@ mod test {
     ///
     #[test]
     fn test_read_yaml_empty_display_name_error() {
-        let temp_dir = TempDir::new("test_read_yaml_empty_display_name_error")
+        let temp_dir = Builder::new()
+            .prefix("test_read_yaml_empty_display_name_error")
+            .tempdir()
             .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -535,8 +547,10 @@ mod test {
     ///
     #[test]
     fn test_read_yaml_empty_key_error() {
-        let temp_dir =
-            TempDir::new("test_read_yaml_empty_key_error").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_read_yaml_empty_key_error")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -566,7 +580,9 @@ mod test {
     ///
     #[test]
     fn test_read_yaml_missing_endpoints_error() {
-        let temp_dir = TempDir::new("test_read_yaml_missing_endpoints_error")
+        let temp_dir = Builder::new()
+            .prefix("test_read_yaml_missing_endpoints_error")
+            .tempdir()
             .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -597,8 +613,10 @@ mod test {
     ///
     #[test]
     fn test_read_yaml_missing_keys_error() {
-        let temp_dir =
-            TempDir::new("test_read_yaml_missing_keys_error").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_read_yaml_missing_keys_error")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -627,7 +645,10 @@ mod test {
     ///
     #[test]
     fn test_get_node_ok() {
-        let temp_dir = TempDir::new("test_get_node_ok").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_get_node_ok")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -651,7 +672,10 @@ mod test {
     ///
     #[test]
     fn test_get_node_not_found() {
-        let temp_dir = TempDir::new("test_get_node_not_found").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_get_node_not_found")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -675,7 +699,10 @@ mod test {
     ///
     #[test]
     fn test_has_node() {
-        let temp_dir = TempDir::new("test_has_node").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_has_node")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -700,7 +727,10 @@ mod test {
     ///
     #[test]
     fn test_list_nodes_ok() {
-        let temp_dir = TempDir::new("test_list_nodes_ok").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_list_nodes_ok")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -727,7 +757,10 @@ mod test {
     ///
     #[test]
     fn test_list_nodes_empty_ok() {
-        let temp_dir = TempDir::new("test_list_nodes_empty_ok").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_list_nodes_empty_ok")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -751,8 +784,10 @@ mod test {
     ///
     #[test]
     fn test_list_nodes_filter_metadata_ok() {
-        let temp_dir =
-            TempDir::new("test_list_nodes_filter_metadata_ok").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_list_nodes_filter_metadata_ok")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -783,8 +818,10 @@ mod test {
     ///
     #[test]
     fn test_list_nodes_filter_multiple_ok() {
-        let temp_dir =
-            TempDir::new("test_list_nodes_filter_multiple_ok").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_list_nodes_filter_multiple_ok")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -821,8 +858,10 @@ mod test {
     ///
     #[test]
     fn test_list_nodes_filter_empty_ok() {
-        let temp_dir =
-            TempDir::new("test_list_nodes_filter_empty_ok").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_list_nodes_filter_empty_ok")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -853,7 +892,9 @@ mod test {
     ///
     #[test]
     fn test_add_node_duplicate_endpoint_error() {
-        let temp_dir = TempDir::new("test_xv_node_duplicate_endpoint_error")
+        let temp_dir = Builder::new()
+            .prefix("test_xv_node_duplicate_endpoint_error")
+            .tempdir()
             .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -888,8 +929,10 @@ mod test {
     ///
     #[test]
     fn test_add_node_empty_identity_error() {
-        let temp_dir =
-            TempDir::new("test_add_node_empty_identity_error").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_add_node_empty_identity_error")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -921,8 +964,10 @@ mod test {
     ///
     #[test]
     fn test_add_node_empty_endpoint_error() {
-        let temp_dir =
-            TempDir::new("test_add_node_empty_endpoint_error").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_add_node_empty_endpoint_error")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -954,7 +999,9 @@ mod test {
     ///
     #[test]
     fn test_add_node_empty_display_name_error() {
-        let temp_dir = TempDir::new("test_add_node_missing_endpoints_error")
+        let temp_dir = Builder::new()
+            .prefix("test_add_node_missing_endpoints_error")
+            .tempdir()
             .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -987,7 +1034,9 @@ mod test {
     ///
     #[test]
     fn test_add_node_empty_key_error() {
-        let temp_dir = TempDir::new("test_add_node_missing_endpoints_error")
+        let temp_dir = Builder::new()
+            .prefix("test_add_node_missing_endpoints_error")
+            .tempdir()
             .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -1020,7 +1069,9 @@ mod test {
     ///
     #[test]
     fn test_add_node_missing_endpoints_error() {
-        let temp_dir = TempDir::new("test_add_node_missing_endpoints_error")
+        let temp_dir = Builder::new()
+            .prefix("test_add_node_missing_endpoints_error")
+            .tempdir()
             .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -1053,7 +1104,9 @@ mod test {
     ///
     #[test]
     fn test_add_node_missing_keys_error() {
-        let temp_dir = TempDir::new("test_add_node_missing_endpoints_error")
+        let temp_dir = Builder::new()
+            .prefix("test_add_node_missing_endpoints_error")
+            .tempdir()
             .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -1085,7 +1138,10 @@ mod test {
     ///
     #[test]
     fn test_update_node_ok() {
-        let temp_dir = TempDir::new("test_update_node_ok").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_update_node_ok")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -1120,7 +1176,9 @@ mod test {
     ///
     #[test]
     fn test_update_node_duplicate_endpoint_error() {
-        let temp_dir = TempDir::new("test_xv_node_duplicate_endpoint_error")
+        let temp_dir = Builder::new()
+            .prefix("test_xv_node_duplicate_endpoint_error")
+            .tempdir()
             .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -1155,7 +1213,10 @@ mod test {
     ///
     #[test]
     fn test_delete_node_ok() {
-        let temp_dir = TempDir::new("test_delete_node_ok").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_delete_node_ok")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -1188,8 +1249,10 @@ mod test {
     ///
     #[test]
     fn test_delete_node_not_found() {
-        let temp_dir =
-            TempDir::new("test_delete_node_not_found").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_delete_node_not_found")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -1214,7 +1277,10 @@ mod test {
     ///
     #[test]
     fn test_create_file() {
-        let temp_dir = TempDir::new("test_create_file").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_create_file")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -1242,8 +1308,10 @@ mod test {
     ///
     #[test]
     fn test_reload_modified_file() {
-        let temp_dir =
-            TempDir::new("test_reload_modified_file").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_reload_modified_file")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -1278,7 +1346,10 @@ mod test {
     ///
     #[test]
     fn test_file_removed() {
-        let temp_dir = TempDir::new("test_file_removed").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("test_file_removed")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")

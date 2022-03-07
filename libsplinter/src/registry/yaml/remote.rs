@@ -437,7 +437,7 @@ mod tests {
 
     use actix_web::HttpResponse;
     use futures::future::IntoFuture;
-    use tempdir::TempDir;
+    use tempfile::{Builder, TempDir};
 
     use crate::rest_api::actix_web_1::{Method, Resource, RestApiBuilder, RestApiShutdownHandle};
     #[cfg(feature = "authorization")]
@@ -1220,7 +1220,10 @@ mod tests {
         /// `registry` to populate the remote file (if `Some`, otherwise the remote file won't be
         /// available).
         fn setup(test_name: &str, registry: Option<Vec<Node>>) -> Self {
-            let temp_dir = TempDir::new(test_name).expect("Failed to create temp dir");
+            let temp_dir = Builder::new()
+                .prefix(test_name)
+                .tempdir()
+                .expect("Failed to create temp dir");
             let temp_dir_path = temp_dir
                 .path()
                 .to_str()

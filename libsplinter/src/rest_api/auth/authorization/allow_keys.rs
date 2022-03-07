@@ -188,7 +188,7 @@ mod tests {
     use std::thread::sleep;
     use std::time::Duration;
 
-    use tempdir::TempDir;
+    use tempfile::Builder;
 
     const KEY1: &str = "012345";
     const KEY2: &str = "abcdef";
@@ -202,8 +202,10 @@ mod tests {
     ///    returned
     #[test]
     fn auth_handler_unexpected_identity() {
-        let temp_dir =
-            TempDir::new("auth_handler_unexpected_identity").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("auth_handler_unexpected_identity")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("allow_keys")
@@ -234,7 +236,10 @@ mod tests {
     ///    returned
     #[test]
     fn auth_handler_unknown_key() {
-        let temp_dir = TempDir::new("auth_handler_unknown_key").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("auth_handler_unknown_key")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("allow_keys")
@@ -260,7 +265,10 @@ mod tests {
     ///    returned
     #[test]
     fn auth_handler_allow() {
-        let temp_dir = TempDir::new("auth_handler_allow").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("auth_handler_allow")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("allow_keys")
@@ -294,7 +302,10 @@ mod tests {
     ///    returned
     #[test]
     fn reload_modified_file() {
-        let temp_dir = TempDir::new("reload_modified_file").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("reload_modified_file")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("allow_keys")
@@ -342,7 +353,10 @@ mod tests {
     ///    returned
     #[test]
     fn file_removed() {
-        let temp_dir = TempDir::new("file_removed").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("file_removed")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("allow_keys")
@@ -380,7 +394,10 @@ mod tests {
     /// 4. Call `has_permission` with the key in the file and verify that `Allow` is returned
     #[test]
     fn load_after_file_created() {
-        let temp_dir = TempDir::new("load_after_file_created").expect("Failed to create temp dir");
+        let temp_dir = Builder::new()
+            .prefix("load_after_file_created")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("allow_keys")
