@@ -494,7 +494,7 @@ impl fmt::Display for ProposalSlice {
         );
 
         for member in self.circuit.members.iter() {
-            display_string += &format!("\n    {} ({:?})\n", member.node_id, member.endpoints);
+            display_string += &format!("\n    {}\n", member.node_id);
             if member.node_id == self.requester_node_id {
                 display_string += &"        Vote: ACCEPT (implied as requester):\n".to_string();
                 display_string += &format!("            {}\n", self.requester);
@@ -507,6 +507,10 @@ impl fmt::Display for ProposalSlice {
                     }
                 }
                 display_string += &format!("{}\n", vote_string);
+            }
+            display_string += "        Endpoints:\n";
+            for endpoint in member.endpoints.iter() {
+                display_string += &format!("            {}\n", endpoint);
             }
             for service in self.circuit.roster.iter() {
                 if service.allowed_nodes.contains(&member.node_id) {
