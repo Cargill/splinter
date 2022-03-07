@@ -24,16 +24,29 @@ use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource
 
 use super::super::error::CircuitFetchError;
 use super::super::resources::circuits_circuit_id::CircuitResponse;
+#[cfg(feature = "circuit-display-endpoints")]
+use super::super::resources::circuits_circuit_id::CircuitResponseWithEndpoints;
 
 pub fn make_fetch_circuit_resource<T: CircuitStore + 'static>(store: T) -> Resource {
-    Resource::build("/admin/circuits/{circuit_id}")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let mut resource = Resource::build("/admin/circuits/{circuit_id}").add_request_guard(
+        ProtocolVersionRangeGuard::new(
             protocol::ADMIN_FETCH_CIRCUIT_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |r, _| {
+        ),
+    );
+    #[cfg(not(feature = "circuit-display-endpoints"))]
+    {
+        resource = resource.add_method(Method::Get, move |r, _| {
             fetch_circuit(r, web::Data::new(store.clone()))
-        })
+        });
+    }
+    #[cfg(feature = "circuit-display-endpoints")]
+    {
+        resource = resource.add_method(Method::Get, move |r, _| {
+            fetch_circuit_with_endpoints(r, web::Data::new(store.clone()))
+        });
+    }
+    resource
 }
 
 fn fetch_circuit<T: CircuitStore + 'static>(
@@ -53,6 +66,47 @@ fn fetch_circuit<T: CircuitStore + 'static>(
         })
         .then(|res| match res {
             Ok(circuit) => Ok(HttpResponse::Ok().json(CircuitResponse::from(&circuit))),
+            Err(err) => match err {
+                BlockingError::Error(err) => match err {
+                    CircuitFetchError::CircuitStoreError(err) => {
+                        error!("{}", err);
+                        Ok(HttpResponse::InternalServerError()
+                            .json(ErrorResponse::internal_error()))
+                    }
+                    CircuitFetchError::NotFound(err) => {
+                        Ok(HttpResponse::NotFound().json(ErrorResponse::not_found(&err)))
+                    }
+                },
+
+                _ => {
+                    error!("{}", err);
+                    Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
+                }
+            },
+        }),
+    )
+}
+
+#[cfg(feature = "circuit-display-endpoints")]
+fn fetch_circuit_with_endpoints<T: CircuitStore + 'static>(
+    request: HttpRequest,
+    store: web::Data<T>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    let circuit_id = request
+        .match_info()
+        .get("circuit_id")
+        .unwrap_or("")
+        .to_string();
+    Box::new(
+        web::block(move || {
+            store.circuit_with_endpoints(&circuit_id)?.ok_or_else(|| {
+                CircuitFetchError::NotFound(format!("Unable to find circuit: {}", circuit_id))
+            })
+        })
+        .then(|res| match res {
+            Ok((circuit, nodes)) => {
+                Ok(HttpResponse::Ok().json(CircuitResponseWithEndpoints::from((&circuit, nodes))))
+            }
             Err(err) => match err {
                 BlockingError::Error(err) => match err {
                     CircuitFetchError::CircuitStoreError(err) => {

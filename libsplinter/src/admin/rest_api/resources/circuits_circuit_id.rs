@@ -14,6 +14,8 @@
 
 use std::collections::BTreeMap;
 
+#[cfg(feature = "circuit-display-endpoints")]
+use crate::circuit::service::SplinterNode;
 use crate::circuit::{Circuit, Roster, ServiceDefinition};
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
@@ -31,6 +33,27 @@ impl<'a> From<&'a Circuit> for CircuitResponse<'a> {
             members: circuit.members().to_vec(),
             roster: circuit.roster().into(),
             management_type: circuit.circuit_management_type(),
+        }
+    }
+}
+
+#[cfg(feature = "circuit-display-endpoints")]
+#[derive(Debug, Serialize, Clone, PartialEq)]
+pub(crate) struct CircuitResponseWithEndpoints<'a> {
+    pub id: &'a str,
+    pub members: Vec<SplinterNode>,
+    pub roster: Vec<ServiceResponse<'a>>,
+    pub management_type: &'a str,
+}
+
+#[cfg(feature = "circuit-display-endpoints")]
+impl<'a> From<(&'a Circuit, Vec<SplinterNode>)> for CircuitResponseWithEndpoints<'a> {
+    fn from(circuit: (&'a Circuit, Vec<SplinterNode>)) -> Self {
+        Self {
+            id: circuit.0.id(),
+            members: circuit.1,
+            roster: circuit.0.roster().into(),
+            management_type: circuit.0.circuit_management_type(),
         }
     }
 }
