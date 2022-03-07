@@ -63,6 +63,7 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "circuit-display-endpoints",
     "circuit-template",
     "health",
     "postgres",
@@ -70,6 +71,7 @@ experimental = [
 ]
 
 circuit-auth-type = []
+circuit-display-endpoints = ["splinter/circuit-display-endpoints"]
 circuit-template = ["splinter/circuit-template"]
 database-migrate-biome = ["splinter/biome"]
 
