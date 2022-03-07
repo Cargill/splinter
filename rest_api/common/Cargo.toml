@@ -23,6 +23,7 @@ description = """\
 """
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
 
 [features]
 default = []
