@@ -77,6 +77,7 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "circuit-display-endpoints",
     "health",
     "service-arg-validation",
     "service-endpoint",
@@ -86,6 +87,7 @@ experimental = [
 biome = ["splinter/biome", "database"]
 biome-credentials = ["splinter/biome-credentials", "biome"]
 biome-key-management = ["splinter/biome-key-management", "biome"]
+circuit-display-endpoints = ["splinter/circuit-display-endpoints"]
 database = ["splinter/postgres"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [
