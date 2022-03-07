@@ -25,6 +25,11 @@ use crate::error::CliError;
 
 const PAGING_LIMIT: &str = "1000";
 
+#[cfg(not(feature = "circuit-display-endpoints"))]
+type ReturnCircuitSlice = CircuitSlice;
+#[cfg(feature = "circuit-display-endpoints")]
+type ReturnCircuitSlice = CircuitSliceWithEndpoints;
+
 impl<'a> SplinterRestClient<'a> {
     /// Submits an admin payload to this client's Splinter node.
     pub fn submit_admin_payload(&self, payload: Vec<u8>) -> Result<(), CliError> {
@@ -100,40 +105,49 @@ impl<'a> SplinterRestClient<'a> {
             })
     }
 
-    pub fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<CircuitSlice>, CliError> {
-        Client::new()
+    pub fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<ReturnCircuitSlice>, CliError> {
+        let res = Client::new()
             .get(&format!("{}/admin/circuits/{}", self.url, circuit_id))
             .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
             .send()
-            .map_err(|err| CliError::ActionError(format!("Failed to fetch circuit: {}", err)))
-            .and_then(|res| {
-                let status = res.status();
-                if status.is_success() {
-                    res.json::<CircuitSlice>().map(Some).map_err(|_| {
-                        CliError::ActionError(
-                            "Request was successful, but received an invalid response".into(),
-                        )
-                    })
-                } else if status == StatusCode::NOT_FOUND {
-                    Ok(None)
-                } else {
-                    let message = res
-                        .json::<ServerError>()
-                        .map_err(|_| {
-                            CliError::ActionError(format!(
-                                "Circuit fetch request failed with status code '{}', but error \
-                                 response was not valid",
-                                status
-                            ))
-                        })?
-                        .message;
+            .map_err(|err| CliError::ActionError(format!("Failed to fetch circuit: {}", err)))?;
 
-                    Err(CliError::ActionError(format!(
-                        "Failed to fetch circuit: {}",
-                        message
-                    )))
-                }
-            })
+        let status = res.status();
+        if status.is_success() {
+            let circuit: Circuits = res.json::<Circuits>().map_err(|_| {
+                CliError::ActionError(
+                    "Request was successful, but received an invalid response".into(),
+                )
+            })?;
+
+            #[cfg(not(feature = "circuit-display-endpoints"))]
+            {
+                return Ok(Some(CircuitSlice::from(circuit)));
+            }
+
+            #[cfg(feature = "circuit-display-endpoints")]
+            {
+                return Ok(Some(CircuitSliceWithEndpoints::from(circuit)));
+            }
+        } else if status == StatusCode::NOT_FOUND {
+            Ok(None)
+        } else {
+            let message = res
+                .json::<ServerError>()
+                .map_err(|_| {
+                    CliError::ActionError(format!(
+                        "Circuit fetch request failed with status code '{}', but error \
+                                 response was not valid",
+                        status
+                    ))
+                })?
+                .message;
+
+            Err(CliError::ActionError(format!(
+                "Failed to fetch circuit: {}",
+                message
+            )))
+        }
     }
 
     pub fn list_proposals(
@@ -271,6 +285,180 @@ impl fmt::Display for CircuitSlice {
 
         write!(f, "{}", display_string)
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Circuits {
+    CircuitSlice {
+        id: String,
+        members: Vec<String>,
+        roster: Vec<CircuitServiceSlice>,
+        management_type: String,
+    },
+    CircuitSliceWithEndpoints {
+        id: String,
+        members: Vec<CircuitNodes>,
+        roster: Vec<CircuitServiceSlice>,
+        management_type: String,
+    },
+}
+
+impl From<Circuits> for CircuitSlice {
+    fn from(circuit: Circuits) -> Self {
+        CircuitSlice::from(&circuit)
+    }
+}
+
+impl<'a> From<&'a Circuits> for CircuitSlice {
+    fn from(circuit: &'a Circuits) -> Self {
+        match circuit {
+            Circuits::CircuitSlice {
+                id,
+                members,
+                roster,
+                management_type,
+            } => CircuitSlice {
+                id: id.to_string(),
+                members: members.to_vec(),
+                roster: roster.to_vec(),
+                management_type: management_type.to_string(),
+            },
+            Circuits::CircuitSliceWithEndpoints {
+                id,
+                members,
+                roster,
+                management_type,
+            } => CircuitSlice {
+                id: id.to_string(),
+                members: members
+                    .into_iter()
+                    .map(|m| m.id.clone().to_string())
+                    .collect(),
+                roster: roster.to_vec(),
+                management_type: management_type.to_string(),
+            },
+        }
+    }
+}
+
+#[cfg(feature = "circuit-display-endpoints")]
+impl From<Circuits> for CircuitSliceWithEndpoints {
+    fn from(circuit: Circuits) -> Self {
+        CircuitSliceWithEndpoints::from(&circuit)
+    }
+}
+
+#[cfg(feature = "circuit-display-endpoints")]
+impl<'a> From<&'a Circuits> for CircuitSliceWithEndpoints {
+    fn from(circuit: &'a Circuits) -> Self {
+        match circuit {
+            Circuits::CircuitSlice {
+                id,
+                members,
+                roster,
+                management_type,
+            } => CircuitSliceWithEndpoints {
+                id: id.to_string(),
+                members: members
+                    .into_iter()
+                    .map(|m| CircuitNodes {
+                        id: m.to_string(),
+                        endpoints: vec![],
+                    })
+                    .collect(),
+                roster: roster.to_vec(),
+                management_type: management_type.to_string(),
+            },
+            Circuits::CircuitSliceWithEndpoints {
+                id,
+                members,
+                roster,
+                management_type,
+            } => CircuitSliceWithEndpoints {
+                id: id.to_string(),
+                members: members.to_vec(),
+                roster: roster.to_vec(),
+                management_type: management_type.to_string(),
+            },
+        }
+    }
+}
+
+impl fmt::Display for Circuits {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        #[cfg(not(feature = "circuit-display-endpoints"))]
+        {
+            write!(f, "{}", CircuitSlice::from(self))
+        }
+        #[cfg(feature = "circuit-display-endpoints")]
+        {
+            write!(f, "{}", CircuitSliceWithEndpoints::from(self))
+        }
+    }
+}
+
+#[cfg(feature = "circuit-display-endpoints")]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct CircuitSliceWithEndpoints {
+    pub id: String,
+    pub members: Vec<CircuitNodes>,
+    pub roster: Vec<CircuitServiceSlice>,
+    pub management_type: String,
+}
+
+#[cfg(feature = "circuit-display-endpoints")]
+impl fmt::Display for CircuitSliceWithEndpoints {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut display_string = format!(
+            "Circuit: {}\n    Management Type: {}\n",
+            self.id, self.management_type
+        );
+
+        for member in self.members.iter() {
+            display_string += &format!("\n    {}\n", member.id);
+            if !member.endpoints.is_empty() {
+                display_string += "        Endpoints:\n";
+                for endpoint in member.endpoints.iter() {
+                    display_string += &format!("            {}\n", endpoint);
+                }
+            }
+            for service in self.roster.iter() {
+                if service.allowed_nodes.contains(&member.id) {
+                    display_string += &format!(
+                        "        Service ({}): {}\n",
+                        service.service_type, service.service_id
+                    );
+
+                    for (key, value) in &service.arguments {
+                        display_string += &format!("          {}:\n", key);
+                        // break apart value if its a list
+                        if value.starts_with('[') && value.ends_with(']') {
+                            let values: JsonResult<Vec<String>> = serde_json::from_str(value);
+                            match values {
+                                Ok(values) => {
+                                    for i in values {
+                                        display_string += &format!("              {}\n", i);
+                                    }
+                                }
+                                Err(_) => display_string += &format!("              {}\n", value),
+                            };
+                        } else {
+                            display_string += &format!("              {}\n", value);
+                        }
+                    }
+                }
+            }
+        }
+
+        write!(f, "{}", display_string)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct CircuitNodes {
+    pub id: String,
+    pub endpoints: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
