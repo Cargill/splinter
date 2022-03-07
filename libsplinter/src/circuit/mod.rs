@@ -563,6 +563,30 @@ impl SplinterState {
         Ok(circuit_directory.circuit(circuit_name).map(Circuit::clone))
     }
 
+    #[cfg(feature = "circuit-display-endpoints")]
+    pub fn circuit_with_endpoints(
+        &self,
+        circuit_name: &str,
+    ) -> Result<Option<(Circuit, Vec<SplinterNode>)>, SplinterStateError> {
+        let circuit_directory = self
+            .circuit_directory
+            .read()
+            .map_err(|_| SplinterStateError::new("Failed to read circuit directory".into()))?;
+
+        match circuit_directory.circuit(circuit_name).map(Circuit::clone) {
+            Some(circuit) => {
+                let mut nodes = Vec::new();
+                for member in &circuit.members {
+                    circuit_directory
+                        .node(&member)
+                        .map(|node| nodes.push(node.clone()));
+                }
+                Ok(Some((circuit.clone(), nodes)))
+            }
+            None => Ok(None),
+        }
+    }
+
     pub fn has_circuit(&self, circuit_name: &str) -> Result<bool, SplinterStateError> {
         let circuit_directory = self
             .circuit_directory
@@ -601,6 +625,15 @@ impl CircuitStore for SplinterState {
 
     fn circuit(&self, circuit_name: &str) -> Result<Option<Circuit>, CircuitStoreError> {
         self.circuit(circuit_name)
+            .map_err(|err| CircuitStoreError::new(err.context()))
+    }
+
+    #[cfg(feature = "circuit-display-endpoints")]
+    fn circuit_with_endpoints(
+        &self,
+        circuit_name: &str,
+    ) -> Result<Option<(Circuit, Vec<SplinterNode>)>, CircuitStoreError> {
+        self.circuit_with_endpoints(circuit_name)
             .map_err(|err| CircuitStoreError::new(err.context()))
     }
 }

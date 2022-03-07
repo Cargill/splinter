@@ -15,6 +15,8 @@
 use std::convert::TryInto;
 
 use crate::circuit::Circuit;
+#[cfg(feature = "circuit-display-endpoints")]
+use crate::circuit::SplinterNode;
 
 /// A filter that matches on aspects of a circuit definition.
 ///
@@ -39,6 +41,12 @@ pub trait CircuitStore: Send + Sync + Clone {
     fn circuits(&self, filter: Option<CircuitFilter>) -> Result<CircuitIter, CircuitStoreError>;
 
     fn circuit(&self, circuit_name: &str) -> Result<Option<Circuit>, CircuitStoreError>;
+
+    #[cfg(feature = "circuit-display-endpoints")]
+    fn circuit_with_endpoints(
+        &self,
+        circuit_name: &str,
+    ) -> Result<Option<(Circuit, Vec<SplinterNode>)>, CircuitStoreError>;
 }
 
 /// An iterator over circuits, with a well-known count of values.
