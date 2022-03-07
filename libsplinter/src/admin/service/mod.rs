@@ -43,11 +43,9 @@ use crate::protos::admin::{
 };
 #[cfg(feature = "registry")]
 use crate::registry::RegistryReader;
-use crate::service::{
-    error::{ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError},
-    instance::{
-        ServiceArgValidator, ServiceInstance, ServiceMessageContext, ServiceNetworkRegistry,
-    },
+use crate::service::instance::{
+    ServiceArgValidator, ServiceDestroyError, ServiceError, ServiceInstance, ServiceMessageContext,
+    ServiceNetworkRegistry, ServiceStartError, ServiceStopError,
 };
 
 use self::consensus::AdminConsensusManager;
@@ -1016,9 +1014,9 @@ mod tests {
     use crate::orchestrator::ServiceOrchestratorBuilder;
     use crate::peer::PeerManager;
     use crate::protos::admin;
-    use crate::service::{
-        error,
-        instance::{ServiceNetworkRegistry, ServiceNetworkSender},
+    use crate::service::instance::{
+        ServiceConnectionError, ServiceDisconnectionError, ServiceNetworkRegistry,
+        ServiceNetworkSender, ServiceSendError,
     };
     use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Transport};
@@ -1288,13 +1286,13 @@ mod tests {
         fn connect(
             &self,
             _service_id: &str,
-        ) -> Result<Box<dyn ServiceNetworkSender>, error::ServiceConnectionError> {
+        ) -> Result<Box<dyn ServiceNetworkSender>, ServiceConnectionError> {
             Ok(Box::new(MockNetworkSender {
                 tx: self.tx.clone(),
             }))
         }
 
-        fn disconnect(&self, _service_id: &str) -> Result<(), error::ServiceDisconnectionError> {
+        fn disconnect(&self, _service_id: &str) -> Result<(), ServiceDisconnectionError> {
             Ok(())
         }
     }
@@ -1305,7 +1303,7 @@ mod tests {
     }
 
     impl ServiceNetworkSender for MockNetworkSender {
-        fn send(&self, recipient: &str, message: &[u8]) -> Result<(), error::ServiceSendError> {
+        fn send(&self, recipient: &str, message: &[u8]) -> Result<(), ServiceSendError> {
             self.tx
                 .send((recipient.to_string(), message.to_vec()))
                 .expect("Unable to send test message");
@@ -1317,7 +1315,7 @@ mod tests {
             &self,
             _recipient: &str,
             _message: &[u8],
-        ) -> Result<Vec<u8>, error::ServiceSendError> {
+        ) -> Result<Vec<u8>, ServiceSendError> {
             panic!("MockNetworkSender.send_and_await unexpectedly called")
         }
 
@@ -1325,7 +1323,7 @@ mod tests {
             &self,
             _message_origin: &ServiceMessageContext,
             _message: &[u8],
-        ) -> Result<(), error::ServiceSendError> {
+        ) -> Result<(), ServiceSendError> {
             panic!("MockNetworkSender.reply unexpectedly called")
         }
 
@@ -1338,7 +1336,7 @@ mod tests {
             recipient: &str,
             message: &[u8],
             _sender: &str,
-        ) -> Result<(), error::ServiceSendError> {
+        ) -> Result<(), ServiceSendError> {
             self.tx
                 .send((recipient.to_string(), message.to_vec()))
                 .expect("Unable to send test message");

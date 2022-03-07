@@ -655,10 +655,10 @@ pub mod tests {
         ServiceDisconnectResponse_Status,
     };
     use crate::protos::network::NetworkMessage;
-    use crate::service::error::{
-        ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError,
+    use crate::service::instance::{
+        ServiceDestroyError, ServiceError, ServiceNetworkRegistry, ServiceNetworkSender,
+        ServiceStartError, ServiceStopError,
     };
-    use crate::service::instance::{ServiceNetworkRegistry, ServiceNetworkSender};
     use crate::transport::inproc::InprocTransport;
     use crate::transport::matrix::ConnectionMatrixSender;
     use crate::transport::Transport;

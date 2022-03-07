@@ -337,7 +337,7 @@ mod tests {
     use super::*;
 
     use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
-    use splinter::service::{instance::ServiceMessageContext, ServiceSendError};
+    use splinter::service::instance::{ServiceMessageContext, ServiceSendError};
 
     /// Verifies that the `is_coordinator` and `coordinator_service_id` methods work properly.
     ///

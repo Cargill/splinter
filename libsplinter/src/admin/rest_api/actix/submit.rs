@@ -23,7 +23,7 @@ use crate::rest_api::{
     actix_web_1::{into_protobuf, Method, ProtocolVersionRangeGuard, Resource},
     SPLINTER_PROTOCOL_VERSION,
 };
-use crate::service::ServiceError;
+use crate::service::instance::ServiceError;
 
 const ADMIN_SUBMIT_PROTOCOL_MIN: u32 = 1;
 

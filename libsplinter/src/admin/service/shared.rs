@@ -46,9 +46,7 @@ use crate::protos::admin::{
     ServiceProtocolVersionRequest, SplinterNode, SplinterService,
 };
 use crate::public_key;
-use crate::service::{error::ServiceError, instance::ServiceArgValidator};
-
-use crate::service::instance::ServiceNetworkSender;
+use crate::service::instance::{ServiceArgValidator, ServiceError, ServiceNetworkSender};
 
 use super::error::{AdminSharedError, MarshallingError};
 use super::messages;
@@ -3751,7 +3749,7 @@ mod tests {
     };
     use crate::protos::network;
     use crate::protos::prelude::*;
-    use crate::service::{instance::ServiceMessageContext, ServiceSendError};
+    use crate::service::instance::{ServiceMessageContext, ServiceSendError};
     use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{
         inproc::InprocTransport, ConnectError, Connection, DisconnectError, RecvError, SendError,

@@ -20,8 +20,7 @@ use crate::protos::circuit::{
     AdminDirectMessage, CircuitDirectMessage, CircuitMessage, CircuitMessageType,
 };
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
-use crate::service::error::ServiceSendError;
-use crate::service::instance::{ServiceMessageContext, ServiceNetworkSender};
+use crate::service::instance::{ServiceMessageContext, ServiceNetworkSender, ServiceSendError};
 
 #[derive(Debug, Clone)]
 pub enum ServiceMessage {

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod error;
 mod factory;
 mod message_context;
 mod network_registry;
@@ -25,3 +26,8 @@ pub use network_registry::ServiceNetworkRegistry;
 pub use network_sender::ServiceNetworkSender;
 pub use service_instance::ServiceInstance;
 pub use validation::ServiceArgValidator;
+
+pub use error::{
+    FactoryCreateError, ServiceConnectionError, ServiceDestroyError, ServiceDisconnectionError,
+    ServiceError, ServiceSendError, ServiceStartError, ServiceStopError,
+};

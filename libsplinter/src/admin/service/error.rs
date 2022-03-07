@@ -19,7 +19,7 @@ use crate::admin::store::error::AdminServiceStoreError;
 use crate::consensus::error::ProposalManagerError;
 use crate::orchestrator::InitializeServiceError;
 use crate::orchestrator::ShutdownServiceError;
-use crate::service::error::{ServiceError, ServiceSendError};
+use crate::service::instance::{ServiceError, ServiceSendError};
 
 use protobuf::error;
 

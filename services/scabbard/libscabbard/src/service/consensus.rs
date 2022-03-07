@@ -405,9 +405,8 @@ mod tests {
     use std::collections::{HashSet, VecDeque};
 
     use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
-    use splinter::service::{
-        instance::{ServiceMessageContext, ServiceNetworkSender},
-        ServiceSendError,
+    use splinter::service::instance::{
+        ServiceMessageContext, ServiceNetworkSender, ServiceSendError,
     };
 
     /// Tests that the network sender properly creates messages and sends them using the

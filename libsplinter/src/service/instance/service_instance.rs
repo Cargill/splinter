@@ -15,9 +15,11 @@
 use std::any::Any;
 
 use crate::error::InternalError;
-use crate::service::{ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError};
 
-use super::{ServiceMessageContext, ServiceNetworkRegistry};
+use super::{
+    ServiceDestroyError, ServiceError, ServiceMessageContext, ServiceNetworkRegistry,
+    ServiceStartError, ServiceStopError,
+};
 
 /// A Service provides message handling for a given service type.
 pub trait ServiceInstance: Send {

@@ -14,7 +14,7 @@
 
 use std::error::Error;
 
-use crate::service::FactoryCreateError;
+use crate::service::instance::FactoryCreateError;
 
 use super::ServiceDefinition;
 

@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::service::ServiceSendError;
-
-use super::ServiceMessageContext;
+use super::{ServiceMessageContext, ServiceSendError};
 
 /// The ServiceNetworkSender trait allows a service to send its own messages, such as replies to
 /// the original message or forwarding the message to other services on the same circuit.  It does

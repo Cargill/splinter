@@ -35,7 +35,6 @@
 //!  lower-level messaging and networking needs to talk to applications that implement Splinter
 //!  node capabilities, such as the Splinter daemon.
 
-pub mod error;
 #[cfg(feature = "service-id")]
 mod id;
 pub mod instance;
@@ -44,8 +43,3 @@ pub mod rest_api;
 
 #[cfg(feature = "service-id")]
 pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};
-
-pub use error::{
-    FactoryCreateError, ServiceConnectionError, ServiceDestroyError, ServiceDisconnectionError,
-    ServiceError, ServiceSendError, ServiceStartError, ServiceStopError,
-};

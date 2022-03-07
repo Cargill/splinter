@@ -16,9 +16,8 @@ use std::collections::HashMap;
 
 #[cfg(feature = "rest-api-actix-web-1")]
 use crate::service::rest_api::ServiceEndpoint;
-use crate::service::FactoryCreateError;
 
-use super::ServiceInstance;
+use super::{FactoryCreateError, ServiceInstance};
 
 /// A `ServiceFactory` creates services.
 pub trait ServiceFactory: Send {
