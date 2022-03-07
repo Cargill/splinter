@@ -46,8 +46,7 @@ use crate::protos::admin::{
     ServiceProtocolVersionRequest, SplinterNode, SplinterService,
 };
 use crate::public_key;
-use crate::service::error::ServiceError;
-use crate::service::validation::ServiceArgValidator;
+use crate::service::{error::ServiceError, instance::ServiceArgValidator};
 
 use crate::service::instance::ServiceNetworkSender;
 

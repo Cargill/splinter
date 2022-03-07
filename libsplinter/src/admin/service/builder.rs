@@ -27,7 +27,7 @@ use crate::keys::KeyPermissionManager;
 use crate::orchestrator::ServiceOrchestrator;
 use crate::peer::PeerManagerConnector;
 use crate::public_key::PublicKey;
-use crate::service::validation::ServiceArgValidator;
+use crate::service::instance::ServiceArgValidator;
 
 use super::shared::AdminServiceShared;
 use super::{admin_service_id, AdminKeyVerifier, AdminService};

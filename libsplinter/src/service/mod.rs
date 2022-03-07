@@ -41,7 +41,6 @@ mod id;
 pub mod instance;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
-pub mod validation;
 
 #[cfg(feature = "service-id")]
 pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};

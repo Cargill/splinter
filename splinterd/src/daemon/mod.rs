@@ -84,7 +84,7 @@ use splinter::rest_api::auth::authorization::Permission;
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
 use splinter::runtime::service::instance::{ServiceProcessor, ServiceProcessorShutdownHandle};
-use splinter::service::validation::ServiceArgValidator;
+use splinter::service::instance::ServiceArgValidator;
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, Connection, Incoming, Listener,

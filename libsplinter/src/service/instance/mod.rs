@@ -17,9 +17,11 @@ mod message_context;
 mod network_registry;
 mod network_sender;
 mod service_instance;
+mod validation;
 
 pub use factory::ServiceFactory;
 pub use message_context::ServiceMessageContext;
 pub use network_registry::ServiceNetworkRegistry;
 pub use network_sender::ServiceNetworkSender;
 pub use service_instance::ServiceInstance;
+pub use validation::ServiceArgValidator;

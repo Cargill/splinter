@@ -36,9 +36,8 @@ use sawtooth::receipt::store::ReceiptStore;
 use splinter::error::InternalError;
 use splinter::error::{InvalidArgumentError, InvalidStateError};
 use splinter::orchestrator::{OrchestratableService, OrchestratableServiceFactory};
-use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{
-    instance::{ServiceFactory, ServiceInstance},
+    instance::{ServiceArgValidator, ServiceFactory, ServiceInstance},
     FactoryCreateError,
 };
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
