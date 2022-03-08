@@ -23,6 +23,7 @@ description = """\
 """
 
 [dependencies]
+actix-web = "4"
 splinter = { path = "../../libsplinter", features = ["store", "store-factory"] }
 
 [features]
