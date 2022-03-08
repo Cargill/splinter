@@ -26,6 +26,7 @@ description = """\
 actix-utils = "3"
 actix-web = "4"
 splinter = { path = "../../libsplinter", features = ["store", "store-factory"] }
+splinter-rest-api-common = { path = "../common" }
 
 [features]
 default = []
