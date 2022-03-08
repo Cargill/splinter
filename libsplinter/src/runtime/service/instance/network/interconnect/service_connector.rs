@@ -15,7 +15,7 @@
 //! Service lookup implementations on the ServiceConnector.
 
 use super::{ServiceLookup, ServiceLookupError, ServiceLookupProvider};
-use crate::service::network::ServiceConnector;
+use crate::runtime::service::instance::network::ServiceConnector;
 
 impl ServiceLookup for ServiceConnector {
     fn connection_id(&self, service_id: &str) -> Result<Option<String>, ServiceLookupError> {

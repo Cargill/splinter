@@ -23,7 +23,7 @@ use transact::protos::FromBytes;
 
 use splinter::{
     consensus::{PeerId, Proposal, ProposalId},
-    service::ServiceNetworkSender,
+    service::instance::ServiceNetworkSender,
 };
 
 use crate::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
@@ -337,7 +337,7 @@ mod tests {
     use super::*;
 
     use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
-    use splinter::service::{ServiceMessageContext, ServiceSendError};
+    use splinter::service::instance::{ServiceMessageContext, ServiceSendError};
 
     /// Verifies that the `is_coordinator` and `coordinator_service_id` methods work properly.
     ///

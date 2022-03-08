@@ -15,7 +15,7 @@
 //! Builder for constructing new service processors.
 
 use crate::error::InvalidStateError;
-use crate::service::Service;
+use crate::service::instance::ServiceInstance;
 use crate::transport::Connection;
 
 use super::ServiceProcessor;
@@ -32,7 +32,7 @@ pub struct ServiceProcessorBuilder {
     incoming_capacity: Option<usize>,
     outgoing_capacity: Option<usize>,
     channel_capacity: Option<usize>,
-    services: Vec<Box<dyn Service>>,
+    services: Vec<Box<dyn ServiceInstance>>,
 }
 
 impl ServiceProcessorBuilder {
@@ -88,7 +88,7 @@ impl ServiceProcessorBuilder {
     ///
     /// This function may be called more than once to add additional services.  It must be called
     /// at least once to construct a valid service processor.
-    pub fn with_service(mut self, service: Box<dyn Service>) -> Self {
+    pub fn with_service(mut self, service: Box<dyn ServiceInstance>) -> Self {
         self.services.push(service);
 
         self

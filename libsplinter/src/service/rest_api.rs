@@ -22,14 +22,14 @@ use crate::rest_api::actix_web_1::{Continuation, Method, RequestGuard};
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 
-use super::Service;
+use super::instance::ServiceInstance;
 
 /// The type for functions that handle REST API requests made to service endpoints.
 pub type Handler = Arc<
     dyn Fn(
             HttpRequest,
             web::Payload,
-            &dyn Service,
+            &dyn ServiceInstance,
         ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
         + Send
         + Sync

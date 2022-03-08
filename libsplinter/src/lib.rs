@@ -99,6 +99,7 @@ pub mod public_key;
 pub mod registry;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
+pub mod runtime;
 pub mod service;
 #[cfg(feature = "store")]
 pub mod store;

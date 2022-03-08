@@ -438,7 +438,9 @@ pub mod tests {
         MessageContext, MessageSender,
     };
     use crate::protos::service;
-    use crate::service::network::{ServiceConnectionManager, ServiceConnectionNotification};
+    use crate::runtime::service::instance::network::{
+        ServiceConnectionManager, ServiceConnectionNotification,
+    };
     use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
 

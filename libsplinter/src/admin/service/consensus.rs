@@ -34,7 +34,7 @@ use crate::hex::to_hex;
 use crate::peer::PeerTokenPair;
 use crate::protos::admin::{AdminMessage, AdminMessage_Type, ProposedCircuit};
 use crate::protos::two_phase::RequiredVerifiers;
-use crate::service::ServiceError;
+use crate::service::instance::ServiceError;
 
 use super::error::AdminConsensusManagerError;
 use super::shared::AdminServiceShared;

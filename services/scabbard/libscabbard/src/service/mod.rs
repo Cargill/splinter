@@ -36,9 +36,9 @@ use sawtooth::receipt::store::ReceiptStore;
 use splinter::{
     consensus::{Proposal, ProposalUpdate},
     orchestrator::OrchestratableService,
-    service::{
-        Service, ServiceDestroyError, ServiceError, ServiceMessageContext, ServiceNetworkRegistry,
-        ServiceStartError, ServiceStopError,
+    service::instance::{
+        ServiceDestroyError, ServiceError, ServiceInstance, ServiceMessageContext,
+        ServiceNetworkRegistry, ServiceStartError, ServiceStopError,
     },
 };
 use transact::{
@@ -307,7 +307,7 @@ impl Scabbard {
     }
 }
 
-impl Service for Scabbard {
+impl ServiceInstance for Scabbard {
     fn service_id(&self) -> &str {
         &self.service_id
     }
@@ -512,7 +512,7 @@ impl Service for Scabbard {
 }
 
 impl OrchestratableService for Scabbard {
-    fn as_service(&self) -> &dyn Service {
+    fn as_service(&self) -> &dyn ServiceInstance {
         self
     }
 
@@ -529,7 +529,7 @@ pub mod tests {
 
     use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
     use sawtooth::receipt::store::{ReceiptIter, ReceiptStoreError};
-    use splinter::service::{
+    use splinter::service::instance::{
         ServiceConnectionError, ServiceDisconnectionError, ServiceMessageContext,
         ServiceNetworkSender, ServiceSendError,
     };
@@ -820,7 +820,7 @@ pub mod tests {
     }
 
     /// Verifies that the given service connects on start and disconnects on stop.
-    pub fn test_connect_and_disconnect(service: &mut dyn Service) {
+    pub fn test_connect_and_disconnect(service: &mut dyn ServiceInstance) {
         let registry = MockServiceNetworkRegistry::new();
         service.start(&registry).expect("failed to start engine");
         assert!(registry
