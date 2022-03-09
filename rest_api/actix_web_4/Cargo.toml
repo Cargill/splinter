@@ -23,6 +23,7 @@ description = """\
 """
 
 [dependencies]
+splinter = { path = "../../libsplinter", features = ["store", "store-factory"] }
 
 [features]
 default = []
