@@ -18,14 +18,36 @@ mod postgres;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
+use std::sync::{Arc, RwLock};
+
 use ::diesel::r2d2::{ConnectionManager, Pool};
 
+use crate::store::pool::ConnectionPool;
+
+/// A `StoreCommandExecutor`, powered by [`Diesel`](https://crates.io/crates/diesel).
 pub struct DieselStoreCommandExecutor<C: diesel::Connection + 'static> {
-    conn: Pool<ConnectionManager<C>>,
+    conn: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection> DieselStoreCommandExecutor<C> {
+    /// Creates a new `DieselStoreCommandExecutor`.
+    ///
+    /// # Arguments
+    ///
+    ///  * `conn`: connection pool for the database
     pub fn new(conn: Pool<ConnectionManager<C>>) -> Self {
-        DieselStoreCommandExecutor { conn }
+        DieselStoreCommandExecutor { conn: conn.into() }
+    }
+
+    /// Create a new `DieselStoreCommandExecutor` with write exclusivity enabled.
+    ///
+    /// Write exclusivity is enforced by providing a connection pool that is wrapped in a
+    /// [`RwLock`]. This ensures that there may be only one writer, but many readers.
+    ///
+    /// # Arguments
+    ///
+    ///  * `conn`: read-write lock-guarded connection pool for the database
+    pub fn new_with_write_exclusivity(conn: Arc<RwLock<Pool<ConnectionManager<C>>>>) -> Self {
+        Self { conn: conn.into() }
     }
 }

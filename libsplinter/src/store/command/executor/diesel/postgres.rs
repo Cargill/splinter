@@ -24,16 +24,13 @@ impl StoreCommandExecutor for DieselStoreCommandExecutor<PgConnection> {
         &self,
         store_commands: Vec<C>,
     ) -> Result<(), InternalError> {
-        let conn = &*self
-            .conn
-            .get()
-            .map_err(|e| InternalError::from_source(Box::new(e)))?;
-
-        conn.transaction::<(), InternalError, _>(|| {
-            for cmd in store_commands {
-                cmd.execute(conn)?;
-            }
-            Ok(())
+        self.conn.execute_write(|conn| {
+            conn.transaction::<(), InternalError, _>(|| {
+                for cmd in store_commands {
+                    cmd.execute(conn)?;
+                }
+                Ok(())
+            })
         })
     }
 }
