@@ -18,14 +18,22 @@ mod postgres;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
+use std::sync::{Arc, RwLock};
+
 use ::diesel::r2d2::{ConnectionManager, Pool};
 
+use crate::store::pool::ConnectionPool;
+
 pub struct DieselStoreCommandExecutor<C: diesel::Connection + 'static> {
-    conn: Pool<ConnectionManager<C>>,
+    conn: ConnectionPool<C>,
 }
 
 impl<C: diesel::Connection> DieselStoreCommandExecutor<C> {
     pub fn new(conn: Pool<ConnectionManager<C>>) -> Self {
-        DieselStoreCommandExecutor { conn }
+        DieselStoreCommandExecutor { conn: conn.into() }
+    }
+
+    pub fn new_with_write_exclusivity(conn: Arc<RwLock<Pool<ConnectionManager<C>>>>) -> Self {
+        Self { conn: conn.into() }
     }
 }
