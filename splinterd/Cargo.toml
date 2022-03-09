@@ -104,6 +104,7 @@ experimental = [
     # The following features are experimental:
     "authorization-handler-maintenance",
     "https-bind",
+    "lifecycle-executor-interval",
     "node",
     "service-endpoint",
     "service-timer-interval",
@@ -129,6 +130,7 @@ config-allow-keys = ["authorization-handler-allow-keys"]
 database-postgres = ["diesel", "diesel/postgres", "scabbard/postgres", "splinter/postgres"]
 database-sqlite = ["diesel", "diesel/sqlite", "scabbard/sqlite", "splinter/sqlite"]
 https-bind = ["splinter/https-bind"]
+lifecycle-executor-interval = []
 tap = [
   "splinter/tap",
   "scabbard/metrics",

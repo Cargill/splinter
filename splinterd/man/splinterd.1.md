@@ -150,6 +150,10 @@ OPTIONS
 `--influx-username` `USERNAME`
 : The username used for authorization with the InfluxDB.
 
+`--lifecycle-executor-interval` `interval`
+: How often the lifecycle executor should be woken up to check for pending
+  services, in seconds. (Default: 30)
+
 `-n`, `--network-endpoints` `NETWORK-ENDPOINT`
 : Specifies the endpoint for daemon-to-daemon communication between Splinter
   nodes, using the format `protocol_prefix://ip:port`.

@@ -188,7 +188,14 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
         {
             partial_config = partial_config.with_service_timer_interval(
                 parse_value(&self.matches, "service_timer_interval")?.map(Duration::from_secs),
-            )
+            );
+        }
+
+        #[cfg(feature = "lifecycle-executor-interval")]
+        {
+            partial_config = partial_config.with_lifecycle_executor_interval(
+                parse_value(&self.matches, "lifecycle_executor_interval")?.map(Duration::from_secs),
+            );
         }
 
         partial_config =
