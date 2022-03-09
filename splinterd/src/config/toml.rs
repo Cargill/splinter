@@ -22,6 +22,8 @@ use serde::Deserialize as DeserializeTrait;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 use std::convert::TryInto;
+#[cfg(feature = "service2")]
+use std::time::Duration;
 
 use super::logging::{default_pattern, UnnamedAppenderConfig, UnnamedLoggerConfig};
 use super::ScabbardState;
@@ -207,6 +209,8 @@ struct TomlConfig {
     scabbard_state: Option<ScabbardStateToml>,
     config_dir: Option<String>,
     state_dir: Option<String>,
+    #[cfg(feature = "service-timer-interval")]
+    service_timer_interval: Option<u64>,
 
     // Deprecated values
     cert_dir: Option<String>,
@@ -330,6 +334,15 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 .with_influx_url(self.toml_config.influx_url)
                 .with_influx_username(self.toml_config.influx_username)
                 .with_influx_password(self.toml_config.influx_password)
+        }
+
+        #[cfg(feature = "service-timer-interval")]
+        {
+            partial_config = partial_config.with_service_timer_interval(
+                self.toml_config
+                    .service_timer_interval
+                    .map(Duration::from_secs),
+            )
         }
 
         if let Some(mut loggers) = self.toml_config.loggers {

@@ -490,6 +490,18 @@ fn main() {
                 .takes_value(true),
         );
 
+    #[cfg(feature = "service-timer-interval")]
+    let app = app.arg(
+        Arg::with_name("service_timer_interval")
+            .long("service-timer-interval")
+            .value_name("interval")
+            .long_help(
+                "How often the service timer should be woken up, in seconds; \
+                    defaults to 1 second",
+            )
+            .takes_value(true),
+    );
+
     let app = app.arg(
         Arg::with_name("scabbard_state")
             .long("scabbard-state")

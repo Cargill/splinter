@@ -106,6 +106,7 @@ experimental = [
     "https-bind",
     "node",
     "service-endpoint",
+    "service-timer-interval",
     "service2",
     "ws-transport",
 ]
@@ -156,6 +157,7 @@ oauth = [
 ]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-endpoint = []
+service-timer-interval = []
 service2 = [
   "splinter/service-message-handler-dispatch",
   "splinter/service-message-sender-factory-peer",
