@@ -65,7 +65,7 @@ pub struct ScabbardState {
     merkle_state: merkle_state::MerkleState,
     commit_hash_store: Box<dyn CommitHashStore>,
     context_manager: ContextManager,
-    executor: Executor,
+    executor: Option<Executor>,
     current_state_root: String,
     receipt_store: Arc<dyn ReceiptStore>,
     pending_changes: Option<(String, Vec<TransactionReceipt>)>,
@@ -145,7 +145,7 @@ impl ScabbardState {
             merkle_state,
             commit_hash_store,
             context_manager,
-            executor,
+            executor: Some(executor),
             current_state_root,
             receipt_store,
             pending_changes: None,
@@ -201,6 +201,9 @@ impl ScabbardState {
     }
 
     pub fn prepare_change(&mut self, batch: BatchPair) -> Result<String, ScabbardStateError> {
+        let executor = self.executor.as_ref().ok_or_else(|| {
+            ScabbardStateError("attempting to prepare a change on a stopped service".into())
+        })?;
         // Setup the transact scheduler
         let (result_tx, result_rx) = std::sync::mpsc::channel();
         let mut scheduler = SerialScheduler::new(
@@ -216,8 +219,7 @@ impl ScabbardState {
         // Add the batch to, finalize, and execute the scheduler
         scheduler.add_batch(batch.clone())?;
         scheduler.finalize()?;
-        self.executor
-            .execute(scheduler.take_task_iterator()?, scheduler.new_notifier()?)?;
+        executor.execute(scheduler.take_task_iterator()?, scheduler.new_notifier()?)?;
 
         let mut recv_result: Option<BatchExecutionResult> = None;
 
