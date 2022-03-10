@@ -120,20 +120,6 @@ impl ScabbardState {
 
         // Initialize transact
         let context_manager = ContextManager::new(Box::new(merkle_state.clone()));
-        let mut executor = Executor::new(vec![Box::new(StaticExecutionAdapter::new_adapter(
-            vec![
-                Box::new(SabreTransactionHandler::new(Box::new(
-                    SettingsAdminPermission,
-                ))),
-                #[cfg(test)]
-                Box::new(CommandTransactionHandler::new()),
-            ],
-            context_manager.clone(),
-        )?)]);
-        executor
-            .start()
-            .map_err(|err| ScabbardStateError(format!("failed to start executor: {}", err)))?;
-
         // initialize committed_batches metric
         counter!("splinter.scabbard.committed_batches", 0,
             "circuit" => circuit_id.clone(),
@@ -144,7 +130,7 @@ impl ScabbardState {
             merkle_state,
             commit_hash_store,
             context_manager,
-            executor: Some(executor),
+            executor: None,
             current_state_root,
             receipt_store,
             pending_changes: None,
