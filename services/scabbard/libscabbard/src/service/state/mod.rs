@@ -157,6 +157,32 @@ impl ScabbardState {
         })
     }
 
+    pub fn start_executor(&mut self) -> Result<(), ScabbardStateError> {
+        let mut executor = Executor::new(vec![Box::new(StaticExecutionAdapter::new_adapter(
+            vec![
+                Box::new(SabreTransactionHandler::new(Box::new(
+                    SettingsAdminPermission,
+                ))),
+                #[cfg(test)]
+                Box::new(CommandTransactionHandler::new()),
+            ],
+            self.context_manager.clone(),
+        )?)]);
+        executor
+            .start()
+            .map_err(|err| ScabbardStateError(format!("failed to start executor: {}", err)))?;
+
+        self.executor = Some(executor);
+
+        Ok(())
+    }
+
+    pub fn stop_executor(&mut self) {
+        if let Some(executor) = self.executor.take() {
+            executor.stop();
+        }
+    }
+
     fn write_current_state_root(&self) -> Result<(), ScabbardStateError> {
         self.commit_hash_store
             .set_current_commit_hash(&self.current_state_root)
