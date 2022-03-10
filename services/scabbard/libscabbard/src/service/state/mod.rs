@@ -44,7 +44,7 @@ use transact::{
     scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler},
     state::{
         merkle::{MerkleRadixLeafReadError, MerkleRadixLeafReader},
-        Read, StateChange as TransactStateChange, Write,
+        Prune, Read, StateChange as TransactStateChange, Write,
     },
 };
 
@@ -281,6 +281,8 @@ impl ScabbardState {
         match self.pending_changes.take() {
             Some((signature, txn_receipts)) => {
                 let state_changes = receipts_into_transact_state_changes(&txn_receipts)?;
+
+                let previous_state_root = self.current_state_root.clone();
                 self.current_state_root = self
                     .merkle_state
                     .commit(&self.current_state_root, &state_changes)?;
@@ -326,6 +328,18 @@ impl ScabbardState {
                     "circuit" => self.circuit_id.clone(),
                     "service" => format!("{}::{}", &self.circuit_id, &self.service_id)
                 );
+
+                if previous_state_root != self.current_state_root {
+                    self.merkle_state
+                        .prune(vec![previous_state_root.clone()])
+                        .map_err(|err| {
+                            ScabbardStateError(format!(
+                                "failed to prune previous state {}: {}",
+                                previous_state_root, err
+                            ))
+                        })?;
+                }
+
                 Ok(())
             }
             None => Err(ScabbardStateError("no pending changes to commit".into())),
