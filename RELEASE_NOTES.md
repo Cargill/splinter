@@ -1,5 +1,29 @@
 # Release Notes
 
+## Changes in Splinter 0.6.9
+
+### libsplinter
+
+* Remove unused actix-web-1 compression features to prevent dependency
+  duplication and conflicts with future work.
+
+* Make the `RoutingTableReaderError` type public as it is part of the public
+  trait `RoutingTableWriter` and should share the same visibility.
+
+* Correct a SQLite migration that left the database with an unsatisfiable
+  foreign key constraint on the `rbac_assignments` table.
+
+### splintered
+
+* Add `AuthorizationManager` field to the `NetworkSubsystem` to fix an issue
+  with zombie threads in integration tests.
+
+### scabbard
+
+* Add a mechanism to shutdown the transaction executor when a scabbard service
+  is stopped to fix an issue where a stopped scabbard service would leak several
+  threads.
+
 ## Changes in Splinter 0.6.8
 
 ### splinter CLI
