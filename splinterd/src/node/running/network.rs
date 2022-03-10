@@ -19,6 +19,7 @@ use std::thread::JoinHandle;
 use splinter::circuit::routing::{memory::RoutingTable, RoutingTableWriter};
 use splinter::error::InternalError;
 use splinter::mesh::Mesh;
+use splinter::network::auth::AuthorizationManager;
 use splinter::network::connection_manager::ConnectionManager;
 use splinter::network::dispatch::DispatchLoop;
 use splinter::peer::{interconnect::PeerInterconnect, PeerManager, PeerManagerConnector};
@@ -29,6 +30,7 @@ use splinter::transport::inproc::InprocTransport;
 
 /// A running admin subsystem.
 pub struct NetworkSubsystem {
+    pub(crate) authorization_manager: AuthorizationManager,
     pub(crate) connection_manager: ConnectionManager,
     pub(crate) peer_manager: PeerManager,
     pub(crate) routing_table: RoutingTable,
@@ -68,6 +70,7 @@ impl ShutdownHandle for NetworkSubsystem {
         self.interconnect.signal_shutdown();
         self.peer_manager.signal_shutdown();
         self.connection_manager.signal_shutdown();
+        self.authorization_manager.shutdown_signaler().shutdown();
         self.circuit_dispatch_loop.signal_shutdown();
         self.network_dispatch_loop.signal_shutdown();
         self.mesh.signal_shutdown();
@@ -86,6 +89,8 @@ impl ShutdownHandle for NetworkSubsystem {
         if let Err(err) = self.connection_manager.wait_for_shutdown() {
             errors.push(err)
         }
+
+        self.authorization_manager.wait_for_shutdown();
 
         if let Err(err) = self.circuit_dispatch_loop.wait_for_shutdown() {
             errors.push(err)
