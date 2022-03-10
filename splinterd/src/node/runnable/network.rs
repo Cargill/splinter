@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use cylinder::{Signer, VerifierFactory};
+use cylinder::VerifierFactory;
 use splinter::admin::service::admin_service_id;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
@@ -87,14 +87,20 @@ impl RunnableNetworkSubsystem {
 
         let mesh = Mesh::new(512, 128);
 
+        let authorization_manager = AuthorizationManager::new(
+            node_id.to_string(),
+            self.signers.clone(),
+            self.signing_context.clone(),
+        )
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
         // Configure connection manager
         let connection_manager = Self::build_connection_manager(
             &node_id,
             Box::new(transport),
             &mesh,
             heartbeat_interval,
-            self.signing_context.clone(),
-            self.signers.clone(),
+            &authorization_manager,
         )?;
         let connection_connector = connection_manager.connector();
 
@@ -166,6 +172,7 @@ impl RunnableNetworkSubsystem {
 
         Ok(NetworkSubsystem {
             peer_manager,
+            authorization_manager,
             connection_manager,
             routing_table,
             _network_listener_joinhandles: network_listener_joinhandles,
@@ -213,8 +220,7 @@ impl RunnableNetworkSubsystem {
         transport: Box<dyn Transport + Send>,
         mesh: &Mesh,
         heartbeat_interval: Duration,
-        signing_context: Arc<Mutex<Box<dyn VerifierFactory>>>,
-        signers: Vec<Box<dyn Signer>>,
+        authorization_manager: &AuthorizationManager,
     ) -> Result<ConnectionManager, InternalError> {
         let inproc_ids = vec![
             (
@@ -229,10 +235,6 @@ impl RunnableNetworkSubsystem {
 
         // Set up Authorization
         let inproc_authorizer = InprocAuthorizer::new(inproc_ids, node_id.to_string());
-
-        let authorization_manager =
-            AuthorizationManager::new(node_id.to_string(), signers, signing_context)
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         let mut authorizers = Authorizers::new();
         authorizers.add_authorizer("inproc", inproc_authorizer);
