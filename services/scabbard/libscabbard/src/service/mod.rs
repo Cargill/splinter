@@ -334,6 +334,12 @@ impl Service for Scabbard {
             .map_err(|_| ServiceStartError::PoisonedLock("shared lock poisoned".into()))?
             .set_network_sender(service_registry.connect(self.service_id())?);
 
+        self.state
+            .lock()
+            .map_err(|_| ServiceStartError::PoisonedLock("shared lock poisoned".into()))?
+            .start_executor()
+            .map_err(|err| ServiceStartError::Internal(err.to_string()))?;
+
         // Setup consensus
         consensus.replace(
             ScabbardConsensusManager::new(
@@ -372,10 +378,14 @@ impl Service for Scabbard {
             .take_network_sender()
             .ok_or_else(|| ServiceStopError::Internal(Box::new(ScabbardError::NotConnected)))?;
 
-        self.state
+        let mut state = self
+            .state
             .lock()
-            .map_err(|_| ServiceStopError::PoisonedLock("state lock poisoned".into()))?
-            .clear_subscribers();
+            .map_err(|_| ServiceStopError::PoisonedLock("state lock poisoned".into()))?;
+
+        state.clear_subscribers();
+
+        state.stop_executor();
 
         service_registry.disconnect(self.service_id())?;
 

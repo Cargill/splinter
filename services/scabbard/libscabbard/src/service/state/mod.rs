@@ -1059,6 +1059,8 @@ mod tests {
         )
         .expect("Failed to initialize state");
 
+        state.start_executor().expect("Failed to start executor");
+
         // Set a value in state
         let address = "abcdef".to_string();
         let value = b"value".to_vec();
@@ -1095,6 +1097,8 @@ mod tests {
                 .expect("Failed to get state for unset address"),
             None,
         );
+
+        state.stop_executor();
     }
 
     /// Verify that the `ScabbardState::get_state_with_prefix` method works properly.
@@ -1131,6 +1135,8 @@ mod tests {
             vec![],
         )
         .expect("Failed to initialize state");
+
+        state.start_executor().expect("Failed to start executor");
 
         // Set some values in state
         let prefix = "abcdef".to_string();
@@ -1189,6 +1195,8 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .expect("Failed to collect entries under unset prefix");
         assert!(no_entries.is_empty());
+
+        state.stop_executor();
     }
 
     fn mock_transaction_receipt(id: &str) -> TransactionReceipt {
