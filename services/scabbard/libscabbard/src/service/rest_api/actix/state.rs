@@ -189,6 +189,8 @@ mod tests {
             )
             .expect("Failed to initialize state");
 
+            state.start_executor().expect("Failed to start executor");
+
             let signing_context = Secp256k1Context::new();
             let signer = signing_context.new_signer(signing_context.new_random_private_key());
             let batch = CommandTransactionBuilder::new()
@@ -207,6 +209,8 @@ mod tests {
                 .prepare_change(batch)
                 .expect("Failed to prepare change");
             state.commit().expect("Failed to commit change");
+
+            state.stop_executor();
         }
 
         // Initialize scabbard
