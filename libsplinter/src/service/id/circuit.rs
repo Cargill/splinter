@@ -96,12 +96,12 @@ impl CircuitId {
         Ok(CircuitId { inner: circuit_id })
     }
 
-    /// Returns a `&str` representing the value of CircuitId.
+    /// Returns a `&str` representing the value of `CircuitId`.
     pub fn as_str(&self) -> &str {
         &self.inner
     }
 
-    /// Returns a `Box<str>`, consuming the CircuitId.
+    /// Returns a `Box<str>`, consuming the `CircuitId`.
     pub fn deconstruct(self) -> Box<str> {
         self.inner
     }

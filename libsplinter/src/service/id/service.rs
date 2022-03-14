@@ -75,12 +75,12 @@ impl ServiceId {
         Ok(ServiceId { inner: service_id })
     }
 
-    /// Returns a `&str` representing the value of ServiceId.
+    /// Returns a `&str` representing the value of `ServiceId`.
     pub fn as_str(&self) -> &str {
         &self.inner
     }
 
-    /// Returns a `Box<str>`, consuming the ServiceId.
+    /// Returns a `Box<str>`, consuming the `ServiceId`.
     pub fn deconstruct(self) -> Box<str> {
         self.inner
     }
