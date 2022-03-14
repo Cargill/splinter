@@ -25,6 +25,12 @@ pub use self::diesel::DieselStoreCommandExecutor;
 pub trait StoreCommandExecutor {
     type Context;
 
+    /// Execute each [`StoreCommand`] in `store_commands`
+    ///
+    /// # Arguments
+    ///
+    /// * `store_commands` - A list of items that implement the [`StoreCommand`]
+    ///   trait
     fn execute<C: StoreCommand<Context = Self::Context>>(
         &self,
         store_commands: Vec<C>,
