@@ -308,7 +308,7 @@ impl fmt::Display for ProposalSlice {
         for member in self.circuit.members.iter() {
             display_string += &format!("\n    {} ({:?})\n", member.node_id, member.endpoints);
             if member.node_id == self.requester_node_id {
-                display_string += &"        Vote: ACCEPT (implied as requester):\n".to_string();
+                display_string += "        Vote: ACCEPT (implied as requester):\n";
                 display_string += &format!("            {}\n", self.requester);
             } else {
                 let mut vote_string = "        Vote: PENDING".to_string();

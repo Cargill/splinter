@@ -182,8 +182,8 @@ impl TryFrom<v1::CircuitCreateTemplate> for CircuitCreateTemplate {
             version: create_circuit_template.version().to_string(),
             arguments: create_circuit_template
                 .args()
-                .to_owned()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(RuleArgument::try_from)
                 .collect::<Result<_, CircuitTemplateError>>()?,
             rules: Rules::from(create_circuit_template.rules().clone()),
