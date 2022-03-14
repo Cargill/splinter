@@ -148,7 +148,8 @@ mod tests {
         assert_eq!(service_id.as_str(), "abcd")
     }
 
-    /// Tests successfully creating a ServiceId from a well-formed `String` using ServiceId::try_from().
+    /// Tests successfully creating a ServiceId from a well-formed `String` using
+    /// ServiceId::try_from().
     #[test]
     fn test_service_id_well_formed_try_from_string() {
         let service_id =
@@ -156,7 +157,8 @@ mod tests {
         assert_eq!(service_id.as_str(), "abcd")
     }
 
-    /// Tests successfully creating a ServiceId from a well-formed `String` using String::try_into().
+    /// Tests successfully creating a ServiceId from a well-formed `String` using
+    /// String::try_into().
     #[test]
     fn test_service_id_well_formed_try_into_string() {
         let service_id: ServiceId = String::from("abcd")
@@ -165,7 +167,8 @@ mod tests {
         assert_eq!(service_id.as_str(), "abcd")
     }
 
-    /// Tests successfully creating a ServiceId from a well-fromed `Box<str>` using Box<str>::try_into().
+    /// Tests successfully creating a ServiceId from a well-fromed `Box<str>` using
+    /// Box<str>::try_into().
     #[test]
     fn test_service_id_well_formed_from_box_str() {
         let s: Box<str> = "abcd".into();

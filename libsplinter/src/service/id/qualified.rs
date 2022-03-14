@@ -188,7 +188,8 @@ mod tests {
         let result = FullyQualifiedServiceId::new_from_string("abc?e-fghij::0011");
         assert_eq!(
             &result.unwrap_err().to_string(),
-            "invalid circuit id part: invalid characters, expected ASCII alphanumeric characters separated with a dash ('-') (fully_qualified_service_id)"
+            "invalid circuit id part: invalid characters, expected ASCII alphanumeric characters \
+            separated with a dash ('-') (fully_qualified_service_id)"
         );
     }
 
@@ -198,7 +199,8 @@ mod tests {
         let result = FullyQualifiedServiceId::new_from_string("abcde-fghij::00?0");
         assert_eq!(
             &result.unwrap_err().to_string(),
-            "invalid service id part: invalid characters, expected ASCII alphanumeric (fully_qualified_service_id)"
+            "invalid service id part: invalid characters, expected ASCII alphanumeric \
+            (fully_qualified_service_id)"
         );
     }
 

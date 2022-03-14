@@ -89,7 +89,9 @@ impl CircuitId {
         }) {
             return Err(InvalidArgumentError::new(
                 "circuit_id".to_string(),
-                "invalid characters, expected ASCII alphanumeric characters separated with a dash ('-')".to_string(),
+                "invalid characters, expected ASCII alphanumeric characters separated with a \
+                dash ('-')"
+                    .to_string(),
             ));
         }
 
@@ -146,7 +148,8 @@ mod tests {
         assert_eq!(circuit_id.as_str(), "abcde-abcde")
     }
 
-    /// Tests successfully creating a CircuitId from a well-formed `Box<str>` using CircuitId::new().
+    /// Tests successfully creating a CircuitId from a well-formed `Box<str>` using
+    /// CircuitId::new().
     #[test]
     fn test_circuit_id_well_formed_new_box_str() {
         let s: Box<str> = "abcde-fghij".into();
@@ -162,7 +165,8 @@ mod tests {
         assert_eq!(circuit_id.as_str(), "abcde-00000")
     }
 
-    /// Tests successfully creating a CircuitId from a well-formed `String` using CircuitId::try_from().
+    /// Tests successfully creating a CircuitId from a well-formed `String` using
+    /// CircuitId::try_from().
     #[test]
     fn test_circuit_id_well_formed_try_from_string() {
         let circuit_id = CircuitId::try_from(String::from("11111-abcde"))
@@ -170,7 +174,8 @@ mod tests {
         assert_eq!(circuit_id.as_str(), "11111-abcde")
     }
 
-    /// Tests successfully creating a CircuitId from a well-formed `String` using String::try_into().
+    /// Tests successfully creating a CircuitId from a well-formed `String` using
+    /// String::try_into().
     #[test]
     fn test_circuit_id_well_formed_try_into_string() {
         let circuit_id: CircuitId = String::from("abcde-1abcd")
@@ -179,7 +184,8 @@ mod tests {
         assert_eq!(circuit_id.as_str(), "abcde-1abcd")
     }
 
-    /// Tests successfully creating a CircuitId from a well-fromed `Box<str>` using Box<str>::try_into().
+    /// Tests successfully creating a CircuitId from a well-fromed `Box<str>` using
+    /// Box<str>::try_into().
     #[test]
     fn test_circuit_id_well_formed_from_box_str() {
         let s: Box<str> = "abcd4-ABCDE".into();
@@ -267,7 +273,8 @@ mod tests {
     fn test_circuit_id_invalid_characters_new() {
         assert_eq!(
             &CircuitId::new("abcd!-12345").unwrap_err().to_string(),
-            "invalid characters, expected ASCII alphanumeric characters separated with a dash ('-') (circuit_id)",
+            "invalid characters, expected ASCII alphanumeric characters separated with a dash \
+            ('-') (circuit_id)",
         );
     }
 
@@ -276,7 +283,8 @@ mod tests {
     fn test_circuit_id_invalid_no_dash_new() {
         assert_eq!(
             &CircuitId::new("abcdef12345").unwrap_err().to_string(),
-            "invalid characters, expected ASCII alphanumeric characters separated with a dash ('-') (circuit_id)",
+            "invalid characters, expected ASCII alphanumeric characters separated with a dash \
+            ('-') (circuit_id)",
         );
     }
 
@@ -287,7 +295,8 @@ mod tests {
             String::from("abcd--abcde").try_into();
         assert_eq!(
             &result.unwrap_err().to_string(),
-            "invalid characters, expected ASCII alphanumeric characters separated with a dash ('-') (circuit_id)",
+            "invalid characters, expected ASCII alphanumeric characters separated with a dash \
+            ('-') (circuit_id)",
         );
     }
 
@@ -298,7 +307,8 @@ mod tests {
         let result: Result<CircuitId, InvalidArgumentError> = s.try_into();
         assert_eq!(
             &result.unwrap_err().to_string(),
-            "invalid characters, expected ASCII alphanumeric characters separated with a dash ('-') (circuit_id)",
+            "invalid characters, expected ASCII alphanumeric characters separated with a dash \
+            ('-') (circuit_id)",
         );
     }
 
