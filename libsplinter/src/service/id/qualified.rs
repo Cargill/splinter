@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Implementation of fully qualified service id, FullyQualifiedServiceId.
+//! Implementation of fully qualified service ID, FullyQualifiedServiceId.
 
 use std::fmt;
 
@@ -30,8 +30,8 @@ const FQSI_MINIMUM_LEN: usize = CIRCUIT_ID_LEN + FQSI_SEPARATOR_LEN + 1;
 /// A `FullyQualifiedServiceId` consists of a [`CircuitId`] and [`ServiceId`]. The combination is
 /// considered to be fully-qualified because it contains enough context to identify a service.
 ///
-/// The string representation of a fully-qualified service identifier consists of a circuit id
-/// followed by a double-colon separator "::" followed by a service id.  For example, the string
+/// The string representation of a fully-qualified service identifier consists of a circuit ID
+/// followed by a double-colon separator "::" followed by a service ID. For example, the string
 /// "fuKi4-fhek3::93kd" is a valid fully-qualified service identifier.
 ///
 /// The acronym FQSI may be used to refer to a fully-qualified service identifier.
@@ -188,7 +188,8 @@ mod tests {
         let result = FullyQualifiedServiceId::new_from_string("abc?e-fghij::0011");
         assert_eq!(
             &result.unwrap_err().to_string(),
-            "invalid circuit id part: invalid characters, expected ASCII alphanumeric characters separated with a dash ('-') (fully_qualified_service_id)"
+            "invalid circuit id part: invalid characters, expected ASCII alphanumeric characters \
+            separated with a dash ('-') (fully_qualified_service_id)"
         );
     }
 
@@ -198,7 +199,8 @@ mod tests {
         let result = FullyQualifiedServiceId::new_from_string("abcde-fghij::00?0");
         assert_eq!(
             &result.unwrap_err().to_string(),
-            "invalid service id part: invalid characters, expected ASCII alphanumeric (fully_qualified_service_id)"
+            "invalid service id part: invalid characters, expected ASCII alphanumeric \
+            (fully_qualified_service_id)"
         );
     }
 
