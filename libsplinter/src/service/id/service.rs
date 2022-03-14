@@ -23,7 +23,7 @@ use crate::error::InvalidArgumentError;
 
 /// A service identifier.
 ///
-/// A service id consists of a string, with one of the following formats:
+/// A service ID consists of a string, with one of the following formats:
 ///
 /// - 4 character alphanumeric string (non-management circuits)
 /// - a public key hex string (management circuit only)

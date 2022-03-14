@@ -21,7 +21,7 @@ use rand::{distributions::Alphanumeric, Rng};
 
 use crate::error::InvalidArgumentError;
 
-// Circuit id strings are always 11 characters in length.
+// Circuit ID strings are always 11 characters in length.
 const CIRCUIT_ID_STR_LEN: usize = 11;
 
 /// A circuit identifier.
