@@ -47,13 +47,13 @@ impl From<ProtobufError> for SplinterError {
 
 impl From<HandshakeError<TcpStream>> for SplinterError {
     fn from(e: HandshakeError<TcpStream>) -> Self {
-        SplinterError::TLSError(format!("TLSError: {}", e.to_string()))
+        SplinterError::TLSError(format!("TLSError: {}", e))
     }
 }
 
 impl From<ErrorStack> for SplinterError {
     fn from(e: ErrorStack) -> Self {
-        SplinterError::TLSError(format!("TLSError: {}", e.to_string()))
+        SplinterError::TLSError(format!("TLSError: {}", e))
     }
 }
 

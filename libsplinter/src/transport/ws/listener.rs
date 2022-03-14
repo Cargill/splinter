@@ -56,7 +56,7 @@ impl Listener for WsListener {
 
 impl From<InvalidConnection<TcpStream, Buffer>> for AcceptError {
     fn from(iconn: InvalidConnection<TcpStream, Buffer>) -> Self {
-        AcceptError::ProtocolError(format!("HyperIntoWsError: {}", iconn.error.to_string()))
+        AcceptError::ProtocolError(format!("HyperIntoWsError: {}", iconn.error))
     }
 }
 

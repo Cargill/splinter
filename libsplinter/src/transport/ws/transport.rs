@@ -143,7 +143,7 @@ impl From<WebSocketError> for ConnectError {
     fn from(err: WebSocketError) -> Self {
         match err {
             WebSocketError::IoError(e) => ConnectError::from(e),
-            _ => ConnectError::ProtocolError(format!("WebSocketError: {}", err.to_string())),
+            _ => ConnectError::ProtocolError(format!("WebSocketError: {}", err)),
         }
     }
 }
