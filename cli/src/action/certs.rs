@@ -236,7 +236,6 @@ fn handle_skip(
     let server_key_path = private_cert_path.join(SERVER_KEY);
     let ca_key_path = private_cert_path.join(CA_KEY);
     let cert_path = cert_dir;
-    let mut ca;
 
     // if all exists, log existence and return
     if client_cert_path.exists()
@@ -328,7 +327,7 @@ fn handle_skip(
     }
 
     // if ca files exists, log and read the cert and key from the file
-    if ca_cert_path.exists() && ca_key_path.exists() {
+    let mut ca = if ca_cert_path.exists() && ca_key_path.exists() {
         info!(
             "CA certificate exists, skipping: {}",
             absolute_path(&ca_cert_path)?,
@@ -336,7 +335,7 @@ fn handle_skip(
         info!("CA key exists, skipping: {}", absolute_path(&ca_key_path)?);
         let ca_cert = get_ca_cert(&ca_cert_path)?;
         let ca_key = get_ca_key(&ca_key_path)?;
-        ca = Some((ca_key, ca_cert));
+        Some((ca_key, ca_cert))
     } else {
         // if the ca files do not exist, generate them
         info!("Writing file: {}/{}", absolute_path(&cert_path)?, CA_CERT);
@@ -346,8 +345,8 @@ fn handle_skip(
             CA_KEY
         );
         let (genearte_ca_key, generate_ca_cert) = write_ca(&cert_path, &private_cert_path)?;
-        ca = Some((genearte_ca_key, generate_ca_cert));
-    }
+        Some((genearte_ca_key, generate_ca_cert))
+    };
 
     // if the client files exist log
     if client_cert_path.exists() && client_key_path.exists() {
