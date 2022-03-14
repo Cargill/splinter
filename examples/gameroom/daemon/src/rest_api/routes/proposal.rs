@@ -182,9 +182,7 @@ fn list_proposals_from_db(
             let circuit_id = proposal.circuit_id.to_string();
             ApiGameroomProposal::from(
                 proposal,
-                proposal_members
-                    .remove(&circuit_id)
-                    .unwrap_or_else(Vec::new),
+                proposal_members.remove(&circuit_id).unwrap_or_default(),
             )
         })
         .collect::<Vec<ApiGameroomProposal>>();
