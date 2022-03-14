@@ -65,7 +65,7 @@ pub struct ScabbardState {
     merkle_state: merkle_state::MerkleState,
     commit_hash_store: Box<dyn CommitHashStore>,
     context_manager: ContextManager,
-    executor: Executor,
+    executor: Option<Executor>,
     current_state_root: String,
     receipt_store: Arc<dyn ReceiptStore>,
     pending_changes: Option<(String, Vec<TransactionReceipt>)>,
@@ -121,19 +121,6 @@ impl ScabbardState {
 
         // Initialize transact
         let context_manager = ContextManager::new(Box::new(merkle_state.clone()));
-        let mut executor = Executor::new(vec![Box::new(StaticExecutionAdapter::new_adapter(
-            vec![
-                Box::new(SawtoothToTransactHandlerAdapter::new(
-                    SabreTransactionHandler::new(Box::new(SettingsAdminPermission)),
-                )),
-                #[cfg(test)]
-                Box::new(CommandTransactionHandler::new()),
-            ],
-            context_manager.clone(),
-        )?)]);
-        executor
-            .start()
-            .map_err(|err| ScabbardStateError(format!("failed to start executor: {}", err)))?;
 
         // initialize committed_batches metric
         counter!("splinter.scabbard.committed_batches", 0,
@@ -145,7 +132,7 @@ impl ScabbardState {
             merkle_state,
             commit_hash_store,
             context_manager,
-            executor,
+            executor: None,
             current_state_root,
             receipt_store,
             pending_changes: None,
@@ -156,6 +143,32 @@ impl ScabbardState {
             circuit_id,
             batch_history: BatchHistory::new(),
         })
+    }
+
+    pub fn start_executor(&mut self) -> Result<(), ScabbardStateError> {
+        let mut executor = Executor::new(vec![Box::new(StaticExecutionAdapter::new_adapter(
+            vec![
+                Box::new(SawtoothToTransactHandlerAdapter::new(
+                    SabreTransactionHandler::new(Box::new(SettingsAdminPermission)),
+                )),
+                #[cfg(test)]
+                Box::new(CommandTransactionHandler::new()),
+            ],
+            self.context_manager.clone(),
+        )?)]);
+        executor
+            .start()
+            .map_err(|err| ScabbardStateError(format!("failed to start executor: {}", err)))?;
+
+        self.executor = Some(executor);
+
+        Ok(())
+    }
+
+    pub fn stop_executor(&mut self) {
+        if let Some(executor) = self.executor.take() {
+            executor.stop();
+        }
     }
 
     fn write_current_state_root(&self) -> Result<(), ScabbardStateError> {
@@ -201,6 +214,9 @@ impl ScabbardState {
     }
 
     pub fn prepare_change(&mut self, batch: BatchPair) -> Result<String, ScabbardStateError> {
+        let executor = self.executor.as_ref().ok_or_else(|| {
+            ScabbardStateError("attempting to prepare a change on a stopped service".into())
+        })?;
         // Setup the transact scheduler
         let (result_tx, result_rx) = std::sync::mpsc::channel();
         let mut scheduler = SerialScheduler::new(
@@ -216,8 +232,7 @@ impl ScabbardState {
         // Add the batch to, finalize, and execute the scheduler
         scheduler.add_batch(batch.clone())?;
         scheduler.finalize()?;
-        self.executor
-            .execute(scheduler.take_task_iterator()?, scheduler.new_notifier()?)?;
+        executor.execute(scheduler.take_task_iterator()?, scheduler.new_notifier()?)?;
 
         let mut recv_result: Option<BatchExecutionResult> = None;
 
@@ -1044,6 +1059,8 @@ mod tests {
         )
         .expect("Failed to initialize state");
 
+        state.start_executor().expect("Failed to start executor");
+
         // Set a value in state
         let address = "abcdef".to_string();
         let value = b"value".to_vec();
@@ -1080,6 +1097,8 @@ mod tests {
                 .expect("Failed to get state for unset address"),
             None,
         );
+
+        state.stop_executor();
     }
 
     /// Verify that the `ScabbardState::get_state_with_prefix` method works properly.
@@ -1116,6 +1135,8 @@ mod tests {
             vec![],
         )
         .expect("Failed to initialize state");
+
+        state.start_executor().expect("Failed to start executor");
 
         // Set some values in state
         let prefix = "abcdef".to_string();
@@ -1174,6 +1195,8 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .expect("Failed to collect entries under unset prefix");
         assert!(no_entries.is_empty());
+
+        state.stop_executor();
     }
 
     fn mock_transaction_receipt(id: &str) -> TransactionReceipt {
