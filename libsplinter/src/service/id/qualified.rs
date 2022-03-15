@@ -172,7 +172,7 @@ mod tests {
         );
     }
 
-    /// Tests that parsing a string which lackes a "::" separator gives an error.
+    /// Tests that parsing a string which lacks a "::" separator gives an error.
     #[test]
     fn test_fqsi_new_from_string_no_separator() {
         let result = FullyQualifiedServiceId::new_from_string("abcde-fghij--0011");

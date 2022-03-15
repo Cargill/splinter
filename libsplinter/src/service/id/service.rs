@@ -38,7 +38,7 @@ impl ServiceId {
     ///
     /// # Arguments
     ///
-    /// * `service_id` - A alphanumeric string of representing a service identifier.
+    /// * `service_id` - An alphanumeric string representing a service identifier.
     ///
     /// # Errors
     ///
@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(service_id.as_str(), "abcd")
     }
 
-    /// Tests successfully creating a ServiceId from a well-fromed `Box<str>` using
+    /// Tests successfully creating a ServiceId from a well-formed `Box<str>` using
     /// Box<str>::try_into().
     #[test]
     fn test_service_id_well_formed_from_box_str() {
@@ -218,7 +218,7 @@ mod tests {
         );
     }
 
-    /// Test successfully creation ServiceIds with ServiceId::new_random().
+    /// Test successful creation of ServiceIds with ServiceId::new_random().
     ///
     /// Calls new_random() many times and verifies that the results are reasonably random (that,
     /// for example, we aren't getting the same ServiceId every time).
@@ -245,7 +245,7 @@ mod tests {
         assert!(set.len() > (ITERATIONS as f32 * 0.9) as usize);
     }
 
-    /// Test that ServiceId is displayed as its alphanumberic string of characters.
+    /// Test that ServiceId is displayed as its alphanumeric string of characters.
     #[test]
     fn test_service_id_display_value() {
         let service_id: ServiceId = String::from("abcde")
