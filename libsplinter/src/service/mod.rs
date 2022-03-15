@@ -35,11 +35,57 @@
 //!  lower-level messaging and networking needs to talk to applications that implement Splinter
 //!  node capabilities, such as the Splinter daemon.
 
+#[cfg(feature = "service-arguments-converter")]
+mod arguments_converter;
 #[cfg(feature = "service-id")]
 mod id;
 pub mod instance;
+#[cfg(feature = "service-lifecycle")]
+mod lifecycle;
+#[cfg(feature = "service-message-converter")]
+mod message_converter;
+#[cfg(feature = "service-message-handler")]
+mod message_handler;
+#[cfg(feature = "service-message-handler-factory")]
+mod message_handler_factory;
+#[cfg(feature = "service-message-sender")]
+mod message_sender;
+#[cfg(feature = "service-message-sender-factory")]
+mod message_sender_factory;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
+#[cfg(feature = "service-routable")]
+mod routable;
+#[cfg(feature = "service-timer-filter")]
+mod timer_filter;
+#[cfg(feature = "service-timer-handler")]
+mod timer_handler;
+#[cfg(feature = "service-timer-handler-factory")]
+mod timer_handler_factory;
 
+#[cfg(feature = "service-arguments-converter")]
+pub use arguments_converter::ArgumentsConverter;
 #[cfg(feature = "service-id")]
 pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};
+#[cfg(feature = "service-lifecycle")]
+pub use lifecycle::Lifecycle;
+#[cfg(feature = "service-message-converter")]
+pub use message_converter::MessageConverter;
+#[cfg(feature = "service-message-handler")]
+pub use message_handler::MessageHandler;
+#[cfg(feature = "service-message-handler-factory")]
+pub use message_handler_factory::MessageHandlerFactory;
+#[cfg(feature = "service-message-sender")]
+use message_sender::IntoMessageSender;
+#[cfg(feature = "service-message-sender")]
+pub use message_sender::MessageSender;
+#[cfg(feature = "service-message-sender-factory")]
+pub use message_sender_factory::MessageSenderFactory;
+#[cfg(feature = "service-routable")]
+pub use routable::{Routable, Typed};
+#[cfg(feature = "service-timer-filter")]
+pub use timer_filter::TimerFilter;
+#[cfg(feature = "service-timer-handler")]
+pub use timer_handler::TimerHandler;
+#[cfg(feature = "service-timer-handler-factory")]
+pub use timer_handler_factory::TimerHandlerFactory;
