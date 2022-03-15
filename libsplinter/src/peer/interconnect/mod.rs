@@ -21,6 +21,7 @@
 //! [`PeerInterconnect`]: struct.PeerInterconnect.html
 //! [`PeerInterconnectBuilder`]: struct.PeerInterconnectBuilder.html
 //! [`ShutdownSignaler`]: struct.ShutdownSignaler.html
+mod error;
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -40,7 +41,7 @@ use crate::transport::matrix::{
 };
 
 use super::connector::{PeerLookup, PeerLookupProvider};
-use super::error::PeerInterconnectError;
+use self::error::PeerInterconnectError;
 use super::PeerTokenPair;
 
 const DEFAULT_PENDING_QUEUE_SIZE: usize = 100;
