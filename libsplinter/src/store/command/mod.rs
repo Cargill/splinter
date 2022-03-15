@@ -27,5 +27,10 @@ use crate::error::InternalError;
 pub trait StoreCommand {
     type Context;
 
+    /// Update the database using the provided connection
+    ///
+    /// # Arguments
+    ///
+    /// * `conn` - Connection to the database being updated
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError>;
 }
