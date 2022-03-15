@@ -23,7 +23,7 @@ use gameroom_database::DatabaseError;
 
 #[derive(Debug)]
 pub enum GameroomDaemonError {
-    LoggingInitialization(flexi_logger::FlexiLoggerError),
+    LoggingInitialization(Box<flexi_logger::FlexiLoggerError>),
     Configuration(Box<ConfigurationError>),
     Database(Box<DatabaseError>),
     RestApi(RestApiServerError),
@@ -76,7 +76,7 @@ impl fmt::Display for GameroomDaemonError {
 
 impl From<flexi_logger::FlexiLoggerError> for GameroomDaemonError {
     fn from(err: flexi_logger::FlexiLoggerError) -> GameroomDaemonError {
-        GameroomDaemonError::LoggingInitialization(err)
+        GameroomDaemonError::LoggingInitialization(Box::new(err))
     }
 }
 

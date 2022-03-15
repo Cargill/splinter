@@ -116,7 +116,7 @@ fn find_node_id(config: &Config) -> Result<String, UserError> {
         let node_id = config
             .node_id()
             .map(ToOwned::to_owned)
-            .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>().to_string()));
+            .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>()));
         let mut file = File::create(&node_id_path).map_err(|err| {
             UserError::io_err_with_source(
                 &format!("Unable to create node_id file {:?}", &node_id_path),

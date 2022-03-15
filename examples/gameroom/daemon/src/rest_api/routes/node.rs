@@ -82,7 +82,7 @@ pub async fn list_nodes(
         request_url = format!(
             "{}&filter={}",
             request_url,
-            utf8_percent_encode(filter, QUERY_ENCODE_SET).to_string()
+            utf8_percent_encode(filter, QUERY_ENCODE_SET)
         );
     }
 

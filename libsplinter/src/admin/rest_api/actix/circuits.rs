@@ -119,7 +119,7 @@ fn query_list_circuits<T: CircuitStore + 'static>(
         let circuits = store.circuits(filters.map(CircuitFilter::WithMember))?;
         let offset_value = offset.unwrap_or(0);
         let total = circuits.total();
-        let limit_value = limit.unwrap_or_else(|| total as usize);
+        let limit_value = limit.unwrap_or(total as usize);
 
         let circuits = circuits
             .skip(offset_value)

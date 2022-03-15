@@ -66,7 +66,7 @@ impl Handler for ServiceConnectRequestHandler {
             // If the circuit has the service in its roster and the service is not yet connected
             // forward the connection to the rest of the nodes on the circuit and add the service
             // to splinter state
-            if circuit.roster().contains(&service_id.to_string())
+            if circuit.roster().contains(service_id)
                 && !self
                     .state
                     .has_service(&unique_id)
@@ -107,7 +107,7 @@ impl Handler for ServiceConnectRequestHandler {
                 }
             // If the circuit exists and has the service in the roster but the service is already
             // connected, return an error response
-            } else if circuit.roster().contains(&service_id.to_string())
+            } else if circuit.roster().contains(service_id)
                 && self
                     .state
                     .has_service(&unique_id)
@@ -198,7 +198,7 @@ impl Handler for ServiceDisconnectRequestHandler {
             // If the circuit has the service in its roster and the service is connected
             // forward the disconnection to the rest of the nodes on the circuit and remove the
             // service from splinter state
-            if circuit.roster().contains(&service_id.to_string())
+            if circuit.roster().contains(service_id)
                 && self
                     .state
                     .has_service(&unique_id)
@@ -210,7 +210,7 @@ impl Handler for ServiceDisconnectRequestHandler {
                 response.set_status(ServiceDisconnectResponse_Status::OK);
             // If the circuit exists and has the service in the roster but the service not
             // connected, return an error response
-            } else if circuit.roster().contains(&service_id.to_string())
+            } else if circuit.roster().contains(service_id)
                 && !self
                     .state
                     .has_service(&unique_id)

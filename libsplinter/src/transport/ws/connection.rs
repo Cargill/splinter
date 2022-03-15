@@ -125,7 +125,7 @@ impl From<WebSocketError> for RecvError {
     fn from(err: WebSocketError) -> Self {
         match err {
             WebSocketError::IoError(e) => RecvError::from(e),
-            _ => RecvError::ProtocolError(format!("WebSocketError: {}", err.to_string())),
+            _ => RecvError::ProtocolError(format!("WebSocketError: {}", err)),
         }
     }
 }
@@ -134,7 +134,7 @@ impl From<WebSocketError> for SendError {
     fn from(err: WebSocketError) -> Self {
         match err {
             WebSocketError::IoError(e) => SendError::from(e),
-            _ => SendError::ProtocolError(format!("WebSocketError: {}", err.to_string())),
+            _ => SendError::ProtocolError(format!("WebSocketError: {}", err)),
         }
     }
 }

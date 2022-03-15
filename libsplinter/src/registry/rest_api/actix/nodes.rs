@@ -154,7 +154,7 @@ fn query_list_nodes(
         let nodes = registry.list_nodes(&filters)?;
         let offset_value = offset.unwrap_or(0);
         let total = nodes.len();
-        let limit_value = limit.unwrap_or_else(|| total as usize);
+        let limit_value = limit.unwrap_or(total as usize);
 
         let nodes = nodes
             .skip(offset_value)
