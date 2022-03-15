@@ -15,7 +15,9 @@
 //! Builder for Scabbard configuration
 
 use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
+use diesel::r2d2::{ConnectionManager, Pool};
 use splinter::error::InternalError;
 
 const DEFAULT_TEST_DB_SIZE: usize = 120 * 1024 * 1024;
@@ -25,7 +27,7 @@ const DEFAULT_TEST_DB_SIZE: usize = 120 * 1024 * 1024;
 pub struct ScabbardConfigBuilder {
     data_dir: Option<PathBuf>,
     database_size: Option<usize>,
-    receipt_db_url: Option<String>,
+    connection_pool: Option<Arc<RwLock<Pool<ConnectionManager<diesel::SqliteConnection>>>>>,
 }
 
 impl ScabbardConfigBuilder {
@@ -46,10 +48,11 @@ impl ScabbardConfigBuilder {
         self
     }
 
-    /// Sets the receipt db connection url that will be used for the scabbard service
-    /// receipt store
-    pub fn with_receipt_db_url(mut self, receipt_db_url: String) -> Self {
-        self.receipt_db_url = Some(receipt_db_url);
+    pub fn with_connection_pool(
+        mut self,
+        connection_pool: Arc<RwLock<Pool<ConnectionManager<diesel::SqliteConnection>>>>,
+    ) -> Self {
+        self.connection_pool = Some(connection_pool);
         self
     }
 
@@ -63,14 +66,15 @@ impl ScabbardConfigBuilder {
         let data_dir = self
             .data_dir
             .ok_or_else(|| InternalError::with_message("A data directory is required.".into()))?;
-        let receipt_db_url = self.receipt_db_url.ok_or_else(|| {
-            InternalError::with_message("A receipt database url is required.".into())
-        })?;
+
+        let connection_pool = self
+            .connection_pool
+            .ok_or_else(|| InternalError::with_message("A connection pool is required.".into()))?;
 
         Ok(ScabbardConfig {
             data_dir,
             database_size,
-            receipt_db_url,
+            connection_pool,
         })
     }
 }
@@ -81,6 +85,6 @@ pub struct ScabbardConfig {
     pub(crate) data_dir: PathBuf,
     /// The size of the LMDB databases that will be generated per scabbard service instance.
     pub(crate) database_size: usize,
-    /// The url of the receipt store database.
-    pub(crate) receipt_db_url: String,
+    /// The connection pool to use for state
+    pub(crate) connection_pool: Arc<RwLock<Pool<ConnectionManager<diesel::SqliteConnection>>>>,
 }
