@@ -17,7 +17,5 @@ use crate::error::InternalError;
 use super::{FullyQualifiedServiceId, Routable};
 
 pub trait TimerFilter: Routable {
-    type Message;
-
     fn filter(&self) -> Result<Vec<FullyQualifiedServiceId>, InternalError>;
 }
