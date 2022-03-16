@@ -21,8 +21,10 @@
 //! [`PeerInterconnect`]: struct.PeerInterconnect.html
 //! [`PeerInterconnectBuilder`]: struct.PeerInterconnectBuilder.html
 //! [`ShutdownSignaler`]: struct.ShutdownSignaler.html
+mod error;
+mod pending;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::Instant;
@@ -35,16 +37,18 @@ use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::threading::pacemaker;
 use crate::transport::matrix::{
-    ConnectionMatrixEnvelope, ConnectionMatrixReceiver, ConnectionMatrixRecvError,
-    ConnectionMatrixSender,
+    ConnectionMatrixReceiver, ConnectionMatrixRecvError, ConnectionMatrixSender,
 };
 
 use super::connector::{PeerLookup, PeerLookupProvider};
-use super::error::PeerInterconnectError;
 use super::PeerTokenPair;
 
-const DEFAULT_PENDING_QUEUE_SIZE: usize = 100;
-const DEFAULT_TIME_BETWEEN_ATTEMPTS: u64 = 10; // 10 seconds
+use self::error::PeerInterconnectError;
+use self::pending::{
+    run_pending_loop, PendingIncomingMsg, PendingOutgoingMsg, RetryMessage,
+    DEFAULT_TIME_BETWEEN_ATTEMPTS,
+};
+
 const DEFAULT_INITIAL_ATTEMPTS: usize = 3; // 3 attempts
 
 /// Message to send to the network message sender with the recipient and payload
@@ -108,7 +112,7 @@ pub struct PeerInterconnect {
     recv_join_handle: thread::JoinHandle<()>,
     send_join_handle: thread::JoinHandle<()>,
     recv_pending_join_handle: thread::JoinHandle<()>,
-    pending_shutdown_sender: Sender<RetryIncoming>,
+    pending_shutdown_sender: Sender<RetryMessage>,
     pacemaker_shutdown_signaler: pacemaker::ShutdownSignaler,
 }
 
@@ -129,7 +133,7 @@ impl ShutdownHandle for PeerInterconnect {
 
         if self
             .pending_shutdown_sender
-            .send(RetryIncoming::Shutdown)
+            .send(RetryMessage::Shutdown)
             .is_err()
         {
             warn!(
@@ -281,6 +285,7 @@ where
         let recv_peer_lookup = peer_lookup_provider.peer_lookup();
         let pending_network_dispatcher_sender = network_dispatcher_sender.clone();
         let pacemaker_pending_incoming_sender = pending_incoming_sender.clone();
+        let pending_outgoing_sender = pending_incoming_sender.clone();
         let pending_shutdown_sender = pending_incoming_sender.clone();
         debug!("Starting peer interconnect receiver");
         let recv_join_handle = thread::Builder::new()
@@ -302,14 +307,22 @@ where
                 ))
             })?;
 
+        let message_sender = self
+            .message_sender
+            .take()
+            .ok_or_else(|| PeerInterconnectError::StartUpError("Already started".to_string()))?;
+
+        let pending_message_sender = message_sender.clone();
+
         let pending_recv_peer_lookup = peer_lookup_provider.peer_lookup();
         let recv_pending_join_handle = thread::Builder::new()
-            .name("PeerInterconnect Pending Recv".into())
+            .name("PeerInterconnect Pending".into())
             .spawn(move || {
-                if let Err(err) = run_pending_recv_loop(
+                if let Err(err) = run_pending_loop(
                     &*pending_recv_peer_lookup,
                     pending_incoming_receiver,
                     pending_network_dispatcher_sender,
+                    pending_message_sender,
                 ) {
                     error!("Shutting down peer interconnect pending receiver: {}", err);
                 }
@@ -322,17 +335,17 @@ where
             })?;
 
         let send_peer_lookup = peer_lookup_provider.peer_lookup();
-        let message_sender = self
-            .message_sender
-            .take()
-            .ok_or_else(|| PeerInterconnectError::StartUpError("Already started".to_string()))?;
+
         debug!("Starting peer interconnect sender");
         let send_join_handle = thread::Builder::new()
             .name("PeerInterconnect Sender".into())
             .spawn(move || {
-                if let Err(err) =
-                    run_send_loop(&*send_peer_lookup, dispatched_receiver, message_sender)
-                {
+                if let Err(err) = run_send_loop(
+                    &*send_peer_lookup,
+                    dispatched_receiver,
+                    message_sender,
+                    pending_outgoing_sender,
+                ) {
                     error!("Shutting down peer interconnect sender: {}", err);
                 }
             })
@@ -347,7 +360,7 @@ where
         let pacemaker = pacemaker::Pacemaker::builder()
             .with_interval(DEFAULT_TIME_BETWEEN_ATTEMPTS)
             .with_sender(pacemaker_pending_incoming_sender)
-            .with_message_factory(|| RetryIncoming::Retry)
+            .with_message_factory(|| RetryMessage::Retry)
             .start()
             .map_err(|err| PeerInterconnectError::StartUpError(err.to_string()))?;
 
@@ -368,7 +381,7 @@ fn run_recv_loop<R>(
     peer_connector: &dyn PeerLookup,
     message_receiver: R,
     dispatch_msg_sender: DispatchMessageSender<NetworkMessageType>,
-    pending_sender: Sender<RetryIncoming>,
+    pending_sender: Sender<RetryMessage>,
 ) -> Result<(), String>
 where
     R: ConnectionMatrixReceiver + 'static,
@@ -431,7 +444,7 @@ where
                 }
             }
         } else {
-            match pending_sender.send(RetryIncoming::Pending(PendingIncomingMsg {
+            match pending_sender.send(RetryMessage::PendingIncoming(PendingIncomingMsg {
                 envelope,
                 last_attempt: Instant::now(),
                 remaining_attempts: DEFAULT_INITIAL_ATTEMPTS,
@@ -453,6 +466,7 @@ fn run_send_loop<S>(
     peer_connector: &dyn PeerLookup,
     receiver: Receiver<SendRequest>,
     message_sender: S,
+    pending_sender: Sender<RetryMessage>,
 ) -> Result<(), String>
 where
     S: ConnectionMatrixSender + 'static,
@@ -483,11 +497,15 @@ where
             None
         };
 
+        let mut pending = None;
         // if peer exists, send message over the network
         if let Some(connection_id) = connection_id {
             // If connection is missing, check with peer manager to see if connection id has
             // changed and try to resend message. Otherwise remove cached connection_id.
-            if let Err(err) = message_sender.send(connection_id.to_string(), payload.to_vec()) {
+            if message_sender
+                .send(connection_id.to_string(), payload.to_vec())
+                .is_err()
+            {
                 if let Some(new_connection_id) =
                     peer_connector.connection_id(&recipient).map_err(|err| {
                         format!("Unable to get connection ID for {}: {}", recipient, err)
@@ -497,140 +515,44 @@ where
                     if new_connection_id != connection_id {
                         peer_id_to_connection_id
                             .insert(recipient.clone(), new_connection_id.clone());
-                        if let Err(err) = message_sender.send(new_connection_id, payload) {
-                            error!("Unable to send message to {}: {}", recipient, err);
+                        if message_sender
+                            .send(new_connection_id, payload.to_vec())
+                            .is_err()
+                        {
+                            pending = Some((recipient, payload));
                         }
                     } else {
-                        error!("Unable to send message to {}: {}", recipient, err);
                         // remove cached connection id, peer has gone away
                         peer_id_to_connection_id.remove(&recipient);
+                        pending = Some((recipient, payload));
                     }
                 } else {
-                    error!("Unable to send message to {}: {}", recipient, err);
                     // remove cached connection id, peer has gone away
                     peer_id_to_connection_id.remove(&recipient);
+                    pending = Some((recipient, payload));
                 }
             }
         } else {
-            error!("Cannot send message, unknown peer: {}", recipient);
-        }
-    }
-}
-
-/// Internal struct for keeping track of an pending message whose peer was not known at time of
-/// receipt.
-struct PendingIncomingMsg {
-    envelope: ConnectionMatrixEnvelope,
-    last_attempt: Instant,
-    remaining_attempts: usize,
-}
-
-/// Message for telling the pending_recv_loop, to check if messages should be retried, a new
-/// message was received whose peer is currently missing, or to shutdown.
-enum RetryIncoming {
-    Retry,
-    Pending(PendingIncomingMsg),
-    Shutdown,
-}
-
-/// This thread is in charge of retrying messages that were received but interconnect did not yet
-/// have a matching peer ID for the connection ID. It is possible this peer did not exist yet due
-/// to timing so it should be retried in the future. The message will be rechecked serveral
-/// times, but if the peer is not added after a configured number of attempts the message will
-/// be dropped. The number of pending queue messages is limited to a set size.
-fn run_pending_recv_loop(
-    peer_connector: &dyn PeerLookup,
-    receiver: Receiver<RetryIncoming>,
-    dispatch_msg_sender: DispatchMessageSender<NetworkMessageType>,
-) -> Result<(), String> {
-    let mut connection_id_to_peer_id: HashMap<String, PeerTokenPair> = HashMap::new();
-    let mut pending_queue = VecDeque::new();
-    loop {
-        match receiver.recv() {
-            Ok(RetryIncoming::Pending(pending)) => {
-                if pending_queue.len() > DEFAULT_PENDING_QUEUE_SIZE {
-                    warn!(
-                        "PeerInterconnect pending recv queue is to large, dropping oldest message"
-                    );
-                    pending_queue.pop_front();
-                }
-                pending_queue.push_back(pending);
-                continue;
-            }
-            Ok(RetryIncoming::Retry) => (),
-            Ok(RetryIncoming::Shutdown) => {
-                info!("Received Shutdown");
-                break Ok(());
-            }
-            Err(_) => break Err("Pending retry receiver dropped".to_string()),
-        };
-
-        let mut still_need_retry = VecDeque::new();
-        for mut pending in pending_queue.into_iter() {
-            if pending.last_attempt.elapsed().as_secs() < DEFAULT_TIME_BETWEEN_ATTEMPTS {
-                still_need_retry.push_back(pending);
-                continue;
-            }
-
-            let connection_id = pending.envelope.id().to_string();
-            let peer_id = if let Some(peer_id) = connection_id_to_peer_id.get(&connection_id) {
-                Some(peer_id.to_owned())
-            } else if let Some(peer_id) = peer_connector
-                .peer_id(&connection_id)
-                .map_err(|err| format!("Unable to get peer ID for {}: {}", connection_id, err))?
-            {
-                connection_id_to_peer_id.insert(connection_id.to_string(), peer_id.clone());
-                Some(peer_id)
-            } else {
-                None
-            };
-
-            // If we have the peer, pass message to dispatcher, otherwise check if we should drop
-            // the message
-            if let Some(peer_id) = peer_id {
-                let mut network_msg: NetworkMessage =
-                    match Message::parse_from_bytes(pending.envelope.payload()) {
-                        Ok(msg) => msg,
-                        Err(err) => {
-                            error!("Unable to dispatch message: {}", err);
-                            continue;
-                        }
-                    };
-
-                trace!(
-                    "Received message from {}({}): {:?}",
-                    peer_id,
-                    connection_id,
-                    network_msg.get_message_type()
-                );
-                match dispatch_msg_sender.send(
-                    network_msg.get_message_type(),
-                    network_msg.take_payload(),
-                    peer_id.into(),
-                ) {
-                    Ok(()) => (),
-                    Err((message_type, _, _)) => {
-                        error!("Unable to dispatch message of type {:?}", message_type)
-                    }
-                }
-            } else if pending.remaining_attempts > 0 {
-                pending.remaining_attempts -= 1;
-                debug!(
-                    "Received message from removed or unknown peer with connection_id {},\
-                         attempts left {}",
-                    connection_id, pending.remaining_attempts
-                );
-                still_need_retry.push_back(pending);
-            } else {
-                error!(
-                    "Received message from removed or unknown peer with connection_id {},\
-                    dropping",
-                    connection_id
-                );
-            }
+            pending = Some((recipient, payload));
         }
 
-        pending_queue = still_need_retry;
+        if let Some((recipient, payload)) = pending {
+            match pending_sender.send(RetryMessage::PendingOutgoing(PendingOutgoingMsg {
+                recipient: recipient.clone(),
+                payload,
+                last_attempt: Instant::now(),
+                remaining_attempts: DEFAULT_INITIAL_ATTEMPTS,
+            })) {
+                Ok(()) => debug!(
+                    "Trying to send message to removed or unknown connection with peer_id {},\
+                             adding to pending, attempts left {}",
+                    recipient, DEFAULT_INITIAL_ATTEMPTS
+                ),
+                Err(_) => {
+                    error!("Unable to send message to pending message thread");
+                }
+            }
+        }
     }
 }
 
