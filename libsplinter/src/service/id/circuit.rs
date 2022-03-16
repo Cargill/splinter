@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(circuit_id.as_str(), "abcde-1abcd")
     }
 
-    /// Tests successfully creating a CircuitId from a well-fromed `Box<str>` using
+    /// Tests successfully creating a CircuitId from a well-formed `Box<str>` using
     /// Box<str>::try_into().
     #[test]
     fn test_circuit_id_well_formed_from_box_str() {
@@ -339,7 +339,7 @@ mod tests {
         assert!(set.len() > (ITERATIONS as f32 * 0.9) as usize);
     }
 
-    /// Test that CircuitId is displayed as its alphanumberic string of characters.
+    /// Test that CircuitId is displayed as its alphanumeric string of characters.
     #[test]
     fn test_circuit_id_display_value() {
         let circuit_id: CircuitId = String::from("abcde-01234")
