@@ -18,8 +18,13 @@ use std::collections::HashMap;
 use std::fs::File;
 
 use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+use diesel::Connection;
 use splinter::error::{InternalError, InvalidArgumentError};
+use splinter::migrations::run_sqlite_migrations;
 use splinter::registry::Node as RegistryNode;
+use splinter::store::sqlite::{
+    create_sqlite_connection_pool_with_write_exclusivity, SqliteStoreFactory,
+};
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinterd::node::{
     Node, NodeBuilder, PermissionConfig, RestApiVariant, RunnableNode, ScabbardConfigBuilder,
@@ -90,31 +95,34 @@ impl Network {
             File::create(temp_db_path.clone())
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
+            run_sqlite_migrations(
+                &diesel::SqliteConnection::establish(&temp_db_path.to_string_lossy())
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?,
+            )?;
+
+            let pool = create_sqlite_connection_pool_with_write_exclusivity(
+                &temp_db_path.to_string_lossy(),
+            )?;
+
             let mut signers = Vec::new();
             for _ in 0..self.num_of_keys {
                 signers.push(context.new_signer(context.new_random_private_key()));
             }
+
+            let store_factory = SqliteStoreFactory::new_with_write_exclusivity(pool.clone());
 
             let mut builder = NodeBuilder::new()
                 .with_rest_api_variant(self.default_rest_api_variant)
                 .with_scabbard(
                     ScabbardConfigBuilder::new()
                         .with_data_dir(temp_dir.path().to_path_buf())
-                        .with_receipt_db_url(
-                            temp_db_path
-                                .to_str()
-                                .ok_or_else(|| {
-                                    InternalError::with_message(
-                                        "failed to convert db path to str".to_string(),
-                                    )
-                                })?
-                                .to_string(),
-                        )
+                        .with_connection_pool(pool)
                         .build()?,
                 )
                 .with_admin_signer(admin_signer)
                 .with_signers(signers)
                 .with_external_registries(self.external_registries.clone())
+                .with_store_factory(Box::new(store_factory))
                 .with_biome_enabled()
                 .with_permission_config(self.permission_config.clone())
                 .with_client_auth(self.auth.clone());

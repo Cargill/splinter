@@ -18,10 +18,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use cylinder::VerifierFactory;
-use diesel::{
-    r2d2::{ConnectionManager, Pool},
-    sqlite::SqliteConnection,
-};
 use scabbard::service::ScabbardFactoryBuilder;
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
@@ -194,21 +190,22 @@ impl AdminSubsystemBuilder {
         let scabbard_service_factory = self
             .scabbard_config
             .map(|config| {
-                let connection_manager =
-                    ConnectionManager::<SqliteConnection>::new(config.receipt_db_url.clone());
-                let pool = Pool::builder()
-                    .build(connection_manager)
-                    .expect("Failed to build connection pool");
-
-                scabbard::migrations::run_sqlite_migrations(
-                    &*pool.get().expect("Failed to get connection for migrations"),
-                )
-                .expect("Failed to run migrations");
+                {
+                    let pool = config.connection_pool.write().map_err(|_| {
+                        InternalError::with_message(
+                            "Cannot build AdminSubsystem, connection pool lock poisoned".into(),
+                        )
+                    })?;
+                    scabbard::migrations::run_sqlite_migrations(
+                        &*pool.get().expect("Failed to get connection for migrations"),
+                    )
+                    .expect("Failed to run migrations");
+                }
 
                 ScabbardFactoryBuilder::new()
                     .with_lmdb_state_db_dir(config.data_dir.to_string_lossy().into())
                     .with_lmdb_state_db_size(config.database_size)
-                    .with_storage_configuration(config.receipt_db_url.as_str().into())
+                    .with_storage_configuration(config.connection_pool.into())
                     .with_signature_verifier_factory(signing_context.clone())
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))
