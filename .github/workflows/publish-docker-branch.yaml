@@ -1,6 +1,7 @@
 name: Publish Docker Images
 
 on:
+  workflow_dispatch:
   workflow_run:
     workflows: ["Merge"]
     types:
@@ -14,13 +15,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  start_cluster_main:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.repository_owner == 'Cargill'
+    name: Start buildx cluster
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-buildx-cluster.outputs.label }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - uses: actions/checkout@v2
+
+      - name: Start EC2 runner
+        id: start-buildx-cluster
+        uses: ./.github/actions/ec2-docker-buildx
+        with:
+          action: start
+          amd_ami_id: ${{ secrets.AMD_AMI_ID }}
+          amd_instance_type: c6i.4xlarge
+          arm_ami_id: ${{ secrets.ARM_AMI_ID }}
+          arm_instance_type: c6g.4xlarge
+          gh_personal_access_token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          security_group_id: ${{ secrets.SECURITY_GROUP_ID }}
+          subnet: ${{ secrets.SUBNET }}
+
+      - name: Test output
+        run: echo ${{ steps.start-buildx-cluster.outputs.label }}
+
   publish_docker_main:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.repository_owner == 'Cargill'
-    runs-on: ubuntu-18.04
+    needs:
+      - start_cluster_main
+    runs-on: ${{ needs.start_cluster_main.outputs.label }}
     steps:
       - name: Display envvars
         run: env
@@ -36,7 +77,7 @@ jobs:
           fetch-depth: 0
 
       - name: Publish branch to dockerhub
-        run: ./ci/publish-docker main
+        run: docker buildx ls && ./ci/publish-docker main
         env:
           NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
           VERSION: AUTO_STRICT
@@ -50,3 +91,142 @@ jobs:
           fields: repo,message,author,job
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  stop_cluster_main:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.repository_owner == 'Cargill' &&
+      always()
+    name: Stop buildx cluster
+    needs:
+      - start_cluster_main
+      - publish_docker_main
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - uses: actions/checkout@v2
+
+      - name: Destroy cluster
+        uses: ./.github/actions/ec2-docker-buildx
+        with:
+          action: stop
+          label: ${{ needs.start_cluster_main.outputs.label }}
+
+# --== experimental images ==--
+
+  start_cluster_experimental:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.repository_owner == 'Cargill'
+    name: Start buildx cluster
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-buildx-cluster.outputs.label }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - uses: actions/checkout@v2
+
+      - name: Start EC2 runner
+        id: start-buildx-cluster
+        uses: ./.github/actions/ec2-docker-buildx
+        with:
+          action: start
+          amd_ami_id: ${{ secrets.AMD_AMI_ID }}
+          amd_instance_type: c6i.4xlarge
+          arm_ami_id: ${{ secrets.ARM_AMI_ID }}
+          arm_instance_type: c6g.4xlarge
+          gh_personal_access_token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          security_group_id: ${{ secrets.SECURITY_GROUP_ID }}
+          subnet: ${{ secrets.SUBNET }}
+
+      - name: Test output
+        run: echo ${{ steps.start-buildx-cluster.outputs.label }}
+
+  publish_docker_experimental:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.repository_owner == 'Cargill'
+    needs:
+      - start_cluster_experimental
+    runs-on: ${{ needs.start_cluster_experimental.outputs.label }}
+    steps:
+      - name: Display envvars
+        run: env
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Publish branch to dockerhub
+        run: docker buildx ls && ./ci/publish-docker experimental
+        env:
+          NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
+          VERSION: AUTO_STRICT
+          CARGO_TERM_COLOR: always
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  stop_cluster_experimental:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.repository_owner == 'Cargill' &&
+      always()
+    name: Stop buildx cluster
+    needs:
+      - start_cluster_experimental
+      - publish_docker_experimental
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - uses: actions/checkout@v2
+
+      - name: Destroy cluster
+        uses: ./.github/actions/ec2-docker-buildx
+        with:
+          action: stop
+          label: ${{ needs.start_cluster_experimental.outputs.label }}
