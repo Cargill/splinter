@@ -96,3 +96,177 @@ impl ServiceDispatcher {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::sync::mpsc::{channel, Sender};
+
+    use crate::runtime::service::SingleThreadedMessageHandlerTaskRunner;
+    use crate::service::{MessageHandler, MessageSender, Routable, ServiceId, ServiceType};
+
+    use std::collections::HashMap;
+
+    /// Test that a given service id may be routed
+    #[test]
+    fn test_is_routable() -> Result<(), Box<dyn std::error::Error>> {
+        let (tx, _rx) = channel();
+        let resolver = TestResolver::new([(
+            FullyQualifiedServiceId::new_from_string("JgsDS-2eRnC::a000")?,
+            "testtype".to_string(),
+        )]);
+
+        let service_dispatcher = ServiceDispatcher::new(
+            vec![TestMessageHandlerFactory.into_boxed()],
+            Box::new(TestMessageSenderFactory { tx }),
+            Box::new(resolver),
+            Box::new(SingleThreadedMessageHandlerTaskRunner::new()),
+        );
+
+        assert!(
+            service_dispatcher.is_routable(&FullyQualifiedServiceId::new_from_string(
+                "JgsDS-2eRnC::a000"
+            )?)?
+        );
+        assert!(
+            !service_dispatcher.is_routable(&FullyQualifiedServiceId::new_from_string(
+                "AAAAA-BBBBB::a000"
+            )?)?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_dispatch() -> Result<(), Box<dyn std::error::Error>> {
+        let (tx, rx) = channel();
+        let resolver = TestResolver::new([(
+            FullyQualifiedServiceId::new_from_string("JgsDS-2eRnC::a000")?,
+            "testtype".to_string(),
+        )]);
+
+        let service_dispatcher = ServiceDispatcher::new(
+            vec![TestMessageHandlerFactory.into_boxed()],
+            Box::new(TestMessageSenderFactory { tx }),
+            Box::new(resolver),
+            Box::new(SingleThreadedMessageHandlerTaskRunner::new()),
+        );
+
+        let to_service = FullyQualifiedServiceId::new_from_string("JgsDS-2eRnC::a000")?;
+        let from_service = FullyQualifiedServiceId::new_from_string("AAAAA-BBBBB::a000")?;
+
+        service_dispatcher.dispatch(to_service.clone(), from_service.clone(), b"hello".to_vec())?;
+
+        let (scope, to, out_msg) = rx.recv()?;
+
+        assert_eq!(scope, to_service);
+        assert_eq!(&to, from_service.service_id());
+        assert_eq!(&out_msg, b"hello;out");
+
+        Ok(())
+    }
+
+    struct TestResolver {
+        mapping: HashMap<FullyQualifiedServiceId, String>,
+    }
+
+    impl TestResolver {
+        fn new<const N: usize>(entries: [(FullyQualifiedServiceId, String); N]) -> Self {
+            Self {
+                mapping: entries.into(),
+            }
+        }
+    }
+
+    impl ServiceTypeResolver for TestResolver {
+        fn resolve_type(
+            &self,
+            service_id: &FullyQualifiedServiceId,
+        ) -> Result<Option<ServiceType>, InternalError> {
+            Ok(self
+                .mapping
+                .get(service_id)
+                .cloned()
+                .map(|s| ServiceType::new(s).unwrap()))
+        }
+    }
+
+    #[derive(Clone)]
+    struct TestMessageHandlerFactory;
+
+    impl MessageHandlerFactory for TestMessageHandlerFactory {
+        type MessageHandler = TestMessageHandler;
+
+        fn new_handler(&self) -> Self::MessageHandler {
+            TestMessageHandler
+        }
+
+        fn clone_boxed(
+            &self,
+        ) -> Box<dyn MessageHandlerFactory<MessageHandler = Self::MessageHandler>> {
+            Box::new(self.clone())
+        }
+    }
+
+    const TEST_TYPES: &'static [ServiceType] = &[ServiceType::new_static("testtype")];
+
+    impl Routable for TestMessageHandlerFactory {
+        fn service_types(&self) -> &[ServiceType] {
+            TEST_TYPES
+        }
+    }
+
+    struct TestMessageHandler;
+
+    impl MessageHandler for TestMessageHandler {
+        type Message = Vec<u8>;
+
+        fn handle_message(
+            &mut self,
+            sender: &dyn MessageSender<Self::Message>,
+            _to_service: FullyQualifiedServiceId,
+            from_service: FullyQualifiedServiceId,
+            message: Self::Message,
+        ) -> Result<(), InternalError> {
+            let mut msg = message;
+            msg.extend(b";out");
+
+            sender.send(from_service.service_id(), msg)
+        }
+    }
+
+    struct TestMessageSender {
+        scope: FullyQualifiedServiceId,
+        tx: Sender<(FullyQualifiedServiceId, ServiceId, Vec<u8>)>,
+    }
+
+    impl MessageSender<Vec<u8>> for TestMessageSender {
+        fn send(&self, to_service: &ServiceId, message: Vec<u8>) -> Result<(), InternalError> {
+            self.tx
+                .send((self.scope.clone(), to_service.clone(), message))
+                .map_err(|_| InternalError::with_message("Receiver dropped".into()))
+        }
+    }
+
+    #[derive(Clone)]
+    struct TestMessageSenderFactory {
+        tx: Sender<(FullyQualifiedServiceId, ServiceId, Vec<u8>)>,
+    }
+
+    impl MessageSenderFactory<Vec<u8>> for TestMessageSenderFactory {
+        fn new_message_sender(
+            &self,
+            from_service: &FullyQualifiedServiceId,
+        ) -> Result<Box<dyn MessageSender<Vec<u8>>>, InternalError> {
+            Ok(Box::new(TestMessageSender {
+                scope: from_service.clone(),
+                tx: self.tx.clone(),
+            }))
+        }
+
+        fn clone_boxed(&self) -> Box<dyn MessageSenderFactory<Vec<u8>>> {
+            Box::new(self.clone())
+        }
+    }
+}
