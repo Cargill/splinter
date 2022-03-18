@@ -14,7 +14,7 @@
 
 [package]
 name = "scabbard"
-version = "0.6.9"
+version = "0.6.10"
 authors = ["Cargill Incorporated"]
 edition = "2018"
 license = "Apache-2.0"
