@@ -30,6 +30,8 @@ pub use dispatch::ServiceDispatcher;
 pub use dispatch::ServiceTypeResolver;
 #[cfg(feature = "service-message-handler-dispatch")]
 pub use dispatch::SingleThreadedMessageHandlerTaskRunner;
+#[cfg(feature = "service-message-handler-dispatch")]
+pub use dispatch::{MessageHandlerTaskPool, MessageHandlerTaskPoolBuilder};
 #[cfg(all(feature = "diesel", feature = "service-lifecycle-store"))]
 pub use lifecycle_executor::DieselLifecycleStore;
 #[cfg(all(feature = "service-lifecycle-store", feature = "postgres"))]
