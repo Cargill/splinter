@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{message_handler::IntoMessageHandler, MessageConverter, MessageHandler};
+use super::{
+    message_handler::IntoMessageHandler, MessageConverter, MessageHandler, Routable, ServiceType,
+};
 
-pub trait MessageHandlerFactory: Send {
+pub trait MessageHandlerFactory: Routable + Send {
     type MessageHandler: MessageHandler;
 
     fn new_handler(&self) -> Self::MessageHandler;
@@ -106,6 +108,15 @@ where
     }
 }
 
+impl<F, C, R> Routable for IntoMessageHandlerFactory<F, C, R>
+where
+    F: MessageHandlerFactory,
+{
+    fn service_types(&self) -> &[ServiceType<'_>] {
+        self.inner.service_types()
+    }
+}
+
 impl<F, C, R> Clone for IntoMessageHandlerFactory<F, C, R>
 where
     F: MessageHandlerFactory + Clone + 'static,
@@ -169,5 +180,14 @@ where
         Box::new(Self {
             inner: self.inner.clone(),
         })
+    }
+}
+
+impl<F> Routable for BoxedMessageHandlerFactory<F>
+where
+    F: MessageHandlerFactory,
+{
+    fn service_types(&self) -> &[ServiceType<'_>] {
+        self.inner.service_types()
     }
 }
