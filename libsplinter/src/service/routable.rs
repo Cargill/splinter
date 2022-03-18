@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::ServiceType;
+
 pub trait Routable {
-    fn service_types(&self) -> &[String];
+    fn service_types(&self) -> &[ServiceType];
 }
 
 pub trait Typed {
