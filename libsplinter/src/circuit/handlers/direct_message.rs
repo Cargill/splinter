@@ -147,7 +147,7 @@ impl Handler for CircuitDirectMessageHandler {
 
                             (network_msg_bytes, node_peer_id)
                         } else {
-                            let peer_id: PeerId = match service.peer_id() {
+                            let peer_id: PeerId = match service.local_peer_id() {
                                 Some(peer_id) => peer_id.clone().into(),
                                 None => {
                                     // This should never happen, as a peer id will always
@@ -275,11 +275,11 @@ mod tests {
             vec![],
         );
 
-        service_abc.set_peer_id(PeerTokenPair::new(
+        service_abc.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("abc_network"),
             PeerAuthorizationToken::from_peer_id("123"),
         ));
-        service_def.set_peer_id(PeerTokenPair::new(
+        service_def.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("def_network"),
             PeerAuthorizationToken::from_peer_id("345"),
         ));
@@ -373,11 +373,11 @@ mod tests {
             vec![],
         );
 
-        service_abc.set_peer_id(PeerTokenPair::new(
+        service_abc.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("abc_network"),
             PeerAuthorizationToken::from_peer_id("123"),
         ));
-        service_def.set_peer_id(PeerTokenPair::new(
+        service_def.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("def_network"),
             PeerAuthorizationToken::from_peer_id("345"),
         ));
@@ -465,7 +465,7 @@ mod tests {
             vec![],
         );
 
-        service_abc.set_peer_id(PeerTokenPair::new(
+        service_abc.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("abc_network"),
             PeerAuthorizationToken::from_peer_id("123"),
         ));
@@ -554,7 +554,7 @@ mod tests {
             vec![],
         );
 
-        service_def.set_peer_id(PeerTokenPair::new(
+        service_def.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("def_network"),
             PeerAuthorizationToken::from_peer_id("345"),
         ));
