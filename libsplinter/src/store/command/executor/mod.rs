@@ -36,11 +36,3 @@ pub trait StoreCommandExecutor {
         store_commands: Vec<C>,
     ) -> Result<(), InternalError>;
 }
-
-impl<C> StoreCommand for Box<dyn StoreCommand<Context = C>> {
-    type Context = C;
-
-    fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
-        (&**self).execute(conn)
-    }
-}
