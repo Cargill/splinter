@@ -185,25 +185,6 @@ impl fmt::Display for PeerUpdateError {
     }
 }
 
-/// Errors that could be raised by `PeerInterconnect`
-#[derive(Debug, PartialEq)]
-pub enum PeerInterconnectError {
-    /// `PeerInterconnect` start up failed
-    StartUpError(String),
-}
-
-impl error::Error for PeerInterconnectError {}
-
-impl fmt::Display for PeerInterconnectError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            PeerInterconnectError::StartUpError(msg) => {
-                write!(f, "Unable to start peer interconnect: {}", msg)
-            }
-        }
-    }
-}
-
 /// Errors that could be raised when looking up a peer
 #[derive(Debug)]
 pub struct PeerLookupError(pub String);
