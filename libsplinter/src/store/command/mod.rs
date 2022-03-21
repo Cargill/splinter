@@ -34,3 +34,11 @@ pub trait StoreCommand {
     /// * `conn` - Connection to the database being updated
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError>;
 }
+
+impl<C> StoreCommand for Box<dyn StoreCommand<Context = C>> {
+    type Context = C;
+
+    fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
+        (&**self).execute(conn)
+    }
+}
