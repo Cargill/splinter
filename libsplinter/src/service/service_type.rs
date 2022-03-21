@@ -54,7 +54,7 @@ macro_rules! invalid_arg_error {
     };
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct ServiceType<'a>(ServiceTypeInner<'a>);
 
 impl<'a> ServiceType<'a> {
@@ -143,7 +143,7 @@ impl<'a> Display for ServiceType<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 enum ServiceTypeInner<'a> {
     Borrowed(&'a str),
     Owned(Box<str>),
