@@ -99,11 +99,11 @@ impl ServiceInstances for RoutingTableServiceInstances {
             return Err(ServiceAddInstanceError::NotAllowed);
         }
 
-        if service.peer_id().is_some() {
+        if service.local_peer_id().is_some() {
             return Err(ServiceAddInstanceError::AlreadyRegistered);
         }
 
-        service.set_peer_id(PeerTokenPair::new(
+        service.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id(&component_id),
             PeerAuthorizationToken::from_peer_id(&self.node_id),
         ));
@@ -132,11 +132,11 @@ impl ServiceInstances for RoutingTableServiceInstances {
             })?
             .ok_or(ServiceRemoveInstanceError::NotRegistered)?;
 
-        if service.peer_id().is_none() {
+        if service.local_peer_id().is_none() {
             return Err(ServiceRemoveInstanceError::NotRegistered);
         }
 
-        service.remove_peer_id();
+        service.remove_local_peer_id();
 
         let mut writer = self.routing_table_writer.clone();
         writer.add_service(service_id, service).map_err(|err| {
@@ -222,7 +222,7 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .expect("Missing service");
-        service.set_peer_id(PeerTokenPair::new(
+        service.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("abc_network"),
             PeerAuthorizationToken::from_peer_id("123"),
         ));
@@ -271,7 +271,7 @@ mod tests {
                 .get_service(&id)
                 .expect("cannot check if it has the service")
                 .expect("no service returned")
-                .peer_id(),
+                .local_peer_id(),
             &Some(PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("my_component"),
                 PeerAuthorizationToken::from_peer_id("123"),
@@ -324,7 +324,7 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .expect("Missing service");
-        service.set_peer_id(PeerTokenPair::new(
+        service.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("abc_network"),
             PeerAuthorizationToken::from_peer_id("123"),
         ));
@@ -344,7 +344,7 @@ mod tests {
             .get_service(&id)
             .expect("cannot check if it has the service")
             .expect("no service returned")
-            .peer_id()
+            .local_peer_id()
             .is_none());
     }
 
