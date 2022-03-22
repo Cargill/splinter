@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod instance;
-#[cfg(feature = "service-lifecycle-executor")]
-mod lifecycle_executor;
+//! This module contains an Executor for running lifecycles
+
+#[cfg(feature = "service-lifecycle-store")]
+mod store;
+
+#[cfg(feature = "service-lifecycle-store")]
+pub use store::{
+    service::{LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus},
+};
