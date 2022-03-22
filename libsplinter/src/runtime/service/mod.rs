@@ -15,3 +15,9 @@
 pub mod instance;
 #[cfg(feature = "service-lifecycle-executor")]
 mod lifecycle_executor;
+
+#[cfg(feature = "service-lifecycle-executor")]
+pub use lifecycle_executor::{
+    LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus, LifecycleStore,
+    LifecycleStoreError,
+};

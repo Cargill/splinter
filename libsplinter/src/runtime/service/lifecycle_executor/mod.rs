@@ -19,5 +19,7 @@ mod store;
 
 #[cfg(feature = "service-lifecycle-store")]
 pub use store::{
+    error::LifecycleStoreError,
     service::{LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus},
+    LifecycleStore,
 };
