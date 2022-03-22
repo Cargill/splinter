@@ -95,7 +95,7 @@ impl Handler for ServiceConnectRequestHandler {
 
                 // If the circuit exists and has the service in the roster but the service is already
                 // connected, return an error response
-                if service.peer_id().is_some() {
+                if service.local_peer_id().is_some() {
                     response.set_status(
                         ServiceConnectResponse_Status::ERROR_SERVICE_ALREADY_REGISTERED,
                     );
@@ -105,7 +105,8 @@ impl Handler for ServiceConnectRequestHandler {
                     response.set_status(ServiceConnectResponse_Status::ERROR_NOT_AN_ALLOWED_NODE);
                     response.set_error_message(format!("{} is not allowed on this node", unique_id))
                 } else {
-                    service.set_peer_id(PeerTokenPair::from(context.source_peer_id().clone()));
+                    service
+                        .set_local_peer_id(PeerTokenPair::from(context.source_peer_id().clone()));
                     let mut writer = self.routing_table_writer.clone();
                     writer
                         .add_service(unique_id, service)
@@ -214,8 +215,8 @@ impl Handler for ServiceDisconnectRequestHandler {
                         DispatchError::HandleError(format!("Unable to get service {}", service_id))
                     })?;
 
-                if service.peer_id().is_some() {
-                    service.remove_peer_id();
+                if service.local_peer_id().is_some() {
+                    service.remove_local_peer_id();
                     let mut writer = self.routing_table_writer.clone();
                     writer
                         .add_service(unique_id, service)
@@ -482,7 +483,7 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .unwrap();
-        service.set_peer_id(
+        service.set_local_peer_id(
             PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("abc_network"),
                 PeerAuthorizationToken::from_peer_id("123"),
@@ -664,7 +665,7 @@ mod tests {
             .get_service(&id)
             .expect("Unable to get service")
             .unwrap();
-        service.set_peer_id(
+        service.set_local_peer_id(
             PeerTokenPair::new(
                 PeerAuthorizationToken::from_peer_id("abc_network"),
                 PeerAuthorizationToken::from_peer_id("123"),

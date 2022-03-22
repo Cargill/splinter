@@ -55,7 +55,7 @@ impl Handler for CircuitErrorHandler {
                 let node_id = service.node_id();
                 if node_id == self.node_id {
                     // If the service is connected to this node, send the error to the service
-                    match service.peer_id() {
+                    match service.local_peer_id() {
                         Some(peer_id) => peer_id.clone(),
                         None => {
                             // This should never happen, as a peer id will always
@@ -205,11 +205,11 @@ mod tests {
 
         let abc_id = ServiceId::new("alpha".into(), "abc".into());
         let def_id = ServiceId::new("alpha".into(), "def".into());
-        service_abc.set_peer_id(PeerTokenPair::new(
+        service_abc.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("abc_network"),
             PeerAuthorizationToken::from_peer_id("123"),
         ));
-        service_def.set_peer_id(PeerTokenPair::new(
+        service_def.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("def_network"),
             PeerAuthorizationToken::from_peer_id("345"),
         ));
@@ -310,11 +310,11 @@ mod tests {
 
         let abc_id = ServiceId::new("alpha".into(), "abc".into());
         let def_id = ServiceId::new("alpha".into(), "def".into());
-        service_abc.set_peer_id(PeerTokenPair::new(
+        service_abc.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("abc_network"),
             PeerAuthorizationToken::from_peer_id("123"),
         ));
-        service_def.set_peer_id(PeerTokenPair::new(
+        service_def.set_local_peer_id(PeerTokenPair::new(
             PeerAuthorizationToken::from_peer_id("def_network"),
             PeerAuthorizationToken::from_peer_id("345"),
         ));
