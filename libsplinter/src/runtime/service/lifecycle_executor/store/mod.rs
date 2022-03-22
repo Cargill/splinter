@@ -45,3 +45,7 @@ pub trait LifecycleStore {
         status: &LifecycleStatus,
     ) -> Result<Vec<LifecycleService>, LifecycleStoreError>;
 }
+
+pub trait LifecycleStoreFactory<C>: Sync + Send {
+    fn new_store<'a>(&'a self, conn: &'a C) -> Box<dyn LifecycleStore + 'a>;
+}

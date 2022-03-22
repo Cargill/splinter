@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod factory;
 mod models;
 mod operations;
 mod schema;
@@ -24,7 +25,7 @@ use diesel::{
 };
 
 use crate::runtime::service::{
-    LifecycleService, LifecycleStatus, LifecycleStore, LifecycleStoreError,
+    LifecycleService, LifecycleStatus, LifecycleStore, LifecycleStoreError, LifecycleStoreFactory,
 };
 use crate::service::FullyQualifiedServiceId;
 use crate::store::pool::ConnectionPool;

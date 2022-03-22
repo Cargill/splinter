@@ -18,8 +18,12 @@ mod lifecycle_executor;
 
 #[cfg(all(feature = "diesel", feature = "service-lifecycle-store"))]
 pub use lifecycle_executor::DieselLifecycleStore;
+#[cfg(all(feature = "service-lifecycle-store", feature = "postgres"))]
+pub use lifecycle_executor::PostgresLifecycleStoreFactory;
+#[cfg(all(feature = "service-lifecycle-store", feature = "sqlite"))]
+pub use lifecycle_executor::SqliteLifecycleStoreFactory;
 #[cfg(feature = "service-lifecycle-executor")]
 pub use lifecycle_executor::{
     LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus, LifecycleStore,
-    LifecycleStoreError,
+    LifecycleStoreError, LifecycleStoreFactory,
 };

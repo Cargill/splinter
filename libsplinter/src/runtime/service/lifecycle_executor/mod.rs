@@ -17,12 +17,15 @@
 #[cfg(feature = "service-lifecycle-store")]
 mod store;
 
+#[cfg(all(feature = "service-lifecycle-store", feature = "postgres"))]
+pub use store::diesel::factory::PostgresLifecycleStoreFactory;
+#[cfg(all(feature = "service-lifecycle-store", feature = "sqlite"))]
+pub use store::diesel::factory::SqliteLifecycleStoreFactory;
+#[cfg(all(feature = "service-lifecycle-store", feature = "diesel"))]
+pub use store::diesel::DieselLifecycleStore;
 #[cfg(feature = "service-lifecycle-store")]
 pub use store::{
     error::LifecycleStoreError,
     service::{LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus},
-    LifecycleStore,
+    LifecycleStore, LifecycleStoreFactory,
 };
-
-#[cfg(all(feature = "diesel", feature = "service-lifecycle-store"))]
-pub use store::diesel::DieselLifecycleStore;
