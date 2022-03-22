@@ -12,14 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod instance;
-#[cfg(feature = "service-lifecycle-executor")]
-mod lifecycle_executor;
+table! {
+    service_lifecycle_status (circuit_id, service_id) {
+        circuit_id -> Text,
+        service_id -> Text,
+        service_type -> Text,
+        command -> Text,
+        status -> Text,
+    }
+}
 
-#[cfg(all(feature = "diesel", feature = "service-lifecycle-store"))]
-pub use lifecycle_executor::DieselLifecycleStore;
-#[cfg(feature = "service-lifecycle-executor")]
-pub use lifecycle_executor::{
-    LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus, LifecycleStore,
-    LifecycleStoreError,
-};
+table! {
+    service_lifecycle_argument (circuit_id, service_id, key) {
+        circuit_id -> Text,
+        service_id -> Text,
+        key -> Text,
+        value -> Text,
+        position -> Integer,
+    }
+}

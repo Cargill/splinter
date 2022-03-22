@@ -12,14 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod instance;
-#[cfg(feature = "service-lifecycle-executor")]
-mod lifecycle_executor;
+//! Provides database operations for the `DieselLifecycleStore`.
 
-#[cfg(all(feature = "diesel", feature = "service-lifecycle-store"))]
-pub use lifecycle_executor::DieselLifecycleStore;
-#[cfg(feature = "service-lifecycle-executor")]
-pub use lifecycle_executor::{
-    LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus, LifecycleStore,
-    LifecycleStoreError,
-};
+pub(super) mod add_service;
+pub(super) mod get_service;
+pub(super) mod list_service;
+pub(super) mod remove_service;
+pub(super) mod update_service;
+
+pub struct LifecycleStoreOperations<'a, C> {
+    conn: &'a C,
+}
+
+impl<'a, C: diesel::Connection> LifecycleStoreOperations<'a, C> {
+    pub fn new(conn: &'a C) -> Self {
+        LifecycleStoreOperations { conn }
+    }
+}

@@ -14,6 +14,8 @@
 
 //! Stores required for lifecycle execution
 
+#[cfg(feature = "diesel")]
+pub mod diesel;
 pub mod error;
 pub mod service;
 

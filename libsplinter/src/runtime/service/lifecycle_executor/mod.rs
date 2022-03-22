@@ -23,3 +23,6 @@ pub use store::{
     service::{LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus},
     LifecycleStore,
 };
+
+#[cfg(all(feature = "diesel", feature = "service-lifecycle-store"))]
+pub use store::diesel::DieselLifecycleStore;
