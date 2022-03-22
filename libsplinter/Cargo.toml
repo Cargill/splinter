@@ -130,6 +130,7 @@ experimental = [
     "service-id",
     "service-lifecycle",
     "service-lifecycle-executor",
+    "service-lifecycle-store",
     "service-message-converter",
     "service-message-handler",
     "service-message-handler-factory",
@@ -194,7 +195,8 @@ rest-api-cors = []
 service-arguments-converter = []
 service-id = []
 service-lifecycle = ["service-arguments-converter", "service-id", "store-command"]
-service-lifecycle-executor = ["service-lifecycle"]
+service-lifecycle-executor = ["service-lifecycle", "service-lifecycle-store"]
+service-lifecycle-store = ["service-lifecycle"]
 service-message-converter = []
 service-message-handler = ["service-id", "service-message-converter", "service-message-sender"]
 service-message-handler-factory = ["service-message-handler"]
