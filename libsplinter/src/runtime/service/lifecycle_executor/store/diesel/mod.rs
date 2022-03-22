@@ -18,7 +18,10 @@ mod schema;
 
 use std::sync::{Arc, RwLock};
 
-use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::{
+    connection::AnsiTransactionManager,
+    r2d2::{ConnectionManager, Pool},
+};
 
 use crate::runtime::service::{
     LifecycleService, LifecycleStatus, LifecycleStore, LifecycleStoreError,
@@ -172,6 +175,90 @@ impl LifecycleStore for DieselLifecycleStore<diesel::sqlite::SqliteConnection> {
 impl DieselLifecycleStore<diesel::sqlite::SqliteConnection> {
     pub fn clone_box(&self) -> Box<dyn LifecycleStore + Send> {
         Box::new(self.clone())
+    }
+}
+
+pub struct DieselConnectionLifecycleStore<'a, C>
+where
+    C: diesel::Connection<TransactionManager = AnsiTransactionManager> + 'static,
+    C::Backend: diesel::backend::UsesAnsiSavepointSyntax,
+{
+    connection: &'a C,
+}
+
+impl<'a, C> DieselConnectionLifecycleStore<'a, C>
+where
+    C: diesel::Connection<TransactionManager = AnsiTransactionManager> + 'static,
+    C::Backend: diesel::backend::UsesAnsiSavepointSyntax,
+{
+    pub fn new(connection: &'a C) -> Self {
+        DieselConnectionLifecycleStore { connection }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl<'a> LifecycleStore for DieselConnectionLifecycleStore<'a, diesel::pg::PgConnection> {
+    fn add_service(&self, service: LifecycleService) -> Result<(), LifecycleStoreError> {
+        LifecycleStoreOperations::new(self.connection).add_service(service)
+    }
+
+    fn update_service(&self, service: LifecycleService) -> Result<(), LifecycleStoreError> {
+        LifecycleStoreOperations::new(self.connection).update_service(service)
+    }
+
+    fn remove_service(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<(), LifecycleStoreError> {
+        LifecycleStoreOperations::new(self.connection).remove_service(service_id)
+    }
+
+    fn get_service(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<LifecycleService>, LifecycleStoreError> {
+        LifecycleStoreOperations::new(self.connection).get_service(service_id)
+    }
+
+    // list services that have the provided LifecycleStatus
+    fn list_services(
+        &self,
+        status: &LifecycleStatus,
+    ) -> Result<Vec<LifecycleService>, LifecycleStoreError> {
+        LifecycleStoreOperations::new(self.connection).list_service(status)
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl<'a> LifecycleStore for DieselConnectionLifecycleStore<'a, diesel::sqlite::SqliteConnection> {
+    fn add_service(&self, service: LifecycleService) -> Result<(), LifecycleStoreError> {
+        LifecycleStoreOperations::new(self.connection).add_service(service)
+    }
+
+    fn update_service(&self, service: LifecycleService) -> Result<(), LifecycleStoreError> {
+        LifecycleStoreOperations::new(self.connection).update_service(service)
+    }
+
+    fn remove_service(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<(), LifecycleStoreError> {
+        LifecycleStoreOperations::new(self.connection).remove_service(service_id)
+    }
+
+    fn get_service(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<LifecycleService>, LifecycleStoreError> {
+        LifecycleStoreOperations::new(self.connection).get_service(service_id)
+    }
+
+    // list services that have the provided LifecycleStatus
+    fn list_services(
+        &self,
+        status: &LifecycleStatus,
+    ) -> Result<Vec<LifecycleService>, LifecycleStoreError> {
+        LifecycleStoreOperations::new(self.connection).list_service(status)
     }
 }
 
