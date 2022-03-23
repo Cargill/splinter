@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::InternalError;
+//! The message used by the Timer to know when to execute service handler
 
-use super::{FullyQualifiedServiceId, Routable};
+use crate::service::{FullyQualifiedServiceId, ServiceType};
 
-pub trait TimerFilter: Routable {
-    fn filter(&self) -> Result<Vec<FullyQualifiedServiceId>, InternalError>;
+#[derive(Clone, Debug)]
+pub enum TimerMessage {
+    WakeUpAll,
+    WakeUp {
+        service_type: ServiceType<'static>,
+        service_id: Option<FullyQualifiedServiceId>,
+    },
+    Shutdown,
 }

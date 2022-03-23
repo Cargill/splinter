@@ -15,6 +15,8 @@
 pub mod instance;
 #[cfg(feature = "service-lifecycle-executor")]
 mod lifecycle_executor;
+#[cfg(feature = "service-timer")]
+mod timer;
 
 #[cfg(all(feature = "diesel", feature = "service-lifecycle-store"))]
 pub use lifecycle_executor::DieselLifecycleStore;
@@ -28,3 +30,5 @@ pub use lifecycle_executor::{
     LifecycleService, LifecycleServiceBuilder, LifecycleStatus, LifecycleStore,
     LifecycleStoreError, LifecycleStoreFactory,
 };
+#[cfg(feature = "service-timer")]
+pub use timer::{Timer, TimerAlarm};
