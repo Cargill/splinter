@@ -12,19 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod instance;
-#[cfg(feature = "service-lifecycle-executor")]
-mod lifecycle_executor;
+//! This module contains an Executor for running lifecycles
 
-#[cfg(all(feature = "diesel", feature = "service-lifecycle-store"))]
-pub use lifecycle_executor::DieselLifecycleStore;
+#[cfg(feature = "service-lifecycle-store")]
+mod store;
+
+mod commands;
+mod executor;
+
 #[cfg(all(feature = "service-lifecycle-store", feature = "postgres"))]
-pub use lifecycle_executor::PostgresLifecycleStoreFactory;
+pub use store::diesel::factory::PostgresLifecycleStoreFactory;
 #[cfg(all(feature = "service-lifecycle-store", feature = "sqlite"))]
-pub use lifecycle_executor::SqliteLifecycleStoreFactory;
-#[cfg(feature = "service-lifecycle-executor")]
-pub use lifecycle_executor::{
-    ExecutorAlarm, LifecycleCommand, LifecycleCommandGenerator, LifecycleExecutor,
-    LifecycleService, LifecycleServiceBuilder, LifecycleStatus, LifecycleStore,
-    LifecycleStoreError, LifecycleStoreFactory,
+pub use store::diesel::factory::SqliteLifecycleStoreFactory;
+#[cfg(all(feature = "service-lifecycle-store", feature = "diesel"))]
+pub use store::diesel::DieselLifecycleStore;
+#[cfg(feature = "service-lifecycle-store")]
+pub use store::{
+    error::LifecycleStoreError,
+    service::{LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus},
+    LifecycleStore, LifecycleStoreFactory,
 };
+
+pub use commands::LifecycleCommandGenerator;
+pub use executor::{ExecutorAlarm, LifecycleExecutor};
