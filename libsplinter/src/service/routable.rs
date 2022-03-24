@@ -17,7 +17,3 @@ use super::ServiceType;
 pub trait Routable {
     fn service_types(&self) -> &[ServiceType];
 }
-
-pub trait Typed {
-    fn service_type(&self) -> &str;
-}

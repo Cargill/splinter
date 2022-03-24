@@ -84,7 +84,7 @@ pub use message_sender::MessageSender;
 #[cfg(feature = "service-message-sender-factory")]
 pub use message_sender_factory::MessageSenderFactory;
 #[cfg(feature = "service-routable")]
-pub use routable::{Routable, Typed};
+pub use routable::Routable;
 #[cfg(feature = "service-type")]
 pub use service_type::ServiceType;
 #[cfg(feature = "service-timer-filter")]
