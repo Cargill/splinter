@@ -14,38 +14,11 @@
 
 //! Stores required for a scabbard services operation.
 
-#[cfg(feature = "diesel")]
-pub mod diesel;
-mod error;
+mod commit_hash;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 pub(crate) mod pool;
-pub mod transact;
 
-pub use error::CommitHashStoreError;
-
-/// A store for the current commit hash value.
-///
-/// The commit hash, for Scabbard's purposes is the current state root hash of the Merkle-Radix
-/// tree after transactions have been applied.
-pub trait CommitHashStore: Sync + Send {
-    /// Returns the current commit hash for the instance
-    fn get_current_commit_hash(&self) -> Result<Option<String>, CommitHashStoreError>;
-
-    /// Sets the current commit hash value.
-    ///
-    /// The commit hash, for Scabbard's purposes is the current state root hash of the Merkle-Radix
-    /// tree after transactions have been applied.
-    ///
-    /// # Arguments
-    ///
-    /// * `current_commit_hash` - the new "current" commit hash.
-    fn set_current_commit_hash(&self, commit_hash: &str) -> Result<(), CommitHashStoreError>;
-
-    fn clone_boxed(&self) -> Box<dyn CommitHashStore>;
-}
-
-impl Clone for Box<dyn CommitHashStore> {
-    fn clone(&self) -> Self {
-        (*self).clone_boxed()
-    }
-}
+#[cfg(feature = "diesel")]
+pub use commit_hash::diesel;
+pub use commit_hash::transact;
+pub use commit_hash::{CommitHashStore, CommitHashStoreError};
