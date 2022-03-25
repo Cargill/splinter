@@ -23,6 +23,8 @@ pub(crate) mod factory;
 mod rest_api;
 mod shared;
 mod state;
+#[cfg(feature = "scabbardv3")]
+pub mod v3;
 
 use std::any::Any;
 use std::collections::{HashSet, VecDeque};

@@ -87,6 +87,20 @@ lmdb = []
 postgres = ["diesel/postgres", "diesel_migrations", "log", "sawtooth/postgres", "transact/postgres"]
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix-web-1 = ["actix-web", "rest-api", "splinter/rest-api-actix-web-1"]
-scabbardv3 = ["splinter/store-command"]
+scabbardv3 = [
+    "splinter/service-arguments-converter",
+    "splinter/service-id",
+    "splinter/service-lifecycle",
+    "splinter/service-message-converter",
+    "splinter/service-message-handler",
+    "splinter/service-message-handler-factory",
+    "splinter/service-message-sender",
+    "splinter/service-routable",
+    "splinter/service-timer-filter",
+    "splinter/service-timer-handler",
+    "splinter/service-timer-handler-factory",
+    "splinter/service-type",
+    "splinter/store-command"
+    ]
 splinter-service = ["log", "sawtooth"]
 sqlite = ["diesel/sqlite", "diesel_migrations", "log", "sawtooth/sqlite", "transact/sqlite"]
