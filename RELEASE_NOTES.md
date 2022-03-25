@@ -1,5 +1,17 @@
 # Release Notes
 
+## Changes in Splinter 0.6.10
+
+### libsplinter
+
+* Add retry to sending messages in `PeerInterconnect`. Now if the
+  `PeerInterconnect` receives a message that should be sent to a peer, but the
+  message fails to send because the connection has disconnected, the message
+  will be sent to the pending thread, where it will be retried up to 3 times,
+  with 10 seconds in between each try. This fixes a race condition where,
+  duplicate connections are rectified but one side removes the old connection
+  before the other finishes authorization.
+
 ## Changes in Splinter 0.6.9
 
 ### libsplinter
