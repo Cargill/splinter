@@ -14,12 +14,20 @@
 
 //! Stores required for a scabbard services operation.
 
+#[cfg(feature = "scabbardv3")]
+mod command;
 #[cfg(feature = "diesel")]
 pub mod diesel;
 mod error;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 pub(crate) mod pool;
 pub mod transact;
+
+#[cfg(feature = "scabbardv3")]
+pub use command::{
+    ScabbardFinalizeServiceCommand, ScabbardPrepareServiceCommand, ScabbardPurgeServiceCommand,
+    ScabbardRetireServiceCommand,
+};
 
 pub use error::CommitHashStoreError;
 
