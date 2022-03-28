@@ -37,7 +37,6 @@
 
 #[cfg(feature = "service-arguments-converter")]
 mod arguments_converter;
-#[cfg(feature = "service-id")]
 mod id;
 pub mod instance;
 #[cfg(feature = "service-lifecycle")]
@@ -67,7 +66,6 @@ mod timer_handler_factory;
 
 #[cfg(feature = "service-arguments-converter")]
 pub use arguments_converter::ArgumentsConverter;
-#[cfg(feature = "service-id")]
 pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};
 #[cfg(feature = "service-lifecycle")]
 pub use lifecycle::Lifecycle;
