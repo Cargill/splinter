@@ -127,7 +127,6 @@ experimental = [
     "registry-client-reqwest",
     "rest-api-actix-web-3",
     "service-arguments-converter",
-    "service-id",
     "service-lifecycle",
     "service-lifecycle-executor",
     "service-lifecycle-store",
@@ -194,27 +193,25 @@ rest-api-actix-web-1 = [
 rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
 service-arguments-converter = []
-service-id = []
-service-lifecycle = ["service-arguments-converter", "service-id", "store-command"]
+service-lifecycle = ["service-arguments-converter", "store-command"]
 service-lifecycle-executor = ["service-lifecycle", "service-lifecycle-store"]
 service-lifecycle-store = ["service-lifecycle"]
 service-message-converter = []
-service-message-handler = ["service-id", "service-message-converter", "service-message-sender"]
+service-message-handler = ["service-message-converter", "service-message-sender"]
 service-message-handler-factory = ["service-message-handler"]
-service-message-sender = ["service-id", "service-message-converter"]
+service-message-sender = ["service-message-converter"]
 service-message-sender-factory = ["service-message-sender"]
 service-network = []
 service-routable = ["service-type"]
 service-timer =[
-  "service-id",
   "service-message-sender-factory",
   "service-routable",
   "service-timer-filter",
   "service-timer-handler",
   "service-timer-handler-factory"
 ]
-service-timer-filter = ["service-id"]
-service-timer-handler = ["service-id", "service-message-converter", "service-message-sender"]
+service-timer-filter = []
+service-timer-handler = ["service-message-converter", "service-message-sender"]
 service-timer-handler-factory = ["service-timer-handler"]
 service-type = []
 sqlite = ["diesel/sqlite", "diesel_migrations", "store"]
