@@ -127,7 +127,7 @@ impl RunnableAdminSubsystem {
 
         admin_service_builder = admin_service_builder
             .with_node_id(node_id)
-            .with_service_orchestrator(orchestrator)
+            .with_lifecycle_dispatch(vec![Box::new(orchestrator)])
             .with_peer_manager_connector(peer_connector.clone())
             .with_admin_service_store(store_factory.get_admin_service_store())
             .with_admin_event_store(store_factory.get_admin_service_store())

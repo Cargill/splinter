@@ -17,6 +17,7 @@
 #[cfg(feature = "admin-service-client")]
 pub mod client;
 pub mod error;
+pub mod lifecycle;
 pub mod messages;
 #[cfg(any(feature = "rest-api-actix-web-1", feature = "rest-api-actix-web-3"))]
 pub mod rest_api;

@@ -16,12 +16,12 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::iter::ExactSizeIterator;
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::{Message, RepeatedField};
 
+use crate::admin::lifecycle::LifecycleDispatch;
 use crate::admin::store::{
     AdminServiceStore, Circuit as StoreCircuit, CircuitBuilder as StoreCircuitBuilder,
     CircuitPredicate, CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus,
@@ -35,7 +35,6 @@ use crate::error::InternalError;
 use crate::hex::parse_hex;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
-use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
 use crate::peer::{PeerAuthorizationToken, PeerManagerConnector, PeerRef, PeerTokenPair};
 use crate::protos::admin::{
     AbandonedCircuit, AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
@@ -109,7 +108,7 @@ pub struct AdminServiceShared {
     // the list of circuit that have been committed to splinter state but whose services haven't
     // been initialized or stopped, depending on the proposal type
     uninitialized_circuits: HashMap<String, UninitializedCircuit>,
-    orchestrator: Arc<Mutex<ServiceOrchestrator>>,
+    lifecycle_dispatch: Vec<Box<dyn LifecycleDispatch>>,
     // map of service arg validators, by service type
     service_arg_validators: HashMap<String, Box<dyn ServiceArgValidator + Send>>,
     // peer connector used to connect to new members listed in a circuit
@@ -160,7 +159,7 @@ impl AdminServiceShared {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
         node_id: String,
-        orchestrator: Arc<Mutex<ServiceOrchestrator>>,
+        lifecycle_dispatch: Vec<Box<dyn LifecycleDispatch>>,
         service_arg_validators: HashMap<String, Box<dyn ServiceArgValidator + Send>>,
         peer_connector: PeerManagerConnector,
         admin_store: Box<dyn AdminServiceStore>,
@@ -175,7 +174,7 @@ impl AdminServiceShared {
             node_id,
             network_sender: None,
             uninitialized_circuits: Default::default(),
-            orchestrator,
+            lifecycle_dispatch,
             service_arg_validators,
             peer_connector,
             peer_refs: HashMap::new(),
@@ -234,6 +233,10 @@ impl AdminServiceShared {
 
     pub fn network_sender(&self) -> &Option<Box<dyn ServiceNetworkSender>> {
         &self.network_sender
+    }
+
+    pub fn lifecycle_dispatch(&self) -> &[Box<dyn LifecycleDispatch>] {
+        &self.lifecycle_dispatch
     }
 
     pub fn set_network_sender(&mut self, network_sender: Option<Box<dyn ServiceNetworkSender>>) {
@@ -3366,158 +3369,114 @@ impl AdminServiceShared {
         ))
     }
 
-    /// Initialize all services that this node should run on the created circuit using the service
-    /// orchestrator. This may not include all services if they are not supported locally. It is
-    /// expected that some services will be started externally.
+    /// Initialize all services that this node should run on the created circuit using the
+    /// lifecycle dispatch. This may not include all services if they are not supported locally.
+    //  It is expected that some services will be started externally.
     pub fn initialize_services(&mut self, circuit: &Circuit) -> Result<(), AdminSharedError> {
-        let orchestrator = self.orchestrator.lock().map_err(|_| {
-            AdminSharedError::ServiceInitializationFailed {
-                context: "ServiceOrchestrator lock poisoned".into(),
-                source: None,
+        // Start all services the lifecycle dispatches can
+        for service in circuit.get_roster() {
+            if !service.allowed_nodes.contains(&self.node_id) {
+                continue;
             }
-        })?;
 
-        // Get all services this node is allowed to run
-        let services = circuit
-            .get_roster()
-            .iter()
-            .filter(|service| {
-                service.allowed_nodes.contains(&self.node_id)
-                    && orchestrator
-                        .supported_service_types()
-                        .contains(&service.get_service_type().to_string())
-            })
-            .collect::<Vec<_>>();
-
-        // Start all services the orchestrator has a factory for
-        for service in services {
-            let service_definition = ServiceDefinition {
-                circuit: circuit.circuit_id.clone(),
-                service_id: service.service_id.clone(),
-                service_type: service.service_type.clone(),
-            };
-
-            let service_arguments = service
+            let service_arguments: Vec<(String, String)> = service
                 .arguments
                 .iter()
                 .map(|arg| (arg.key.clone(), arg.value.clone()))
                 .collect();
 
-            orchestrator
-                .initialize_service(service_definition.clone(), service_arguments)
-                .map_err(|err| AdminSharedError::ServiceInitializationFailed {
-                    context: format!(
-                        "Unable to start service {} on circuit {}",
-                        service.service_id, circuit.circuit_id
-                    ),
-                    source: Some(err),
-                })?;
+            for dispatch in &self.lifecycle_dispatch {
+                dispatch
+                    .add_service(
+                        &circuit.circuit_id,
+                        &service.service_id,
+                        &service.service_type,
+                        service_arguments.clone(),
+                    )
+                    .map_err(|err| {
+                        error!("{}", err);
+                        AdminSharedError::ServiceInitializationFailed {
+                            context: format!(
+                                "Unable to start service {} on circuit {}",
+                                service.service_id, circuit.circuit_id
+                            ),
+                            source: None,
+                        }
+                    })?;
+            }
         }
 
         Ok(())
     }
 
     /// Stops all services that this node was running on the disbanded or abandoned circuit using
-    /// the service orchestrator. This may not include all services if they are not supported
+    /// the service lifecycle dispatch. This may not include all services if they are not supported
     /// locally. It is expected that some services will be stopped externally.
     pub fn stop_services(&mut self, circuit: &Circuit) -> Result<(), AdminSharedError> {
-        let orchestrator =
-            self.orchestrator
-                .lock()
-                .map_err(|_| AdminSharedError::ServiceShutdownFailed {
-                    context: "ServiceOrchestrator lock poisoned".into(),
-                    source: None,
-                })?;
+        // Stop all services the lifecycle dispatches can
+        for service in circuit.get_roster() {
+            if !service.allowed_nodes.contains(&self.node_id) {
+                continue;
+            }
 
-        // Get all services this node is allowed to run
-        let services = circuit
-            .get_roster()
-            .iter()
-            .filter(|service| {
-                service.allowed_nodes.contains(&self.node_id)
-                    && orchestrator
-                        .supported_service_types()
-                        .contains(&service.get_service_type().to_string())
-            })
-            .collect::<Vec<_>>();
-
-        // Shutdown all services the orchestrator has a factory for
-        for service in services {
-            debug!("Stopping service: {}", service.service_id.clone());
-            let service_definition = ServiceDefinition {
-                circuit: circuit.circuit_id.clone(),
-                service_id: service.service_id.clone(),
-                service_type: service.service_type.clone(),
-            };
-
-            orchestrator
-                .stop_service(&service_definition)
-                .map_err(|err| AdminSharedError::ServiceShutdownFailed {
-                    context: format!(
-                        "Unable to shutdown service {} on circuit {}",
-                        service.service_id, circuit.circuit_id
-                    ),
-                    source: Some(err),
-                })?;
+            for dispatch in &self.lifecycle_dispatch {
+                dispatch
+                    .retire_service(
+                        &circuit.circuit_id,
+                        &service.service_id,
+                        &service.service_type,
+                    )
+                    .map_err(|err| {
+                        error!("{}", err);
+                        AdminSharedError::ServiceShutdownFailed {
+                            context: format!(
+                                "Unable to shutdown service {} on circuit {}",
+                                service.service_id, circuit.circuit_id
+                            ),
+                            source: None,
+                        }
+                    })?;
+            }
         }
-
         Ok(())
     }
 
     /// Purges all services that this node was running on the disbanded circuit using the service
-    /// orchestrator. Destroying a service will also remove the service's state LMDB files.
+    /// lifecycle dispatch. Destroying a service will also remove the service's state LMDB files.
     pub fn purge_services(
         &mut self,
         circuit_id: &str,
         services: &[StoreService],
     ) -> Result<(), AdminSharedError> {
-        let orchestrator =
-            self.orchestrator
-                .lock()
-                .map_err(|_| AdminSharedError::ServiceShutdownFailed {
-                    context: "ServiceOrchestrator lock poisoned".into(),
-                    source: None,
-                })?;
+        for service in services {
+            if service.node_id() != self.node_id() {
+                continue;
+            }
 
-        // Get all services this node is allowed to run
-        let purge_results = services
-            .iter()
-            .filter_map(|service| {
-                if service.node_id() == self.node_id
-                    && orchestrator
-                        .supported_service_types()
-                        .contains(&service.service_type().to_string())
+            for dispatch in &self.lifecycle_dispatch {
+                if let Err(err) =
+                    dispatch.purge_service(circuit_id, service.service_id(), service.service_type())
                 {
-                    return Some(ServiceDefinition {
-                        circuit: circuit_id.to_string(),
-                        service_id: service.service_id().to_string(),
-                        service_type: service.service_type().to_string(),
-                    });
+                    error!(
+                        "Service {}::{} ({}) failed to purge: {}",
+                        circuit_id,
+                        service.service_id(),
+                        service.service_type(),
+                        err
+                    );
                 }
-                None
-            })
-            .map(|service| {
-                debug!(
-                    "Purging service: {}::{} ({})",
-                    &service.circuit, &service.service_id, &service.service_type,
-                );
-
-                let res = orchestrator.purge_service(&service);
-                (service, res)
-            })
-            .filter(|(_, res)| res.is_err())
-            .collect::<Vec<_>>();
-
-        for (service_def, res) in purge_results {
-            if let Err(err) = res {
-                error!(
-                    "Service {}::{} ({}) failed to purge: {}",
-                    service_def.circuit, service_def.service_id, service_def.service_type, err
-                );
             }
         }
 
         Ok(())
+    }
+
+    pub fn shutdown_all_services(&self) {
+        for dispatch in &self.lifecycle_dispatch {
+            if let Err(err) = dispatch.shutdown_all_services() {
+                error!("{}", err)
+            }
+        }
     }
 
     /// Verify all members are ready before cleaning up after the disbanded circuit, i.e. removing
@@ -3736,7 +3695,7 @@ mod tests {
     use crate::network::auth::AuthorizationManager;
     use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
     use crate::network::connection_manager::ConnectionManager;
-    use crate::orchestrator::ServiceOrchestratorBuilder;
+    use crate::orchestrator::{ServiceOrchestrator, ServiceOrchestratorBuilder};
     use crate::peer::{PeerManager, PeerManagerConnector};
     use crate::protocol::authorization::{
         AuthorizationMessage, AuthorizationType, Authorized, ConnectRequest, ConnectResponse,
@@ -3799,7 +3758,7 @@ mod tests {
 
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -3943,7 +3902,7 @@ mod tests {
 
         let mut shared = AdminServiceShared::new(
             "test-node".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4045,7 +4004,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4088,7 +4047,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4125,7 +4084,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4166,7 +4125,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4218,7 +4177,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4265,7 +4224,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4315,7 +4274,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4362,7 +4321,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4409,7 +4368,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4461,7 +4420,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4502,7 +4461,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4545,7 +4504,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4592,7 +4551,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4646,7 +4605,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4700,7 +4659,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4742,7 +4701,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4784,7 +4743,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4834,7 +4793,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4884,7 +4843,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4934,7 +4893,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -4976,7 +4935,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5018,7 +4977,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5060,7 +5019,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5102,7 +5061,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5144,7 +5103,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5187,7 +5146,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5227,7 +5186,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5270,7 +5229,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5312,7 +5271,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5354,7 +5313,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5404,7 +5363,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5452,7 +5411,7 @@ mod tests {
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5511,7 +5470,7 @@ mod tests {
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5571,7 +5530,7 @@ mod tests {
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5633,7 +5592,7 @@ mod tests {
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5699,7 +5658,7 @@ mod tests {
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5759,7 +5718,7 @@ mod tests {
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5817,7 +5776,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5876,7 +5835,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5925,7 +5884,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -5984,7 +5943,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6070,7 +6029,7 @@ mod tests {
 
         let mut shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6194,7 +6153,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6246,7 +6205,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6289,7 +6248,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6343,7 +6302,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6398,7 +6357,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6456,7 +6415,7 @@ mod tests {
 
         let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6528,7 +6487,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6575,7 +6534,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6614,7 +6573,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6664,7 +6623,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6713,7 +6672,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6770,7 +6729,7 @@ mod tests {
 
         let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6845,7 +6804,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6891,7 +6850,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6932,7 +6891,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -6980,7 +6939,7 @@ mod tests {
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,
@@ -7036,7 +6995,7 @@ mod tests {
 
         let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
-            Arc::new(Mutex::new(orchestrator)),
+            vec![Box::new(orchestrator)],
             HashMap::new(),
             peer_connector,
             store,

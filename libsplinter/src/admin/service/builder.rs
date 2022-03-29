@@ -20,11 +20,11 @@ use std::time::Duration;
 
 use cylinder::Verifier as SignatureVerifier;
 
+use crate::admin::lifecycle::LifecycleDispatch;
 use crate::admin::store::AdminServiceStore;
 use crate::circuit::routing::RoutingTableWriter;
 use crate::error::InvalidStateError;
 use crate::keys::KeyPermissionManager;
-use crate::orchestrator::ServiceOrchestrator;
 use crate::peer::PeerManagerConnector;
 use crate::public_key::PublicKey;
 use crate::service::instance::ServiceArgValidator;
@@ -42,7 +42,7 @@ const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 #[derive(Default)]
 pub struct AdminServiceBuilder {
     node_id: Option<String>,
-    orchestrator: Option<ServiceOrchestrator>,
+    lifecycle_dispatch: Option<Vec<Box<dyn LifecycleDispatch>>>,
     service_arg_validators: HashMap<String, Box<dyn ServiceArgValidator + Send>>,
     peer_connector: Option<PeerManagerConnector>,
     admin_store: Option<Box<dyn AdminServiceStore>>,
@@ -67,9 +67,12 @@ impl AdminServiceBuilder {
         self
     }
 
-    /// Sets the service orchestrator.
-    pub fn with_service_orchestrator(mut self, orchestrator: ServiceOrchestrator) -> Self {
-        self.orchestrator = Some(orchestrator);
+    /// Sets the lifecycle_dispatches
+    pub fn with_lifecycle_dispatch(
+        mut self,
+        lifecycle_dispatch: Vec<Box<dyn LifecycleDispatch>>,
+    ) -> Self {
+        self.lifecycle_dispatch = Some(lifecycle_dispatch);
         self
     }
 
@@ -165,12 +168,9 @@ impl AdminServiceBuilder {
             .coordinator_timeout
             .unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
 
-        let orchestrator = self.orchestrator.ok_or_else(|| {
-            InvalidStateError::with_message(
-                "An admin service requires a service_orchestrator".into(),
-            )
+        let lifecycle_dispatch = self.lifecycle_dispatch.ok_or_else(|| {
+            InvalidStateError::with_message("An admin service requires a lifecycle_dispatch".into())
         })?;
-        let orchestrator = Arc::new(Mutex::new(orchestrator));
 
         let node_id = self.node_id.ok_or_else(|| {
             InvalidStateError::with_message("An admin service requires a node_id".into())
@@ -221,7 +221,7 @@ impl AdminServiceBuilder {
 
         let admin_service_shared = Arc::new(Mutex::new(AdminServiceShared::new(
             node_id.clone(),
-            orchestrator.clone(),
+            lifecycle_dispatch,
             service_arg_validators,
             peer_connector.clone(),
             admin_store,
@@ -237,7 +237,6 @@ impl AdminServiceBuilder {
             service_id,
             node_id,
             admin_service_shared,
-            orchestrator,
             coordinator_timeout,
             consensus: None,
             peer_connector,
