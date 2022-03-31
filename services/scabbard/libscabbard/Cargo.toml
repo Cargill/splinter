@@ -89,7 +89,6 @@ rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix-web-1 = ["actix-web", "rest-api", "splinter/rest-api-actix-web-1"]
 scabbardv3 = [
     "splinter/service-arguments-converter",
-    "splinter/service-id",
     "splinter/service-lifecycle",
     "splinter/service-message-converter",
     "splinter/service-message-handler",
