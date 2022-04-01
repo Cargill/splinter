@@ -53,7 +53,7 @@ pub struct RestApi {
     pub(super) resources: Vec<Resource>,
     pub(super) bind: BindConfig,
     #[cfg(feature = "rest-api-cors")]
-    pub(super) whitelist: Option<Vec<String>>,
+    pub(super) allow_list: Option<Vec<String>>,
     pub(super) identity_providers: Vec<Box<dyn IdentityProvider>>,
     #[cfg(feature = "authorization")]
     pub(super) authorization_handlers: Vec<Box<dyn AuthorizationHandler>>,
@@ -80,7 +80,7 @@ impl RestApi {
         let bind_config_for_err = self.bind.clone();
         let resources = self.resources;
         #[cfg(feature = "rest-api-cors")]
-        let whitelist = self.whitelist;
+        let allow_list = self.allow_list;
         let authorization = Authorization::new(
             self.identity_providers.to_owned(),
             #[cfg(feature = "authorization")]
@@ -88,7 +88,7 @@ impl RestApi {
         );
 
         #[cfg(feature = "rest-api-cors")]
-        let cors = match &whitelist {
+        let cors = match &allow_list {
             Some(list) => Cors::new(list.to_vec()),
             None => Cors::new_allow_any(),
         };
@@ -255,10 +255,10 @@ impl RestApi {
 
         let resources = self.resources.to_owned();
         #[cfg(feature = "rest-api-cors")]
-        let whitelist = self.whitelist.to_owned();
+        let allow_list = self.allow_list.to_owned();
 
         #[cfg(feature = "rest-api-cors")]
-        let cors = match &whitelist {
+        let cors = match &allow_list {
             Some(list) => Cors::new(list.to_vec()),
             None => Cors::new_allow_any(),
         };

@@ -45,7 +45,7 @@ pub struct SplinterDaemonBuilder {
     heartbeat: Option<u64>,
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
-    whitelist: Option<Vec<String>>,
+    allow_list: Option<Vec<String>>,
     #[cfg(feature = "biome-credentials")]
     enable_biome_credentials: Option<bool>,
     #[cfg(feature = "oauth")]
@@ -162,9 +162,17 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[allow(dead_code)]
     #[cfg(feature = "rest-api-cors")]
+    #[deprecated(since = "0.7.0", note = "please use `with_allow_list` instead")]
     pub fn with_whitelist(mut self, value: Option<Vec<String>>) -> Self {
-        self.whitelist = value;
+        self.allow_list = value;
+        self
+    }
+
+    #[cfg(feature = "rest-api-cors")]
+    pub fn with_allow_list(mut self, value: Option<Vec<String>>) -> Self {
+        self.allow_list = value;
         self
     }
 
@@ -361,7 +369,7 @@ impl SplinterDaemonBuilder {
             registry_forced_refresh,
             admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
-            whitelist: self.whitelist,
+            allow_list: self.allow_list,
             #[cfg(feature = "biome-credentials")]
             enable_biome_credentials,
             #[cfg(feature = "oauth")]

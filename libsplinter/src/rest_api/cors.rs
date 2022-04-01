@@ -25,14 +25,14 @@ use futures::{
 /// Configuration for CORS support
 #[derive(Clone)]
 pub struct Cors {
-    whitelist: Vec<String>,
+    allow_list: Vec<String>,
 }
 
 impl Cors {
     /// Initialize the CORS preflight check with a set of allowed domains.
-    pub fn new(whitelist: Vec<String>) -> Self {
-        debug!("Creating CORS with whitelist: {:?}", whitelist);
-        Cors { whitelist }
+    pub fn new(allow_list: Vec<String>) -> Self {
+        debug!("Creating CORS with with_allow_list: {:?}", allow_list);
+        Cors { allow_list }
     }
 
     /// Initialize the CORS preflight check with "*" domains.
@@ -57,7 +57,7 @@ where
     fn new_transform(&self, service: S) -> Self::Future {
         ok(CorsMiddleware {
             service,
-            whitelist: self.whitelist.clone(),
+            allow_list: self.allow_list.clone(),
         })
     }
 }
@@ -65,7 +65,7 @@ where
 #[doc(hidden)]
 pub struct CorsMiddleware<S> {
     service: S,
-    whitelist: Vec<String>,
+    allow_list: Vec<String>,
 }
 
 impl<S, B> Service for CorsMiddleware<S>
@@ -97,7 +97,7 @@ where
                     .get(header::ACCESS_CONTROL_REQUEST_HEADERS)
                     .cloned();
                 let allowed_origin = self
-                    .whitelist
+                    .allow_list
                     .iter()
                     .any(|domain| domain == "*" || origin.contains(domain));
                 // This verifies if a client is making a preflight check with the OPTIONS

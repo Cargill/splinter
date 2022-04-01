@@ -286,10 +286,10 @@ impl ConfigBuilder {
                 .find_map(|p| p.no_tls().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("no tls".to_string()))?,
             #[cfg(feature = "rest-api-cors")]
-            whitelist: self
+            allow_list: self
                 .partial_configs
                 .iter()
-                .find_map(|p| p.whitelist().map(|v| (v, p.source()))),
+                .find_map(|p| p.allow_list().map(|v| (v, p.source()))),
             #[cfg(feature = "biome-credentials")]
             enable_biome_credentials: self
                 .partial_configs

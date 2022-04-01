@@ -112,9 +112,9 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
 
         #[cfg(feature = "rest-api-cors")]
         {
-            partial_config = partial_config.with_whitelist(
+            partial_config = partial_config.with_allow_list(
                 self.matches
-                    .values_of("whitelist")
+                    .values_of("allow_list")
                     .map(|values| values.map(String::from).collect::<Vec<String>>()),
             )
         }

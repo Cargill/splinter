@@ -66,7 +66,7 @@ pub struct PartialConfig {
     tls_insecure: Option<bool>,
     no_tls: Option<bool>,
     #[cfg(feature = "rest-api-cors")]
-    whitelist: Option<Vec<String>>,
+    allow_list: Option<Vec<String>>,
     #[cfg(feature = "biome-credentials")]
     enable_biome_credentials: Option<bool>,
     #[cfg(feature = "oauth")]
@@ -136,7 +136,7 @@ impl PartialConfig {
             tls_insecure: None,
             no_tls: None,
             #[cfg(feature = "rest-api-cors")]
-            whitelist: None,
+            allow_list: None,
             #[cfg(feature = "biome-credentials")]
             enable_biome_credentials: None,
             #[cfg(feature = "oauth")]
@@ -281,8 +281,8 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "rest-api-cors")]
-    pub fn whitelist(&self) -> Option<Vec<String>> {
-        self.whitelist.clone()
+    pub fn allow_list(&self) -> Option<Vec<String>> {
+        self.allow_list.clone()
     }
 
     #[cfg(feature = "biome-credentials")]
@@ -663,14 +663,14 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "rest-api-cors")]
-    /// Adds a `whitelist` value to the `PartialConfig` object.
+    /// Adds a `allow_list` value to the `PartialConfig` object.
     ///
     /// # Arguments
     ///
-    /// * `whitelist` - Add whitelist to the REST API CORS configuration
+    /// * `allow_list` - Add allow_list to the REST API CORS configuration
     ///
-    pub fn with_whitelist(mut self, whitelist: Option<Vec<String>>) -> Self {
-        self.whitelist = whitelist;
+    pub fn with_allow_list(mut self, allow_list: Option<Vec<String>>) -> Self {
+        self.allow_list = allow_list;
         self
     }
 

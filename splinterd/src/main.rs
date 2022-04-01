@@ -386,13 +386,14 @@ fn main() {
 
     #[cfg(feature = "rest-api-cors")]
     let app = app.arg(
-        Arg::with_name("whitelist")
-            .long("whitelist")
+        Arg::with_name("allow_list")
+            .long("allow-list")
             .multiple(true)
+            .alias("whitelist")
             .required(false)
             .takes_value(true)
             .use_delimiter(true)
-            .help("Whitelisted domains"),
+            .help("List of allowed domains for CORS"),
     );
 
     #[cfg(feature = "biome-credentials")]
@@ -675,7 +676,7 @@ fn start_daemon(matches: ArgMatches, log_handle: Handle) -> Result<(), UserError
 
     #[cfg(feature = "rest-api-cors")]
     {
-        daemon_builder = daemon_builder.with_whitelist(config.whitelist().map(ToOwned::to_owned));
+        daemon_builder = daemon_builder.with_allow_list(config.allow_list().map(ToOwned::to_owned));
     }
 
     #[cfg(feature = "biome-credentials")]
