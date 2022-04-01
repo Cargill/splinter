@@ -23,6 +23,8 @@ description = """\
 """
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
+splinter = { path = "../../libsplinter" }
 
 [features]
 default = []
