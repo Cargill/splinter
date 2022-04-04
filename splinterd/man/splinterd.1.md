@@ -269,14 +269,14 @@ OPTIONS
 : Specifies the path and file name for the REST API key.
   (Default: `/etc/splinter/certs/rest_api.key`.)
 
-`--whitelist WHITELIST` `[,...]`
+`--allow-list ALLOW_LIST` `[,...]`
 : Lists one or more trusted domains for cross-origin resource sharing (CORS).
   This option allows the specified domains to access restricted web resources
   in a Splinter application.  If this option is not specified, all domains will
   be allowed to access Splinter web resources.
 
   Specify multiple domains in a comma-separated list or with separate
-  `--whitelist` options.
+  `--allow-list` options.
 
 CERTIFICATE FILES
 =================

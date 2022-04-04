@@ -123,7 +123,7 @@ pub struct SplinterDaemon {
     registry_forced_refresh: u64,
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
-    whitelist: Option<Vec<String>>,
+    allow_list: Option<Vec<String>>,
     #[cfg(feature = "biome-credentials")]
     enable_biome_credentials: bool,
     #[cfg(feature = "oauth")]
@@ -634,9 +634,9 @@ impl SplinterDaemon {
 
         #[cfg(feature = "rest-api-cors")]
         {
-            if let Some(list) = &self.whitelist {
-                debug!("Whitelisted domains added to CORS");
-                rest_api_builder = rest_api_builder.with_whitelist(list.to_vec());
+            if let Some(list) = &self.allow_list {
+                debug!("Allow listed domains added to CORS");
+                rest_api_builder = rest_api_builder.with_allow_list(list.to_vec());
             }
         }
 

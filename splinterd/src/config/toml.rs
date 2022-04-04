@@ -178,7 +178,7 @@ struct TomlConfig {
     admin_timeout: Option<u64>,
     version: Option<String>,
     #[cfg(feature = "rest-api-cors")]
-    whitelist: Option<Vec<String>>,
+    allow_list: Option<Vec<String>>,
     #[cfg(feature = "oauth")]
     oauth_provider: Option<String>,
     #[cfg(feature = "oauth")]
@@ -220,6 +220,8 @@ struct TomlConfig {
     registry_forced_refresh_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<u64>,
     bind: Option<String>,
+    #[cfg(feature = "rest-api-cors")]
+    whitelist: Option<Vec<String>>,
 }
 
 /// `PartialConfig` builder which holds values defined in a toml file.
@@ -306,7 +308,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
 
         #[cfg(feature = "rest-api-cors")]
         {
-            partial_config = partial_config.with_whitelist(self.toml_config.whitelist);
+            partial_config = partial_config.with_allow_list(self.toml_config.allow_list);
         }
 
         #[cfg(feature = "oauth")]
@@ -396,6 +398,13 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
         }
         if partial_config.rest_api_endpoint().is_none() {
             partial_config = partial_config.with_rest_api_endpoint(self.toml_config.bind)
+        }
+
+        #[cfg(feature = "rest-api-cors")]
+        {
+            if partial_config.allow_list().is_none() {
+                partial_config = partial_config.with_allow_list(self.toml_config.whitelist);
+            }
         }
 
         Ok(partial_config)

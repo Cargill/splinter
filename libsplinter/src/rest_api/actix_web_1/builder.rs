@@ -41,7 +41,7 @@ pub struct RestApiBuilder {
     resources: Vec<Resource>,
     bind: Option<BindConfig>,
     #[cfg(feature = "rest-api-cors")]
-    whitelist: Option<Vec<String>>,
+    allow_list: Option<Vec<String>>,
     auth_configs: Vec<AuthConfig>,
     #[cfg(feature = "authorization")]
     authorization_handlers: Vec<Box<dyn AuthorizationHandler>>,
@@ -75,8 +75,15 @@ impl RestApiBuilder {
     }
 
     #[cfg(feature = "rest-api-cors")]
-    pub fn with_whitelist(mut self, values: Vec<String>) -> Self {
-        self.whitelist = Some(values);
+    pub fn with_allow_list(mut self, values: Vec<String>) -> Self {
+        self.allow_list = Some(values);
+        self
+    }
+
+    #[deprecated(since = "0.7.0", note = "please use `with_allow_list` instead")]
+    #[cfg(feature = "rest-api-cors")]
+    pub fn with_white_list(mut self, values: Vec<String>) -> Self {
+        self.allow_list = Some(values);
         self
     }
 
@@ -250,7 +257,7 @@ impl RestApiBuilder {
             bind,
             resources: self.resources,
             #[cfg(feature = "rest-api-cors")]
-            whitelist: self.whitelist,
+            allow_list: self.allow_list,
             identity_providers,
             #[cfg(feature = "authorization")]
             authorization_handlers: self.authorization_handlers,
@@ -341,7 +348,7 @@ mod test {
                 bind,
                 resources: self.resources,
                 #[cfg(feature = "rest-api-cors")]
-                whitelist: self.whitelist,
+                allow_list: self.allow_list,
                 identity_providers: vec![],
                 #[cfg(feature = "authorization")]
                 authorization_handlers: vec![],

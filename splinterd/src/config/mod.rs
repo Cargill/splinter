@@ -75,7 +75,7 @@ pub struct Config {
     tls_insecure: (bool, ConfigSource),
     no_tls: (bool, ConfigSource),
     #[cfg(feature = "rest-api-cors")]
-    whitelist: Option<(Vec<String>, ConfigSource)>,
+    allow_list: Option<(Vec<String>, ConfigSource)>,
     #[cfg(feature = "biome-credentials")]
     enable_biome_credentials: (bool, ConfigSource),
     #[cfg(feature = "oauth")]
@@ -224,8 +224,8 @@ impl Config {
     }
 
     #[cfg(feature = "rest-api-cors")]
-    pub fn whitelist(&self) -> Option<&[String]> {
-        if let Some((list, _)) = &self.whitelist {
+    pub fn allow_list(&self) -> Option<&[String]> {
+        if let Some((list, _)) = &self.allow_list {
             Some(list)
         } else {
             None
@@ -456,8 +456,8 @@ impl Config {
     }
 
     #[cfg(feature = "rest-api-cors")]
-    pub fn whitelist_source(&self) -> Option<&ConfigSource> {
-        if let Some((_, source)) = &self.whitelist {
+    pub fn allow_list_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.allow_list {
             Some(source)
         } else {
             None
@@ -756,7 +756,7 @@ impl Config {
             self.no_tls_source()
         );
         #[cfg(feature = "rest-api-cors")]
-        self.log_whitelist();
+        self.log_allow_list();
         #[cfg(feature = "biome-credentials")]
         debug!(
             "Config: enable_biome_credentials: {:?} (source: {:?})",
@@ -891,9 +891,9 @@ impl Config {
     }
 
     #[cfg(feature = "rest-api-cors")]
-    fn log_whitelist(&self) {
-        if let (Some(list), Some(source)) = (self.whitelist(), self.whitelist_source()) {
-            debug!("Config: whitelist: {:?} (source: {:?})", list, source,);
+    fn log_allow_list(&self) {
+        if let (Some(list), Some(source)) = (self.allow_list(), self.allow_list_source()) {
+            debug!("Config: allow_list: {:?} (source: {:?})", list, source,);
         }
     }
 }
