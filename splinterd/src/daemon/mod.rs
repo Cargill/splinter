@@ -378,35 +378,46 @@ impl SplinterDaemon {
             .into_iter()
             .map(|mut network_listener| {
                 let connection_connector_clone = connection_connector.clone();
-                thread::spawn(move || {
-                    let endpoint = network_listener.endpoint();
-                    for connection_result in network_listener.incoming() {
-                        let connection = match connection_result {
-                            Ok(connection) => connection,
-                            Err(AcceptError::ProtocolError(msg)) => {
-                                warn!("Failed to accept connection on {}: {}", endpoint, msg);
-                                continue;
+                thread::Builder::new()
+                    .name(format!(
+                        "NetworkIncomingListener-{}",
+                        network_listener.endpoint()
+                    ))
+                    .spawn(move || {
+                        let endpoint = network_listener.endpoint();
+                        for connection_result in network_listener.incoming() {
+                            let connection = match connection_result {
+                                Ok(connection) => connection,
+                                Err(AcceptError::ProtocolError(msg)) => {
+                                    warn!("Failed to accept connection on {}: {}", endpoint, msg);
+                                    continue;
+                                }
+                                Err(AcceptError::IoError(err)) => {
+                                    warn!("Failed to accept connection on {}: {}", endpoint, err);
+                                    continue;
+                                }
+                            };
+                            debug!("Received connection from {}", connection.remote_endpoint());
+                            if let Err(err) =
+                                connection_connector_clone.add_inbound_connection(connection)
+                            {
+                                error!(
+                                    "Unable to add inbound connection to connection manager: {}",
+                                    err
+                                );
+                                error!("Exiting listener thread for {}", endpoint);
+                                break;
                             }
-                            Err(AcceptError::IoError(err)) => {
-                                warn!("Failed to accept connection on {}: {}", endpoint, err);
-                                continue;
-                            }
-                        };
-                        debug!("Received connection from {}", connection.remote_endpoint());
-                        if let Err(err) =
-                            connection_connector_clone.add_inbound_connection(connection)
-                        {
-                            error!(
-                                "Unable to add inbound connection to connection manager: {}",
-                                err
-                            );
-                            error!("Exiting listener thread for {}", endpoint);
-                            break;
                         }
-                    }
-                })
+                    })
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| {
+                StartError::NetworkError(format!(
+                    "Unable to start NetworkIncomingListener threads: {}",
+                    err
+                ))
+            })?;
 
         // hold on to peer refs for the peers provided to ensure the connections are kept around
         let mut peer_refs = vec![];
@@ -886,50 +897,55 @@ impl SplinterDaemon {
         #[cfg(feature = "service-endpoint")] mut external_service_listener: Box<dyn Listener>,
     ) {
         // this thread will just be dropped on shutdown
-        let _ = thread::spawn(move || {
-            // accept the internal service connections
-            for mut listener in internal_service_listeners.into_iter() {
-                match listener.incoming().next() {
-                    Some(Ok(connection)) => {
-                        let remote_endpoint = connection.remote_endpoint();
-                        if let Err(err) = connection_connector.add_inbound_connection(connection) {
-                            error!("Unable to add peer {}: {}", remote_endpoint, err)
+        let _ = thread::Builder::new()
+            .name("ServiceIncomingConnectionListener".into())
+            .spawn(move || {
+                // accept the internal service connections
+                for mut listener in internal_service_listeners.into_iter() {
+                    match listener.incoming().next() {
+                        Some(Ok(connection)) => {
+                            let remote_endpoint = connection.remote_endpoint();
+                            if let Err(err) =
+                                connection_connector.add_inbound_connection(connection)
+                            {
+                                error!("Unable to add peer {}: {}", remote_endpoint, err)
+                            }
                         }
-                    }
-                    Some(Err(err)) => {
-                        return Err(StartError::TransportError(format!(
-                            "Accept Error: {:?}",
-                            err
-                        )));
-                    }
-                    None => {}
-                }
-            }
-
-            #[cfg(feature = "service-endpoint")]
-            {
-                for connection_result in external_service_listener.incoming() {
-                    let connection = match connection_result {
-                        Ok(connection) => connection,
-                        Err(err) => {
+                        Some(Err(err)) => {
                             return Err(StartError::TransportError(format!(
                                 "Accept Error: {:?}",
                                 err
                             )));
                         }
-                    };
-                    debug!(
-                        "Received service connection from {}",
-                        connection.remote_endpoint()
-                    );
-                    if let Err(err) = connection_connector.add_inbound_connection(connection) {
-                        error!("Unable to add inbound service connection: {}", err);
+                        None => {}
                     }
                 }
-            }
 
-            Ok(())
-        });
+                #[cfg(feature = "service-endpoint")]
+                {
+                    for connection_result in external_service_listener.incoming() {
+                        let connection = match connection_result {
+                            Ok(connection) => connection,
+                            Err(err) => {
+                                return Err(StartError::TransportError(format!(
+                                    "Accept Error: {:?}",
+                                    err
+                                )));
+                            }
+                        };
+                        debug!(
+                            "Received service connection from {}",
+                            connection.remote_endpoint()
+                        );
+                        if let Err(err) = connection_connector.add_inbound_connection(connection) {
+                            error!("Unable to add inbound service connection: {}", err);
+                        }
+                    }
+                }
+
+                Ok(())
+            })
+            .expect("Unable to create ServiceIncomingConnectionListener thread");
     }
 
     fn start_admin_service(
