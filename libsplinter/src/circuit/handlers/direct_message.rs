@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::circuit::handlers::create_message;
-use crate::circuit::routing::{RoutingTableReader, ServiceId};
+use crate::circuit::routing::{RoutingTableReader, ServiceId as RoutingServiceId};
 use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
 use crate::peer::PeerTokenPair;
 use crate::protos::circuit::{
@@ -64,7 +64,7 @@ impl Handler for CircuitDirectMessageHandler {
         let circuit_name = msg.get_circuit();
         let msg_sender = msg.get_sender();
         let recipient = msg.get_recipient();
-        let recipient_id = ServiceId::new(circuit_name.to_string(), recipient.to_string());
+        let recipient_id = RoutingServiceId::new(circuit_name.to_string(), recipient.to_string());
 
         // msg bytes will either be message bytes of a direct message or an error message
         // the msg_recipient is either the service/node id to send the message to or is the
