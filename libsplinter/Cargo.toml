@@ -132,9 +132,11 @@ experimental = [
     "service-lifecycle-store",
     "service-message-converter",
     "service-message-handler",
+    "service-message-handler-dispatch",
     "service-message-handler-factory",
     "service-message-sender",
     "service-message-sender-factory",
+    "service-message-sender-factory-peer",
     "service-network",
     "service-routable",
     "service-timer",
@@ -198,9 +200,10 @@ service-lifecycle-executor = ["service-lifecycle", "service-lifecycle-store"]
 service-lifecycle-store = ["service-lifecycle"]
 service-message-converter = []
 service-message-handler = ["service-message-converter", "service-message-sender"]
-service-message-handler-factory = ["service-message-handler"]
+service-message-handler-factory = ["service-type", "service-routable", "service-message-handler"]
 service-message-sender = ["service-message-converter"]
 service-message-sender-factory = ["service-message-sender"]
+service-message-sender-factory-peer = ["service-message-sender"]
 service-network = []
 service-routable = ["service-type"]
 service-timer =[
@@ -212,6 +215,7 @@ service-timer =[
 ]
 service-timer-filter = []
 service-timer-handler = ["service-message-converter", "service-message-sender"]
+service-message-handler-dispatch = ["service-message-handler", "service-message-handler-factory"]
 service-timer-handler-factory = ["service-timer-handler"]
 service-type = []
 sqlite = ["diesel/sqlite", "diesel_migrations", "store"]

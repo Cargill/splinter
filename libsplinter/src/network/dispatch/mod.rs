@@ -232,6 +232,12 @@ impl std::fmt::Display for DispatchError {
     }
 }
 
+impl From<InternalError> for DispatchError {
+    fn from(err: InternalError) -> Self {
+        Self::InternalError(err)
+    }
+}
+
 /// A sender for outgoing messages.
 ///
 /// The message sender trait can used by Handlers to send messages based on the received messages.

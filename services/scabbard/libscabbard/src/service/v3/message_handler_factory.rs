@@ -11,9 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use splinter::service::MessageHandlerFactory;
+use splinter::service::{MessageHandlerFactory, Routable, ServiceType};
 
 use super::message_handler::ScabbardMessageHandler;
+
+const SCABBARD_SERVICE_TYPES: &[ServiceType<'static>] = &[ServiceType::new_static("scabbard:v3")];
 
 #[derive(Clone, Default)]
 pub struct ScabbardMessageHandlerFactory {}
@@ -33,5 +35,11 @@ impl MessageHandlerFactory for ScabbardMessageHandlerFactory {
 
     fn clone_boxed(&self) -> Box<dyn MessageHandlerFactory<MessageHandler = Self::MessageHandler>> {
         Box::new(self.clone())
+    }
+}
+
+impl Routable for ScabbardMessageHandlerFactory {
+    fn service_types(&self) -> &[ServiceType] {
+        SCABBARD_SERVICE_TYPES
     }
 }
