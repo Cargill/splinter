@@ -1,0 +1,114 @@
+name: 0-6 Build splinter-dev
+on:
+  - push
+  - workflow_dispatch
+jobs:
+  start_cluster:
+    if: github.repository == 'Cargill/splinter'
+    name: Start buildx cluster
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start_buildx_cluster.outputs.label }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - uses: actions/checkout@v2
+
+      - name: Start EC2 runner
+        id: start_buildx_cluster
+        uses: ./.github/actions/ec2-docker-buildx
+        with:
+          action: start
+          amd_ami_id: ${{ secrets.AMD_AMI_ID }}
+          amd_instance_type: ${{ secrets.AMD_INSTANCE_TYPE }}
+          arm_ami_id: ${{ secrets.ARM_AMI_ID }}
+          arm_instance_type: ${{ secrets.ARM_INSTANCE_TYPE }}
+          gh_personal_access_token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          security_group_id: ${{ secrets.SECURITY_GROUP_ID }}
+          subnet: ${{ secrets.SUBNET }}
+
+      - name: Test output
+        run: echo ${{ steps.start_buildx_cluster.outputs.label }}
+
+      - name: Notify Slack of Failure
+        if: cancelled() || failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  build_splinter_dev:
+    if: github.repository == 'Cargill/splinter'
+    name: Build splinter-dev
+    needs: start_cluster
+    runs-on: ${{ needs.start_cluster.outputs.label }}
+    steps:
+      - name: Buildx ls
+        run: docker buildx ls
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Docker build
+        env:
+          NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
+        run: ./ci/splinter-dev-buildx
+
+      - name: Notify Slack of Failure
+        if: cancelled() || failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  stop_cluster:
+    name: Stop buildx cluster
+    needs:
+      - start_cluster
+      - build_splinter_dev
+    runs-on: ubuntu-latest
+    if: ${{ github.repository == 'Cargill/splinter' && always() }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - uses: actions/checkout@v2
+
+      - name: Destroy cluster
+        uses: ./.github/actions/ec2-docker-buildx
+        with:
+          action: stop
+          label: ${{ needs.start_cluster.outputs.label }}
+
+      - name: Notify Slack of Failure
+        if: cancelled() || failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
