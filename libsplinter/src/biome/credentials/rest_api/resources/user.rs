@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "biome-key-management")]
 use super::key_management::NewKey;
 
 #[derive(Deserialize)]
@@ -19,5 +20,6 @@ pub(crate) struct ModifyUser {
     pub username: String,
     pub hashed_password: String,
     pub new_password: Option<String>,
+    #[cfg(feature = "biome-key-management")]
     pub new_key_pairs: Vec<NewKey>,
 }
