@@ -13,23 +13,42 @@
 // limitations under the License.
 
 use splinter::error::InvalidArgumentError;
+use splinter::service::ServiceId;
 
-pub struct ScabbardArguments {}
+pub struct ScabbardArguments {
+    peers: Vec<ServiceId>,
+}
 
 impl ScabbardArguments {
-    pub fn new() -> Result<Self, InvalidArgumentError> {
-        Ok(Self {})
+    pub fn new(peers: Vec<ServiceId>) -> Result<Self, InvalidArgumentError> {
+        Ok(Self { peers })
+    }
+
+    pub fn peers(&self) -> &Vec<ServiceId> {
+        &self.peers
     }
 }
 
-pub struct ScabbardArgumentsBuilder {}
+#[derive(Default)]
+pub struct ScabbardArgumentsBuilder {
+    peers: Option<Vec<ServiceId>>,
+}
 
 impl ScabbardArgumentsBuilder {
-    pub fn new() -> Result<Self, InvalidArgumentError> {
-        Ok(Self {})
+    pub fn new() -> Self {
+        Self { peers: None }
+    }
+
+    pub fn with_peers(mut self, peers: Vec<ServiceId>) -> Self {
+        self.peers = Some(peers);
+        self
     }
 
     pub fn build(self) -> Result<ScabbardArguments, InvalidArgumentError> {
-        ScabbardArguments::new()
+        let peers = self
+            .peers
+            .ok_or_else(|| InvalidArgumentError::new("peers", "must be set"))?;
+
+        ScabbardArguments::new(peers)
     }
 }
