@@ -18,7 +18,7 @@ use super::Permission;
 
 /// A map used to correlate requests with the permissions that guard them.
 #[derive(Default)]
-pub(in crate::rest_api) struct PermissionMap {
+pub struct PermissionMap {
     internal: Vec<(RequestDefinition, Permission)>,
 }
 
