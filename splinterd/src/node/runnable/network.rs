@@ -163,10 +163,10 @@ impl RunnableNetworkSubsystem {
             .map_err(InternalError::with_message)?;
 
         let mut network_listener_joinhandles =
-            Self::listen_for_incoming_peers(network_listeners, &connection_connector);
+            Self::listen_for_incoming_peers(network_listeners, &connection_connector)?;
 
         let service_listener_joinhandle =
-            Self::listen_for_services(internal_service_listeners, &connection_connector);
+            Self::listen_for_services(internal_service_listeners, &connection_connector)?;
 
         network_listener_joinhandles.push(service_listener_joinhandle);
 
@@ -322,67 +322,78 @@ impl RunnableNetworkSubsystem {
     fn listen_for_incoming_peers(
         network_listeners: Vec<Box<dyn Listener>>,
         connection_connector: &Connector,
-    ) -> Vec<thread::JoinHandle<()>> {
+    ) -> Result<Vec<thread::JoinHandle<()>>, InternalError> {
         // setup threads to listen on the network ports and add incoming connections to the network
         // these threads will just be dropped on shutdown
         network_listeners
             .into_iter()
             .map(|mut network_listener| {
                 let connection_connector_clone = connection_connector.clone();
-                thread::spawn(move || {
-                    let endpoint = network_listener.endpoint();
-                    for connection_result in network_listener.incoming() {
-                        let connection = match connection_result {
-                            Ok(connection) => connection,
-                            Err(AcceptError::ProtocolError(msg)) => {
-                                warn!("Failed to accept connection on {}: {}", endpoint, msg);
-                                continue;
+                thread::Builder::new()
+                    .name(format!(
+                        "IncomingPeerConnectionListener-{}",
+                        network_listener.endpoint()
+                    ))
+                    .spawn(move || {
+                        let endpoint = network_listener.endpoint();
+                        for connection_result in network_listener.incoming() {
+                            let connection = match connection_result {
+                                Ok(connection) => connection,
+                                Err(AcceptError::ProtocolError(msg)) => {
+                                    warn!("Failed to accept connection on {}: {}", endpoint, msg);
+                                    continue;
+                                }
+                                Err(AcceptError::IoError(err)) => {
+                                    warn!("Failed to accept connection on {}: {}", endpoint, err);
+                                    continue;
+                                }
+                            };
+                            debug!("Received connection from {}", connection.remote_endpoint());
+                            if let Err(err) =
+                                connection_connector_clone.add_inbound_connection(connection)
+                            {
+                                error!(
+                                    "Unable to add inbound connection to connection manager: {}",
+                                    err
+                                );
+                                error!("Exiting listener thread for {}", endpoint);
+                                break;
                             }
-                            Err(AcceptError::IoError(err)) => {
-                                warn!("Failed to accept connection on {}: {}", endpoint, err);
-                                continue;
-                            }
-                        };
-                        debug!("Received connection from {}", connection.remote_endpoint());
-                        if let Err(err) =
-                            connection_connector_clone.add_inbound_connection(connection)
-                        {
-                            error!(
-                                "Unable to add inbound connection to connection manager: {}",
-                                err
-                            );
-                            error!("Exiting listener thread for {}", endpoint);
-                            break;
                         }
-                    }
-                })
+                    })
+                    .map_err(|_| InternalError::with_message("Unable to spawn thread".into()))
             })
-            .collect::<Vec<_>>()
+            .collect::<Result<Vec<_>, _>>()
     }
 
     fn listen_for_services(
         internal_service_listeners: Vec<Box<dyn Listener>>,
         connection_connector: &Connector,
-    ) -> thread::JoinHandle<()> {
+    ) -> Result<thread::JoinHandle<()>, InternalError> {
         // this thread will just be dropped on shutdown
         let connection_connector = connection_connector.clone();
-        thread::spawn(move || {
-            // accept the internal service connections
-            for mut listener in internal_service_listeners.into_iter() {
-                match listener.incoming().next() {
-                    Some(Ok(connection)) => {
-                        let remote_endpoint = connection.remote_endpoint();
-                        if let Err(err) = connection_connector.add_inbound_connection(connection) {
-                            error!("Unable to add peer {}: {}", remote_endpoint, err)
+        thread::Builder::new()
+            .name("ServiceIncomingConnectionListener".into())
+            .spawn(move || {
+                // accept the internal service connections
+                for mut listener in internal_service_listeners.into_iter() {
+                    match listener.incoming().next() {
+                        Some(Ok(connection)) => {
+                            let remote_endpoint = connection.remote_endpoint();
+                            if let Err(err) =
+                                connection_connector.add_inbound_connection(connection)
+                            {
+                                error!("Unable to add peer {}: {}", remote_endpoint, err)
+                            }
                         }
+                        Some(Err(err)) => {
+                            error!("Accept Error: {:?}", err);
+                            break;
+                        }
+                        None => {}
                     }
-                    Some(Err(err)) => {
-                        error!("Accept Error: {:?}", err);
-                        break;
-                    }
-                    None => {}
                 }
-            }
-        })
+            })
+            .map_err(|_| InternalError::with_message("Unable to spawn thread".into()))
     }
 }
