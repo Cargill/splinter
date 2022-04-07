@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::rest_api::actix_web_1::Method;
+use crate::rest_api::actix_web_1::Method as Actix1Method;
 
 use super::Permission;
 
@@ -180,33 +180,36 @@ mod tests {
         let mut map = PermissionMap::new();
         assert!(map.internal.is_empty());
 
-        map.add_permission(Method::Get, "/test/endpoint", perm1);
+        map.add_permission(Actix1Method::Get, "/test/endpoint", perm1);
         assert_eq!(map.internal.len(), 1);
         assert_eq!(
-            map.get_permission(&Method::Get, "/test/endpoint"),
+            map.get_permission(&Actix1Method::Get, "/test/endpoint"),
             Some(&perm1)
         );
-        assert_eq!(map.get_permission(&Method::Put, "/test/endpoint"), None);
-        assert_eq!(map.get_permission(&Method::Get, "/test/other"), None);
+        assert_eq!(
+            map.get_permission(&Actix1Method::Put, "/test/endpoint"),
+            None
+        );
+        assert_eq!(map.get_permission(&Actix1Method::Get, "/test/other"), None);
 
         let mut other_map = PermissionMap::new();
-        other_map.add_permission(Method::Put, "/test/endpoint/{variable}", perm2);
+        other_map.add_permission(Actix1Method::Put, "/test/endpoint/{variable}", perm2);
         map.append(&mut other_map);
         assert_eq!(map.internal.len(), 2);
         assert_eq!(
-            map.get_permission(&Method::Get, "/test/endpoint"),
+            map.get_permission(&Actix1Method::Get, "/test/endpoint"),
             Some(&perm1)
         );
         assert_eq!(
-            map.get_permission(&Method::Put, "/test/endpoint/test1"),
+            map.get_permission(&Actix1Method::Put, "/test/endpoint/test1"),
             Some(&perm2)
         );
         assert_eq!(
-            map.get_permission(&Method::Put, "/test/endpoint/test2"),
+            map.get_permission(&Actix1Method::Put, "/test/endpoint/test2"),
             Some(&perm2)
         );
         assert_eq!(
-            map.get_permission(&Method::Get, "/test/endpoint/test1"),
+            map.get_permission(&Actix1Method::Get, "/test/endpoint/test1"),
             None
         );
     }
