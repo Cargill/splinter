@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::rest_api::Method;
+use crate::rest_api::actix_web_1::Method;
 
 use super::Permission;
 
