@@ -446,21 +446,17 @@ impl Handler for AuthCompleteHandler {
             context.source_connection_id()
         );
 
-        match self
+        if let Err(err) = self
             .auth_manager
             .received_complete(context.source_connection_id())
         {
-            Err(err) => {
-                send_authorization_error(
-                    &self.auth_manager,
-                    context.source_id(),
-                    context.source_connection_id(),
-                    sender,
-                    &err.to_string(),
-                )?;
-                return Ok(());
-            }
-            Ok(()) => (),
+            send_authorization_error(
+                &self.auth_manager,
+                context.source_id(),
+                context.source_connection_id(),
+                sender,
+                &err.to_string(),
+            )?;
         }
 
         Ok(())
