@@ -112,10 +112,18 @@ impl ScabbardState {
             let initial_state_root = merkle_state
                 .get_initial_state_root()
                 .map_err(|err| ScabbardStateError(err.to_string()))?;
-            merkle_state.commit(
+
+            let new_state_root = merkle_state.commit(
                 &initial_state_root,
                 vec![admin_keys_state_change].as_slice(),
-            )?
+            )?;
+
+            // store the new state root to the commit store
+            commit_hash_store
+                .set_current_commit_hash(&new_state_root)
+                .map_err(|err| ScabbardStateError(err.to_string()))?;
+
+            new_state_root
         };
 
         // Initialize transact
