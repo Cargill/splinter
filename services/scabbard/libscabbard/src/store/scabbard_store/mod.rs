@@ -12,23 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Stores required for a scabbard services operation.
-
-#[cfg(feature = "scabbardv3")]
-mod command;
-mod commit_hash;
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
-pub(crate) mod pool;
-#[cfg(feature = "scabbardv3")]
-mod scabbard_store;
-
-#[cfg(feature = "scabbardv3")]
-pub use command::{
-    ScabbardFinalizeServiceCommand, ScabbardPrepareServiceCommand, ScabbardPurgeServiceCommand,
-    ScabbardRetireServiceCommand,
-};
-
-#[cfg(feature = "diesel")]
-pub use commit_hash::diesel;
-pub use commit_hash::transact;
-pub use commit_hash::{CommitHashStore, CommitHashStoreError};
+pub mod commit;
+pub mod context;
+pub mod service;
+pub mod state;
