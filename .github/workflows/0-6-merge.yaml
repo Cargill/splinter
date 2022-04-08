@@ -225,7 +225,8 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-  publish_docker:
+  start_cluster:
+    name: Start buildx cluster
     needs:
       - lint_gameroom_client
       - lint_splinter
@@ -236,7 +237,41 @@ jobs:
       - build_docker
       - shellcheck_splinter
       - lint_dockerfiles
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-buildx-cluster.outputs.label }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - uses: actions/checkout@v2
+
+      - name: Start EC2 runner
+        id: start-buildx-cluster
+        uses: ./.github/actions/ec2-docker-buildx
+        with:
+          action: start
+          amd_ami_id: ${{ secrets.AMD_AMI_ID }}
+          amd_instance_type: c6i.4xlarge
+          arm_ami_id: ${{ secrets.ARM_AMI_ID }}
+          arm_instance_type: c6g.4xlarge
+          gh_personal_access_token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          security_group_id: ${{ secrets.SECURITY_GROUP_ID }}
+          subnet: ${{ secrets.SUBNET }}
+
+      - name: Test output
+        run: echo ${{ steps.start-buildx-cluster.outputs.label }}
+
+  publish_docker:
+    needs:
+      - start_cluster
+    runs-on: ${{ needs.start_cluster.outputs.label }}
     steps:
       - name: Display envvars
         run: env
@@ -266,3 +301,130 @@ jobs:
           fields: repo,message,author,job
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  stop_cluster:
+    name: Stop buildx cluster
+    needs:
+      - start_cluster
+      - publish_docker
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - uses: actions/checkout@v2
+
+      - name: Destroy cluster
+        uses: ./.github/actions/ec2-docker-buildx
+        with:
+          action: stop
+          label: ${{ needs.start_cluster.outputs.label }}
+
+# --== experimental images ==--
+
+  start_cluster_experimental:
+    name: Start buildx cluster
+    needs:
+      - lint_gameroom_client
+      - lint_splinter
+      - lint_openapi
+      - unit_test_splinter
+      - gameroom_tests
+      - gameroom_ui_tests
+      - build_docker
+      - shellcheck_splinter
+      - lint_dockerfiles
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-buildx-cluster.outputs.label }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - uses: actions/checkout@v2
+
+      - name: Start EC2 runner
+        id: start-buildx-cluster
+        uses: ./.github/actions/ec2-docker-buildx
+        with:
+          action: start
+          amd_ami_id: ${{ secrets.AMD_AMI_ID }}
+          amd_instance_type: c6i.4xlarge
+          arm_ami_id: ${{ secrets.ARM_AMI_ID }}
+          arm_instance_type: c6g.4xlarge
+          gh_personal_access_token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          security_group_id: ${{ secrets.SECURITY_GROUP_ID }}
+          subnet: ${{ secrets.SUBNET }}
+
+      - name: Test output
+        run: echo ${{ steps.start-buildx-cluster.outputs.label }}
+
+  publish_docker_experimental:
+    needs:
+      - start_cluster_experimental
+    runs-on: ${{ needs.start_cluster_experimental.outputs.label }}
+    steps:
+      - name: Display envvars
+        run: env
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Publish branch to dockerhub
+        run: ./ci/publish-docker 0.6-experimental
+        env:
+          NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
+          VERSION: AUTO_STRICT
+          CARGO_TERM_COLOR: always
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  stop_cluster_experimental:
+    name: Stop buildx cluster
+    needs:
+      - start_cluster_experimental
+      - publish_docker_experimental
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - uses: actions/checkout@v2
+
+      - name: Destroy cluster
+        uses: ./.github/actions/ec2-docker-buildx
+        with:
+          action: stop
+          label: ${{ needs.start_cluster_experimental.outputs.label }}
