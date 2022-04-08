@@ -63,7 +63,7 @@ impl Action for StateMigrateAction {
             in_database, out_database
         );
 
-        if !args.is_present("yes") {
+        if !args.is_present("yes") && !args.is_present("dry_run") {
             warn!(
                 "Warning: This will purge the data from `--in` and only the current state \
                 root is stored, the rest are purged."
@@ -187,7 +187,15 @@ impl Action for StateMigrateAction {
             });
 
             for (circuit_id, service_id) in local_services {
-                info!("Migrating state data for {}::{}", circuit_id, service_id);
+                if !args.is_present("dry_run") {
+                    info!("Migrating state data for {}::{}", circuit_id, service_id);
+                } else {
+                    info!(
+                        "Checking if state data for {}::{} could be migrated",
+                        circuit_id, service_id
+                    );
+                }
+
                 let commit_hash_store =
                     upgrade_stores.new_commit_hash_store(&circuit_id, &service_id);
                 let commit_hash = commit_hash_store
@@ -225,21 +233,29 @@ impl Action for StateMigrateAction {
                     )));
                 }
 
-                let state_writer = get_merkle_state(
-                    out_database,
-                    &circuit_id,
-                    &service_id,
-                    &out_upgrade_stores,
-                    &lmdb_db_factory,
-                    true,
-                )?;
+                // If dry_run, do not actually attempt to move the data
+                if !args.is_present("dry_run") {
+                    let state_writer = get_merkle_state(
+                        out_database,
+                        &circuit_id,
+                        &service_id,
+                        &out_upgrade_stores,
+                        &lmdb_db_factory,
+                        true,
+                    )?;
 
-                copy_state(&state_reader, commit_hash.to_string(), &state_writer)?;
+                    copy_state(&state_reader, commit_hash.to_string(), &state_writer)?;
 
-                // delete the existing scabbard state
-                state_reader.delete_tree(&lmdb_db_factory)?;
+                    // delete the existing scabbard state
+                    state_reader.delete_tree(&lmdb_db_factory)?;
+                }
             }
-            info!("Scabbard state successfully migrated to {}", out_database);
+            if !args.is_present("dry_run") {
+                info!("Scabbard state successfully migrated to {}", out_database);
+            } else {
+                info!("Dry run was successful for {}", out_database);
+            }
+
             Ok(())
         }
     }
