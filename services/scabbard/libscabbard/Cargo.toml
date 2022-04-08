@@ -99,7 +99,6 @@ scabbardv3 = [
     "splinter/service-timer-handler",
     "splinter/service-timer-handler-factory",
     "splinter/service-type",
-    "splinter/store-command"
     ]
 splinter-service = ["log", "sawtooth"]
 sqlite = ["diesel/sqlite", "diesel_migrations", "log", "sawtooth/sqlite", "transact/sqlite"]

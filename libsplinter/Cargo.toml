@@ -144,7 +144,6 @@ experimental = [
     "service-timer-handler",
     "service-timer-handler-factory",
     "service-type",
-    "store-command",
     "ws-transport",
 ]
 
@@ -195,7 +194,7 @@ rest-api-actix-web-1 = [
 rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
 service-arguments-converter = []
-service-lifecycle = ["service-arguments-converter", "store-command"]
+service-lifecycle = ["service-arguments-converter"]
 service-lifecycle-executor = ["service-lifecycle", "service-lifecycle-store"]
 service-lifecycle-store = ["service-lifecycle"]
 service-message-converter = []
@@ -220,7 +219,6 @@ service-timer-handler-factory = ["service-timer-handler"]
 service-type = []
 sqlite = ["diesel/sqlite", "diesel_migrations", "store"]
 store = []
-store-command = ["store"]
 store-factory = ["store"]
 tap = ["chrono", "futures-0-3", "influxdb", "metrics", "tokio-1"]
 trust-authorization = []

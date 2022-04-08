@@ -14,7 +14,6 @@
 
 //! Contains a `StoreFactory` trait, which is an abstract factory for building stores
 //! backed by a single storage mechanism (e.g. database)
-#[cfg(feature = "store-command")]
 pub mod command;
 #[cfg(all(feature = "store-factory", feature = "memory"))]
 pub mod memory;
