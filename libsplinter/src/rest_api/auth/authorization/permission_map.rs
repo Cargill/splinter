@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::rest_api::Method;
+use crate::rest_api::actix_web_1::Method as Actix1Method;
 
 use super::Permission;
 
 /// A map used to correlate requests with the permissions that guard them.
 #[derive(Default)]
-pub(in crate::rest_api) struct PermissionMap {
+pub struct PermissionMap {
     internal: Vec<(RequestDefinition, Permission)>,
 }
 
@@ -35,17 +35,23 @@ impl PermissionMap {
 
     /// Sets the permission for the given (method, endpoint) pair. The endpoint may contain path
     /// variables surrounded by `{}`.
-    pub fn add_permission(&mut self, method: Method, endpoint: &str, permission: Permission) {
+    pub fn add_permission<M>(&mut self, method: M, endpoint: &str, permission: Permission)
+    where
+        M: Into<Method>,
+    {
         self.internal
-            .push((RequestDefinition::new(method, endpoint), permission));
+            .push((RequestDefinition::new(method.into(), endpoint), permission));
     }
 
     /// Gets the permission for a request. This will attempt to match the method and endpoint to a
     /// known (method, endpoint) pair, considering path variables of known endpoints.
-    pub fn get_permission(&self, method: &Method, endpoint: &str) -> Option<&Permission> {
+    pub fn get_permission<M>(&self, method: M, endpoint: &str) -> Option<&Permission>
+    where
+        M: Into<Method> + Copy,
+    {
         self.internal
             .iter()
-            .find(|(req, _)| req.matches(method, endpoint))
+            .find(|(req, _)| req.matches(&method.into(), endpoint))
             .map(|(_, perm)| perm)
     }
 
@@ -53,6 +59,39 @@ impl PermissionMap {
     /// contents of the other map.
     pub fn append(&mut self, other: &mut PermissionMap) {
         self.internal.append(&mut other.internal)
+    }
+}
+
+#[derive(PartialEq, Clone)]
+pub enum Method {
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
+    Head,
+    Options,
+    Connect,
+    Trace,
+    Extension(String),
+}
+
+impl From<&Actix1Method> for Method {
+    fn from(source: &Actix1Method) -> Self {
+        match source {
+            Actix1Method::Get => Method::Get,
+            Actix1Method::Post => Method::Post,
+            Actix1Method::Put => Method::Put,
+            Actix1Method::Patch => Method::Patch,
+            Actix1Method::Delete => Method::Delete,
+            Actix1Method::Head => Method::Head,
+        }
+    }
+}
+
+impl From<Actix1Method> for Method {
+    fn from(source: crate::rest_api::actix_web_1::Method) -> Self {
+        (&source).into()
     }
 }
 
@@ -180,33 +219,36 @@ mod tests {
         let mut map = PermissionMap::new();
         assert!(map.internal.is_empty());
 
-        map.add_permission(Method::Get, "/test/endpoint", perm1);
+        map.add_permission(Actix1Method::Get, "/test/endpoint", perm1);
         assert_eq!(map.internal.len(), 1);
         assert_eq!(
-            map.get_permission(&Method::Get, "/test/endpoint"),
+            map.get_permission(&Actix1Method::Get, "/test/endpoint"),
             Some(&perm1)
         );
-        assert_eq!(map.get_permission(&Method::Put, "/test/endpoint"), None);
-        assert_eq!(map.get_permission(&Method::Get, "/test/other"), None);
+        assert_eq!(
+            map.get_permission(&Actix1Method::Put, "/test/endpoint"),
+            None
+        );
+        assert_eq!(map.get_permission(&Actix1Method::Get, "/test/other"), None);
 
         let mut other_map = PermissionMap::new();
-        other_map.add_permission(Method::Put, "/test/endpoint/{variable}", perm2);
+        other_map.add_permission(Actix1Method::Put, "/test/endpoint/{variable}", perm2);
         map.append(&mut other_map);
         assert_eq!(map.internal.len(), 2);
         assert_eq!(
-            map.get_permission(&Method::Get, "/test/endpoint"),
+            map.get_permission(&Actix1Method::Get, "/test/endpoint"),
             Some(&perm1)
         );
         assert_eq!(
-            map.get_permission(&Method::Put, "/test/endpoint/test1"),
+            map.get_permission(&Actix1Method::Put, "/test/endpoint/test1"),
             Some(&perm2)
         );
         assert_eq!(
-            map.get_permission(&Method::Put, "/test/endpoint/test2"),
+            map.get_permission(&Actix1Method::Put, "/test/endpoint/test2"),
             Some(&perm2)
         );
         assert_eq!(
-            map.get_permission(&Method::Get, "/test/endpoint/test1"),
+            map.get_permission(&Actix1Method::Get, "/test/endpoint/test1"),
             None
         );
     }
