@@ -14,5 +14,41 @@
 
 pub mod commit;
 pub mod context;
+mod error;
 pub mod service;
 pub mod state;
+
+pub(crate) use error::ScabbardStoreError;
+
+use commit::CommitEntry;
+use context::ScabbardContext;
+use service::ScabbardService;
+use splinter::service::FullyQualifiedServiceId;
+
+pub trait ScabbardStore {
+    /// Add a new context
+    fn add_consensus_context(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        context: ScabbardContext,
+    ) -> Result<(), ScabbardStoreError>;
+    /// Update an existing context
+    fn update_consensus_context(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        context: ScabbardContext,
+    ) -> Result<(), ScabbardStoreError>;
+    /// List ready services
+    fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError>;
+    /// Add a new scabbard service
+    fn add_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError>;
+    /// Add a new commit entry
+    fn add_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError>;
+    /// Get the commit entry for the specified service_id and epoch
+    fn get_last_commit_entry(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<CommitEntry>, ScabbardStoreError>;
+    /// Update an existing commit entry
+    fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError>;
+}
