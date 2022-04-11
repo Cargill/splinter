@@ -38,6 +38,14 @@ inputs:
       This is required when running the 'stop' action.
     required: false
 
+  mode:
+    description: >-
+      'buildx' - start a two node buildx cluster for multi-arch builds.
+      'single' - start a single self-hosted AMD runner.
+      Defaults to 'buildx'.
+    required: false
+    default: 'buildx'
+
   security_group_id:
     description: >-
       Must allow outbound traffic to connect to GitHub
@@ -65,5 +73,6 @@ runs:
     - ${{ inputs.arm_instance_type }}
     - ${{ inputs.gh_personal_access_token }}
     - ${{ inputs.label }}
+    - ${{ inputs.mode }}
     - ${{ inputs.security_group_id }}
     - ${{ inputs.subnet }}

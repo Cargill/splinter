@@ -1,7 +1,7 @@
 # ec2-docker-buildx
 
-Creates a two node buildx cluster on AWS to use in GHA workflows when qemu is
-too slow.
+Creates a self-hosted runner for Github Actions on EC2. Useful for when
+Github hosted runners are too slow.
 This is exposed as a Github Actions self-hosted runner scoped to the repo where
 this action is run from.
 
@@ -48,6 +48,7 @@ jobs:
           arm_ami_id: ${{ secrets.ARM_AMI_ID }}
           arm_instance_type: t4g.nano
           gh_personal_access_token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          mode: buildx
           security_group_id: ${{ secrets.SECURITY_GROUP_ID }}
           subnet: ${{ secrets.SUBNET }}
 
@@ -116,6 +117,13 @@ GitHub Personal Access Token with "repo" permissions
 Label applied to the created EC2 instances during creation.
 No effect during `start`.
 This is required when running the `stop` action.
+
+`mode`
+
+  * `buildx` - start a two node buildx cluster for multi-arch builds
+  * `single` - start a single self-hosted AMD runner
+
+Defaults to `buildx`
 
 `security_group_id`
 
