@@ -1,4 +1,4 @@
-# ec2-docker-buildx
+# ec2-runners
 
 Creates a self-hosted runner for Github Actions on EC2. Useful for when
 Github hosted runners are too slow.
@@ -40,7 +40,7 @@ jobs:
 
       - name: Start EC2 runners
         id: start_buildx_cluster
-        uses: ./.github/actions/ec2-docker-buildx
+        uses: ./.github/actions/ec2-runners
         with:
           action: start
           amd_ami_id: ${{ secrets.AMD_AMI_ID }}
@@ -76,7 +76,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Destroy cluster
-        uses: ./.github/actions/ec2-docker-buildx
+        uses: ./.github/actions/ec2-runners
         with:
           action: stop
           label: ${{ needs.start_cluster.outputs.label }}
