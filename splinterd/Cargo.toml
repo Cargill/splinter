@@ -106,6 +106,7 @@ experimental = [
     "https-bind",
     "node",
     "service-endpoint",
+    "service2",
     "ws-transport",
 ]
 
@@ -145,6 +146,8 @@ node = [
     "splinter/rest-api-actix-web-3",
     "splinter/registry-client",
     "splinter/registry-client-reqwest",
+    "splinter/service-message-handler-dispatch",
+    "splinter/service-message-sender-factory-peer",
     "splinter/biome-client",
     "splinter/biome-client-reqwest",
 ]
@@ -153,6 +156,11 @@ oauth = [
 ]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-endpoint = []
+service2 = [
+  "splinter/service-message-handler-dispatch",
+  "splinter/service-message-sender-factory-peer",
+  "splinter/service-message-sender-factory"
+]
 trust-authorization = ["splinter/trust-authorization"]
 ws-transport = ["splinter/ws-transport"]
 

@@ -38,6 +38,10 @@ use splinter::peer::{interconnect::PeerInterconnectBuilder, PeerManager};
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::NetworkMessageType;
 use splinter::public_key::PublicKey;
+use splinter::runtime::service::{
+    NetworkMessageSenderFactory, RoutingTableServiceTypeResolver, ServiceDispatcher,
+    SingleThreadedMessageHandlerTaskRunner,
+};
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, Incoming, Listener, Transport,
 };
@@ -270,7 +274,8 @@ impl RunnableNetworkSubsystem {
         routing_writer: Box<dyn RoutingTableWriter>,
         public_keys: Vec<PublicKey>,
     ) -> Dispatcher<CircuitMessageType> {
-        let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(network_sender));
+        let mut dispatcher =
+            Dispatcher::<CircuitMessageType>::new(Box::new(network_sender.clone()));
 
         let service_connect_request_handler = ServiceConnectRequestHandler::new(
             node_id.to_string(),
@@ -283,8 +288,20 @@ impl RunnableNetworkSubsystem {
             ServiceDisconnectRequestHandler::new(routing_reader.clone(), routing_writer.clone());
         dispatcher.set_handler(Box::new(service_disconnect_request_handler));
 
-        let direct_message_handler =
-            CircuitDirectMessageHandler::new(node_id.to_string(), routing_reader.clone());
+        let direct_message_handler = CircuitDirectMessageHandler::new(
+            node_id.to_string(),
+            routing_reader.clone(),
+            ServiceDispatcher::new(
+                vec![],
+                Box::new(NetworkMessageSenderFactory::new(
+                    node_id,
+                    network_sender,
+                    routing_reader.clone(),
+                )),
+                Box::new(RoutingTableServiceTypeResolver::new(routing_reader.clone())),
+                Box::new(SingleThreadedMessageHandlerTaskRunner::new()),
+            ),
+        );
         dispatcher.set_handler(Box::new(direct_message_handler));
 
         let circuit_error_handler =
