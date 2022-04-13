@@ -1,5 +1,30 @@
 # Release Notes
 
+## Changes in Splinter 0.6.11
+
+### libsplinter
+
+* Rename `circuit::routing::Service::peer_id` to `::local_peer_id` as it is a
+  more accurate name for its purpose.
+
+### splinterd
+
+* Name incoming connection listener threads. This change names the incoming
+  connection listener threads for peers and services "peers".  This change is
+  both in the daemon and the node test framework.
+
+### scabbard
+
+* Set initial state root properly on start up of Scabbard. Previously, Scabbard
+  did not set the initial state root hash in the commit store on start. This
+  caused the `state migrate` command to fail if a scabbard circuit was created
+  but never used. Scabbard now properly sets the state root on start. If the
+  state was not set previously, it will be set on restart.
+
+### builds
+
+* Publish Docker images for both amd64 and arm64
+
 ## Changes in Splinter 0.6.10
 
 ### libsplinter
