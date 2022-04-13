@@ -12,20 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use splinter::error::InternalError;
-use splinter::service::MessageConverter;
-
-use crate::protocol::v3::message::ScabbardMessage;
-
-#[derive(Clone)]
-pub struct ScabbardMessageByteConverter {}
-
-impl MessageConverter<ScabbardMessage, Vec<u8>> for ScabbardMessageByteConverter {
-    fn to_left(&self, _right: Vec<u8>) -> Result<ScabbardMessage, InternalError> {
-        Ok(ScabbardMessage::Message)
-    }
-
-    fn to_right(&self, _left: ScabbardMessage) -> Result<Vec<u8>, InternalError> {
-        Ok(vec![])
-    }
-}
+pub mod message;

@@ -15,7 +15,6 @@
 mod arguments;
 mod arguments_converter;
 mod lifecycle;
-mod message;
 mod message_converter;
 mod message_handler;
 mod message_handler_factory;
@@ -26,7 +25,6 @@ mod timer_handler_factory;
 pub use arguments::{ScabbardArguments, ScabbardArgumentsBuilder};
 pub use arguments_converter::ScabbardArgumentsVecConverter;
 pub use lifecycle::ScabbardLifecycle;
-pub use message::ScabbardMessage;
 pub use message_converter::ScabbardMessageByteConverter;
 pub use message_handler::ScabbardMessageHandler;
 pub use message_handler_factory::ScabbardMessageHandlerFactory;

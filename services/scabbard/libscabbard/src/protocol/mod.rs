@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "scabbardv3")]
+pub mod v3;
+
 pub const SCABBARD_PROTOCOL_VERSION: u32 = 1;
 
 #[cfg(all(feature = "rest-api", feature = "rest-api-actix-web-1"))]
