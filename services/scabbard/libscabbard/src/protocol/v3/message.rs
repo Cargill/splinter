@@ -12,6 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::protos::prelude::*;
+use crate::protos::scabbard_v3;
+
+#[derive(Debug)]
 pub enum ScabbardMessage {
-    Message,
+    ConsensusMessage(Vec<u8>),
+}
+
+impl FromProto<scabbard_v3::ScabbardMessageV3> for ScabbardMessage {
+    fn from_proto(
+        mut source: scabbard_v3::ScabbardMessageV3,
+    ) -> Result<Self, ProtoConversionError> {
+        use scabbard_v3::ScabbardMessageV3_Type::*;
+        match source.get_message_type() {
+            CONSENSUS_MESSAGE => Ok(ScabbardMessage::ConsensusMessage(
+                source.take_consensus_message(),
+            )),
+            UNSET => Err(ProtoConversionError::InvalidTypeError(
+                "no message type was set".into(),
+            )),
+        }
+    }
+}
+
+impl FromNative<ScabbardMessage> for scabbard_v3::ScabbardMessageV3 {
+    fn from_native(source: ScabbardMessage) -> Result<Self, ProtoConversionError> {
+        let mut proto_msg = scabbard_v3::ScabbardMessageV3::new();
+
+        match source {
+            ScabbardMessage::ConsensusMessage(msg) => proto_msg.set_consensus_message(msg),
+        }
+
+        Ok(proto_msg)
+    }
 }
