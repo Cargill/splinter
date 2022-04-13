@@ -89,7 +89,7 @@ use splinter::runtime::service::instance::{ServiceProcessor, ServiceProcessorShu
 #[cfg(feature = "service2")]
 use splinter::runtime::service::{
     MessageHandlerTaskPoolBuilder, MessageHandlerTaskRunner, NetworkMessageSenderFactory,
-    RoutingTableServiceTypeResolver, ServiceDispatcher,
+    RoutingTableServiceTypeResolver, ServiceDispatcher, Timer,
 };
 use splinter::service::instance::ServiceArgValidator;
 use splinter::threading::lifecycle::ShutdownHandle;
@@ -154,6 +154,8 @@ pub struct SplinterDaemon {
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: String,
     enable_lmdb_state: bool,
+    #[cfg(feature = "service2")]
+    service_timer_interval: Duration,
 }
 
 impl SplinterDaemon {
@@ -374,9 +376,14 @@ impl SplinterDaemon {
             })?;
         let circuit_dispatch_sender = circuit_dispatch_loop.new_dispatcher_sender();
 
+        #[cfg(not(feature = "service2"))]
         // Set up the Network dispatcher
         let network_dispatcher =
             set_up_network_dispatcher(network_sender, &node_id, circuit_dispatch_sender);
+        #[cfg(feature = "service2")]
+        // Set up the Network dispatcher
+        let network_dispatcher =
+            set_up_network_dispatcher(network_sender.clone(), &node_id, circuit_dispatch_sender);
 
         let mut network_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(network_dispatcher)
@@ -804,6 +811,17 @@ impl SplinterDaemon {
 
         let mut admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
 
+        #[cfg(feature = "service2")]
+        let mut timer = Timer::new(
+            vec![],
+            self.service_timer_interval,
+            Box::new(NetworkMessageSenderFactory::new(
+                &node_id,
+                network_sender,
+                routing_reader.clone(),
+            )),
+        )?;
+
         let (shutdown_tx, shutdown_rx) = channel();
         ctrlc::set_handler(move || {
             if shutdown_tx.send(()).is_err() {
@@ -875,6 +893,11 @@ impl SplinterDaemon {
 
         #[cfg(feature = "service2")]
         {
+            timer.signal_shutdown();
+            if let Err(err) = timer.wait_for_shutdown() {
+                error!("Unable to cleanly shut down service timer: {}", err);
+            }
+
             message_handler_task_pool.signal_shutdown();
             if let Err(err) = message_handler_task_pool.wait_for_shutdown() {
                 error!(

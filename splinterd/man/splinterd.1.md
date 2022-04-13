@@ -225,6 +225,10 @@ OPTIONS
 : Specifies where scabbard stores its internal state. Accepted values: `lmdb`,
   `database`
 
+`--service-timer-interval INTERVAL`
+: How often the service timer should be woken up, in seconds
+  (Default: 1)
+
 `--state-dir STATE-DIR`
 : Specifies the storage directory.
   (Default: `/var/lib/splinter`.)

@@ -490,6 +490,18 @@ fn main() {
                 .takes_value(true),
         );
 
+    #[cfg(feature = "service-timer-interval")]
+    let app = app.arg(
+        Arg::with_name("service_timer_interval")
+            .long("service-timer-interval")
+            .value_name("interval")
+            .long_help(
+                "How often the service timer should be woken up, in seconds; \
+                    defaults to 1 second",
+            )
+            .takes_value(true),
+    );
+
     let app = app.arg(
         Arg::with_name("scabbard_state")
             .long("scabbard-state")
@@ -706,6 +718,12 @@ fn start_daemon(matches: ArgMatches, log_handle: Handle) -> Result<(), UserError
     daemon_builder = daemon_builder
         .with_signers(signers)
         .with_peering_token(peering_token);
+
+    #[cfg(feature = "service2")]
+    {
+        daemon_builder =
+            daemon_builder.with_service_timer_interval(config.service_timer_interval());
+    }
 
     let mut node = daemon_builder.build().map_err(|err| {
         UserError::daemon_err_with_source("unable to build the Splinter daemon", Box::new(err))

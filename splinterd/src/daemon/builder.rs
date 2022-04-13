@@ -66,6 +66,8 @@ pub struct SplinterDaemonBuilder {
     signers: Option<Vec<Box<dyn Signer>>>,
     peering_token: Option<PeerAuthorizationToken>,
     enable_lmdb_state: bool,
+    #[cfg(feature = "service2")]
+    service_timer_interval: Option<Duration>,
 }
 
 impl SplinterDaemonBuilder {
@@ -244,6 +246,12 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "service2")]
+    pub fn with_service_timer_interval(mut self, service_timer_interval: Duration) -> Self {
+        self.service_timer_interval = Some(service_timer_interval);
+        self
+    }
+
     pub fn build(self) -> Result<SplinterDaemon, CreateError> {
         let heartbeat = self.heartbeat.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
@@ -348,6 +356,11 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: peering_token".to_string())
         })?;
 
+        #[cfg(feature = "service2")]
+        let service_timer_interval = self.service_timer_interval.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: service_timer_interval".to_string())
+        })?;
+
         Ok(SplinterDaemon {
             #[cfg(feature = "authorization-handler-allow-keys")]
             config_dir,
@@ -391,6 +404,8 @@ impl SplinterDaemonBuilder {
             signers,
             peering_token,
             enable_lmdb_state: self.enable_lmdb_state,
+            #[cfg(feature = "service2")]
+            service_timer_interval,
         })
     }
 }

@@ -13,6 +13,8 @@
 // limitations under the License.
 
 //! `PartialConfig` builder using values from splinterd command line arguments.
+#[cfg(feature = "service2")]
+use std::time::Duration;
 
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 use clap::{ArgMatches, ErrorKind};
@@ -180,6 +182,13 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 .with_influx_url(self.matches.value_of("influx_url").map(String::from))
                 .with_influx_username(self.matches.value_of("influx_username").map(String::from))
                 .with_influx_password(self.matches.value_of("influx_password").map(String::from))
+        }
+
+        #[cfg(feature = "service-timer-interval")]
+        {
+            partial_config = partial_config.with_service_timer_interval(
+                parse_value(&self.matches, "service_timer_interval")?.map(Duration::from_secs),
+            )
         }
 
         partial_config =
