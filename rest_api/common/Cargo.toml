@@ -40,3 +40,5 @@ experimental = [
     "stable",
     # The following features are experimental:
 ]
+
+authorization = ["splinter/authorization"]
