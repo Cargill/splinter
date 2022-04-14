@@ -15,3 +15,5 @@
 #[cfg(feature = "authorization")]
 pub mod authorization;
 pub mod identity;
+
+pub use splinter::rest_api::auth::AuthorizationHeader;
