@@ -23,7 +23,7 @@ mod timer_filter;
 mod timer_handler;
 mod timer_handler_factory;
 
-pub use arguments::{ScabbardArguments, ScabbardArgumentsBuilder};
+pub use arguments::{ScabbardArguments, ScabbardArgumentsBuilder, ScabbardConsensus};
 pub use arguments_converter::ScabbardArgumentsVecConverter;
 pub use lifecycle::ScabbardLifecycle;
 pub use message::ScabbardMessage;
