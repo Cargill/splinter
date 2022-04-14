@@ -24,7 +24,7 @@ description = """\
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-splinter = { path = "../../libsplinter" }
+splinter = { path = "../../libsplinter", features = ["rest-api"] }
 
 [features]
 default = []
