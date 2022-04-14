@@ -12,12 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains `MessageSender` trait.
+
 use crate::error::InternalError;
 
 use super::{MessageConverter, ServiceId};
 
-/// Send a message between services on the same circuit.
+/// Sends a message between services on the same circuit.
+///
+/// Implementations of `MessageSender` takes one generic for the type of message being sent.
 pub trait MessageSender<M> {
+    /// Send a message of type `M` to a provided service ID
+    ///
+    /// # Arguments
+    ///
+    /// * `to_service` - The service ID for the recipient of this message
+    /// * `message` - The message to be sent
     fn send(&self, to_service: &ServiceId, message: M) -> Result<(), InternalError>;
 }
 

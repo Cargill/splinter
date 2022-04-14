@@ -12,30 +12,63 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains `Lifecycle` trait.
+
 use crate::error::InternalError;
 use crate::store::command::StoreCommand;
 
 use super::{ArgumentsConverter, FullyQualifiedServiceId};
 
+/// Moves a service through its lifecycle.
+///
+/// When implementing `Lifecycle`, one generic is provided for the context type that will be used
+/// buy the `StoreCommand`s. Every service type needs to implement this trait as it is used by
+/// the `LifecycleExecutor` to update a service status.
 pub trait Lifecycle<K> {
     type Arguments;
 
+    /// Return a `StoreCommand` for adding a service that will be in the prepared state. The
+    /// service after the command is run should be ready to handle incoming messages.
+    /// Any associated timer operations should not yet be running.
+    ///
+    /// # Arguments
+    ///
+    /// * `service` - The fully qualified service ID for the service being added
+    /// * `arguments` - The arguments for the service
     fn command_to_prepare(
         &self,
         service: FullyQualifiedServiceId,
         arguments: Self::Arguments,
     ) -> Result<Box<dyn StoreCommand<Context = K>>, InternalError>;
 
+    /// Return a `StoreCommand` for updating a service to the finalized state. The
+    /// service after the command is run should be ready to handle timer operations.
+    ///
+    /// # Arguments
+    ///
+    /// * `service` - The fully qualified service ID for the service being finalized
     fn command_to_finalize(
         &self,
         service: FullyQualifiedServiceId,
     ) -> Result<Box<dyn StoreCommand<Context = K>>, InternalError>;
 
+    /// Return a `StoreCommand` for updating a service to the retired state. The
+    /// service after the command is run should not longer handle messages.
+    ///
+    /// # Arguments
+    ///
+    /// * `service` - The fully qualified service ID for the service being retired
     fn command_to_retire(
         &self,
         service: FullyQualifiedServiceId,
     ) -> Result<Box<dyn StoreCommand<Context = K>>, InternalError>;
 
+    /// Return a `StoreCommand` for purging a service. The service after the command is run should
+    /// be completly remove from state.
+    ///
+    /// # Arguments
+    ///
+    /// * `service` - The fully qualified service ID for the service being purged
     fn command_to_purge(
         &self,
         service: FullyQualifiedServiceId,

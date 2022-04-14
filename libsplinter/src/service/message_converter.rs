@@ -19,10 +19,10 @@ use crate::error::InternalError;
 /// Convert between two different message formats.
 ///
 /// Commonly this conversion will be serialization and deserialization; for example, when
-/// converting between a internal struct format and Vec<u8>.
+/// converting between a internal struct format and `Vec<u8>`.
 ///
 /// When implementing MessageConverter, two generic type parameters must be specified: `L` and `R`.
-/// `L` is for the left side, `R` is for the right side. The functions `to_left` and `to_right
+/// `L` is for the left side, `R` is for the right side. The functions `to_left` and `to_right`
 /// convert in the desired direction.
 pub trait MessageConverter<L, R> {
     /// Convert from generic type paramter `R` to type `L`.

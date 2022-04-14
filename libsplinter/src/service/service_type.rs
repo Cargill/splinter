@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Implementation of service type, `ServiceType`.
+
 use std::convert::TryFrom;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
@@ -54,6 +56,7 @@ macro_rules! invalid_arg_error {
     };
 }
 
+/// A service type.
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct ServiceType<'a>(ServiceTypeInner<'a>);
 
