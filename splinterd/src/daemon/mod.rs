@@ -14,6 +14,8 @@
 
 pub mod builder;
 mod error;
+#[cfg(feature = "service2")]
+mod lifecycle;
 mod registry;
 mod store;
 
@@ -30,6 +32,9 @@ use std::time::Duration;
 use cylinder::{secp256k1::Secp256k1Context, Signer, SigningError, VerifierFactory};
 use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactoryBuilder;
+#[cfg(feature = "service2")]
+use splinter::admin::lifecycle::sync::SyncLifecycleInterface;
+use splinter::admin::lifecycle::LifecycleDispatch;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService, AdminServiceBuilder};
 #[cfg(feature = "biome-credentials")]
@@ -108,6 +113,8 @@ pub use store::ConnectionUri;
 const ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
+#[cfg(feature = "service2")]
+const ADMIN_SERVICE_LIFECYCLE_TIMEOUT: u64 = 30;
 
 pub struct SplinterDaemon {
     #[cfg(feature = "authorization-handler-allow-keys")]
@@ -156,6 +163,8 @@ pub struct SplinterDaemon {
     enable_lmdb_state: bool,
     #[cfg(feature = "service2")]
     service_timer_interval: Duration,
+    #[cfg(feature = "service2")]
+    lifecycle_executor_interval: Duration,
 }
 
 impl SplinterDaemon {
@@ -451,6 +460,13 @@ impl SplinterDaemon {
             }
         }
 
+        #[cfg(feature = "service2")]
+        let mut executor = lifecycle::create_lifecycle_executor(
+            &connection_pool,
+            store_factory.get_lifecycle_store(),
+            self.lifecycle_executor_interval,
+        )?;
+
         let mut scabbard_factory_builder =
             ScabbardFactoryBuilder::new().with_signature_verifier_factory(signing_context);
 
@@ -509,9 +525,24 @@ impl SplinterDaemon {
 
         let mut admin_service_builder = AdminServiceBuilder::new();
 
+        // allow unused mut, needs to be mutable if service2 is enabled
+        #[allow(unused_mut)]
+        let mut lifecycle_dispatches: Vec<Box<dyn LifecycleDispatch>> =
+            vec![Box::new(orchestrator)];
+
+        #[cfg(feature = "service2")]
+        let supported_types = vec![];
+        #[cfg(feature = "service2")]
+        lifecycle_dispatches.push(Box::new(SyncLifecycleInterface::new(
+            store_factory.get_lifecycle_store(),
+            executor.alarm(),
+            supported_types,
+            Duration::from_secs(ADMIN_SERVICE_LIFECYCLE_TIMEOUT),
+        )));
+
         admin_service_builder = admin_service_builder
             .with_node_id(node_id.clone())
-            .with_lifecycle_dispatch(vec![Box::new(orchestrator)])
+            .with_lifecycle_dispatch(lifecycle_dispatches)
             .with_peer_manager_connector(peer_connector)
             .with_admin_service_store(store_factory.get_admin_service_store())
             .with_signature_verifier(admin_service_verifier)
@@ -896,6 +927,14 @@ impl SplinterDaemon {
             timer.signal_shutdown();
             if let Err(err) = timer.wait_for_shutdown() {
                 error!("Unable to cleanly shut down service timer: {}", err);
+            }
+
+            executor.signal_shutdown();
+            if let Err(err) = executor.wait_for_shutdown() {
+                error!(
+                    "Unable to cleanly shut down service lifecycle executor: {}",
+                    err
+                )
             }
 
             message_handler_task_pool.signal_shutdown();

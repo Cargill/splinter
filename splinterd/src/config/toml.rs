@@ -211,6 +211,8 @@ struct TomlConfig {
     state_dir: Option<String>,
     #[cfg(feature = "service-timer-interval")]
     service_timer_interval: Option<u64>,
+    #[cfg(feature = "lifecycle-executor-interval")]
+    lifecycle_executor_interval: Option<u64>,
 
     // Deprecated values
     cert_dir: Option<String>,
@@ -342,7 +344,16 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 self.toml_config
                     .service_timer_interval
                     .map(Duration::from_secs),
-            )
+            );
+        }
+
+        #[cfg(feature = "lifecycle-executor-interval")]
+        {
+            partial_config = partial_config.with_lifecycle_executor_interval(
+                self.toml_config
+                    .lifecycle_executor_interval
+                    .map(Duration::from_secs),
+            );
         }
 
         if let Some(mut loggers) = self.toml_config.loggers {

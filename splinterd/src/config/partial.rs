@@ -102,6 +102,8 @@ pub struct PartialConfig {
     scabbard_state: Option<ScabbardState>,
     #[cfg(feature = "service2")]
     service_timer_interval: Option<Duration>,
+    #[cfg(feature = "service2")]
+    lifecycle_executor_interval: Option<Duration>,
 }
 
 impl PartialConfig {
@@ -174,6 +176,8 @@ impl PartialConfig {
             scabbard_state: None,
             #[cfg(feature = "service2")]
             service_timer_interval: None,
+            #[cfg(feature = "service2")]
+            lifecycle_executor_interval: None,
         }
     }
 
@@ -385,6 +389,11 @@ impl PartialConfig {
     #[cfg(feature = "service2")]
     pub fn service_timer_interval(&self) -> Option<Duration> {
         self.service_timer_interval
+    }
+
+    #[cfg(feature = "service2")]
+    pub fn lifecycle_executor_interval(&self) -> Option<Duration> {
+        self.lifecycle_executor_interval
     }
 
     /// Adds a `config_dir` value to the `PartialConfig` object.
@@ -925,6 +934,15 @@ impl PartialConfig {
     #[cfg(feature = "service2")]
     pub fn with_service_timer_interval(mut self, service_timer_interval: Option<Duration>) -> Self {
         self.service_timer_interval = service_timer_interval;
+        self
+    }
+
+    #[cfg(feature = "service2")]
+    pub fn with_lifecycle_executor_interval(
+        mut self,
+        lifecycle_executor_interval: Option<Duration>,
+    ) -> Self {
+        self.lifecycle_executor_interval = lifecycle_executor_interval;
         self
     }
 }

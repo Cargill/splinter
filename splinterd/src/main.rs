@@ -502,6 +502,18 @@ fn main() {
             .takes_value(true),
     );
 
+    #[cfg(feature = "lifecycle-executor-interval")]
+    let app = app.arg(
+        Arg::with_name("lifecycle_executor_interval")
+            .long("lifecycle-executor-interval")
+            .value_name("interval")
+            .long_help(
+                "How often the lifecycle executor should be woken up to check for pending \
+                services, in seconds; defaults to 30 seconds",
+            )
+            .takes_value(true),
+    );
+
     let app = app.arg(
         Arg::with_name("scabbard_state")
             .long("scabbard-state")
@@ -723,6 +735,9 @@ fn start_daemon(matches: ArgMatches, log_handle: Handle) -> Result<(), UserError
     {
         daemon_builder =
             daemon_builder.with_service_timer_interval(config.service_timer_interval());
+
+        daemon_builder =
+            daemon_builder.with_lifecycle_executor_interval(config.lifecycle_executor_interval());
     }
 
     let mut node = daemon_builder.build().map_err(|err| {
