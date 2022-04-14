@@ -26,7 +26,7 @@ use crate::store::{
 
 use super::CommitHashStoreOperations;
 
-pub(in crate::store::diesel) trait CommitHashStoreSetCurrentCommitHashOperation {
+pub(in crate::store::commit_hash::diesel) trait CommitHashStoreSetCurrentCommitHashOperation {
     fn set_current_commit_hash(
         &self,
         circuit_id: &str,
