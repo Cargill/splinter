@@ -18,7 +18,7 @@ use splinter::{
     service::{FullyQualifiedServiceId, MessageHandler, MessageSender},
 };
 
-use super::ScabbardMessage;
+use crate::protocol::v3::message::ScabbardMessage;
 
 #[derive(Default)]
 pub struct ScabbardMessageHandler {}

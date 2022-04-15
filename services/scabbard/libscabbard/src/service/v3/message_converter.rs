@@ -15,17 +15,19 @@
 use splinter::error::InternalError;
 use splinter::service::MessageConverter;
 
-use super::message::ScabbardMessage;
+use crate::protocol::v3::message::ScabbardMessage;
+use crate::protos::{FromBytes, IntoBytes};
 
 #[derive(Clone)]
 pub struct ScabbardMessageByteConverter {}
 
 impl MessageConverter<ScabbardMessage, Vec<u8>> for ScabbardMessageByteConverter {
-    fn to_left(&self, _right: Vec<u8>) -> Result<ScabbardMessage, InternalError> {
-        Ok(ScabbardMessage::Message)
+    fn to_left(&self, right: Vec<u8>) -> Result<ScabbardMessage, InternalError> {
+        ScabbardMessage::from_bytes(&right).map_err(|err| InternalError::from_source(Box::new(err)))
     }
 
-    fn to_right(&self, _left: ScabbardMessage) -> Result<Vec<u8>, InternalError> {
-        Ok(vec![])
+    fn to_right(&self, left: ScabbardMessage) -> Result<Vec<u8>, InternalError> {
+        IntoBytes::<crate::protos::scabbard_v3::ScabbardMessageV3>::into_bytes(left)
+            .map_err(|err| InternalError::from_source(Box::new(err)))
     }
 }

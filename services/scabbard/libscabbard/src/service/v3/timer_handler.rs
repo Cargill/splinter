@@ -19,7 +19,7 @@ use splinter::{
     service::{FullyQualifiedServiceId, MessageSender, TimerHandler},
 };
 
-use super::ScabbardMessage;
+use crate::protocol::v3::message::ScabbardMessage;
 
 #[derive(Default)]
 pub struct ScabbardTimerHandler {}
