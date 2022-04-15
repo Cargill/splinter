@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::convert::TryFrom;
+
 use splinter::{
     error::{InternalError, InvalidArgumentError},
     service::{ArgumentsConverter, ServiceId},
 };
 
-use super::{ScabbardArguments, ScabbardArgumentsBuilder};
+use super::{ScabbardArguments, ScabbardArgumentsBuilder, ScabbardConsensus};
 
 pub struct ScabbardArgumentsVecConverter {}
 
@@ -48,6 +50,11 @@ impl ArgumentsConverter<ScabbardArguments, Vec<(String, String)>>
                         .collect::<Result<Vec<ServiceId>, InvalidArgumentError>>()
                         .map_err(|err| InternalError::from_source(Box::new(err)))?;
                     arg_builder = arg_builder.with_peers(peers);
+                }
+                "consensus" => {
+                    let consensus = ScabbardConsensus::try_from(value)
+                        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                    arg_builder = arg_builder.with_consensus(consensus);
                 }
                 _ => {
                     return Err(InternalError::with_message(format!(
