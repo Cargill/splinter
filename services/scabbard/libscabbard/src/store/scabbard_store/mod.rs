@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod action;
 pub mod commit;
 pub mod context;
 mod error;
 pub mod service;
 pub mod state;
+pub mod two_phase;
 
 pub(crate) use error::ScabbardStoreError;
 
