@@ -41,3 +41,5 @@ pub use scabbard_store::PooledPgScabbardStoreFactory;
 pub use scabbard_store::PooledScabbardStoreFactory;
 #[cfg(all(feature = "scabbardv3", feature = "sqlite"))]
 pub use scabbard_store::PooledSqliteScabbardStoreFactory;
+#[cfg(feature = "scabbardv3")]
+pub use scabbard_store::{action, context, service, state, two_phase, ScabbardStore};
