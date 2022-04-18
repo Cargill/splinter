@@ -18,6 +18,7 @@ pub mod context;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 pub mod diesel;
 mod error;
+mod factory;
 pub mod service;
 pub mod state;
 pub mod two_phase;
@@ -31,6 +32,12 @@ use commit::CommitEntry;
 use context::ScabbardContext;
 use service::ScabbardService;
 use splinter::service::FullyQualifiedServiceId;
+
+#[cfg(feature = "postgres")]
+pub use factory::{PgScabbardStoreFactory, PooledPgScabbardStoreFactory};
+pub use factory::{PooledScabbardStoreFactory, ScabbardStoreFactory};
+#[cfg(feature = "sqlite")]
+pub use factory::{PooledSqliteScabbardStoreFactory, SqliteScabbardStoreFactory};
 
 pub trait ScabbardStore {
     /// Add a new context
