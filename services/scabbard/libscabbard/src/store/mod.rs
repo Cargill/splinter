@@ -32,3 +32,6 @@ pub use command::{
 pub use commit_hash::diesel;
 pub use commit_hash::transact;
 pub use commit_hash::{CommitHashStore, CommitHashStoreError};
+
+#[cfg(all(feature = "scabbardv3", feature = "diesel"))]
+pub use scabbard_store::diesel::DieselScabbardStore;

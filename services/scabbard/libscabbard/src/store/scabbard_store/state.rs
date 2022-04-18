@@ -19,7 +19,6 @@ use splinter::error::InvalidStateError;
 
 use super::context::{CoordinatorState, ParticipantState};
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Scabbard2pcState {
     Abort,

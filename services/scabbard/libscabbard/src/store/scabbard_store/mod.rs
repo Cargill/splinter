@@ -15,6 +15,8 @@
 pub mod action;
 pub mod commit;
 pub mod context;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+pub mod diesel;
 mod error;
 pub mod service;
 pub mod state;

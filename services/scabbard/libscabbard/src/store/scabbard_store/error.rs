@@ -18,7 +18,7 @@ use std::fmt;
 #[cfg(feature = "diesel")]
 use splinter::error::ConstraintViolationType;
 use splinter::error::{
-    ConstraintViolationError, InternalError, ResourceTemporarilyUnavailableError,
+    ConstraintViolationError, InternalError, InvalidStateError, ResourceTemporarilyUnavailableError,
 };
 
 /// Represents ScabbardStore errors
@@ -30,6 +30,9 @@ pub enum ScabbardStoreError {
     ConstraintViolation(ConstraintViolationError),
     /// Represents when the underlying resource is unavailable
     ResourceTemporarilyUnavailable(ResourceTemporarilyUnavailableError),
+    /// Represents when an operation cannot be completed because the state of the underlying
+    /// struct is inconsistent.
+    InvalidState(InvalidStateError),
 }
 
 impl Error for ScabbardStoreError {
@@ -38,6 +41,7 @@ impl Error for ScabbardStoreError {
             ScabbardStoreError::Internal(err) => Some(err),
             ScabbardStoreError::ConstraintViolation(err) => Some(err),
             ScabbardStoreError::ResourceTemporarilyUnavailable(err) => Some(err),
+            ScabbardStoreError::InvalidState(err) => Some(err),
         }
     }
 }
@@ -50,6 +54,7 @@ impl fmt::Display for ScabbardStoreError {
             ScabbardStoreError::ResourceTemporarilyUnavailable(err) => {
                 write!(f, "{}", err)
             }
+            ScabbardStoreError::InvalidState(err) => write!(f, "{}", err),
         }
     }
 }

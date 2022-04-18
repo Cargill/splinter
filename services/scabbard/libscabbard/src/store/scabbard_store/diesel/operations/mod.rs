@@ -12,9 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::store::scabbard_store::two_phase::action::ConsensusAction;
+pub(super) mod add_commit_entry;
+pub(super) mod add_consensus_action;
+pub(super) mod add_consensus_context;
+pub(super) mod add_service;
+pub(super) mod get_last_commit_entry;
+pub(super) mod list_consensus_actions;
+pub(super) mod list_ready_services;
+pub(super) mod update_commit_entry;
+pub(super) mod update_consensus_action;
+pub(super) mod update_consensus_context;
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum ScabbardConsensusAction {
-    Scabbard2pcConsensusAction(ConsensusAction),
+pub struct ScabbardStoreOperations<'a, C> {
+    conn: &'a C,
+}
+
+impl<'a, C: diesel::Connection> ScabbardStoreOperations<'a, C> {
+    pub fn new(conn: &'a C) -> Self {
+        ScabbardStoreOperations { conn }
+    }
 }
