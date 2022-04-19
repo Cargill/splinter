@@ -36,12 +36,24 @@ default = []
 
 stable = [
     # The stable feature extends default:
-    "default"
+    "default",
     # The following features are stable:
+    "admin-service",
 ]
 
 experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+]
+
+admin-service = [
+    "actix-web",
+    "futures",
+    "log",
+    "serde",
+    "serde_json",
+    "splinter",
+    "splinter-rest-api-common",
+    "splinter/admin-service"
 ]
