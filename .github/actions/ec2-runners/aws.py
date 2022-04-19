@@ -27,6 +27,7 @@ amd_instancetype = os.environ["INPUT_AMD_INSTANCE_TYPE"]
 arm_ami = os.environ["INPUT_ARM_AMI_ID"]
 arm_instancetype = os.environ["INPUT_ARM_INSTANCE_TYPE"]
 github_pat = os.environ["INPUT_GH_PERSONAL_ACCESS_TOKEN"]
+mode = os.environ["INPUT_MODE"]
 region = os.environ["AWS_REGION"]
 repo = os.environ["GITHUB_REPOSITORY"]
 securitygroup = os.environ["INPUT_SECURITY_GROUP_ID"]
@@ -114,19 +115,26 @@ if action == "start":
     reg_token = get_regtoken()
     label = make_label()
     print(f"Creating instances with tag {label}")
-    arm_userdata=""
-    arminstance=create_instance(arm_ami, arm_instancetype, label, arm_userdata)
-    arm_private_ip = arminstance['Instances'][0]['PrivateIpAddress']
-    print("Started ARM instance %s at %s" % (arminstance['Instances'][0]['InstanceId'], arm_private_ip))
-    print("Sleeping for 20s so %s will be ready" % arminstance['Instances'][0]['InstanceId'])
-    time.sleep(20)
+    if mode == "buildx":
+        arm_userdata=""
+        arminstance=create_instance(arm_ami, arm_instancetype, label, arm_userdata)
+        arm_private_ip = arminstance['Instances'][0]['PrivateIpAddress']
+        print("Started ARM instance %s at %s" % (arminstance['Instances'][0]['InstanceId'], arm_private_ip))
+        print("Sleeping for 20s so %s will be ready" % arminstance['Instances'][0]['InstanceId'])
+        time.sleep(20)
 
-    amd_userdata=f"""#!/bin/bash
+        buildx_userdata=f"""
         echo "{arm_private_ip} buildx" >> /etc/hosts
         DOCKER_HOST=tcp://buildx:2375 docker buildx create --name cluster
         docker buildx create --name cluster --append
         docker buildx use cluster
         docker buildx inspect --bootstrap
+        """
+    else:
+        buildx_userdata=""
+
+    amd_userdata=f"""#!/bin/bash
+        {buildx_userdata}
         mkdir /tmp/actions-runner && cd /tmp/actions-runner
         curl -o actions-runner-linux-x64-2.288.1.tar.gz -L https://github.com/actions/runner/releases/download/v2.288.1/actions-runner-linux-x64-2.288.1.tar.gz
         tar xzf ./actions-runner-linux-x64-2.288.1.tar.gz
