@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains `Routable` trait.
+
 use super::ServiceType;
 
+/// Links a component to specific service types.
 pub trait Routable {
+    /// Return a list of associated `ServiceTypes`
     fn service_types(&self) -> &[ServiceType];
 }

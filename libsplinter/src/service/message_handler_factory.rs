@@ -12,13 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains `MessageHandlerFactory` trait.
+
 use super::{
     message_handler::IntoMessageHandler, MessageConverter, MessageHandler, Routable, ServiceType,
 };
 
+/// Creates new `MessageHandler` instances.
 pub trait MessageHandlerFactory: Routable + Send {
     type MessageHandler: MessageHandler;
 
+    /// Returns a new `MessageHandler`
     fn new_handler(&self) -> Self::MessageHandler;
 
     fn clone_boxed(&self) -> Box<dyn MessageHandlerFactory<MessageHandler = Self::MessageHandler>>;

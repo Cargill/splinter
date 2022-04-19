@@ -12,10 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains `TimerFilter` trait.
+
 use crate::error::InternalError;
 
 use super::{FullyQualifiedServiceId, Routable};
 
+/// Return service IDs for services that have pending work.
+///
+/// Every service type will implement a `TimerFilter` to figure out which services
+/// need to be woken up to handle pending work. The `TimerFilter` must also be `Routable`
+/// for certain service types.
 pub trait TimerFilter: Routable {
+    /// Return a list of `FullyQualifiedServiceId` for service that have work to perform
     fn filter(&self) -> Result<Vec<FullyQualifiedServiceId>, InternalError>;
 }

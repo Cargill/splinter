@@ -12,13 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains `TimerHandlerFactory` trait.
+
 use crate::error::InternalError;
 
 use super::TimerHandler;
 
+/// Used to create new `TimerHandler` instances.
 pub trait TimerHandlerFactory: Send {
     type Message;
 
+    /// Returns a new `TimerHandler`
     fn new_handler(&self) -> Result<Box<dyn TimerHandler<Message = Self::Message>>, InternalError>;
 
     fn clone_box(&self) -> Box<dyn TimerHandlerFactory<Message = Self::Message>>;

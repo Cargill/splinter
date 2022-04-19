@@ -12,14 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains `TimerHandler` trait.
+
 use crate::error::InternalError;
 use crate::service::FullyQualifiedServiceId;
 
 use super::{IntoMessageSender, MessageConverter, MessageSender};
 
+/// Executes any work that should be done on some interval for a service implementation.
+///
+/// A `TimerHandler` is run when there is work to be performed and together with `MessageHandler`,
+/// will contain most of the logic of the service. When run, a `TimerHandler` is provided a sender
+/// and a service ID.
 pub trait TimerHandler {
     type Message;
 
+    /// Handle any activity that must be completed by the provided service
+    ///
+    /// # Arguments
+    ///
+    /// * `sender` - The sender for any messages that need to be sent
+    /// * `service` - The service that has work to be performed.
     fn handle_timer(
         &mut self,
         sender: &dyn MessageSender<Self::Message>,

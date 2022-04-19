@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains `MessageSenderFactory` trait.
+
 use crate::error::InternalError;
 
 use super::{FullyQualifiedServiceId, MessageSender};
 
+/// Creates new `MessageSender` instances.
+///
+/// Implementations of `MessageSenderFactory` takes one generic for the type of message the sender
+/// takes.
 pub trait MessageSenderFactory<M>: Send {
+    /// Returns a new `MessageSender`
     fn new_message_sender(
         &self,
         scope: &FullyQualifiedServiceId,
