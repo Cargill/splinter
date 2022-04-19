@@ -25,6 +25,7 @@ description = """\
 [dependencies]
 actix-web = { version = "1", optional = true }
 futures = { version = "0.1", optional = true }
+log = { version = "0.4", optional = true }
 
 [features]
 default = []
