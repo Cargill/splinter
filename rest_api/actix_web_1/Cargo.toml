@@ -40,6 +40,7 @@ stable = [
     # The following features are stable:
     "admin-service",
     "authorization",
+    "rest-api",
 ]
 
 experimental = [
@@ -59,3 +60,4 @@ admin-service = [
     "splinter/admin-service"
 ]
 authorization = ["splinter/authorization"]
+rest-api = ["splinter/rest-api"]
