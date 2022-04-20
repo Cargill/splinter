@@ -60,7 +60,6 @@ use splinter::network::dispatch::{
     dispatch_channel, DispatchLoopBuilder, DispatchMessageSender, Dispatcher,
 };
 use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
-use splinter::orchestrator::ServiceOrchestratorBuilder;
 use splinter::peer::interconnect::NetworkMessageSender;
 use splinter::peer::interconnect::PeerInterconnectBuilder;
 use splinter::peer::PeerAuthorizationToken;
@@ -90,7 +89,9 @@ use splinter::rest_api::auth::authorization::Permission;
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
-use splinter::runtime::service::instance::{ServiceProcessor, ServiceProcessorShutdownHandle};
+use splinter::runtime::service::instance::{
+    ServiceOrchestratorBuilder, ServiceProcessor, ServiceProcessorShutdownHandle,
+};
 #[cfg(feature = "service2")]
 use splinter::runtime::service::{
     MessageHandlerTaskPoolBuilder, MessageHandlerTaskRunner, NetworkMessageSenderFactory,

@@ -17,8 +17,7 @@ use std::fmt;
 
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::consensus::error::ProposalManagerError;
-use crate::orchestrator::InitializeServiceError;
-use crate::orchestrator::ShutdownServiceError;
+use crate::runtime::service::instance::{InitializeServiceError, ShutdownServiceError};
 use crate::service::instance::{ServiceError, ServiceSendError};
 
 use protobuf::error;

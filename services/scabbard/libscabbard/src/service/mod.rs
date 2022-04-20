@@ -37,10 +37,9 @@ use protobuf::Message;
 use sawtooth::receipt::store::ReceiptStore;
 use splinter::{
     consensus::{Proposal, ProposalUpdate},
-    orchestrator::OrchestratableService,
     service::instance::{
-        ServiceDestroyError, ServiceError, ServiceInstance, ServiceMessageContext,
-        ServiceNetworkRegistry, ServiceStartError, ServiceStopError,
+        OrchestratableService, ServiceDestroyError, ServiceError, ServiceInstance,
+        ServiceMessageContext, ServiceNetworkRegistry, ServiceStartError, ServiceStopError,
     },
 };
 use transact::{

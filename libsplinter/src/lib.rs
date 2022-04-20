@@ -90,7 +90,6 @@ pub mod network;
 pub mod node_id;
 #[cfg(feature = "oauth")]
 pub mod oauth;
-pub mod orchestrator;
 pub mod peer;
 pub mod protocol;
 pub mod protos;

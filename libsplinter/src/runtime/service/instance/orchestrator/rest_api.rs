@@ -18,10 +18,9 @@ use std::sync::Mutex;
 use crate::actix_web::HttpResponse;
 use crate::error::InternalError;
 use crate::futures::IntoFuture;
-use crate::orchestrator::OrchestratableService;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 
-use super::{ManagedService, ServiceDefinition, ServiceOrchestrator};
+use super::{ManagedService, OrchestratableService, ServiceDefinition, ServiceOrchestrator};
 
 /// The `ServiceOrchestrator` exposes REST API resources provided by the
 /// [`ServiceFactory::get_rest_endpoints`] methods of its factories. Each factory defines the
