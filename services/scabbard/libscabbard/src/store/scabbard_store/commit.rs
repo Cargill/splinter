@@ -25,7 +25,6 @@ pub struct CommitEntry {
     decision: Option<ConsensusDecision>,
 }
 
-#[allow(dead_code)]
 impl CommitEntry {
     /// Returns the service ID for the commit entry
     pub fn service_id(&self) -> &FullyQualifiedServiceId {
@@ -57,7 +56,6 @@ impl CommitEntry {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Default, Clone)]
 pub struct CommitEntryBuilder {
     service_id: Option<FullyQualifiedServiceId>,
@@ -66,7 +64,6 @@ pub struct CommitEntryBuilder {
     decision: Option<ConsensusDecision>,
 }
 
-#[allow(dead_code)]
 impl CommitEntryBuilder {
     /// Returns the service ID for the commit entry
     pub fn service_id(&self) -> Option<FullyQualifiedServiceId> {
@@ -155,7 +152,6 @@ impl CommitEntryBuilder {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConsensusDecision {
     Abort,

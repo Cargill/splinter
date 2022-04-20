@@ -19,16 +19,14 @@ use splinter::service::ServiceId;
 use super::message::Scabbard2pcMessage;
 use crate::store::scabbard_store::context::ScabbardContext;
 
-#[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ConsensusAction {
     Update(ScabbardContext, Option<SystemTime>),
     SendMessage(ServiceId, Scabbard2pcMessage),
     Notify(ConsensusActionNotification),
 }
 
-#[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ConsensusActionNotification {
     Abort(),
     Commit(),

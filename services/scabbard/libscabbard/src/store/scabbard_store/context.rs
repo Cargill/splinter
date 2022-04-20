@@ -20,13 +20,12 @@ use splinter::service::ServiceId;
 
 use crate::store::scabbard_store::state::Scabbard2pcState;
 
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ScabbardContext {
     Scabbard2pcContext(Context),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Context {
     alarm: Option<SystemTime>,
     coordinator: ServiceId,
@@ -36,7 +35,6 @@ pub struct Context {
     this_process: ServiceId,
 }
 
-#[allow(dead_code)]
 impl Context {
     pub fn alarm(&self) -> Option<SystemTime> {
         self.alarm
@@ -75,7 +73,6 @@ pub struct ContextBuilder {
     this_process: Option<ServiceId>,
 }
 
-#[allow(dead_code)]
 impl ContextBuilder {
     pub fn with_alarm(mut self, alarm: SystemTime) -> ContextBuilder {
         self.alarm = Some(alarm);
@@ -173,7 +170,7 @@ impl ContextBuilder {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TwoPhaseCommitRoleContext {
     inner: InnerContext,
 }
@@ -208,27 +205,25 @@ impl TryFrom<TwoPhaseCommitRoleContext> for ParticipantContext {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum InnerContext {
     Coordinator(CoordinatorContext),
     Participant(ParticipantContext),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CoordinatorContext {
     pub participants: Vec<Participant>,
     pub state: CoordinatorState,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Participant {
     pub process: ServiceId,
     pub vote: Option<bool>,
 }
 
-#[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CoordinatorState {
     Abort,
     Commit,
@@ -237,14 +232,13 @@ pub enum CoordinatorState {
     WaitingForVote,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ParticipantContext {
     pub participant_processes: Vec<ServiceId>,
     pub state: ParticipantState,
 }
 
-#[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParticipantState {
     Abort,
     Commit,

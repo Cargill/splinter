@@ -24,7 +24,6 @@ pub struct ScabbardService {
     status: ServiceStatus,
 }
 
-#[allow(dead_code)]
 impl ScabbardService {
     /// Returns the service ID for the scabbard service
     pub fn service_id(&self) -> &FullyQualifiedServiceId {
@@ -49,7 +48,6 @@ pub struct ScabbardServiceBuilder {
     status: Option<ServiceStatus>,
 }
 
-#[allow(dead_code)]
 impl ScabbardServiceBuilder {
     /// Returns the service ID for the service
     pub fn service_id(&self) -> Option<FullyQualifiedServiceId> {
@@ -125,7 +123,6 @@ impl ScabbardServiceBuilder {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ServiceStatus {
     Prepared,

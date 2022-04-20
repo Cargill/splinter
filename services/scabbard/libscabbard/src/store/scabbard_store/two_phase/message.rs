@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Scabbard2pcMessage {
     VoteRequest(u64, Vec<u8>),
     Commit(u64),
