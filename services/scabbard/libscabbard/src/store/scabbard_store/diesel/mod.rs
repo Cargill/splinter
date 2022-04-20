@@ -47,6 +47,7 @@ use operations::list_ready_services::ListReadyServicesOperation as _;
 use operations::update_commit_entry::UpdateCommitEntryOperation as _;
 use operations::update_consensus_action::UpdateActionOperation as _;
 use operations::update_consensus_context::UpdateContextAction as _;
+use operations::update_service::UpdateServiceAction as _;
 use operations::ScabbardStoreOperations;
 
 use splinter::service::FullyQualifiedServiceId;
@@ -161,6 +162,11 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
             ScabbardStoreOperations::new(conn).update_commit_entry(commit_entry)
         })
     }
+    /// Update an existing scabbard service
+    fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
+        self.pool
+            .execute_write(|conn| ScabbardStoreOperations::new(conn).update_service(service))
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -252,6 +258,11 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_commit_entry(commit_entry)
         })
+    }
+    /// Update an existing scabbard service
+    fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
+        self.pool
+            .execute_write(|conn| ScabbardStoreOperations::new(conn).update_service(service))
     }
 }
 
@@ -347,6 +358,10 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_commit_entry(commit_entry)
     }
+    /// Update an existing scabbard service
+    fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).update_service(service)
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -422,6 +437,10 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     /// Update an existing commit entry
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_commit_entry(commit_entry)
+    }
+    /// Update an existing scabbard service
+    fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).update_service(service)
     }
 }
 
