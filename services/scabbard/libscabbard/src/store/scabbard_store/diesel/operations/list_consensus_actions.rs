@@ -46,7 +46,7 @@ use crate::store::scabbard_store::{
         action::{ConsensusAction, ConsensusActionNotification},
         message::Scabbard2pcMessage,
     },
-    ScabbardConsensusAction, ScabbardContext,
+    IdentifiedScabbardConsensusAction, ScabbardContext,
 };
 
 use super::ScabbardStoreOperations;
@@ -56,7 +56,7 @@ pub(in crate::store::scabbard_store::diesel) trait ListActionsOperation {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ScabbardConsensusAction>, ScabbardStoreError>;
+    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError>;
 }
 
 impl<'a, C> ListActionsOperation for ScabbardStoreOperations<'a, C>
@@ -71,7 +71,7 @@ where
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ScabbardConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
@@ -247,7 +247,8 @@ where
 
                     let coordinator_action_alarm =
                         get_system_time(update_context.coordinator_action_alarm)?;
-                    let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(
+                    let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                        update_context.action_id,
                         ConsensusAction::Update(
                             ScabbardContext::Scabbard2pcContext(context),
                             coordinator_action_alarm,
@@ -305,7 +306,8 @@ where
                             ))
                         }
                     };
-                    let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(
+                    let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                        send_message.action_id,
                         ConsensusAction::SendMessage(service_id, message),
                     );
                     all_actions.push((position, action));
@@ -340,7 +342,8 @@ where
                             )))
                         }
                     };
-                    let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(
+                    let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                        notification.action_id,
                         ConsensusAction::Notify(coordinator_notification),
                     );
                     all_actions.push((position, action));
@@ -478,7 +481,8 @@ where
 
                     let participant_action_alarm =
                         get_system_time(update_context.participant_action_alarm)?;
-                    let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(
+                    let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                        update_context.action_id,
                         ConsensusAction::Update(
                             ScabbardContext::Scabbard2pcContext(context),
                             participant_action_alarm,
@@ -521,7 +525,8 @@ where
                             ))
                         }
                     };
-                    let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(
+                    let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                        send_message.action_id,
                         ConsensusAction::SendMessage(service_id, message),
                     );
                     all_actions.push((position, action));
@@ -564,7 +569,8 @@ where
                             )))
                         }
                     };
-                    let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(
+                    let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                        notification.action_id,
                         ConsensusAction::Notify(participant_notification),
                     );
                     all_actions.push((position, action));

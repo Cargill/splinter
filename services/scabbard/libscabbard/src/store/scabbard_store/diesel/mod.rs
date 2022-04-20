@@ -32,6 +32,7 @@ use diesel::{
 use crate::store::pool::ConnectionPool;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
+    action::IdentifiedScabbardConsensusAction,
     commit::CommitEntry,
     event::{ReturnedScabbardConsensusEvent, ScabbardConsensusEvent},
     service::ScabbardService,
@@ -134,7 +135,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ScabbardConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError> {
         self.pool.execute_read(|conn| {
             ScabbardStoreOperations::new(conn).list_consensus_actions(service_id, epoch)
         })
@@ -278,7 +279,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ScabbardConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).list_consensus_actions(service_id, epoch)
         })
@@ -433,7 +434,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ScabbardConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id, epoch)
     }
     /// List ready services
@@ -551,7 +552,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ScabbardConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id, epoch)
     }
     /// List ready services
@@ -831,10 +832,10 @@ pub mod tests {
             None,
         ));
 
-        store
+        let action_id1 = store
             .add_consensus_action(action1, &coordinator_fqsi, 1)
             .expect("failed to add actions");
-        store
+        let action_id2 = store
             .add_consensus_action(action2, &coordinator_fqsi, 1)
             .expect("failed to add actions");
 
@@ -855,22 +856,22 @@ pub mod tests {
             .build()
             .expect("failed to build update context");
 
-        assert!(matches!(
+        assert_eq!(
             action_list[0],
-            ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Notify(
-                ConsensusActionNotification::RequestForStart()
-            ))
-        ));
-        assert!(matches!(
-            &action_list[1],
-            ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Update(..))
-        ));
+            IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                action_id1,
+                ConsensusAction::Notify(ConsensusActionNotification::RequestForStart())
+            )
+        );
         assert_eq!(
             action_list[1],
-            ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Update(
-                ScabbardContext::Scabbard2pcContext(expected_update_context),
-                None,
-            ))
+            IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                action_id2,
+                ConsensusAction::Update(
+                    ScabbardContext::Scabbard2pcContext(expected_update_context),
+                    None,
+                )
+            )
         );
     }
 

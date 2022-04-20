@@ -28,7 +28,7 @@ use std::time::SystemTime;
 
 pub(crate) use error::ScabbardStoreError;
 
-use action::ScabbardConsensusAction;
+use action::{IdentifiedScabbardConsensusAction, ScabbardConsensusAction};
 use commit::CommitEntry;
 use context::ScabbardContext;
 use event::{ReturnedScabbardConsensusEvent, ScabbardConsensusEvent};
@@ -108,7 +108,7 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ScabbardConsensusAction>, ScabbardStoreError>;
+    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError>;
     /// List ready services
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError>;
     /// Add a new scabbard service
