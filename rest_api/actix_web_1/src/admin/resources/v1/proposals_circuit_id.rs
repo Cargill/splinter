@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::convert::TryFrom;
-
-use crate::admin::messages::{
-    CircuitProposal, CircuitStatus, CreateCircuit, ProposalType, SplinterNode, SplinterService,
-    Vote, VoteRecord,
+use splinter::admin::messages::{
+    CircuitProposal, CreateCircuit, ProposalType, SplinterNode, SplinterService, Vote, VoteRecord,
 };
+
 use crate::hex::as_hex;
-use crate::hex::to_hex;
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
 pub(crate) struct ProposalResponse<'a> {
@@ -33,10 +30,8 @@ pub(crate) struct ProposalResponse<'a> {
     pub requester_node_id: &'a str,
 }
 
-impl<'a> TryFrom<&'a CircuitProposal> for ProposalResponse<'a> {
-    type Error = &'static str;
-
-    fn try_from(proposal: &'a CircuitProposal) -> Result<Self, Self::Error> {
+impl<'a> From<&'a CircuitProposal> for ProposalResponse<'a> {
+    fn from(proposal: &'a CircuitProposal) -> Self {
         let proposal_type = match proposal.proposal_type {
             ProposalType::Create => "Create",
             ProposalType::UpdateRoster => "UpdateRoster",
@@ -45,15 +40,15 @@ impl<'a> TryFrom<&'a CircuitProposal> for ProposalResponse<'a> {
             ProposalType::Disband => "Disband",
         };
 
-        Ok(Self {
+        Self {
             proposal_type,
             circuit_id: &proposal.circuit_id,
             circuit_hash: &proposal.circuit_hash,
-            circuit: CircuitResponse::try_from(&proposal.circuit)?,
+            circuit: (&proposal.circuit).into(),
             votes: proposal.votes.iter().map(VoteResponse::from).collect(),
             requester: &proposal.requester,
             requester_node_id: &proposal.requester_node_id,
-        })
+        }
     }
 }
 
@@ -88,31 +83,19 @@ pub(crate) struct CircuitResponse<'a> {
     pub management_type: &'a str,
     #[serde(serialize_with = "as_hex")]
     pub application_metadata: &'a [u8],
-    pub comments: &'a Option<String>,
-    pub display_name: &'a Option<String>,
-    pub circuit_version: i32,
-    pub circuit_status: &'a CircuitStatus,
+    pub comments: String,
 }
 
-impl<'a> TryFrom<&'a CreateCircuit> for CircuitResponse<'a> {
-    type Error = &'static str;
-
-    fn try_from(circuit: &'a CreateCircuit) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl<'a> From<&'a CreateCircuit> for CircuitResponse<'a> {
+    fn from(circuit: &'a CreateCircuit) -> Self {
+        Self {
             circuit_id: &circuit.circuit_id,
             members: circuit.members.iter().map(NodeResponse::from).collect(),
-            roster: circuit
-                .roster
-                .iter()
-                .map(ServiceResponse::try_from)
-                .collect::<Result<Vec<ServiceResponse>, Self::Error>>()?,
+            roster: circuit.roster.iter().map(ServiceResponse::from).collect(),
             management_type: &circuit.circuit_management_type,
             application_metadata: &circuit.application_metadata,
-            comments: &circuit.comments,
-            display_name: &circuit.display_name,
-            circuit_version: circuit.circuit_version,
-            circuit_status: &circuit.circuit_status,
-        })
+            comments: circuit.comments.clone().unwrap_or_default(),
+        }
     }
 }
 
@@ -120,7 +103,6 @@ impl<'a> TryFrom<&'a CreateCircuit> for CircuitResponse<'a> {
 pub(crate) struct NodeResponse<'a> {
     pub node_id: &'a str,
     pub endpoints: &'a [String],
-    pub public_key: Option<String>,
 }
 
 impl<'a> From<&'a SplinterNode> for NodeResponse<'a> {
@@ -128,10 +110,6 @@ impl<'a> From<&'a SplinterNode> for NodeResponse<'a> {
         Self {
             node_id: &node.node_id,
             endpoints: &node.endpoints,
-            public_key: node
-                .public_key
-                .as_ref()
-                .map(|public_key| to_hex(public_key)),
         }
     }
 }
@@ -140,23 +118,17 @@ impl<'a> From<&'a SplinterNode> for NodeResponse<'a> {
 pub(crate) struct ServiceResponse<'a> {
     pub service_id: &'a str,
     pub service_type: &'a str,
-    pub node_id: String,
+    pub allowed_nodes: &'a [String],
     pub arguments: &'a [(String, String)],
 }
 
-impl<'a> TryFrom<&'a SplinterService> for ServiceResponse<'a> {
-    type Error = &'static str;
-
-    fn try_from(service: &'a SplinterService) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl<'a> From<&'a SplinterService> for ServiceResponse<'a> {
+    fn from(service: &'a SplinterService) -> Self {
+        Self {
             service_id: &service.service_id,
             service_type: &service.service_type,
-            node_id: service
-                .allowed_nodes
-                .get(0)
-                .ok_or("No node id was provided")?
-                .into(),
+            allowed_nodes: &service.allowed_nodes,
             arguments: &service.arguments,
-        })
+        }
     }
 }

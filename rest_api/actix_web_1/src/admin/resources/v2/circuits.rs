@@ -14,8 +14,16 @@
 
 use std::collections::BTreeMap;
 
-use crate::admin::store::{Circuit, CircuitNode, CircuitStatus, Service};
+use splinter::admin::store::{Circuit, CircuitNode, CircuitStatus, Service};
+use splinter::rest_api::paging::Paging;
+
 use crate::hex::to_hex;
+
+#[derive(Debug, Serialize, Clone, PartialEq)]
+pub(crate) struct ListCircuitsResponse<'a> {
+    pub data: Vec<CircuitResponse<'a>>,
+    pub paging: Paging,
+}
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
 pub(crate) struct CircuitResponse<'a> {

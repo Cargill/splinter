@@ -14,7 +14,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::admin::store::{Circuit, Service};
+use splinter::admin::store::{Circuit, Service};
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
 pub(crate) struct CircuitResponse<'a> {

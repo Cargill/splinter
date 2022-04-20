@@ -20,22 +20,24 @@ use std::convert::TryInto;
 use std::str::FromStr;
 use std::time;
 
-use crate::admin::messages::v1;
-use crate::admin::messages::AdminServiceEvent;
-#[cfg(feature = "authorization")]
-use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
-use crate::admin::service::{
+use splinter::admin::messages::v1;
+use splinter::admin::messages::AdminServiceEvent;
+use splinter::admin::service::{
     AdminCommands, AdminServiceEventSubscriber, AdminServiceStatus, AdminSubscriberError,
 };
-use crate::admin::store;
-use crate::error::InvalidStateError;
-use crate::rest_api::{
+use splinter::admin::store;
+use splinter::error::InvalidStateError;
+use splinter::rest_api::{
     actix_web_1::{
         new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request,
         Resource,
     },
-    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
+    ErrorResponse,
 };
+use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
+
+#[cfg(feature = "authorization")]
+use super::CIRCUIT_READ_PERMISSION;
 
 const ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN: u32 = 1;
 

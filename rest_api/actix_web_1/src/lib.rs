@@ -14,6 +14,15 @@
 
 #[macro_use]
 #[cfg(feature = "admin-service")]
+extern crate log;
+#[macro_use]
+#[cfg(feature = "admin-service")]
 extern crate serde;
+#[macro_use]
+#[cfg(feature = "admin-service")]
+extern crate serde_json;
+
+#[cfg(feature = "admin-service")]
+pub mod admin;
 
 mod hex;

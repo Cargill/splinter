@@ -19,18 +19,19 @@ use std::convert::TryFrom;
 use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
 
-#[cfg(feature = "authorization")]
-use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
-use crate::admin::service::proposal_store::ProposalStoreFactory;
-use crate::admin::store::CircuitPredicate;
-use crate::rest_api::{
+use splinter::admin::service::proposal_store::ProposalStoreFactory;
+use splinter::admin::store::CircuitPredicate;
+use splinter::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
+    ErrorResponse,
 };
+use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
 
-use super::super::error::ProposalListError;
-use super::super::resources;
+use super::error::ProposalListError;
+use super::resources;
+#[cfg(feature = "authorization")]
+use super::CIRCUIT_READ_PERMISSION;
 
 const ADMIN_LIST_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 
@@ -241,7 +242,7 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
-    use crate::admin::{
+    use splinter::admin::{
         messages::{
             AuthorizationType, CircuitProposal, CircuitStatus, CreateCircuit, DurabilityType,
             PersistenceType, ProposalType, RouteType, SplinterNode,
@@ -254,13 +255,15 @@ mod tests {
             ProposedCircuitBuilder, ProposedNodeBuilder,
         },
     };
-    use crate::error::InternalError;
-    use crate::public_key::PublicKey;
-    use crate::rest_api::actix_web_1::AuthConfig;
-    use crate::rest_api::auth::authorization::{AuthorizationHandler, AuthorizationHandlerResult};
-    use crate::rest_api::auth::identity::{Identity, IdentityProvider};
-    use crate::rest_api::auth::AuthorizationHeader;
-    use crate::rest_api::{
+    use splinter::error::InternalError;
+    use splinter::public_key::PublicKey;
+    use splinter::rest_api::actix_web_1::AuthConfig;
+    use splinter::rest_api::auth::authorization::{
+        AuthorizationHandler, AuthorizationHandlerResult,
+    };
+    use splinter::rest_api::auth::identity::{Identity, IdentityProvider};
+    use splinter::rest_api::auth::AuthorizationHeader;
+    use splinter::rest_api::{
         actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
         paging::Paging,
     };
@@ -873,7 +876,7 @@ mod tests {
         #[cfg(not(feature = "https-bind"))]
         let bind = "127.0.0.1:0";
         #[cfg(feature = "https-bind")]
-        let bind = crate::rest_api::BindConfig::Http("127.0.0.1:0".into());
+        let bind = splinter::rest_api::BindConfig::Http("127.0.0.1:0".into());
         let identity_provider = MockIdentityProvider::default().clone_box();
         let auth_config = AuthConfig::Custom {
             resources: Vec::new(),

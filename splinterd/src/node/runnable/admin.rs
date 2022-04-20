@@ -18,7 +18,6 @@ use std::time::Duration;
 
 use cylinder::Verifier;
 use scabbard::service::ScabbardFactory;
-use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{AdminCommands, AdminServiceBuilder, AdminServiceStatus};
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
@@ -30,6 +29,7 @@ use splinter::rest_api::actix_web_1::RestResourceProvider as _;
 use splinter::runtime::service::instance::{ServiceOrchestratorBuilder, ServiceProcessorBuilder};
 use splinter::store::StoreFactory;
 use splinter::transport::{inproc::InprocTransport, Transport};
+use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
 
 use crate::node::builder::admin::AdminServiceEventClientVariant;
 use crate::node::running::admin::{self as running_admin, AdminSubsystem};
@@ -151,7 +151,7 @@ impl RunnableAdminSubsystem {
 
         let mut actix1_resources = vec![];
 
-        actix1_resources.append(&mut admin_service.resources());
+        actix1_resources.append(&mut AdminServiceRestProvider::from(&admin_service).resources());
         actix1_resources.append(&mut circuit_resource_provider.resources());
         actix1_resources.append(&mut registry.resources());
         actix1_resources.append(&mut orchestrator_resources);
