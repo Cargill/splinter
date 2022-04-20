@@ -33,7 +33,7 @@ use super::super::resources;
 
 const ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 
-pub fn make_fetch_proposal_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
+pub fn make_fetch_proposal_resource(proposal_store: Box<dyn ProposalStore>) -> Resource {
     let resource = Resource::build("admin/proposals/{circuit_id}").add_request_guard(
         ProtocolVersionRangeGuard::new(
             ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN,
@@ -44,20 +44,20 @@ pub fn make_fetch_proposal_resource<PS: ProposalStore + 'static>(proposal_store:
     #[cfg(feature = "authorization")]
     {
         resource.add_method(Method::Get, CIRCUIT_READ_PERMISSION, move |r, _| {
-            fetch_proposal(r, web::Data::new(proposal_store.clone()))
+            fetch_proposal(r, web::Data::new(proposal_store.clone_boxed()))
         })
     }
     #[cfg(not(feature = "authorization"))]
     {
         resource.add_method(Method::Get, move |r, _| {
-            fetch_proposal(r, web::Data::new(proposal_store.clone()))
+            fetch_proposal(r, web::Data::new(proposal_store.clone_boxed()))
         })
     }
 }
 
-fn fetch_proposal<PS: ProposalStore + 'static>(
+fn fetch_proposal(
     request: HttpRequest,
-    proposal_store: web::Data<PS>,
+    proposal_store: web::Data<Box<dyn ProposalStore>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let circuit_id = request
         .match_info()
@@ -154,7 +154,9 @@ mod tests {
     /// Tests a GET /admin/proposals/{circuit_id} request returns the expected proposal.
     fn test_fetch_proposal_ok() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(Box::new(
+                MockProposalStore,
+            ))]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals/{}",
@@ -190,7 +192,9 @@ mod tests {
     /// proposal. This test is for backwards compatibility.
     fn test_fetch_proposal_ok_v1() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(Box::new(
+                MockProposalStore,
+            ))]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals/{}",
@@ -225,7 +229,9 @@ mod tests {
     /// circuit_id is passed.
     fn test_fetch_proposal_not_found() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(Box::new(
+                MockProposalStore,
+            ))]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals/Circuit-not-valid",
@@ -265,6 +271,10 @@ mod tests {
             } else {
                 None
             })
+        }
+
+        fn clone_boxed(&self) -> Box<dyn ProposalStore> {
+            Box::new(self.clone())
         }
     }
 

@@ -67,8 +67,11 @@ impl RestResourceProvider for AdminService {
                     self.commands(),
                 ),
                 actix::submit::make_submit_route(self.commands()),
-                actix::proposals_circuit_id::make_fetch_proposal_resource(self.proposals()),
-                actix::proposals::make_list_proposals_resource(self.proposals()),
+                actix::submit::make_submit_route(self.commands()),
+                actix::proposals_circuit_id::make_fetch_proposal_resource(Box::new(
+                    self.proposals(),
+                )),
+                actix::proposals::make_list_proposals_resource(Box::new(self.proposals())),
             ]);
         }
 

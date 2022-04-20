@@ -34,7 +34,7 @@ use super::super::resources;
 
 const ADMIN_LIST_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 
-pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
+pub fn make_list_proposals_resource(proposal_store: Box<dyn ProposalStore>) -> Resource {
     let resource =
         Resource::build("admin/proposals").add_request_guard(ProtocolVersionRangeGuard::new(
             ADMIN_LIST_PROPOSALS_PROTOCOL_MIN,
@@ -55,9 +55,9 @@ pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store:
     }
 }
 
-fn list_proposals<PS: ProposalStore + 'static>(
+fn list_proposals(
     req: HttpRequest,
-    proposal_store: web::Data<PS>,
+    proposal_store: web::Data<Box<dyn ProposalStore>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let query: web::Query<HashMap<String, String>> =
         if let Ok(q) = web::Query::from_query(req.query_string()) {
@@ -146,8 +146,8 @@ fn list_proposals<PS: ProposalStore + 'static>(
     ))
 }
 
-fn query_list_proposals<PS: ProposalStore + 'static>(
-    proposal_store: web::Data<PS>,
+fn query_list_proposals(
+    proposal_store: web::Data<Box<dyn ProposalStore>>,
     link: String,
     management_type_filter: Option<String>,
     member_filter: Option<String>,
@@ -259,7 +259,9 @@ mod tests {
     /// Tests a GET /admin/proposals request with no filters returns the expected proposals.
     fn test_list_proposals_ok() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(Box::new(
+                MockProposalStore,
+            ))]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals", bind_url))
             .expect("Failed to parse URL");
@@ -317,7 +319,9 @@ mod tests {
     /// proposals. This test is for backwards compatibility.
     fn test_list_proposals_ok_v1() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(Box::new(
+                MockProposalStore,
+            ))]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals", bind_url))
             .expect("Failed to parse URL");
@@ -372,7 +376,9 @@ mod tests {
     /// proposal.
     fn test_list_proposals_with_management_type_ok() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(Box::new(
+                MockProposalStore,
+            ))]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals?management_type=mgmt_type_1",
@@ -423,7 +429,9 @@ mod tests {
     /// proposals.
     fn test_list_proposals_with_member_ok() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(Box::new(
+                MockProposalStore,
+            ))]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals?member=node_id",
@@ -476,7 +484,9 @@ mod tests {
     /// the expected proposal.
     fn test_list_proposals_with_management_type_and_member_ok() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(Box::new(
+                MockProposalStore,
+            ))]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals?management_type=mgmt_type_2&member=node_id",
@@ -526,7 +536,9 @@ mod tests {
     /// Tests a GET /admin/proposals?limit=1 request returns the expected proposal.
     fn test_list_proposal_with_limit() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(Box::new(
+                MockProposalStore,
+            ))]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals?limit=1", bind_url))
             .expect("Failed to parse URL");
@@ -573,7 +585,9 @@ mod tests {
     /// Tests a GET /admin/proposals?offset=1 request returns the expected proposals.
     fn test_list_proposal_with_offset() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(Box::new(
+                MockProposalStore,
+            ))]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals?offset=1", bind_url))
             .expect("Failed to parse URL");
@@ -670,6 +684,10 @@ mod tests {
             _circuit_id: &str,
         ) -> Result<Option<CircuitProposal>, ProposalStoreError> {
             unimplemented!()
+        }
+
+        fn clone_boxed(&self) -> Box<dyn ProposalStore> {
+            Box::new(self.clone())
         }
     }
 

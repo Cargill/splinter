@@ -19,13 +19,21 @@ use crate::admin::store::{CircuitPredicate, CircuitProposal as StoreProposal};
 use super::messages::CircuitProposal;
 use super::shared::AdminServiceShared;
 
-pub trait ProposalStore: Send + Sync + Clone {
+pub trait ProposalStore: Send + Sync {
     /// Return an iterator over the proposals in this store. Proposal filters may optionally be
     /// provided.
     fn proposals(&self, filters: Vec<CircuitPredicate>)
         -> Result<ProposalIter, ProposalStoreError>;
 
     fn proposal(&self, circuit_id: &str) -> Result<Option<CircuitProposal>, ProposalStoreError>;
+
+    fn clone_boxed(&self) -> Box<dyn ProposalStore>;
+}
+
+impl Clone for Box<dyn ProposalStore> {
+    fn clone(&self) -> Box<dyn ProposalStore> {
+        self.clone_boxed()
+    }
 }
 
 #[derive(Debug)]
@@ -117,6 +125,10 @@ impl ProposalStore for AdminServiceProposals {
                 })
             })
             .transpose()
+    }
+
+    fn clone_boxed(&self) -> Box<dyn ProposalStore> {
+        Box::new(self.clone())
     }
 }
 
