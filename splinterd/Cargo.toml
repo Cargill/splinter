@@ -116,6 +116,7 @@ experimental = [
 authorization = [
     "scabbard/authorization",
     "splinter/authorization",
+    "splinter-rest-api-actix-web-1/authorization",
 ]
 authorization-handler-allow-keys = ["splinter/authorization-handler-allow-keys"]
 authorization-handler-maintenance = [
