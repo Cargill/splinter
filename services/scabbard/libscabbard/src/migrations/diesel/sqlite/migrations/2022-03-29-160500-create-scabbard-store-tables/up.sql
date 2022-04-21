@@ -96,8 +96,6 @@ CREATE TABLE IF NOT EXISTS consensus_update_coordinator_context_action_participa
     FOREIGN KEY (action_id) REFERENCES consensus_update_coordinator_context_action(action_id) ON DELETE CASCADE
 );
 
--- participant tables ----------------------------------------------------------
-
 CREATE TABLE IF NOT EXISTS consensus_participant_context (
     service_id                TEXT NOT NULL,
     alarm                     BIGINT,

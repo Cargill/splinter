@@ -206,8 +206,6 @@ impl From<&ConsensusDecision> for String {
     }
 }
 
-/// --- coordinator tables ------------------------------------------------------
-
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_coordinator_context"]
 #[primary_key(service_id, epoch)]
