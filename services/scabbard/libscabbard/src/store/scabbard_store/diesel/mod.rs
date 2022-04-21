@@ -1036,6 +1036,7 @@ pub mod tests {
         let service = ScabbardServiceBuilder::default()
             .with_service_id(&service_fqsi)
             .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
             .with_status(&ServiceStatus::Finalized)
             .build()
             .expect("failed to build service");
@@ -1147,6 +1148,7 @@ pub mod tests {
         let service = ScabbardServiceBuilder::default()
             .with_service_id(&service_fqsi)
             .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
             .with_status(&ServiceStatus::Finalized)
             .build()
             .expect("failed to build service");
@@ -1204,6 +1206,7 @@ pub mod tests {
         let service = ScabbardServiceBuilder::default()
             .with_service_id(&service_fqsi)
             .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
             .with_status(&ServiceStatus::Finalized)
             .build()
             .expect("failed to build service");
@@ -1257,6 +1260,7 @@ pub mod tests {
         let service = ScabbardServiceBuilder::default()
             .with_service_id(&service_fqsi)
             .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
             .with_status(&ServiceStatus::Finalized)
             .build()
             .expect("failed to build service");
@@ -1315,6 +1319,7 @@ pub mod tests {
         let service = ScabbardServiceBuilder::default()
             .with_service_id(&service_fqsi)
             .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
             .with_status(&ServiceStatus::Prepared)
             .build()
             .expect("failed to build service");

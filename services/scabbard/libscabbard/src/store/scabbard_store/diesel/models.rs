@@ -23,7 +23,7 @@ use crate::store::scabbard_store::{
     context::{
         Context, CoordinatorContext, CoordinatorState, ParticipantContext, ParticipantState,
     },
-    service::{ScabbardService, ServiceStatus},
+    service::{ConsensusType, ScabbardService, ServiceStatus},
     two_phase::{
         action::ConsensusActionNotification, event::Scabbard2pcEvent, message::Scabbard2pcMessage,
     },
@@ -48,6 +48,7 @@ use super::schema::{
 #[primary_key(service_id)]
 pub struct ScabbardServiceModel {
     pub service_id: String,
+    pub consensus: String,
     pub status: String,
 }
 
@@ -55,6 +56,7 @@ impl From<&ScabbardService> for ScabbardServiceModel {
     fn from(service: &ScabbardService) -> Self {
         ScabbardServiceModel {
             service_id: service.service_id().to_string(),
+            consensus: service.consensus().into(),
             status: service.status().into(),
         }
     }
@@ -152,6 +154,28 @@ impl From<&ServiceStatus> for String {
             ServiceStatus::Prepared => "PREPARED".into(),
             ServiceStatus::Finalized => "FINALIZED".into(),
             ServiceStatus::Retired => "RETIRED".into(),
+        }
+    }
+}
+
+impl TryFrom<&str> for ConsensusType {
+    type Error = InternalError;
+
+    fn try_from(consensus: &str) -> Result<Self, Self::Error> {
+        match consensus {
+            "2PC" => Ok(ConsensusType::TwoPC),
+            _ => Err(InternalError::with_message(format!(
+                "Unknown consensus {}",
+                consensus
+            ))),
+        }
+    }
+}
+
+impl From<&ConsensusType> for String {
+    fn from(consensus: &ConsensusType) -> Self {
+        match *consensus {
+            ConsensusType::TwoPC => "2PC".into(),
         }
     }
 }

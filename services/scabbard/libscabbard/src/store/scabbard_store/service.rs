@@ -21,6 +21,7 @@ use splinter::service::{FullyQualifiedServiceId, ServiceId};
 pub struct ScabbardService {
     service_id: FullyQualifiedServiceId,
     peers: Vec<ServiceId>,
+    consensus: ConsensusType,
     status: ServiceStatus,
 }
 
@@ -35,6 +36,11 @@ impl ScabbardService {
         &self.peers
     }
 
+    /// Returns the consensus type for the scabbard service
+    pub fn consensus(&self) -> &ConsensusType {
+        &self.consensus
+    }
+
     /// Returns the status of the scabbard service
     pub fn status(&self) -> &ServiceStatus {
         &self.status
@@ -44,6 +50,7 @@ impl ScabbardService {
         ScabbardServiceBuilder {
             service_id: Some(self.service_id),
             peers: Some(self.peers),
+            consensus: Some(self.consensus),
             status: Some(self.status),
         }
     }
@@ -53,6 +60,7 @@ impl ScabbardService {
 pub struct ScabbardServiceBuilder {
     service_id: Option<FullyQualifiedServiceId>,
     peers: Option<Vec<ServiceId>>,
+    consensus: Option<ConsensusType>,
     status: Option<ServiceStatus>,
 }
 
@@ -65,6 +73,11 @@ impl ScabbardServiceBuilder {
     /// Returns the peers for the service
     pub fn peers(&self) -> Option<Vec<ServiceId>> {
         self.peers.clone()
+    }
+
+    /// Returns the consensus type for the scabbard service
+    pub fn consensus(&self) -> Option<ConsensusType> {
+        self.consensus.clone()
     }
 
     /// Returns the peers for the service
@@ -95,6 +108,16 @@ impl ScabbardServiceBuilder {
         self
     }
 
+    /// Sets the consensus type
+    ///
+    /// # Arguments
+    ///
+    ///  * `consensus` - The consensus type for the scabbard service
+    pub fn with_consensus(mut self, consensus: &ConsensusType) -> ScabbardServiceBuilder {
+        self.consensus = Some(consensus.clone());
+        self
+    }
+
     /// Sets the status
     ///
     /// # Arguments
@@ -119,12 +142,19 @@ impl ScabbardServiceBuilder {
             InvalidStateError::with_message("unable to build, missing field: `peers`".to_string())
         })?;
 
+        let consensus = self.consensus.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `consensus`".to_string(),
+            )
+        })?;
+
         let status = self.status.ok_or_else(|| {
             InvalidStateError::with_message("unable to build, missing field: `status`".to_string())
         })?;
 
         Ok(ScabbardService {
             service_id,
+            consensus,
             peers,
             status,
         })
@@ -144,6 +174,19 @@ impl fmt::Display for ServiceStatus {
             ServiceStatus::Prepared => write!(f, "Status: Prepared"),
             ServiceStatus::Finalized => write!(f, "Status: Finalized"),
             ServiceStatus::Retired => write!(f, "Status: Retired"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ConsensusType {
+    TwoPC,
+}
+
+impl fmt::Display for ConsensusType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConsensusType::TwoPC => write!(f, "Consensus: Two Phase Commit"),
         }
     }
 }
