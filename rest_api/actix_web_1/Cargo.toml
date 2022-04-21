@@ -31,6 +31,9 @@ serde_json = { version = "1", optional = true }
 splinter = { path = "../../libsplinter", features = ["rest-api-actix-web-1"], optional = true }
 splinter-rest-api-common = { path = "../common", optional = true }
 
+[dev-dependencies]
+diesel = { version = "1", features = ["r2d2", "serde_json", "sqlite"] }
+
 [features]
 default = []
 
