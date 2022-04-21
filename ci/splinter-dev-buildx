@@ -17,6 +17,6 @@ set -e
 
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t ${NAMESPACE}splinter-dev:v10 \
+  -t ${NAMESPACE}splinter-dev:v11 \
   -f ci/splinter-dev.dockerfile \
   --push .
