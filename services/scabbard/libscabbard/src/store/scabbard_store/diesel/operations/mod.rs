@@ -22,6 +22,7 @@ pub(super) mod list_ready_services;
 pub(super) mod update_commit_entry;
 pub(super) mod update_consensus_action;
 pub(super) mod update_consensus_context;
+pub(super) mod update_service;
 
 pub struct ScabbardStoreOperations<'a, C> {
     conn: &'a C,

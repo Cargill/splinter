@@ -47,6 +47,7 @@ use operations::list_ready_services::ListReadyServicesOperation as _;
 use operations::update_commit_entry::UpdateCommitEntryOperation as _;
 use operations::update_consensus_action::UpdateActionOperation as _;
 use operations::update_consensus_context::UpdateContextAction as _;
+use operations::update_service::UpdateServiceAction as _;
 use operations::ScabbardStoreOperations;
 
 use splinter::service::FullyQualifiedServiceId;
@@ -161,6 +162,11 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
             ScabbardStoreOperations::new(conn).update_commit_entry(commit_entry)
         })
     }
+    /// Update an existing scabbard service
+    fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
+        self.pool
+            .execute_write(|conn| ScabbardStoreOperations::new(conn).update_service(service))
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -252,6 +258,11 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_commit_entry(commit_entry)
         })
+    }
+    /// Update an existing scabbard service
+    fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
+        self.pool
+            .execute_write(|conn| ScabbardStoreOperations::new(conn).update_service(service))
     }
 }
 
@@ -347,6 +358,10 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_commit_entry(commit_entry)
     }
+    /// Update an existing scabbard service
+    fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).update_service(service)
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -422,6 +437,10 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     /// Update an existing commit entry
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_commit_entry(commit_entry)
+    }
+    /// Update an existing scabbard service
+    fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).update_service(service)
     }
 }
 
@@ -1122,6 +1141,76 @@ pub mod tests {
             .expect("failed to get commit entry");
 
         assert_eq!(get_last_commit_entry, Some(update_commit_entry));
+    }
+
+    /// Test that the scabbard store `update_service` operation is successful.
+    ///
+    /// 1. Add a service in the prepared state to the database
+    /// 2. Add a context to the database for the service that has a past due alarm
+    /// 3. Call `list_ready_services` and check that the service is not returned
+    /// 4. Attempt to use `update_service` the service to change the service state to finalized
+    /// 5. Call `list_ready_services` and check that the service is returned
+    #[test]
+    fn scabbard_store_update_service() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
+            .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
+
+        let peer_service_id = ServiceId::new_random();
+
+        // service with finalized status
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&service_fqsi)
+            .with_peers(&[peer_service_id.clone()])
+            .with_status(&ServiceStatus::Prepared)
+            .build()
+            .expect("failed to build service");
+
+        assert!(store.add_service(service.clone()).is_ok());
+
+        let coordinator_context = ContextBuilder::default()
+            .with_alarm(SystemTime::now())
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+            }])
+            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+
+        store
+            .add_consensus_context(&service_fqsi, context)
+            .expect("failed to add context to store");
+
+        let ready_services = store
+            .list_ready_services()
+            .expect("failed to list ready services");
+
+        // Check that the service is not returned yet because it is in the prepared state still
+        assert!(ready_services.is_empty());
+
+        let update_service = service
+            .into_builder()
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build update service");
+
+        assert!(store.update_service(update_service).is_ok());
+
+        let ready_services = store
+            .list_ready_services()
+            .expect("failed to list ready services");
+
+        // check that the service is returned because it is in the finalized state now
+        assert_eq!(&ready_services[0], &service_fqsi);
     }
 
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {

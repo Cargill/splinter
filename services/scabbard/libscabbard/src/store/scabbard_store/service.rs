@@ -39,6 +39,14 @@ impl ScabbardService {
     pub fn status(&self) -> &ServiceStatus {
         &self.status
     }
+
+    pub fn into_builder(self) -> ScabbardServiceBuilder {
+        ScabbardServiceBuilder {
+            service_id: Some(self.service_id),
+            peers: Some(self.peers),
+            status: Some(self.status),
+        }
+    }
 }
 
 #[derive(Default, Clone)]

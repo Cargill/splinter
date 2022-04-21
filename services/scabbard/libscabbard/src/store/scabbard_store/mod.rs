@@ -137,4 +137,10 @@ pub trait ScabbardStore {
     ///
     /// * `commit_entry` - The `CommitEntry` to be updated in the database
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError>;
+    /// Update an existing scabbard service
+    ///
+    /// # Arguments
+    ///
+    /// * `service` - The `ScabbardService` to be updated
+    fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError>;
 }
