@@ -24,7 +24,9 @@ use crate::store::scabbard_store::{
         Context, CoordinatorContext, CoordinatorState, ParticipantContext, ParticipantState,
     },
     service::{ScabbardService, ServiceStatus},
-    two_phase::{action::ConsensusActionNotification, message::Scabbard2pcMessage},
+    two_phase::{
+        action::ConsensusActionNotification, event::Scabbard2pcEvent, message::Scabbard2pcMessage,
+    },
 };
 
 use super::schema::{
@@ -36,7 +38,8 @@ use super::schema::{
     consensus_update_coordinator_context_action_participant,
     consensus_update_participant_context_action,
     consensus_update_participant_context_action_participant, scabbard_peer, scabbard_service,
-    scabbard_v3_commit_history,
+    scabbard_v3_commit_history, two_pc_consensus_deliver_event, two_pc_consensus_event,
+    two_pc_consensus_start_event, two_pc_consensus_vote_event,
 };
 
 /// Database model representation of `ScabbardService`
@@ -799,4 +802,74 @@ impl From<&Scabbard2pcMessage> for String {
             Scabbard2pcMessage::Abort(_) => String::from("ABORT"),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "two_pc_consensus_event"]
+#[primary_key(id)]
+pub struct TwoPcConsensusEventModel {
+    pub id: i64,
+    pub service_id: String,
+    pub epoch: i64,
+    pub created_at: SystemTime,
+    pub executed_at: Option<i64>,
+    pub position: i32,
+    pub event_type: String,
+}
+
+#[derive(Debug, PartialEq, Insertable)]
+#[table_name = "two_pc_consensus_event"]
+pub struct InsertableTwoPcConsensusEventModel {
+    pub service_id: String,
+    pub epoch: i64,
+    pub executed_at: Option<i64>,
+    pub position: i32,
+    pub event_type: String,
+}
+
+impl From<&Scabbard2pcEvent> for String {
+    fn from(event: &Scabbard2pcEvent) -> Self {
+        match *event {
+            Scabbard2pcEvent::Alarm() => "ALARM".into(),
+            Scabbard2pcEvent::Deliver(..) => "DELIVER".into(),
+            Scabbard2pcEvent::Start(..) => "START".into(),
+            Scabbard2pcEvent::Vote(..) => "VOTE".into(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "two_pc_consensus_deliver_event"]
+#[belongs_to(TwoPcConsensusEventModel, foreign_key = "event_id")]
+#[primary_key(event_id)]
+pub struct TwoPcConsensusDeliverEventModel {
+    pub event_id: i64,
+    pub service_id: String,
+    pub epoch: i64,
+    pub receiver_service_id: String,
+    pub message_type: String,
+    pub vote_response: Option<String>,
+    pub vote_request: Option<Vec<u8>>,
+}
+
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "two_pc_consensus_start_event"]
+#[belongs_to(TwoPcConsensusEventModel, foreign_key = "event_id")]
+#[primary_key(event_id)]
+pub struct TwoPcConsensusStartEventModel {
+    pub event_id: i64,
+    pub service_id: String,
+    pub epoch: i64,
+    pub value: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "two_pc_consensus_vote_event"]
+#[belongs_to(TwoPcConsensusEventModel, foreign_key = "event_id")]
+#[primary_key(event_id)]
+pub struct TwoPcConsensusVoteEventModel {
+    pub event_id: i64,
+    pub service_id: String,
+    pub epoch: i64,
+    pub vote: String, // TRUE or FALSE
 }
