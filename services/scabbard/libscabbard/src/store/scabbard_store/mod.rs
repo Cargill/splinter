@@ -145,6 +145,15 @@ pub trait ScabbardStore {
     ///
     /// * `service` - The `ScabbardService` to be updated
     fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError>;
+    /// Returns a scabbard service
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The fully qualified service id for the `ScabbardService` to be returned
+    fn get_service(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<ScabbardService>, ScabbardStoreError>;
     /// Add a new consensus event
     ///
     /// # Arguments
