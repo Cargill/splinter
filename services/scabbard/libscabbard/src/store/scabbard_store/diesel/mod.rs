@@ -32,7 +32,10 @@ use diesel::{
 use crate::store::pool::ConnectionPool;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    commit::CommitEntry, service::ScabbardService, ScabbardConsensusAction, ScabbardContext,
+    commit::CommitEntry,
+    event::{ReturnedScabbardConsensusEvent, ScabbardConsensusEvent},
+    service::ScabbardService,
+    ScabbardConsensusAction, ScabbardContext,
 };
 
 use super::ScabbardStore;
@@ -40,13 +43,16 @@ use super::ScabbardStore;
 use operations::add_commit_entry::AddCommitEntryOperation as _;
 use operations::add_consensus_action::AddActionOperation as _;
 use operations::add_consensus_context::AddContextOperation as _;
+use operations::add_consensus_event::AddEventOperation as _;
 use operations::add_service::AddServiceOperation as _;
 use operations::get_last_commit_entry::GetLastCommitEntryOperation as _;
 use operations::list_consensus_actions::ListActionsOperation as _;
+use operations::list_consensus_events::ListEventsOperation as _;
 use operations::list_ready_services::ListReadyServicesOperation as _;
 use operations::update_commit_entry::UpdateCommitEntryOperation as _;
 use operations::update_consensus_action::UpdateActionOperation as _;
 use operations::update_consensus_context::UpdateContextAction as _;
+use operations::update_consensus_event::UpdateEventOperation as _;
 use operations::update_service::UpdateServiceAction as _;
 use operations::ScabbardStoreOperations;
 
@@ -167,6 +173,44 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).update_service(service))
     }
+    /// Add a new consensus event
+    fn add_consensus_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+        event: ScabbardConsensusEvent,
+    ) -> Result<i64, ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).add_consensus_event(service_id, epoch, event)
+        })
+    }
+    /// Update an existing consensus event
+    fn update_consensus_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+        event_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).update_consensus_event(
+                service_id,
+                epoch,
+                event_id,
+                executed_at,
+            )
+        })
+    }
+    /// List all consensus events for a given service_id and epoch
+    fn list_consensus_events(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
+        })
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -263,6 +307,44 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
     fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).update_service(service))
+    }
+    /// Add a new consensus event
+    fn add_consensus_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+        event: ScabbardConsensusEvent,
+    ) -> Result<i64, ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).add_consensus_event(service_id, epoch, event)
+        })
+    }
+    /// Update an existing consensus event
+    fn update_consensus_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+        event_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).update_consensus_event(
+                service_id,
+                epoch,
+                event_id,
+                executed_at,
+            )
+        })
+    }
+    /// List all consensus events for a given service_id and epoch
+    fn list_consensus_events(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
+        })
     }
 }
 
@@ -362,6 +444,38 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_service(service)
     }
+    /// Add a new consensus event
+    fn add_consensus_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+        event: ScabbardConsensusEvent,
+    ) -> Result<i64, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, epoch, event)
+    }
+    /// Update an existing consensus event
+    fn update_consensus_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+        event_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).update_consensus_event(
+            service_id,
+            epoch,
+            event_id,
+            executed_at,
+        )
+    }
+    /// List all consensus events for a given service_id and epoch
+    fn list_consensus_events(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -442,6 +556,38 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_service(service)
     }
+    /// Add a new consensus event
+    fn add_consensus_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+        event: ScabbardConsensusEvent,
+    ) -> Result<i64, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, epoch, event)
+    }
+    /// Update an existing consensus event
+    fn update_consensus_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+        event_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).update_consensus_event(
+            service_id,
+            epoch,
+            event_id,
+            executed_at,
+        )
+    }
+    /// List all consensus events for a given service_id and epoch
+    fn list_consensus_events(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
+    }
 }
 
 #[cfg(all(test, feature = "sqlite"))]
@@ -458,7 +604,11 @@ pub mod tests {
         context::{ContextBuilder, Participant},
         service::{ScabbardServiceBuilder, ServiceStatus},
         state::Scabbard2pcState,
-        two_phase::action::{ConsensusAction, ConsensusActionNotification},
+        two_phase::{
+            action::{ConsensusAction, ConsensusActionNotification},
+            event::Scabbard2pcEvent,
+            message::Scabbard2pcMessage,
+        },
     };
 
     use diesel::{
@@ -1211,6 +1361,229 @@ pub mod tests {
 
         // check that the service is returned because it is in the finalized state now
         assert_eq!(&ready_services[0], &service_fqsi);
+    }
+
+    /// Test that the scabbard store `add_consensus_event` operation is successful.
+    ///
+    /// 1. Add a valid participant context to the store
+    /// 2. Attempt to add a valid event to the store and check that the operation was successful
+    /// 3. Attempt to add a coordinator specific event and check that an error is returned
+    #[test]
+    fn scabbard_store_add_event() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let coordinator_fqsi = FullyQualifiedServiceId::new_random();
+
+        let participant_fqsi = FullyQualifiedServiceId::new_random();
+        let participant2_fqsi = FullyQualifiedServiceId::new_random();
+
+        let alarm = SystemTime::now()
+            .checked_add(Duration::from_secs(60))
+            .expect("failed to get alarm time");
+
+        let participant_context = ContextBuilder::default()
+            .with_alarm(alarm)
+            .with_coordinator(coordinator_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participant_processes(vec![
+                participant_fqsi.service_id().clone(),
+                participant2_fqsi.service_id().clone(),
+            ])
+            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_this_process(participant_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+        let context = ScabbardContext::Scabbard2pcContext(participant_context);
+
+        store
+            .add_consensus_context(&participant_fqsi, context)
+            .expect("failed to add context");
+
+        let event = ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
+            participant2_fqsi.service_id().clone(),
+            Scabbard2pcMessage::DecisionRequest(1),
+        ));
+
+        assert!(store
+            .add_consensus_event(&participant_fqsi, 1, event)
+            .is_ok());
+
+        let bad_event = ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Start(
+            vec![1].into(),
+        ));
+
+        assert!(store
+            .add_consensus_event(&participant_fqsi, 1, bad_event)
+            .is_err());
+    }
+
+    /// Test that the scabbard store `update_consensus_event` operation is successful.
+    ///
+    /// 1. Add a valid participant context to the store
+    /// 2. Add a valid event to the store
+    /// 3. Attempt to update the `executed_at` time for the event and check that the operation was
+    ///    successful
+    #[test]
+    fn scabbard_store_update_event() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let coordinator_fqsi = FullyQualifiedServiceId::new_random();
+
+        let participant_fqsi = FullyQualifiedServiceId::new_random();
+        let participant2_fqsi = FullyQualifiedServiceId::new_random();
+
+        let alarm = SystemTime::now()
+            .checked_add(Duration::from_secs(60))
+            .expect("failed to get alarm time");
+
+        let participant_context = ContextBuilder::default()
+            .with_alarm(alarm)
+            .with_coordinator(coordinator_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participant_processes(vec![
+                participant_fqsi.service_id().clone(),
+                participant2_fqsi.service_id().clone(),
+            ])
+            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_this_process(participant_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+        let context = ScabbardContext::Scabbard2pcContext(participant_context);
+
+        store
+            .add_consensus_context(&participant_fqsi, context)
+            .expect("failed to add context");
+
+        let event = ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
+            participant2_fqsi.service_id().clone(),
+            Scabbard2pcMessage::DecisionRequest(1),
+        ));
+
+        let event_id = store
+            .add_consensus_event(&participant_fqsi, 1, event)
+            .expect("failed to add event");
+
+        assert!(store
+            .update_consensus_event(&participant_fqsi, 1, event_id, SystemTime::now())
+            .is_ok());
+    }
+
+    /// Test that the scabbard store `list_consensus_events` operation is successful.
+    ///
+    /// 1. Add a valid participant context to the store
+    /// 2. Add a valid event to the store
+    /// 3. Call `list_consensus_events` and check that the one event is returned
+    /// 4. Add a second valid event to the store
+    /// 5. Call `list_consensus_events` and check that both events are returned in the correct order
+    /// 6. Update the `executed_at` time for the first event
+    /// 7. Call `list_consensus_events` and check that only the second event is returned
+    #[test]
+    fn scabbard_store_list_events() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let coordinator_fqsi = FullyQualifiedServiceId::new_random();
+
+        let participant_fqsi = FullyQualifiedServiceId::new_random();
+        let participant2_fqsi = FullyQualifiedServiceId::new_random();
+
+        let alarm = SystemTime::now()
+            .checked_add(Duration::from_secs(60))
+            .expect("failed to get alarm time");
+
+        let participant_context = ContextBuilder::default()
+            .with_alarm(alarm)
+            .with_coordinator(coordinator_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participant_processes(vec![
+                participant_fqsi.service_id().clone(),
+                participant2_fqsi.service_id().clone(),
+            ])
+            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_this_process(participant_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+        let context = ScabbardContext::Scabbard2pcContext(participant_context);
+
+        store
+            .add_consensus_context(&participant_fqsi, context)
+            .expect("failed to add context");
+
+        let event = ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
+            participant2_fqsi.service_id().clone(),
+            Scabbard2pcMessage::DecisionRequest(1),
+        ));
+
+        let event_id = store
+            .add_consensus_event(&participant_fqsi, 1, event)
+            .expect("failed to add event");
+
+        let events = store
+            .list_consensus_events(&participant_fqsi, 1)
+            .expect("failed to list events");
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0],
+            ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                event_id,
+                Scabbard2pcEvent::Deliver(
+                    participant2_fqsi.service_id().clone(),
+                    Scabbard2pcMessage::DecisionRequest(1)
+                )
+            )
+        );
+
+        let event2 = ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Alarm());
+
+        let event_id2 = store
+            .add_consensus_event(&participant_fqsi, 1, event2)
+            .expect("failed to add event");
+
+        let events = store
+            .list_consensus_events(&participant_fqsi, 1)
+            .expect("failed to list events");
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(
+            events[0],
+            ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                event_id,
+                Scabbard2pcEvent::Deliver(
+                    participant2_fqsi.service_id().clone(),
+                    Scabbard2pcMessage::DecisionRequest(1)
+                )
+            ),
+        );
+        assert_eq!(
+            events[1],
+            ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                event_id2,
+                Scabbard2pcEvent::Alarm()
+            ),
+        );
+
+        store
+            .update_consensus_event(&participant_fqsi, 1, event_id, SystemTime::now())
+            .expect("failed to update event");
+
+        let events = store
+            .list_consensus_events(&participant_fqsi, 1)
+            .expect("failed to list events");
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0],
+            ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                event_id2,
+                Scabbard2pcEvent::Alarm()
+            ),
+        );
     }
 
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {

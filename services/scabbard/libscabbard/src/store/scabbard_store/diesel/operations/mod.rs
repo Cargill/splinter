@@ -15,13 +15,16 @@
 pub(super) mod add_commit_entry;
 pub(super) mod add_consensus_action;
 pub(super) mod add_consensus_context;
+pub(super) mod add_consensus_event;
 pub(super) mod add_service;
 pub(super) mod get_last_commit_entry;
 pub(super) mod list_consensus_actions;
+pub(super) mod list_consensus_events;
 pub(super) mod list_ready_services;
 pub(super) mod update_commit_entry;
 pub(super) mod update_consensus_action;
 pub(super) mod update_consensus_context;
+pub(super) mod update_consensus_event;
 pub(super) mod update_service;
 
 pub struct ScabbardStoreOperations<'a, C> {
