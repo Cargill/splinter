@@ -13,17 +13,19 @@
 // limitations under the License.
 
 use std::convert::TryFrom;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use splinter::error::InternalError;
-use splinter::service::FullyQualifiedServiceId;
+use splinter::service::{FullyQualifiedServiceId, ServiceId};
 
 use crate::store::scabbard_store::{
     commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision},
     context::{
-        Context, CoordinatorContext, CoordinatorState, ParticipantContext, ParticipantState,
+        Context, ContextBuilder, CoordinatorContext, CoordinatorState, Participant,
+        ParticipantContext, ParticipantState, ScabbardContext,
     },
     service::{ConsensusType, ScabbardService, ServiceStatus},
+    state::Scabbard2pcState,
     two_phase::{
         action::ConsensusActionNotification, event::Scabbard2pcEvent, message::Scabbard2pcMessage,
     },
@@ -219,6 +221,96 @@ pub struct CoordinatorContextModel {
     pub vote_timeout_start: Option<i64>,
 }
 
+impl
+    TryFrom<(
+        &CoordinatorContextModel,
+        Vec<CoordinatorContextParticipantModel>,
+    )> for ScabbardContext
+{
+    type Error = InternalError;
+
+    fn try_from(
+        (context, participants): (
+            &CoordinatorContextModel,
+            Vec<CoordinatorContextParticipantModel>,
+        ),
+    ) -> Result<Self, Self::Error> {
+        let epoch = u64::try_from(context.epoch)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let alarm = if let Some(alarm) = context.alarm {
+            Some(
+                SystemTime::UNIX_EPOCH
+                    .checked_add(Duration::from_secs(alarm as u64))
+                    .ok_or_else(|| {
+                        InternalError::with_message(
+                            "'alarm' timestamp could not be represented as a `SystemTime`"
+                                .to_string(),
+                        )
+                    })?,
+            )
+        } else {
+            None
+        };
+        let coordinator = ServiceId::new(&context.coordinator)
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+        let last_commit_epoch = context
+            .last_commit_epoch
+            .map(u64::try_from)
+            .transpose()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let participants = CoordinatorParticipantList::try_from(participants)?.inner;
+
+        let state = match context.state.as_str() {
+            "WAITINGFORSTART" => Scabbard2pcState::WaitingForStart,
+            "VOTING" => {
+                let vote_timeout_start = if let Some(t) = context.vote_timeout_start {
+                    SystemTime::UNIX_EPOCH
+                        .checked_add(Duration::from_secs(t as u64))
+                        .ok_or_else(|| {
+                            InternalError::with_message(
+                                "Failed to convert vote timeout start timestamp to SystemTime"
+                                    .to_string(),
+                            )
+                        })?
+                } else {
+                    return Err(InternalError::with_message(
+                        "Failed to convert to ScabbardContext, context has state 'voting' but 
+                        no vote timeout start time set"
+                            .to_string(),
+                    ));
+                };
+                Scabbard2pcState::Voting { vote_timeout_start }
+            }
+            "WAITINGFORVOTE" => Scabbard2pcState::WaitingForVote,
+            "ABORT" => Scabbard2pcState::Abort,
+            "COMMIT" => Scabbard2pcState::Commit,
+            _ => {
+                return Err(InternalError::with_message(
+                    "Failed to convert to ScabbardContext, invalid state value found".to_string(),
+                ))
+            }
+        };
+
+        let mut builder = ContextBuilder::default()
+            .with_coordinator(&coordinator)
+            .with_epoch(epoch)
+            .with_state(state)
+            .with_participants(participants)
+            .with_this_process(&coordinator);
+
+        if let Some(alarm) = alarm {
+            builder = builder.with_alarm(alarm);
+        }
+        if let Some(last_commit_epoch) = last_commit_epoch {
+            builder = builder.with_last_commit_epoch(last_commit_epoch);
+        }
+        let context = builder
+            .build()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+        Ok(ScabbardContext::Scabbard2pcContext(context))
+    }
+}
+
 impl TryFrom<(&Context, &FullyQualifiedServiceId)> for CoordinatorContextModel {
     type Error = InternalError;
 
@@ -281,6 +373,44 @@ pub struct CoordinatorContextParticipantModel {
     pub epoch: i64,
     pub process: String,
     pub vote: Option<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CoordinatorParticipantList {
+    pub inner: Vec<Participant>,
+}
+
+impl TryFrom<Vec<CoordinatorContextParticipantModel>> for CoordinatorParticipantList {
+    type Error = InternalError;
+
+    fn try_from(
+        participants: Vec<CoordinatorContextParticipantModel>,
+    ) -> Result<Self, Self::Error> {
+        let mut all_participants = Vec::new();
+        for p in participants {
+            let vote = if let Some(vote) = p.vote {
+                match vote.as_str() {
+                    "TRUE" => Some(true),
+                    "FALSE" => Some(false),
+                    _ => return Err(InternalError::with_message(
+                        "Failed to convert coordinator context participant model to participant, 
+                        invalid vote value found"
+                            .to_string(),
+                    )),
+                }
+            } else {
+                None
+            };
+            all_participants.push(Participant {
+                process: ServiceId::new(p.process)
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?,
+                vote,
+            });
+        }
+        Ok(CoordinatorParticipantList {
+            inner: all_participants,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -523,6 +653,129 @@ pub struct ParticipantContextModel {
     pub state: String,
     pub vote: Option<String>,
     pub decision_timeout_start: Option<i64>,
+}
+
+impl
+    TryFrom<(
+        &ParticipantContextModel,
+        Vec<ParticipantContextParticipantModel>,
+    )> for ScabbardContext
+{
+    type Error = InternalError;
+
+    fn try_from(
+        (context, participants): (
+            &ParticipantContextModel,
+            Vec<ParticipantContextParticipantModel>,
+        ),
+    ) -> Result<Self, Self::Error> {
+        let epoch = u64::try_from(context.epoch)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let alarm = if let Some(alarm) = context.alarm {
+            Some(
+                SystemTime::UNIX_EPOCH
+                    .checked_add(Duration::from_secs(alarm as u64))
+                    .ok_or_else(|| {
+                        InternalError::with_message(
+                            "'alarm' timestamp could not be represented as a `SystemTime`"
+                                .to_string(),
+                        )
+                    })?,
+            )
+        } else {
+            None
+        };
+        let coordinator = ServiceId::new(&context.coordinator)
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+        let last_commit_epoch = context
+            .last_commit_epoch
+            .map(u64::try_from)
+            .transpose()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        let state = match context.state.as_str() {
+            "WAITINGFORVOTEREQUEST" => Scabbard2pcState::WaitingForVoteRequest,
+            "VOTED" => {
+                let vote = context
+                    .vote
+                    .as_ref()
+                    .map(|v| match v.as_str() {
+                        "TRUE" => Some(true),
+                        "FALSE" => Some(false),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        InternalError::with_message(
+                        "Failed to convert to ScabbardContext, context has state 'voted' but vote
+                        is unset"
+                        .to_string(),
+                    )
+                    })?
+                    .ok_or_else(|| {
+                        InternalError::with_message(
+                            "Failed to convert to ScabbardContext, context has state 'voted' but an
+                        invalid vote response was found"
+                                .to_string(),
+                        )
+                    })?;
+                let decision_timeout_start = if let Some(t) = context.decision_timeout_start {
+                    SystemTime::UNIX_EPOCH
+                        .checked_add(Duration::from_secs(t as u64))
+                        .ok_or_else(|| {
+                            InternalError::with_message(
+                                "Failed to convert decision timeout start timestamp to SystemTime"
+                                    .to_string(),
+                            )
+                        })?
+                } else {
+                    return Err(InternalError::with_message(
+                        "Failed to convert to ScabbardContext, context has state 'voted' but 
+                        'decision_timeout_start' is unset"
+                            .to_string(),
+                    ));
+                };
+                Scabbard2pcState::Voted {
+                    vote,
+                    decision_timeout_start,
+                }
+            }
+            "WAITINGFORVOTE" => Scabbard2pcState::WaitingForVote,
+            "ABORT" => Scabbard2pcState::Abort,
+            "COMMIT" => Scabbard2pcState::Commit,
+            _ => {
+                return Err(InternalError::with_message(
+                    "Failed to convert to ScabbardContext, invalid state value found".to_string(),
+                ))
+            }
+        };
+        let participant_processes = participants
+            .into_iter()
+            .map(|p| ServiceId::new(p.process))
+            .collect::<Result<Vec<ServiceId>, _>>()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        let mut builder = ContextBuilder::default()
+            .with_coordinator(&coordinator)
+            .with_epoch(epoch)
+            .with_state(state)
+            .with_participant_processes(participant_processes)
+            .with_this_process(
+                FullyQualifiedServiceId::new_from_string(&context.service_id)
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?
+                    .service_id(),
+            );
+
+        if let Some(alarm) = alarm {
+            builder = builder.with_alarm(alarm);
+        }
+        if let Some(last_commit_epoch) = last_commit_epoch {
+            builder = builder.with_last_commit_epoch(last_commit_epoch);
+        }
+        let context = builder
+            .build()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+        Ok(ScabbardContext::Scabbard2pcContext(context))
+    }
 }
 
 impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ParticipantContextModel {
