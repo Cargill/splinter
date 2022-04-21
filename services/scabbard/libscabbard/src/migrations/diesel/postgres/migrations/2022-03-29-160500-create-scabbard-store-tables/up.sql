@@ -13,7 +13,7 @@
 -- limitations under the License.
 -- -----------------------------------------------------------------------------
 
-CREATE TYPE coordinator_state AS ENUM ('WAITINGFORSTART', 'VOTING', 'WAITINGFORCOORDINATORVOTE', 'ABORT', 'COMMIT');
+CREATE TYPE coordinator_state AS ENUM ('WAITINGFORSTART', 'VOTING', 'WAITINGFORVOTE', 'ABORT', 'COMMIT');
 CREATE TYPE coordinator_message_type AS ENUM ('VOTERESPONSE', 'DECISIONREQUEST');
 CREATE TYPE coordinator_notification_type AS ENUM ('REQUESTFORSTART', 'COORDINATORREQUESTFORVOTE', 'COMMIT', 'ABORT', 'MESSAGEDROPPED');
 CREATE TYPE participant_state AS ENUM ('WAITINGFORVOTEREQUEST', 'WAITINGFORVOTE', 'VOTED', 'ABORT', 'COMMIT');

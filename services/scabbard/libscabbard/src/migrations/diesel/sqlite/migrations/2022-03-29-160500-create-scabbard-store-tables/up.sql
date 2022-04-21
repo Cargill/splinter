@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS consensus_coordinator_context (
     epoch                     BIGINT NOT NULL,
     last_commit_epoch         BIGINT,
     state                     TEXT NOT NULL
-    CHECK ( state IN ( 'WAITINGFORSTART', 'VOTING', 'WAITINGFORCOORDINATORVOTE', 'ABORT', 'COMMIT') ),
+    CHECK ( state IN ( 'WAITINGFORSTART', 'VOTING', 'WAITINGFORVOTE', 'ABORT', 'COMMIT') ),
     vote_timeout_start        BIGINT,
     PRIMARY KEY (service_id, epoch)
 );
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS consensus_update_coordinator_context_action (
     epoch                     BIGINT NOT NULL,
     last_commit_epoch         BIGINT,
     state                     TEXT NOT NULL
-    CHECK ( state IN ('WAITINGFORSTART', 'VOTING', 'WAITINGFORCOORDINATORVOTE', 'ABORT', 'COMMIT') ),
+    CHECK ( state IN ('WAITINGFORSTART', 'VOTING', 'WAITINGFORVOTE', 'ABORT', 'COMMIT') ),
     vote_timeout_start        BIGINT,
     coordinator_action_alarm  BIGINT,
     FOREIGN KEY (action_id) REFERENCES consensus_action(id) ON DELETE CASCADE,
