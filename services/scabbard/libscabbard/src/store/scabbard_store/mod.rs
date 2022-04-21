@@ -196,4 +196,14 @@ pub trait ScabbardStore {
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError>;
+    /// Get the current context for a given service
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service for which the
+    ///    current context should be retrieved
+    fn get_current_consensus_context(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<ScabbardContext>, ScabbardStoreError>;
 }

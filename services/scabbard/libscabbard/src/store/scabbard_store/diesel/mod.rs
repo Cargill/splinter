@@ -46,6 +46,7 @@ use operations::add_consensus_action::AddActionOperation as _;
 use operations::add_consensus_context::AddContextOperation as _;
 use operations::add_consensus_event::AddEventOperation as _;
 use operations::add_service::AddServiceOperation as _;
+use operations::get_current_consensus_context::GetCurrentContextAction as _;
 use operations::get_last_commit_entry::GetLastCommitEntryOperation as _;
 use operations::get_service::GetServiceOperation as _;
 use operations::list_consensus_actions::ListActionsOperation as _;
@@ -222,6 +223,15 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
             ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
         })
     }
+    /// Get the current context for a given service
+    fn get_current_consensus_context(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).get_current_consensus_context(service_id)
+        })
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -366,6 +376,15 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
             ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
         })
     }
+    /// Get the current context for a given service
+    fn get_current_consensus_context(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).get_current_consensus_context(service_id)
+        })
+    }
 }
 
 pub struct DieselConnectionScabbardStore<'a, C>
@@ -502,6 +521,13 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
     }
+    /// Get the current context for a given service
+    fn get_current_consensus_context(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).get_current_consensus_context(service_id)
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -619,6 +645,13 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         epoch: u64,
     ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
+    }
+    /// Get the current context for a given service
+    fn get_current_consensus_context(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).get_current_consensus_context(service_id)
     }
 }
 
@@ -1660,6 +1693,154 @@ pub mod tests {
                 Scabbard2pcEvent::Alarm()
             ),
         );
+    }
+
+    /// Test that the scabbard store `get_current_consensus_context` operation is successful.
+    ///
+    /// 1. Add two services to the database
+    /// 2. Add a coordinator context for the first service
+    /// 3. Add a participant context for the second service
+    /// 4. Call `get_current_consensus_context` with the first service ID and check that the
+    ///    coordinator context is returned
+    /// 5. Call `get_current_consensus_context` with the second service ID and check that the
+    ///    participant context is returned
+    /// 6. Add a second coordinator context for the first service with a larger epoch
+    /// 7. Call `get_current_consensus_context` with the first service ID and check that the
+    ///    coordinator context with the larger epoch is returned
+    /// 8. Add a participant context with a larger epoch for the first service
+    /// 9. Call `get_current_consensus_context` with the first service ID and check that the
+    ///    participant context that was most recently added is returned
+    #[test]
+    fn scabbard_store_get_current_context() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let coordinator_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
+            .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
+
+        let participant_service_id = FullyQualifiedServiceId::new_random();
+
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&coordinator_fqsi)
+            .with_peers(&[participant_service_id.service_id().clone()])
+            .with_status(&ServiceStatus::Finalized)
+            .with_consensus(&ConsensusType::TwoPC)
+            .build()
+            .expect("failed to build service");
+
+        store.add_service(service).expect("faield to add service");
+
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&participant_service_id)
+            .with_peers(&[coordinator_fqsi.service_id().clone()])
+            .with_status(&ServiceStatus::Finalized)
+            .with_consensus(&ConsensusType::TwoPC)
+            .build()
+            .expect("failed to build service");
+
+        store.add_service(service).expect("faield to add service");
+
+        let alarm = SystemTime::UNIX_EPOCH
+            .checked_add(Duration::from_secs(
+                SystemTime::now()
+                    .checked_add(Duration::from_secs(60))
+                    .expect("failed to get alarm time")
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .expect("failed to get duration since UNIX EPOCH")
+                    .as_secs(),
+            ))
+            .unwrap();
+
+        let coordinator_context = ContextBuilder::default()
+            .with_alarm(alarm)
+            .with_coordinator(coordinator_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: participant_service_id.service_id().clone(),
+                vote: None,
+            }])
+            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_this_process(coordinator_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+
+        store
+            .add_consensus_context(&coordinator_fqsi, context.clone())
+            .expect("failed to add context");
+
+        let participant_context = ContextBuilder::default()
+            .with_alarm(alarm)
+            .with_coordinator(coordinator_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participant_processes(vec![participant_service_id.service_id().clone()])
+            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_this_process(participant_service_id.clone().service_id())
+            .build()
+            .expect("failed to build context");
+        let context2 = ScabbardContext::Scabbard2pcContext(participant_context);
+
+        store
+            .add_consensus_context(&participant_service_id.clone(), context2.clone())
+            .expect("failed to add context");
+
+        let current_context = store
+            .get_current_consensus_context(&coordinator_fqsi)
+            .expect("failed to get current context");
+
+        assert_eq!(current_context, Some(context));
+
+        let current_context = store
+            .get_current_consensus_context(&participant_service_id)
+            .expect("failed to get current context");
+
+        assert_eq!(current_context, Some(context2));
+
+        let coordinator_context = ContextBuilder::default()
+            .with_alarm(alarm)
+            .with_coordinator(coordinator_fqsi.clone().service_id())
+            .with_epoch(2)
+            .with_participants(vec![Participant {
+                process: participant_service_id.service_id().clone(),
+                vote: None,
+            }])
+            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_this_process(coordinator_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+        let context3 = ScabbardContext::Scabbard2pcContext(coordinator_context);
+
+        store
+            .add_consensus_context(&coordinator_fqsi, context3.clone())
+            .expect("failed to add context");
+
+        let current_context = store
+            .get_current_consensus_context(&coordinator_fqsi)
+            .expect("failed to get current context");
+
+        assert_eq!(current_context, Some(context3));
+
+        let participant_context = ContextBuilder::default()
+            .with_alarm(alarm)
+            .with_coordinator(participant_service_id.clone().service_id())
+            .with_epoch(3)
+            .with_participant_processes(vec![coordinator_fqsi.service_id().clone()])
+            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_this_process(coordinator_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+        let context4 = ScabbardContext::Scabbard2pcContext(participant_context);
+
+        store
+            .add_consensus_context(&coordinator_fqsi.clone(), context4.clone())
+            .expect("failed to add context");
+
+        let current_context = store
+            .get_current_consensus_context(&coordinator_fqsi)
+            .expect("failed to get current context");
+
+        assert_eq!(current_context, Some(context4));
     }
 
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {
