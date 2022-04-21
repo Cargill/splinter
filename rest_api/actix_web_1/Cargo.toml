@@ -33,6 +33,7 @@ splinter-rest-api-common = { path = "../common", optional = true }
 
 [dev-dependencies]
 diesel = { version = "1", features = ["r2d2", "serde_json", "sqlite"] }
+splinter = { path = "../../libsplinter", features = ["admin-service", "rest-api-actix-web-1", "sqlite"] }
 
 [features]
 default = []
