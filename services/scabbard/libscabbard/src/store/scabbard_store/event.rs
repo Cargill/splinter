@@ -12,8 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Structs and enums specific to the two phase commit consensus algorithm
+use crate::store::scabbard_store::two_phase::event::Scabbard2pcEvent;
 
-pub mod action;
-pub mod event;
-pub mod message;
+#[derive(Debug, PartialEq, Clone)]
+pub enum ScabbardConsensusEvent {
+    Scabbard2pcConsensusEvent(Scabbard2pcEvent),
+}
+
+// A scabbard consensus event that includes the event ID associated with the event
+#[derive(Debug, PartialEq, Clone)]
+pub enum ReturnedScabbardConsensusEvent {
+    Scabbard2pcConsensusEvent(i64, Scabbard2pcEvent),
+}

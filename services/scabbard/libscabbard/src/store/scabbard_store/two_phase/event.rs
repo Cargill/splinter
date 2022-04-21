@@ -12,8 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Structs and enums specific to the two phase commit consensus algorithm
+use splinter::service::ServiceId;
 
-pub mod action;
-pub mod event;
-pub mod message;
+use super::message::Scabbard2pcMessage;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Scabbard2pcEvent {
+    Alarm(),
+    Deliver(ServiceId, Scabbard2pcMessage),
+    Start(Vec<u8>),
+    Vote(bool),
+}
