@@ -599,8 +599,7 @@ fn get_system_time(time: Option<i64>) -> Result<Option<SystemTime>, ScabbardStor
                 .checked_add(Duration::from_secs(time as u64))
                 .ok_or_else(|| {
                     InternalError::with_message(
-                        "'sent_at' timestamp could not be represented as a `SystemTime`"
-                            .to_string(),
+                        "timestamp could not be represented as a `SystemTime`".to_string(),
                     )
                 })?,
         )),
