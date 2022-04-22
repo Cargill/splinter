@@ -14,8 +14,6 @@
 
 //! Circuit routing and message handling.
 
-#[cfg(feature = "service-network")]
-pub mod component;
 pub mod handlers;
 pub mod routing;
 #[cfg(feature = "circuit-template")]
