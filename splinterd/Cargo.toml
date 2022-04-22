@@ -127,7 +127,7 @@ authorization-handler-rbac = [
     "splinter/authorization-handler-rbac",
 ]
 biome-credentials = ["splinter/biome-credentials"]
-biome-key-management = ["splinter/biome-key-management"]
+biome-key-management = ["splinter/biome-key-management", "splinter-rest-api-actix-web-1/biome-key-management"]
 biome-profile = ["splinter/biome-profile"]
 config-allow-keys = ["authorization-handler-allow-keys"]
 database-postgres = ["diesel", "diesel/postgres", "scabbard/postgres", "splinter/postgres"]
