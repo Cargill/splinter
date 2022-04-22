@@ -31,6 +31,10 @@ running.
 
 FLAGS
 =====
+`--dry-run`
+: Check that the in and out databases are available and that the in database
+  has a commit hash. The command will not attempt to move the state
+
 `-f`, `--force`
 : Always attempt to move state, regardless of if there is existing data in the
   out database
