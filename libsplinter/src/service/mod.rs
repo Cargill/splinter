@@ -37,8 +37,6 @@
 
 pub mod error;
 mod factory;
-#[cfg(feature = "service-network")]
-pub mod network;
 mod processor;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
