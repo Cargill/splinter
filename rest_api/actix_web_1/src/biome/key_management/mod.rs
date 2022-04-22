@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod key_management;
+mod endpoints;
+mod resources;
 
 use std::sync::Arc;
 
-use crate::biome::key_management::store::KeyStore;
-use crate::rest_api::{Resource, RestResourceProvider};
+use splinter::biome::key_management::store::KeyStore;
+use splinter::rest_api::{Resource, RestResourceProvider};
 
 /// Provides the following REST API endpoints for Biome key management:
 ///
@@ -42,8 +43,8 @@ impl BiomeKeyManagementRestResourceProvider {
 impl RestResourceProvider for BiomeKeyManagementRestResourceProvider {
     fn resources(&self) -> Vec<Resource> {
         vec![
-            key_management::make_key_management_route(self.key_store.clone()),
-            key_management::make_key_management_route_with_public_key(self.key_store.clone()),
+            endpoints::make_key_management_route(self.key_store.clone()),
+            endpoints::make_key_management_route_with_public_key(self.key_store.clone()),
         ]
     }
 }

@@ -14,7 +14,7 @@
 
 //! Defines structures used in key management.
 
-use crate::biome::key_management::Key;
+use splinter::biome::key_management::Key;
 
 #[derive(Deserialize)]
 pub(crate) struct NewKey {

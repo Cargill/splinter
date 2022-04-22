@@ -12,7 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod actix_web_1;
-mod resources;
-
-pub use actix_web_1::BiomeKeyManagementRestResourceProvider;
+#[cfg(feature = "biome-key-management")]
+pub mod key_management;
