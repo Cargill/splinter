@@ -40,9 +40,8 @@ use crate::protos::circuit::{
 };
 use crate::protos::prelude::*;
 use crate::runtime::service::instance::StandardServiceNetworkRegistry;
-use crate::service::instance::{
-    FactoryCreateError, ServiceFactory, ServiceInstance, ServiceMessageContext,
-};
+use crate::service::instance::ServiceMessageContext;
+use crate::service::instance::{OrchestratableService, OrchestratableServiceFactory};
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;
 
@@ -72,35 +71,6 @@ impl std::fmt::Display for ServiceDefinition {
             self.circuit, self.service_id, self.service_type
         )
     }
-}
-
-/// A service that may be orchestratable.
-///
-/// This service has several stronger requirements, mainly required moving and sharing a service
-/// instance among threads.
-pub trait OrchestratableService: ServiceInstance {
-    fn clone_box(&self) -> Box<dyn OrchestratableService>;
-
-    fn as_service(&self) -> &dyn ServiceInstance;
-}
-
-impl Clone for Box<dyn OrchestratableService> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
-}
-
-/// A service factory that produces orchestratable services.
-pub trait OrchestratableServiceFactory: ServiceFactory {
-    /// Create a Service instance with the given ID, of the given type, the given circuit_id,
-    /// with the given arguments.
-    fn create_orchestratable_service(
-        &self,
-        service_id: String,
-        service_type: &str,
-        circuit_id: &str,
-        args: HashMap<String, String>,
-    ) -> Result<Box<dyn OrchestratableService>, FactoryCreateError>;
 }
 
 /// Stores a service and other structures that are used to manage it

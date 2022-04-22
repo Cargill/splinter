@@ -3695,7 +3695,6 @@ mod tests {
     use crate::network::auth::AuthorizationManager;
     use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
     use crate::network::connection_manager::ConnectionManager;
-    use crate::orchestrator::{ServiceOrchestrator, ServiceOrchestratorBuilder};
     use crate::peer::{PeerManager, PeerManagerConnector};
     use crate::protocol::authorization::{
         AuthorizationMessage, AuthorizationType, Authorized, ConnectRequest, ConnectResponse,
@@ -3708,6 +3707,7 @@ mod tests {
     };
     use crate::protos::network;
     use crate::protos::prelude::*;
+    use crate::runtime::service::instance::{ServiceOrchestrator, ServiceOrchestratorBuilder};
     use crate::service::instance::{ServiceMessageContext, ServiceSendError};
     use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{

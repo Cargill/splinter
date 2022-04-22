@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use crate::error::InternalError;
-use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
+use crate::runtime::service::instance::{ServiceDefinition, ServiceOrchestrator};
 
 use super::LifecycleDispatch;
 

@@ -23,12 +23,11 @@ use splinter::admin::service::{AdminCommands, AdminServiceBuilder, AdminServiceS
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
 use splinter::events::Reactor;
-use splinter::orchestrator::ServiceOrchestratorBuilder;
 use splinter::peer::PeerManagerConnector;
 use splinter::public_key::PublicKey;
 use splinter::registry::{LocalYamlRegistry, RegistryReader, UnifiedRegistry};
 use splinter::rest_api::actix_web_1::RestResourceProvider as _;
-use splinter::runtime::service::instance::ServiceProcessorBuilder;
+use splinter::runtime::service::instance::{ServiceOrchestratorBuilder, ServiceProcessorBuilder};
 use splinter::store::StoreFactory;
 use splinter::transport::{inproc::InprocTransport, Transport};
 

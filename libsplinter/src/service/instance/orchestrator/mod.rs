@@ -12,18 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "service-network")]
-pub mod network;
-mod orchestrator;
-mod processor;
+mod factory;
+mod service;
 
-pub use orchestrator::{
-    AddServiceError, InitializeServiceError, ListServicesError, NewOrchestratorError,
-    OrchestratorError, ServiceDefinition, ServiceOrchestrator, ServiceOrchestratorBuilder,
-    ShutdownServiceError,
-};
-
-pub use processor::{
-    registry::StandardServiceNetworkRegistry, JoinHandles, ServiceProcessor,
-    ServiceProcessorBuilder, ServiceProcessorError, ServiceProcessorShutdownHandle,
-};
+pub use factory::OrchestratableServiceFactory;
+pub use service::OrchestratableService;

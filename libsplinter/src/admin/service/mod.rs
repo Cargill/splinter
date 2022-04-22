@@ -1002,9 +1002,9 @@ mod tests {
     use crate::network::auth::AuthorizationManager;
     use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
     use crate::network::connection_manager::ConnectionManager;
-    use crate::orchestrator::ServiceOrchestratorBuilder;
     use crate::peer::PeerManager;
     use crate::protos::admin;
+    use crate::runtime::service::instance::ServiceOrchestratorBuilder;
     use crate::service::instance::{
         ServiceConnectionError, ServiceDisconnectionError, ServiceNetworkRegistry,
         ServiceNetworkSender, ServiceSendError,

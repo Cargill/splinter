@@ -12,18 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "service-network")]
-pub mod network;
-mod orchestrator;
-mod processor;
+use crate::service::instance::ServiceInstance;
 
-pub use orchestrator::{
-    AddServiceError, InitializeServiceError, ListServicesError, NewOrchestratorError,
-    OrchestratorError, ServiceDefinition, ServiceOrchestrator, ServiceOrchestratorBuilder,
-    ShutdownServiceError,
-};
+/// A service that may be orchestratable.
+///
+/// This service has several stronger requirements, mainly required moving and sharing a service
+/// instance among threads.
+pub trait OrchestratableService: ServiceInstance {
+    fn clone_box(&self) -> Box<dyn OrchestratableService>;
 
-pub use processor::{
-    registry::StandardServiceNetworkRegistry, JoinHandles, ServiceProcessor,
-    ServiceProcessorBuilder, ServiceProcessorError, ServiceProcessorShutdownHandle,
-};
+    fn as_service(&self) -> &dyn ServiceInstance;
+}
+
+impl Clone for Box<dyn OrchestratableService> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}

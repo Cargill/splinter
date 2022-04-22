@@ -15,10 +15,10 @@
 //! Builder for constructing new service orchestrators.
 
 use crate::error::InvalidStateError;
+use crate::service::instance::OrchestratableServiceFactory;
 use crate::transport::Connection;
 
 use super::runnable::RunnableServiceOrchestrator;
-use super::OrchestratableServiceFactory;
 
 const DEFAULT_INCOMING_CAPACITY: usize = 512;
 const DEFAULT_OUTGOING_CAPACITY: usize = 512;
