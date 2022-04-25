@@ -12,10 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod admin_service_proposals;
-pub mod error;
-pub mod proposal_iter;
-pub mod store;
+use crate::admin::store::CircuitPredicate;
 
-pub use admin_service_proposals::AdminServiceProposals;
-pub use store::ProposalStore;
+use crate::admin::service::messages::CircuitProposal;
+
+use super::error::ProposalStoreError;
+use super::proposal_iter::ProposalIter;
+
+pub trait ProposalStore: Send + Sync + Clone {
+    /// Return an iterator over the proposals in this store. Proposal filters may optionally be
+    /// provided.
+    fn proposals(&self, filters: Vec<CircuitPredicate>)
+        -> Result<ProposalIter, ProposalStoreError>;
+
+    fn proposal(&self, circuit_id: &str) -> Result<Option<CircuitProposal>, ProposalStoreError>;
+}
