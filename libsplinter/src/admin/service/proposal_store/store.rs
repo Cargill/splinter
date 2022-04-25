@@ -19,7 +19,7 @@ use crate::admin::service::messages::CircuitProposal;
 use super::error::ProposalStoreError;
 use super::proposal_iter::ProposalIter;
 
-pub trait ProposalStore: Send + Sync + Clone {
+pub trait ProposalStore: Send + Sync {
     /// Return an iterator over the proposals in this store. Proposal filters may optionally be
     /// provided.
     fn proposals(&self, filters: Vec<CircuitPredicate>)

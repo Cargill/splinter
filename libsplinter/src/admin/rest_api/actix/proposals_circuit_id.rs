@@ -23,7 +23,7 @@ use futures::Future;
 use crate::admin::rest_api::error::ProposalFetchError;
 #[cfg(feature = "authorization")]
 use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
-use crate::admin::service::proposal_store::ProposalStore;
+use crate::admin::service::proposal_store::ProposalStoreFactory;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     ErrorResponse, SPLINTER_PROTOCOL_VERSION,
@@ -33,7 +33,9 @@ use super::super::resources;
 
 const ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 
-pub fn make_fetch_proposal_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
+pub fn make_fetch_proposal_resource<PSF: ProposalStoreFactory + 'static>(
+    proposal_store_factory: PSF,
+) -> Resource {
     let resource = Resource::build("admin/proposals/{circuit_id}").add_request_guard(
         ProtocolVersionRangeGuard::new(
             ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN,
@@ -44,20 +46,20 @@ pub fn make_fetch_proposal_resource<PS: ProposalStore + 'static>(proposal_store:
     #[cfg(feature = "authorization")]
     {
         resource.add_method(Method::Get, CIRCUIT_READ_PERMISSION, move |r, _| {
-            fetch_proposal(r, web::Data::new(proposal_store.clone()))
+            fetch_proposal(r, web::Data::new(proposal_store_factory.clone()))
         })
     }
     #[cfg(not(feature = "authorization"))]
     {
         resource.add_method(Method::Get, move |r, _| {
-            fetch_proposal(r, web::Data::new(proposal_store.clone()))
+            fetch_proposal(r, web::Data::new(proposal_store_factory.clone()))
         })
     }
 }
 
-fn fetch_proposal<PS: ProposalStore + 'static>(
+fn fetch_proposal<PSF: ProposalStoreFactory + 'static>(
     request: HttpRequest,
-    proposal_store: web::Data<PS>,
+    proposal_store_factory: web::Data<PSF>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let circuit_id = request
         .match_info()
@@ -77,7 +79,8 @@ fn fetch_proposal<PS: ProposalStore + 'static>(
 
     Box::new(
         web::block(move || {
-            let proposal = proposal_store
+            let proposal = proposal_store_factory
+                .new_proposal_store()
                 .proposal(&circuit_id)
                 .map_err(|err| ProposalFetchError::InternalError(err.to_string()))?
                 .ok_or_else(|| {
@@ -145,7 +148,9 @@ mod tests {
             AuthorizationType, CircuitProposal, CircuitStatus, CreateCircuit, DurabilityType,
             PersistenceType, ProposalType, RouteType,
         },
-        service::proposal_store::{ProposalIter, ProposalStoreError},
+        service::proposal_store::{
+            error::ProposalStoreError, proposal_iter::ProposalIter, ProposalStore,
+        },
         store::CircuitPredicate,
     };
     use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
@@ -154,7 +159,7 @@ mod tests {
     /// Tests a GET /admin/proposals/{circuit_id} request returns the expected proposal.
     fn test_fetch_proposal_ok() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStoreFactory)]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals/{}",
@@ -190,7 +195,7 @@ mod tests {
     /// proposal. This test is for backwards compatibility.
     fn test_fetch_proposal_ok_v1() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStoreFactory)]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals/{}",
@@ -225,7 +230,7 @@ mod tests {
     /// circuit_id is passed.
     fn test_fetch_proposal_not_found() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStoreFactory)]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals/Circuit-not-valid",
@@ -243,6 +248,15 @@ mod tests {
             .shutdown()
             .expect("unable to shutdown rest api");
         join_handle.join().expect("Unable to join rest api thread");
+    }
+
+    #[derive(Clone)]
+    struct MockProposalStoreFactory;
+
+    impl ProposalStoreFactory for MockProposalStoreFactory {
+        fn new_proposal_store<'a>(&'a self) -> Box<dyn ProposalStore + 'a> {
+            Box::new(MockProposalStore {})
+        }
     }
 
     #[derive(Clone)]

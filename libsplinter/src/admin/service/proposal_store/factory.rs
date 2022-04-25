@@ -12,14 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod admin_service_proposals;
-mod admin_service_proposals_factory;
-pub mod error;
-mod factory;
-pub mod proposal_iter;
-pub mod store;
+use super::store::ProposalStore;
 
-pub use admin_service_proposals::AdminServiceProposals;
-pub use admin_service_proposals_factory::AdminServiceProposalsFactory;
-pub use factory::ProposalStoreFactory;
-pub use store::ProposalStore;
+pub trait ProposalStoreFactory: Clone + Send + Sync {
+    fn new_proposal_store<'a>(&'a self) -> Box<dyn ProposalStore + 'a>;
+}
