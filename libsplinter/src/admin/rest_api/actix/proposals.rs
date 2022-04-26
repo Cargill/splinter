@@ -21,7 +21,7 @@ use futures::{future::IntoFuture, Future};
 
 #[cfg(feature = "authorization")]
 use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
-use crate::admin::service::proposal_store::ProposalStore;
+use crate::admin::service::proposal_store::ProposalStoreFactory;
 use crate::admin::store::CircuitPredicate;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
@@ -34,7 +34,9 @@ use super::super::resources;
 
 const ADMIN_LIST_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 
-pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
+pub fn make_list_proposals_resource<PSF: ProposalStoreFactory + 'static>(
+    proposal_store_factory: PSF,
+) -> Resource {
     let resource =
         Resource::build("admin/proposals").add_request_guard(ProtocolVersionRangeGuard::new(
             ADMIN_LIST_PROPOSALS_PROTOCOL_MIN,
@@ -44,20 +46,20 @@ pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store:
     #[cfg(feature = "authorization")]
     {
         resource.add_method(Method::Get, CIRCUIT_READ_PERMISSION, move |r, _| {
-            list_proposals(r, web::Data::new(proposal_store.clone()))
+            list_proposals(r, web::Data::new(proposal_store_factory.clone()))
         })
     }
     #[cfg(not(feature = "authorization"))]
     {
         resource.add_method(Method::Get, move |r, _| {
-            list_proposals(r, web::Data::new(proposal_store.clone()))
+            list_proposals(r, web::Data::new(proposal_store_factory.clone()))
         })
     }
 }
 
-fn list_proposals<PS: ProposalStore + 'static>(
+fn list_proposals<PSF: ProposalStoreFactory + 'static>(
     req: HttpRequest,
-    proposal_store: web::Data<PS>,
+    proposal_store_factory: web::Data<PSF>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let query: web::Query<HashMap<String, String>> =
         if let Ok(q) = web::Query::from_query(req.query_string()) {
@@ -136,7 +138,7 @@ fn list_proposals<PS: ProposalStore + 'static>(
     };
 
     Box::new(query_list_proposals(
-        proposal_store,
+        proposal_store_factory,
         link,
         management_type_filter,
         member_filter,
@@ -146,8 +148,8 @@ fn list_proposals<PS: ProposalStore + 'static>(
     ))
 }
 
-fn query_list_proposals<PS: ProposalStore + 'static>(
-    proposal_store: web::Data<PS>,
+fn query_list_proposals<PSF: ProposalStoreFactory + 'static>(
+    proposal_store_factory: web::Data<PSF>,
     link: String,
     management_type_filter: Option<String>,
     member_filter: Option<String>,
@@ -164,7 +166,8 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
             filters.push(CircuitPredicate::MembersInclude(vec![member]));
         }
 
-        let proposals = proposal_store
+        let proposals = proposal_store_factory
+            .new_proposal_store()
             .proposals(filters)
             .map_err(|err| ProposalListError::InternalError(err.to_string()))?;
         let offset_value = offset.unwrap_or(0);
@@ -243,7 +246,9 @@ mod tests {
             AuthorizationType, CircuitProposal, CircuitStatus, CreateCircuit, DurabilityType,
             PersistenceType, ProposalType, RouteType, SplinterNode,
         },
-        service::proposal_store::{ProposalIter, ProposalStoreError},
+        service::proposal_store::{
+            error::ProposalStoreError, proposal_iter::ProposalIter, ProposalStore,
+        },
         store::{
             self, CircuitPredicate, CircuitProposal as StoreProposal, CircuitProposalBuilder,
             ProposedCircuitBuilder, ProposedNodeBuilder,
@@ -259,7 +264,7 @@ mod tests {
     /// Tests a GET /admin/proposals request with no filters returns the expected proposals.
     fn test_list_proposals_ok() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStoreFactory)]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals", bind_url))
             .expect("Failed to parse URL");
@@ -317,7 +322,7 @@ mod tests {
     /// proposals. This test is for backwards compatibility.
     fn test_list_proposals_ok_v1() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStoreFactory)]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals", bind_url))
             .expect("Failed to parse URL");
@@ -372,7 +377,7 @@ mod tests {
     /// proposal.
     fn test_list_proposals_with_management_type_ok() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStoreFactory)]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals?management_type=mgmt_type_1",
@@ -423,7 +428,7 @@ mod tests {
     /// proposals.
     fn test_list_proposals_with_member_ok() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStoreFactory)]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals?member=node_id",
@@ -476,7 +481,7 @@ mod tests {
     /// the expected proposal.
     fn test_list_proposals_with_management_type_and_member_ok() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStoreFactory)]);
 
         let url = Url::parse(&format!(
             "http://{}/admin/proposals?management_type=mgmt_type_2&member=node_id",
@@ -526,7 +531,7 @@ mod tests {
     /// Tests a GET /admin/proposals?limit=1 request returns the expected proposal.
     fn test_list_proposal_with_limit() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStoreFactory)]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals?limit=1", bind_url))
             .expect("Failed to parse URL");
@@ -573,7 +578,7 @@ mod tests {
     /// Tests a GET /admin/proposals?offset=1 request returns the expected proposals.
     fn test_list_proposal_with_offset() {
         let (shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStoreFactory)]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals?offset=1", bind_url))
             .expect("Failed to parse URL");
@@ -643,6 +648,15 @@ mod tests {
             prev: previous_link,
             next: next_link,
             last: last_link,
+        }
+    }
+
+    #[derive(Clone)]
+    struct MockProposalStoreFactory;
+
+    impl ProposalStoreFactory for MockProposalStoreFactory {
+        fn new_proposal_store<'a>(&'a self) -> Box<dyn ProposalStore + 'a> {
+            Box::new(MockProposalStore {})
         }
     }
 

@@ -50,7 +50,7 @@ use crate::service::instance::{
 
 use self::consensus::AdminConsensusManager;
 use self::error::{AdminError, AdminSharedError, Sha256Error};
-use self::proposal_store::{AdminServiceProposals, ProposalStore};
+use self::proposal_store::{AdminServiceProposalsFactory, ProposalStoreFactory};
 use self::shared::{get_peer_token_from_service_id, AdminServiceShared, PeerNodePair};
 
 pub use self::builder::AdminServiceBuilder;
@@ -192,8 +192,8 @@ impl AdminService {
         }
     }
 
-    pub fn proposals(&self) -> impl ProposalStore {
-        AdminServiceProposals::new(&self.admin_service_shared)
+    pub fn proposal_store_factory(&self) -> impl ProposalStoreFactory {
+        AdminServiceProposalsFactory::new(&self.admin_service_shared)
     }
 
     /// On restart of a splinter node, all services that this node should run on the existing
