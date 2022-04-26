@@ -57,6 +57,14 @@ macro_rules! invalid_arg_error {
 }
 
 /// A service type.
+///
+/// A service type is a label that indicates the capabilities and, optionally, a version of a
+/// service. The service type has the following string format:
+///
+/// `"<service_type>[:<version>]"`
+///
+/// This value is used to route a service message to the appropriate
+/// [`MessageHandler`](crate::service::MessageHandler).
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct ServiceType<'a>(ServiceTypeInner<'a>);
 
