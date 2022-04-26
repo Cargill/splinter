@@ -998,7 +998,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .short("y")
                                 .long("yes")
                                 .help("Do not prompt for confirmation"),
-                        ),
+                        )
+                        .arg(Arg::with_name("dry_run").long("dry-run").long_help(
+                            "Check that the in and out databases are available and that \
+                            the in database has a commit hash. The command will not \
+                            attempt to move the state",
+                        )),
                 ),
         );
     }
