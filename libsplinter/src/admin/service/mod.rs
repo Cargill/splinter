@@ -16,7 +16,7 @@ mod builder;
 mod consensus;
 pub(crate) mod error;
 pub(crate) mod messages;
-pub(super) mod proposal_store;
+pub mod proposal_store;
 mod shared;
 mod subscriber;
 
