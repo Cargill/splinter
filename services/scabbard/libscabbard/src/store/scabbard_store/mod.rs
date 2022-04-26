@@ -18,6 +18,7 @@ pub mod context;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 pub mod diesel;
 mod error;
+pub mod event;
 mod factory;
 pub mod service;
 pub mod state;
@@ -30,6 +31,7 @@ pub(crate) use error::ScabbardStoreError;
 use action::ScabbardConsensusAction;
 use commit::CommitEntry;
 use context::ScabbardContext;
+use event::{ReturnedScabbardConsensusEvent, ScabbardConsensusEvent};
 use service::ScabbardService;
 use splinter::service::FullyQualifiedServiceId;
 
@@ -143,4 +145,46 @@ pub trait ScabbardStore {
     ///
     /// * `service` - The `ScabbardService` to be updated
     fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError>;
+    /// Add a new consensus event
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the event
+    ///    belongs to
+    /// * `epoch` - The epoch that the event belongs to
+    /// * `event` - The `ScabbardConsensusEvent` to be added
+    fn add_consensus_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+        event: ScabbardConsensusEvent,
+    ) -> Result<i64, ScabbardStoreError>;
+    /// Update an existing consensus event
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the event
+    ///    belongs to
+    /// * `epoch` - The epoch that the event belongs to
+    /// * `event_id` - The ID of the event to be updated
+    /// * `executed_at` - The time that the event was executed
+    fn update_consensus_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+        event_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError>;
+    /// List all consensus events for a given service_id and epoch
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service for which events
+    ///    should be listed
+    /// * `epoch` - The epoch for which events should be listed
+    fn list_consensus_events(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError>;
 }

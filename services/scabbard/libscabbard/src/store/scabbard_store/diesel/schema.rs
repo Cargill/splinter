@@ -179,6 +179,48 @@ table! {
     }
 }
 
+table! {
+    two_pc_consensus_event (id) {
+        id -> Int8,
+        service_id -> Text,
+        epoch -> BigInt,
+        created_at -> Timestamp,
+        executed_at -> Nullable<BigInt>,
+        position -> Integer,
+        event_type -> Text,
+    }
+}
+
+table! {
+    two_pc_consensus_deliver_event (event_id) {
+        event_id -> Int8,
+        service_id -> Text,
+        epoch -> BigInt,
+        receiver_service_id -> Text,
+        message_type -> Text,
+        vote_response -> Nullable<Text>,
+        vote_request -> Nullable<Binary>,
+    }
+}
+
+table! {
+    two_pc_consensus_start_event (event_id) {
+        event_id -> Int8,
+        service_id -> Text,
+        epoch -> BigInt,
+        value -> Binary,
+    }
+}
+
+table! {
+    two_pc_consensus_vote_event (event_id) {
+        event_id -> Int8,
+        service_id -> Text,
+        epoch -> BigInt,
+        vote -> Text,
+    }
+}
+
 joinable!(consensus_coordinator_notification_action -> consensus_action (action_id));
 joinable!(consensus_coordinator_send_message_action -> consensus_action (action_id));
 joinable!(consensus_update_coordinator_context_action -> consensus_action (action_id));
@@ -188,6 +230,10 @@ joinable!(consensus_update_coordinator_context_action_participant -> consensus_a
 joinable!(consensus_participant_notification_action -> consensus_action (action_id));
 joinable!(consensus_participant_send_message_action -> consensus_action (action_id));
 joinable!(consensus_update_participant_context_action -> consensus_action (action_id));
+
+joinable!(two_pc_consensus_deliver_event -> two_pc_consensus_event(event_id));
+joinable!(two_pc_consensus_start_event -> two_pc_consensus_event(event_id));
+joinable!(two_pc_consensus_vote_event -> two_pc_consensus_event(event_id));
 
 allow_tables_to_appear_in_same_query!(
     consensus_coordinator_context,
@@ -203,6 +249,10 @@ allow_tables_to_appear_in_same_query!(
     consensus_update_participant_context_action_participant,
     consensus_participant_send_message_action,
     consensus_participant_notification_action,
+    two_pc_consensus_event,
+    two_pc_consensus_deliver_event,
+    two_pc_consensus_start_event,
+    two_pc_consensus_vote_event,
 );
 
 allow_tables_to_appear_in_same_query!(scabbard_peer, scabbard_service, scabbard_v3_commit_history,);
