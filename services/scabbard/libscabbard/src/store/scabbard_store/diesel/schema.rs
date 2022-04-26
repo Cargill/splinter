@@ -15,6 +15,7 @@
 table! {
     scabbard_service (service_id) {
         service_id  -> Text,
+        consensus -> Text,
         status -> Text,
     }
 }
