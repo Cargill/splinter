@@ -20,7 +20,7 @@ use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
-    models::{CoordinatorContextModel, ParticipantContextModel},
+    models::{Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel},
     schema::{
         consensus_coordinator_context, consensus_participant_context, two_pc_consensus_event,
     },
@@ -62,7 +62,7 @@ where
                     .filter(consensus_coordinator_context::epoch.eq(epoch).and(
                         consensus_coordinator_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<CoordinatorContextModel>(self.conn)
+                    .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                     .optional()?;
 
             let participant_context =
@@ -70,7 +70,7 @@ where
                     .filter(consensus_participant_context::epoch.eq(epoch).and(
                         consensus_participant_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<ParticipantContextModel>(self.conn)
+                    .first::<Consensus2pcParticipantContextModel>(self.conn)
                     .optional()?;
 
             // return an error if there is both a coordinator and a participant context for the

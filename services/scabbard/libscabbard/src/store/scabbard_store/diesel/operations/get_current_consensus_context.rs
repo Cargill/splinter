@@ -21,8 +21,8 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        CoordinatorContextModel, CoordinatorContextParticipantModel, ParticipantContextModel,
-        ParticipantContextParticipantModel,
+        Consensus2pcCoordinatorContextModel, Consensus2pcCoordinatorContextParticipantModel,
+        Consensus2pcParticipantContextModel, Consensus2pcParticipantContextParticipantModel,
     },
     schema::{
         consensus_coordinator_context, consensus_coordinator_context_participant,
@@ -54,13 +54,13 @@ where
             let coordinator_context = consensus_coordinator_context::table
                 .filter(consensus_coordinator_context::service_id.eq(format!("{}", service_id)))
                 .order(consensus_coordinator_context::epoch.desc())
-                .first::<CoordinatorContextModel>(self.conn)
+                .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                 .optional()?;
 
             let participant_context = consensus_participant_context::table
                 .filter(consensus_participant_context::service_id.eq(format!("{}", service_id)))
                 .order(consensus_participant_context::epoch.desc())
-                .first::<ParticipantContextModel>(self.conn)
+                .first::<Consensus2pcParticipantContextModel>(self.conn)
                 .optional()?;
 
             match (coordinator_context, participant_context) {
@@ -80,17 +80,20 @@ where
                             ));
                         }
                         Ordering::Greater => {
-                            let coordinator_participants: Vec<CoordinatorContextParticipantModel> =
-                                consensus_coordinator_context_participant::table
-                                    .filter(
-                                        consensus_coordinator_context_participant::service_id
-                                            .eq(format!("{}", service_id))
-                                            .and(
-                                                consensus_coordinator_context_participant::epoch
-                                                    .eq(coordinator_context.epoch),
-                                            ),
-                                    )
-                                    .load::<CoordinatorContextParticipantModel>(self.conn)?;
+                            let coordinator_participants: Vec<
+                                Consensus2pcCoordinatorContextParticipantModel,
+                            > = consensus_coordinator_context_participant::table
+                                .filter(
+                                    consensus_coordinator_context_participant::service_id
+                                        .eq(format!("{}", service_id))
+                                        .and(
+                                            consensus_coordinator_context_participant::epoch
+                                                .eq(coordinator_context.epoch),
+                                        ),
+                                )
+                                .load::<Consensus2pcCoordinatorContextParticipantModel>(
+                                    self.conn,
+                                )?;
                             Ok(Some(
                                 ScabbardContext::try_from((
                                     &coordinator_context,
@@ -104,17 +107,20 @@ where
                             ))
                         }
                         Ordering::Less => {
-                            let participant_participants: Vec<ParticipantContextParticipantModel> =
-                                consensus_participant_context_participant::table
-                                    .filter(
-                                        consensus_participant_context_participant::service_id
-                                            .eq(format!("{}", service_id))
-                                            .and(
-                                                consensus_participant_context_participant::epoch
-                                                    .eq(participant_context.epoch),
-                                            ),
-                                    )
-                                    .load::<ParticipantContextParticipantModel>(self.conn)?;
+                            let participant_participants: Vec<
+                                Consensus2pcParticipantContextParticipantModel,
+                            > = consensus_participant_context_participant::table
+                                .filter(
+                                    consensus_participant_context_participant::service_id
+                                        .eq(format!("{}", service_id))
+                                        .and(
+                                            consensus_participant_context_participant::epoch
+                                                .eq(participant_context.epoch),
+                                        ),
+                                )
+                                .load::<Consensus2pcParticipantContextParticipantModel>(
+                                    self.conn,
+                                )?;
                             Ok(Some(
                                 ScabbardContext::try_from((
                                     &participant_context,
@@ -130,17 +136,18 @@ where
                     }
                 }
                 (Some(coordinator_context), None) => {
-                    let coordinator_participants: Vec<CoordinatorContextParticipantModel> =
-                        consensus_coordinator_context_participant::table
-                            .filter(
-                                consensus_coordinator_context_participant::service_id
-                                    .eq(format!("{}", service_id))
-                                    .and(
-                                        consensus_coordinator_context_participant::epoch
-                                            .eq(coordinator_context.epoch),
-                                    ),
-                            )
-                            .load::<CoordinatorContextParticipantModel>(self.conn)?;
+                    let coordinator_participants: Vec<
+                        Consensus2pcCoordinatorContextParticipantModel,
+                    > = consensus_coordinator_context_participant::table
+                        .filter(
+                            consensus_coordinator_context_participant::service_id
+                                .eq(format!("{}", service_id))
+                                .and(
+                                    consensus_coordinator_context_participant::epoch
+                                        .eq(coordinator_context.epoch),
+                                ),
+                        )
+                        .load::<Consensus2pcCoordinatorContextParticipantModel>(self.conn)?;
                     Ok(Some(
                         ScabbardContext::try_from((&coordinator_context, coordinator_participants))
                             .map_err(|err| {
@@ -151,17 +158,18 @@ where
                     ))
                 }
                 (None, Some(participant_context)) => {
-                    let participant_participants: Vec<ParticipantContextParticipantModel> =
-                        consensus_participant_context_participant::table
-                            .filter(
-                                consensus_participant_context_participant::service_id
-                                    .eq(format!("{}", service_id))
-                                    .and(
-                                        consensus_participant_context_participant::epoch
-                                            .eq(participant_context.epoch),
-                                    ),
-                            )
-                            .load::<ParticipantContextParticipantModel>(self.conn)?;
+                    let participant_participants: Vec<
+                        Consensus2pcParticipantContextParticipantModel,
+                    > = consensus_participant_context_participant::table
+                        .filter(
+                            consensus_participant_context_participant::service_id
+                                .eq(format!("{}", service_id))
+                                .and(
+                                    consensus_participant_context_participant::epoch
+                                        .eq(participant_context.epoch),
+                                ),
+                        )
+                        .load::<Consensus2pcParticipantContextParticipantModel>(self.conn)?;
                     Ok(Some(
                         ScabbardContext::try_from((&participant_context, participant_participants))
                             .map_err(|err| {

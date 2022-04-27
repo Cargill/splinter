@@ -209,7 +209,7 @@ impl From<&ConsensusDecision> for String {
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_coordinator_context"]
 #[primary_key(service_id, epoch)]
-pub struct CoordinatorContextModel {
+pub struct Consensus2pcCoordinatorContextModel {
     pub service_id: String,
     pub alarm: Option<i64>, // timestamp, when to wake up
     pub coordinator: String,
@@ -221,16 +221,16 @@ pub struct CoordinatorContextModel {
 
 impl
     TryFrom<(
-        &CoordinatorContextModel,
-        Vec<CoordinatorContextParticipantModel>,
+        &Consensus2pcCoordinatorContextModel,
+        Vec<Consensus2pcCoordinatorContextParticipantModel>,
     )> for ScabbardContext
 {
     type Error = InternalError;
 
     fn try_from(
         (context, participants): (
-            &CoordinatorContextModel,
-            Vec<CoordinatorContextParticipantModel>,
+            &Consensus2pcCoordinatorContextModel,
+            Vec<Consensus2pcCoordinatorContextParticipantModel>,
         ),
     ) -> Result<Self, Self::Error> {
         let epoch = u64::try_from(context.epoch)
@@ -309,7 +309,7 @@ impl
     }
 }
 
-impl TryFrom<(&Context, &FullyQualifiedServiceId)> for CoordinatorContextModel {
+impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcCoordinatorContextModel {
     type Error = InternalError;
 
     fn try_from(
@@ -348,7 +348,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for CoordinatorContextModel {
                     .map_err(|err| InternalError::from_source(Box::new(err)))?
                     .transpose()
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                Ok(CoordinatorContextModel {
+                Ok(Consensus2pcCoordinatorContextModel {
                     service_id: format!("{}", service_id),
                     alarm,
                     coordinator: format!("{}", context.coordinator()),
@@ -366,7 +366,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for CoordinatorContextModel {
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_coordinator_context_participant"]
 #[primary_key(service_id, epoch, process)]
-pub struct CoordinatorContextParticipantModel {
+pub struct Consensus2pcCoordinatorContextParticipantModel {
     pub service_id: String,
     pub epoch: i64,
     pub process: String,
@@ -378,11 +378,11 @@ pub struct CoordinatorParticipantList {
     pub inner: Vec<Participant>,
 }
 
-impl TryFrom<Vec<CoordinatorContextParticipantModel>> for CoordinatorParticipantList {
+impl TryFrom<Vec<Consensus2pcCoordinatorContextParticipantModel>> for CoordinatorParticipantList {
     type Error = InternalError;
 
     fn try_from(
-        participants: Vec<CoordinatorContextParticipantModel>,
+        participants: Vec<Consensus2pcCoordinatorContextParticipantModel>,
     ) -> Result<Self, Self::Error> {
         let mut all_participants = Vec::new();
         for p in participants {
@@ -413,7 +413,7 @@ impl TryFrom<Vec<CoordinatorContextParticipantModel>> for CoordinatorParticipant
 
 #[derive(Debug, PartialEq)]
 pub struct CoordinatorContextParticipantList {
-    pub inner: Vec<CoordinatorContextParticipantModel>,
+    pub inner: Vec<Consensus2pcCoordinatorContextParticipantModel>,
 }
 
 impl TryFrom<(&Context, &FullyQualifiedServiceId)> for CoordinatorContextParticipantList {
@@ -432,7 +432,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for CoordinatorContextPartici
                         true => "TRUE".to_string(),
                         false => "FALSE".to_string(),
                     });
-                    coordinator_participants.push(CoordinatorContextParticipantModel {
+                    coordinator_participants.push(Consensus2pcCoordinatorContextParticipantModel {
                         service_id: format!("{}", service_id),
                         epoch,
                         process: format!("{}", participant.process),
@@ -450,9 +450,9 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for CoordinatorContextPartici
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_update_coordinator_context_action"]
-#[belongs_to(ConsensusActionModel, foreign_key = "action_id")]
+#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
-pub struct UpdateCoordinatorContextActionModel {
+pub struct Consensus2pcUpdateCoordinatorContextActionModel {
     pub action_id: i64,
     pub service_id: String,
     pub alarm: Option<i64>,
@@ -465,7 +465,7 @@ pub struct UpdateCoordinatorContextActionModel {
 }
 
 impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
-    for UpdateCoordinatorContextActionModel
+    for Consensus2pcUpdateCoordinatorContextActionModel
 {
     type Error = InternalError;
 
@@ -510,7 +510,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
                     .map_err(|err| InternalError::from_source(Box::new(err)))?
                     .transpose()
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                Ok(UpdateCoordinatorContextActionModel {
+                Ok(Consensus2pcUpdateCoordinatorContextActionModel {
                     action_id: *action_id,
                     service_id: format!("{}", service_id),
                     alarm,
@@ -529,10 +529,13 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_update_coordinator_context_action_participant"]
-#[belongs_to(ConsensusActionModel, foreign_key = "action_id")]
-#[belongs_to(UpdateCoordinatorContextActionModel, foreign_key = "action_id")]
+#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
+#[belongs_to(
+    Consensus2pcUpdateCoordinatorContextActionModel,
+    foreign_key = "action_id"
+)]
 #[primary_key(action_id, process)]
-pub struct UpdateCoordinatorContextActionParticipantModel {
+pub struct Consensus2pcUpdateCoordinatorContextActionParticipantModel {
     pub action_id: i64,
     pub service_id: String,
     pub epoch: i64,
@@ -542,7 +545,7 @@ pub struct UpdateCoordinatorContextActionParticipantModel {
 
 #[derive(Debug, PartialEq)]
 pub struct UpdateCoordinatorContextActionParticipantList {
-    pub inner: Vec<UpdateCoordinatorContextActionParticipantModel>,
+    pub inner: Vec<Consensus2pcUpdateCoordinatorContextActionParticipantModel>,
 }
 
 impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)>
@@ -563,13 +566,15 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)>
                         true => "TRUE".to_string(),
                         false => "FALSE".to_string(),
                     });
-                    coordinator_participants.push(UpdateCoordinatorContextActionParticipantModel {
-                        action_id: *action_id,
-                        service_id: format!("{}", service_id),
-                        epoch,
-                        process: format!("{}", participant.process),
-                        vote,
-                    })
+                    coordinator_participants.push(
+                        Consensus2pcUpdateCoordinatorContextActionParticipantModel {
+                            action_id: *action_id,
+                            service_id: format!("{}", service_id),
+                            epoch,
+                            process: format!("{}", participant.process),
+                            vote,
+                        },
+                    )
                 }
                 Ok(UpdateCoordinatorContextActionParticipantList {
                     inner: coordinator_participants,
@@ -582,9 +587,9 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)>
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_coordinator_send_message_action"]
-#[belongs_to(ConsensusActionModel, foreign_key = "action_id")]
+#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
-pub struct CoordinatorSendMessageActionModel {
+pub struct Consensus2pcCoordinatorSendMessageActionModel {
     pub action_id: i64,
     pub service_id: String,
     pub epoch: i64,
@@ -595,9 +600,9 @@ pub struct CoordinatorSendMessageActionModel {
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_coordinator_notification_action"]
-#[belongs_to(ConsensusActionModel, foreign_key = "action_id")]
+#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
-pub struct CoordinatorNotificationModel {
+pub struct Consensus2pcCoordinatorNotificationModel {
     pub action_id: i64,
     pub service_id: String,
     pub epoch: i64,
@@ -619,9 +624,9 @@ impl From<&CoordinatorState> for String {
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_action"]
-#[belongs_to(CoordinatorContextModel, foreign_key = "service_id")]
+#[belongs_to(Consensus2pcCoordinatorContextModel, foreign_key = "service_id")]
 #[primary_key(id)]
-pub struct ConsensusActionModel {
+pub struct Consensus2pcActionModel {
     pub id: i64,
     pub service_id: String,
     pub epoch: i64,
@@ -632,7 +637,7 @@ pub struct ConsensusActionModel {
 
 #[derive(Debug, PartialEq, Insertable)]
 #[table_name = "consensus_action"]
-pub struct InsertableConsensusActionModel {
+pub struct InsertableConsensus2pcActionModel {
     pub service_id: String,
     pub epoch: i64,
     pub executed_at: Option<i64>,
@@ -642,7 +647,7 @@ pub struct InsertableConsensusActionModel {
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_participant_context"]
 #[primary_key(service_id, epoch)]
-pub struct ParticipantContextModel {
+pub struct Consensus2pcParticipantContextModel {
     pub service_id: String,
     pub alarm: Option<i64>,
     pub coordinator: String,
@@ -655,16 +660,16 @@ pub struct ParticipantContextModel {
 
 impl
     TryFrom<(
-        &ParticipantContextModel,
-        Vec<ParticipantContextParticipantModel>,
+        &Consensus2pcParticipantContextModel,
+        Vec<Consensus2pcParticipantContextParticipantModel>,
     )> for ScabbardContext
 {
     type Error = InternalError;
 
     fn try_from(
         (context, participants): (
-            &ParticipantContextModel,
-            Vec<ParticipantContextParticipantModel>,
+            &Consensus2pcParticipantContextModel,
+            Vec<Consensus2pcParticipantContextParticipantModel>,
         ),
     ) -> Result<Self, Self::Error> {
         let epoch = u64::try_from(context.epoch)
@@ -776,7 +781,7 @@ impl
     }
 }
 
-impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ParticipantContextModel {
+impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcParticipantContextModel {
     type Error = InternalError;
 
     fn try_from(
@@ -821,7 +826,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ParticipantContextModel {
                     .map_err(|err| InternalError::from_source(Box::new(err)))?
                     .transpose()
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                Ok(ParticipantContextModel {
+                Ok(Consensus2pcParticipantContextModel {
                     service_id: format!("{}", service_id),
                     alarm,
                     coordinator: format!("{}", context.coordinator()),
@@ -840,7 +845,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ParticipantContextModel {
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_participant_context_participant"]
 #[primary_key(service_id, epoch, process)]
-pub struct ParticipantContextParticipantModel {
+pub struct Consensus2pcParticipantContextParticipantModel {
     pub service_id: String,
     pub epoch: i64,
     pub process: String,
@@ -848,7 +853,7 @@ pub struct ParticipantContextParticipantModel {
 
 #[derive(Debug, PartialEq)]
 pub struct ParticipantContextParticipantList {
-    pub inner: Vec<ParticipantContextParticipantModel>,
+    pub inner: Vec<Consensus2pcParticipantContextParticipantModel>,
 }
 
 impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ParticipantContextParticipantList {
@@ -863,7 +868,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ParticipantContextPartici
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
                 let mut participants = Vec::new();
                 for participant in participant_context.participant_processes {
-                    participants.push(ParticipantContextParticipantModel {
+                    participants.push(Consensus2pcParticipantContextParticipantModel {
                         service_id: format!("{}", service_id),
                         epoch,
                         process: format!("{}", participant),
@@ -880,9 +885,9 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ParticipantContextPartici
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_update_participant_context_action"]
-#[belongs_to(ConsensusActionModel, foreign_key = "action_id")]
+#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
-pub struct UpdateParticipantContextActionModel {
+pub struct Consensus2pcUpdateParticipantContextActionModel {
     pub action_id: i64,
     pub service_id: String,
     pub alarm: Option<i64>,
@@ -896,7 +901,7 @@ pub struct UpdateParticipantContextActionModel {
 }
 
 impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
-    for UpdateParticipantContextActionModel
+    for Consensus2pcUpdateParticipantContextActionModel
 {
     type Error = InternalError;
 
@@ -947,7 +952,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
                     .map_err(|err| InternalError::from_source(Box::new(err)))?
                     .transpose()
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                Ok(UpdateParticipantContextActionModel {
+                Ok(Consensus2pcUpdateParticipantContextActionModel {
                     action_id: *action_id,
                     service_id: format!("{}", service_id),
                     alarm,
@@ -967,10 +972,13 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_update_participant_context_action_participant"]
-#[belongs_to(ConsensusActionModel, foreign_key = "action_id")]
-#[belongs_to(UpdateParticipantContextActionModel, foreign_key = "action_id")]
+#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
+#[belongs_to(
+    Consensus2pcUpdateParticipantContextActionModel,
+    foreign_key = "action_id"
+)]
 #[primary_key(action_id, process)]
-pub struct UpdateParticipantContextActionParticipantModel {
+pub struct Consensus2pcUpdateParticipantContextActionParticipantModel {
     pub action_id: i64,
     pub service_id: String,
     pub epoch: i64,
@@ -979,7 +987,7 @@ pub struct UpdateParticipantContextActionParticipantModel {
 
 #[derive(Debug, PartialEq)]
 pub struct UpdateParticipantContextActionParticipantList {
-    pub inner: Vec<UpdateParticipantContextActionParticipantModel>,
+    pub inner: Vec<Consensus2pcUpdateParticipantContextActionParticipantModel>,
 }
 
 impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)>
@@ -996,12 +1004,14 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)>
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
                 let mut participant_participants = Vec::new();
                 for participant in participant_context.participant_processes {
-                    participant_participants.push(UpdateParticipantContextActionParticipantModel {
-                        action_id: *action_id,
-                        service_id: format!("{}", service_id),
-                        epoch,
-                        process: format!("{}", participant),
-                    })
+                    participant_participants.push(
+                        Consensus2pcUpdateParticipantContextActionParticipantModel {
+                            action_id: *action_id,
+                            service_id: format!("{}", service_id),
+                            epoch,
+                            process: format!("{}", participant),
+                        },
+                    )
                 }
                 Ok(UpdateParticipantContextActionParticipantList {
                     inner: participant_participants,
@@ -1014,9 +1024,9 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)>
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_participant_send_message_action"]
-#[belongs_to(ConsensusActionModel, foreign_key = "action_id")]
+#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
-pub struct ParticipantSendMessageActionModel {
+pub struct Consensus2pcParticipantSendMessageActionModel {
     pub action_id: i64,
     pub service_id: String,
     pub epoch: i64,
@@ -1027,9 +1037,9 @@ pub struct ParticipantSendMessageActionModel {
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_participant_notification_action"]
-#[belongs_to(ConsensusActionModel, foreign_key = "action_id")]
+#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
-pub struct ParticipantNotificationModel {
+pub struct Consensus2pcParticipantNotificationModel {
     pub action_id: i64,
     pub service_id: String,
     pub epoch: i64,

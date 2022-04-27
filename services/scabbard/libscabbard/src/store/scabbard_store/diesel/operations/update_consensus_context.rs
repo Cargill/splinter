@@ -24,8 +24,8 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        CoordinatorContextModel, CoordinatorContextParticipantList, ParticipantContextModel,
-        ParticipantContextParticipantList,
+        Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel,
+        CoordinatorContextParticipantList, ParticipantContextParticipantList,
     },
     schema::{
         consensus_coordinator_context, consensus_coordinator_context_participant,
@@ -72,7 +72,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                                         .eq(format!("{}", context.coordinator())),
                                 ),
                         )
-                        .first::<CoordinatorContextModel>(self.conn)
+                        .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                         .optional()?;
 
                     let participant_context = consensus_participant_context::table
@@ -88,7 +88,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                                         .eq(format!("{}", context.coordinator())),
                                 ),
                         )
-                        .first::<ParticipantContextModel>(self.conn)
+                        .first::<Consensus2pcParticipantContextModel>(self.conn)
                         .optional()?;
 
                     if coordinator_context.is_some() {
@@ -105,7 +105,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                         }
 
                         let update_coordinator_context =
-                            CoordinatorContextModel::try_from((&context, service_id))?;
+                            Consensus2pcCoordinatorContextModel::try_from((&context, service_id))?;
 
                         delete(
                             consensus_coordinator_context::table.filter(
@@ -149,7 +149,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                         Ok(())
                     } else if participant_context.is_some() {
                         let update_participant_context =
-                            ParticipantContextModel::try_from((&context, service_id))?;
+                            Consensus2pcParticipantContextModel::try_from((&context, service_id))?;
 
                         delete(
                             consensus_participant_context::table.filter(
@@ -233,14 +233,14 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                                         .eq(format!("{}", context.coordinator())),
                                 ),
                         )
-                        .first::<CoordinatorContextModel>(self.conn)
+                        .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                         .optional()?;
 
                     let participant_context = consensus_participant_context::table
                         .filter(consensus_participant_context::epoch.eq(epoch).and(
                             consensus_participant_context::service_id.eq(format!("{}", service_id)),
                         ))
-                        .first::<ParticipantContextModel>(self.conn)
+                        .first::<Consensus2pcParticipantContextModel>(self.conn)
                         .optional()?;
 
                     if coordinator_context.is_some() {
@@ -257,7 +257,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                         }
 
                         let update_coordinator_context =
-                            CoordinatorContextModel::try_from((&context, service_id))?;
+                            Consensus2pcCoordinatorContextModel::try_from((&context, service_id))?;
 
                         delete(
                             consensus_coordinator_context::table.filter(
@@ -301,7 +301,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                         Ok(())
                     } else if participant_context.is_some() {
                         let update_participant_context =
-                            ParticipantContextModel::try_from((&context, service_id))?;
+                            Consensus2pcParticipantContextModel::try_from((&context, service_id))?;
 
                         delete(
                             consensus_participant_context::table.filter(

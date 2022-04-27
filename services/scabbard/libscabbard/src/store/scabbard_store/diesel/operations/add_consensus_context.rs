@@ -24,8 +24,8 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        CoordinatorContextModel, CoordinatorContextParticipantList, ParticipantContextModel,
-        ParticipantContextParticipantList,
+        Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel,
+        CoordinatorContextParticipantList, ParticipantContextParticipantList,
     },
     schema::{
         consensus_coordinator_context, consensus_coordinator_context_participant,
@@ -55,7 +55,7 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, SqliteConnection> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
                 ScabbardContext::Scabbard2pcContext(context) => {
-                    match CoordinatorContextModel::try_from((&context, service_id)) {
+                    match Consensus2pcCoordinatorContextModel::try_from((&context, service_id)) {
                         Ok(new_coordinator_context) => {
                             let participants = CoordinatorContextParticipantList::try_from((
                                 &context, service_id,
@@ -68,7 +68,9 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                                 .values(participants)
                                 .execute(self.conn)?;
                         }
-                        Err(_) => match ParticipantContextModel::try_from((&context, service_id)) {
+                        Err(_) => match Consensus2pcParticipantContextModel::try_from((
+                            &context, service_id,
+                        )) {
                             Ok(new_participant_context) => {
                                 let participants = ParticipantContextParticipantList::try_from((
                                     &context, service_id,
@@ -105,7 +107,7 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, PgConnection> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
                 ScabbardContext::Scabbard2pcContext(context) => {
-                    match CoordinatorContextModel::try_from((&context, service_id)) {
+                    match Consensus2pcCoordinatorContextModel::try_from((&context, service_id)) {
                         Ok(new_coordinator_context) => {
                             let participants = CoordinatorContextParticipantList::try_from((
                                 &context, service_id,
@@ -118,7 +120,9 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, PgConnection> {
                                 .values(participants)
                                 .execute(self.conn)?;
                         }
-                        Err(_) => match ParticipantContextModel::try_from((&context, service_id)) {
+                        Err(_) => match Consensus2pcParticipantContextModel::try_from((
+                            &context, service_id,
+                        )) {
                             Ok(new_participant_context) => {
                                 let participants = ParticipantContextParticipantList::try_from((
                                     &context, service_id,

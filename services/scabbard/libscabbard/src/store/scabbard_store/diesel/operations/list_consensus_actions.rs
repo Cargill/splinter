@@ -24,9 +24,11 @@ use splinter::service::ServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        CoordinatorContextModel, CoordinatorNotificationModel, CoordinatorSendMessageActionModel,
-        ParticipantContextModel, ParticipantNotificationModel, ParticipantSendMessageActionModel,
-        UpdateCoordinatorContextActionModel, UpdateParticipantContextActionModel,
+        Consensus2pcCoordinatorContextModel, Consensus2pcCoordinatorNotificationModel,
+        Consensus2pcCoordinatorSendMessageActionModel, Consensus2pcParticipantContextModel,
+        Consensus2pcParticipantNotificationModel, Consensus2pcParticipantSendMessageActionModel,
+        Consensus2pcUpdateCoordinatorContextActionModel,
+        Consensus2pcUpdateParticipantContextActionModel,
     },
     schema::{
         consensus_action, consensus_coordinator_context, consensus_coordinator_notification_action,
@@ -82,7 +84,7 @@ where
                     .filter(consensus_coordinator_context::epoch.eq(epoch).and(
                         consensus_coordinator_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<CoordinatorContextModel>(self.conn)
+                    .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                     .optional()?;
 
             // check to see if a participant context with the given epoch and service_id exists
@@ -91,7 +93,7 @@ where
                     .filter(consensus_participant_context::epoch.eq(epoch).and(
                         consensus_participant_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<ParticipantContextModel>(self.conn)
+                    .first::<Consensus2pcParticipantContextModel>(self.conn)
                     .optional()?;
 
             let all_actions = consensus_action::table
@@ -130,19 +132,19 @@ where
                     .filter(
                         consensus_update_coordinator_context_action::action_id.eq_any(&action_ids),
                     )
-                    .load::<UpdateCoordinatorContextActionModel>(self.conn)?;
+                    .load::<Consensus2pcUpdateCoordinatorContextActionModel>(self.conn)?;
 
                 let send_message_actions = consensus_coordinator_send_message_action::table
                     .filter(
                         consensus_coordinator_send_message_action::action_id.eq_any(&action_ids),
                     )
-                    .load::<CoordinatorSendMessageActionModel>(self.conn)?;
+                    .load::<Consensus2pcCoordinatorSendMessageActionModel>(self.conn)?;
 
                 let notification_actions = consensus_coordinator_notification_action::table
                     .filter(
                         consensus_coordinator_notification_action::action_id.eq_any(&action_ids),
                     )
-                    .load::<CoordinatorNotificationModel>(self.conn)?;
+                    .load::<Consensus2pcCoordinatorNotificationModel>(self.conn)?;
 
                 for update_context in update_context_actions {
                     let position = actions_map.get(&update_context.action_id).ok_or_else(|| {
@@ -353,19 +355,19 @@ where
                     .filter(
                         consensus_update_participant_context_action::action_id.eq_any(&action_ids),
                     )
-                    .load::<UpdateParticipantContextActionModel>(self.conn)?;
+                    .load::<Consensus2pcUpdateParticipantContextActionModel>(self.conn)?;
 
                 let send_message_actions = consensus_participant_send_message_action::table
                     .filter(
                         consensus_participant_send_message_action::action_id.eq_any(&action_ids),
                     )
-                    .load::<ParticipantSendMessageActionModel>(self.conn)?;
+                    .load::<Consensus2pcParticipantSendMessageActionModel>(self.conn)?;
 
                 let notification_actions = consensus_participant_notification_action::table
                     .filter(
                         consensus_participant_notification_action::action_id.eq_any(&action_ids),
                     )
-                    .load::<ParticipantNotificationModel>(self.conn)?;
+                    .load::<Consensus2pcParticipantNotificationModel>(self.conn)?;
 
                 for update_context in update_context_actions {
                     let position = actions_map.get(&update_context.action_id).ok_or_else(|| {

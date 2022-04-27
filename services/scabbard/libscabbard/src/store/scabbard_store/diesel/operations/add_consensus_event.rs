@@ -24,9 +24,9 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        CoordinatorContextModel, InsertableTwoPcConsensusEventModel, ParticipantContextModel,
-        TwoPcConsensusDeliverEventModel, TwoPcConsensusStartEventModel,
-        TwoPcConsensusVoteEventModel,
+        Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel,
+        InsertableTwoPcConsensusEventModel, TwoPcConsensusDeliverEventModel,
+        TwoPcConsensusStartEventModel, TwoPcConsensusVoteEventModel,
     },
     schema::{
         consensus_coordinator_context, consensus_participant_context,
@@ -70,7 +70,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     .filter(consensus_coordinator_context::epoch.eq(epoch).and(
                         consensus_coordinator_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<CoordinatorContextModel>(self.conn)
+                    .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                     .optional()?;
 
             // check to see if a participant context with the given epoch and service_id exists
@@ -79,7 +79,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     .filter(consensus_participant_context::epoch.eq(epoch).and(
                         consensus_participant_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<ParticipantContextModel>(self.conn)
+                    .first::<Consensus2pcParticipantContextModel>(self.conn)
                     .optional()?;
 
             let position = two_pc_consensus_event::table
@@ -303,7 +303,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     .filter(consensus_coordinator_context::epoch.eq(epoch).and(
                         consensus_coordinator_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<CoordinatorContextModel>(self.conn)
+                    .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                     .optional()?;
 
             // check to see if a participant context with the given epoch and service_id exists
@@ -312,7 +312,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     .filter(consensus_participant_context::epoch.eq(epoch).and(
                         consensus_participant_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<ParticipantContextModel>(self.conn)
+                    .first::<Consensus2pcParticipantContextModel>(self.conn)
                     .optional()?;
 
             let position = two_pc_consensus_event::table

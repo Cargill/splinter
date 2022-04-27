@@ -25,10 +25,12 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        CoordinatorContextModel, CoordinatorNotificationModel, CoordinatorSendMessageActionModel,
-        InsertableConsensusActionModel, ParticipantContextModel, ParticipantNotificationModel,
-        ParticipantSendMessageActionModel, UpdateCoordinatorContextActionModel,
-        UpdateCoordinatorContextActionParticipantList, UpdateParticipantContextActionModel,
+        Consensus2pcCoordinatorContextModel, Consensus2pcCoordinatorNotificationModel,
+        Consensus2pcCoordinatorSendMessageActionModel, Consensus2pcParticipantContextModel,
+        Consensus2pcParticipantNotificationModel, Consensus2pcParticipantSendMessageActionModel,
+        Consensus2pcUpdateCoordinatorContextActionModel,
+        Consensus2pcUpdateParticipantContextActionModel, InsertableConsensus2pcActionModel,
+        UpdateCoordinatorContextActionParticipantList,
         UpdateParticipantContextActionParticipantList,
     },
     schema::{
@@ -80,7 +82,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     .filter(consensus_coordinator_context::epoch.eq(epoch).and(
                         consensus_coordinator_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<CoordinatorContextModel>(self.conn)
+                    .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                     .optional()?;
 
             // check to see if a participant context with the given epoch and service_id exists
@@ -89,7 +91,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     .filter(consensus_participant_context::epoch.eq(epoch).and(
                         consensus_participant_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<ParticipantContextModel>(self.conn)
+                    .first::<Consensus2pcParticipantContextModel>(self.conn)
                     .optional()?;
 
             let position = consensus_action::table
@@ -118,7 +120,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     ));
                 }
 
-                let insertable_action = InsertableConsensusActionModel {
+                let insertable_action = InsertableConsensus2pcActionModel {
                     service_id: format!("{}", service_id),
                     epoch,
                     executed_at: None,
@@ -139,7 +141,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             let coordinator_action_alarm = get_timestamp(alarm)?;
 
                             let update_context_action =
-                                UpdateCoordinatorContextActionModel::try_from((
+                                Consensus2pcUpdateCoordinatorContextActionModel::try_from((
                                     &context,
                                     service_id,
                                     &action_id,
@@ -186,7 +188,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             }
                         };
 
-                        let send_message_action = CoordinatorSendMessageActionModel {
+                        let send_message_action = Consensus2pcCoordinatorSendMessageActionModel {
                             action_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -216,7 +218,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             _ => (String::from(&notification), None),
                         };
 
-                        let notification_action = CoordinatorNotificationModel {
+                        let notification_action = Consensus2pcCoordinatorNotificationModel {
                             action_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -230,7 +232,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     }
                 }
             } else if participant_context.is_some() {
-                let insertable_action = InsertableConsensusActionModel {
+                let insertable_action = InsertableConsensus2pcActionModel {
                     service_id: format!("{}", service_id),
                     epoch,
                     executed_at: None,
@@ -251,7 +253,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             let participant_action_alarm = get_timestamp(alarm)?;
 
                             let update_context_action =
-                                UpdateParticipantContextActionModel::try_from((
+                                Consensus2pcUpdateParticipantContextActionModel::try_from((
                                     &context,
                                     service_id,
                                     &action_id,
@@ -296,7 +298,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             }
                         };
 
-                        let send_message_action = ParticipantSendMessageActionModel {
+                        let send_message_action = Consensus2pcParticipantSendMessageActionModel {
                             action_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -331,7 +333,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                                 _ => (String::from(&notification), None, None),
                             };
 
-                        let notification_action = ParticipantNotificationModel {
+                        let notification_action = Consensus2pcParticipantNotificationModel {
                             action_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -377,7 +379,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     .filter(consensus_coordinator_context::epoch.eq(epoch).and(
                         consensus_coordinator_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<CoordinatorContextModel>(self.conn)
+                    .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                     .optional()?;
 
             // check to see if a participant context with the given epoch and service_id exists
@@ -386,7 +388,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     .filter(consensus_participant_context::epoch.eq(epoch).and(
                         consensus_participant_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<ParticipantContextModel>(self.conn)
+                    .first::<Consensus2pcParticipantContextModel>(self.conn)
                     .optional()?;
 
             let position = consensus_action::table
@@ -415,7 +417,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     ));
                 }
 
-                let insertable_action = InsertableConsensusActionModel {
+                let insertable_action = InsertableConsensus2pcActionModel {
                     service_id: format!("{}", service_id),
                     epoch,
                     executed_at: None,
@@ -433,7 +435,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             let coordinator_action_alarm = get_timestamp(alarm)?;
 
                             let update_context_action =
-                                UpdateCoordinatorContextActionModel::try_from((
+                                Consensus2pcUpdateCoordinatorContextActionModel::try_from((
                                     &context,
                                     service_id,
                                     &action_id,
@@ -480,7 +482,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             }
                         };
 
-                        let send_message_action = CoordinatorSendMessageActionModel {
+                        let send_message_action = Consensus2pcCoordinatorSendMessageActionModel {
                             action_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -510,7 +512,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             _ => (String::from(&notification), None),
                         };
 
-                        let notification_action = CoordinatorNotificationModel {
+                        let notification_action = Consensus2pcCoordinatorNotificationModel {
                             action_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -524,7 +526,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     }
                 }
             } else if participant_context.is_some() {
-                let insertable_action = InsertableConsensusActionModel {
+                let insertable_action = InsertableConsensus2pcActionModel {
                     service_id: format!("{}", service_id),
                     epoch,
                     executed_at: None,
@@ -542,7 +544,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             let participant_action_alarm = get_timestamp(alarm)?;
 
                             let update_context_action =
-                                UpdateParticipantContextActionModel::try_from((
+                                Consensus2pcUpdateParticipantContextActionModel::try_from((
                                     &context,
                                     service_id,
                                     &action_id,
@@ -587,7 +589,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             }
                         };
 
-                        let send_message_action = ParticipantSendMessageActionModel {
+                        let send_message_action = Consensus2pcParticipantSendMessageActionModel {
                             action_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -622,7 +624,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                                 _ => (String::from(&notification), None, None),
                             };
 
-                        let notification_action = ParticipantNotificationModel {
+                        let notification_action = Consensus2pcParticipantNotificationModel {
                             action_id,
                             service_id: format!("{}", service_id),
                             epoch,

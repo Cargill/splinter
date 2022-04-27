@@ -20,7 +20,7 @@ use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
-    models::{CoordinatorContextModel, ParticipantContextModel},
+    models::{Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel},
     schema::{consensus_action, consensus_coordinator_context, consensus_participant_context},
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -60,7 +60,7 @@ where
                     .filter(consensus_coordinator_context::epoch.eq(epoch).and(
                         consensus_coordinator_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<CoordinatorContextModel>(self.conn)
+                    .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                     .optional()?;
 
             let participant_context =
@@ -68,7 +68,7 @@ where
                     .filter(consensus_participant_context::epoch.eq(epoch).and(
                         consensus_participant_context::service_id.eq(format!("{}", service_id)),
                     ))
-                    .first::<ParticipantContextModel>(self.conn)
+                    .first::<Consensus2pcParticipantContextModel>(self.conn)
                     .optional()?;
 
             let update_executed_at = i64::try_from(
