@@ -29,7 +29,7 @@ use crate::store::scabbard_store::diesel::{
         TwoPcConsensusStartEventModel, TwoPcConsensusVoteEventModel,
     },
     schema::{
-        consensus_2pc_consensus_coordinator_context, consensus_2pc_participant_context,
+        consensus_2pc_coordinator_context, consensus_2pc_participant_context,
         two_pc_consensus_deliver_event, two_pc_consensus_event, two_pc_consensus_start_event,
         two_pc_consensus_vote_event,
     },
@@ -65,15 +65,10 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
             // check to see if a coordinator context with the given epoch and service_id exists
-            let coordinator_context = consensus_2pc_consensus_coordinator_context::table
-                .filter(
-                    consensus_2pc_consensus_coordinator_context::epoch
-                        .eq(epoch)
-                        .and(
-                            consensus_2pc_consensus_coordinator_context::service_id
-                                .eq(format!("{}", service_id)),
-                        ),
-                )
+            let coordinator_context = consensus_2pc_coordinator_context::table
+                .filter(consensus_2pc_coordinator_context::epoch.eq(epoch).and(
+                    consensus_2pc_coordinator_context::service_id.eq(format!("{}", service_id)),
+                ))
                 .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                 .optional()?;
 
@@ -301,15 +296,10 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
             // check to see if a coordinator context with the given epoch and service_id exists
-            let coordinator_context = consensus_2pc_consensus_coordinator_context::table
-                .filter(
-                    consensus_2pc_consensus_coordinator_context::epoch
-                        .eq(epoch)
-                        .and(
-                            consensus_2pc_consensus_coordinator_context::service_id
-                                .eq(format!("{}", service_id)),
-                        ),
-                )
+            let coordinator_context = consensus_2pc_coordinator_context::table
+                .filter(consensus_2pc_coordinator_context::epoch.eq(epoch).and(
+                    consensus_2pc_coordinator_context::service_id.eq(format!("{}", service_id)),
+                ))
                 .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                 .optional()?;
 

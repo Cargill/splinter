@@ -37,7 +37,7 @@ table! {
 }
 
 table! {
-    consensus_2pc_consensus_coordinator_context (service_id, epoch) {
+    consensus_2pc_coordinator_context (service_id, epoch) {
         service_id -> Text,
         alarm -> Nullable<BigInt>,
         coordinator -> Text,
@@ -49,7 +49,7 @@ table! {
 }
 
 table! {
-    consensus_2pc_consensus_coordinator_context_participant (service_id, epoch, process) {
+    consensus_2pc_coordinator_context_participant (service_id, epoch, process) {
         service_id -> Text,
         epoch -> BigInt,
         process -> Text,
@@ -237,8 +237,8 @@ joinable!(two_pc_consensus_start_event -> two_pc_consensus_event(event_id));
 joinable!(two_pc_consensus_vote_event -> two_pc_consensus_event(event_id));
 
 allow_tables_to_appear_in_same_query!(
-    consensus_2pc_consensus_coordinator_context,
-    consensus_2pc_consensus_coordinator_context_participant,
+    consensus_2pc_coordinator_context,
+    consensus_2pc_coordinator_context_participant,
     consensus_2pc_action,
     consensus_2pc_update_coordinator_context_action,
     consensus_2pc_coordinator_send_message_action,

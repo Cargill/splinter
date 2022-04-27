@@ -25,9 +25,8 @@ use crate::store::scabbard_store::diesel::{
         Consensus2pcParticipantContextModel, Consensus2pcParticipantContextParticipantModel,
     },
     schema::{
-        consensus_2pc_consensus_coordinator_context,
-        consensus_2pc_consensus_coordinator_context_participant, consensus_2pc_participant_context,
-        consensus_2pc_participant_context_participant,
+        consensus_2pc_coordinator_context, consensus_2pc_coordinator_context_participant,
+        consensus_2pc_participant_context, consensus_2pc_participant_context_participant,
     },
 };
 use crate::store::scabbard_store::{context::ScabbardContext, ScabbardStoreError};
@@ -52,9 +51,9 @@ where
         service_id: &FullyQualifiedServiceId,
     ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let coordinator_context = consensus_2pc_consensus_coordinator_context::table
-                .filter(consensus_2pc_consensus_coordinator_context::service_id.eq(format!("{}", service_id)))
-                .order(consensus_2pc_consensus_coordinator_context::epoch.desc())
+            let coordinator_context = consensus_2pc_coordinator_context::table
+                .filter(consensus_2pc_coordinator_context::service_id.eq(format!("{}", service_id)))
+                .order(consensus_2pc_coordinator_context::epoch.desc())
                 .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                 .optional()?;
 
@@ -83,12 +82,12 @@ where
                         Ordering::Greater => {
                             let coordinator_participants: Vec<
                                 Consensus2pcCoordinatorContextParticipantModel,
-                            > = consensus_2pc_consensus_coordinator_context_participant::table
+                            > = consensus_2pc_coordinator_context_participant::table
                                 .filter(
-                                    consensus_2pc_consensus_coordinator_context_participant::service_id
+                                    consensus_2pc_coordinator_context_participant::service_id
                                         .eq(format!("{}", service_id))
                                         .and(
-                                            consensus_2pc_consensus_coordinator_context_participant::epoch
+                                            consensus_2pc_coordinator_context_participant::epoch
                                                 .eq(coordinator_context.epoch),
                                         ),
                                 )
@@ -139,12 +138,12 @@ where
                 (Some(coordinator_context), None) => {
                     let coordinator_participants: Vec<
                         Consensus2pcCoordinatorContextParticipantModel,
-                    > = consensus_2pc_consensus_coordinator_context_participant::table
+                    > = consensus_2pc_coordinator_context_participant::table
                         .filter(
-                            consensus_2pc_consensus_coordinator_context_participant::service_id
+                            consensus_2pc_coordinator_context_participant::service_id
                                 .eq(format!("{}", service_id))
                                 .and(
-                                    consensus_2pc_consensus_coordinator_context_participant::epoch
+                                    consensus_2pc_coordinator_context_participant::epoch
                                         .eq(coordinator_context.epoch),
                                 ),
                         )

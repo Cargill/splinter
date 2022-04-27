@@ -32,12 +32,11 @@ use crate::store::scabbard_store::{
 };
 
 use super::schema::{
-    consensus_2pc_action, consensus_2pc_consensus_coordinator_context,
-    consensus_2pc_consensus_coordinator_context_participant,
-    consensus_2pc_coordinator_notification_action, consensus_2pc_coordinator_send_message_action,
-    consensus_2pc_participant_context, consensus_2pc_participant_context_participant,
-    consensus_2pc_participant_notification_action, consensus_2pc_participant_send_message_action,
-    consensus_2pc_update_coordinator_context_action,
+    consensus_2pc_action, consensus_2pc_coordinator_context,
+    consensus_2pc_coordinator_context_participant, consensus_2pc_coordinator_notification_action,
+    consensus_2pc_coordinator_send_message_action, consensus_2pc_participant_context,
+    consensus_2pc_participant_context_participant, consensus_2pc_participant_notification_action,
+    consensus_2pc_participant_send_message_action, consensus_2pc_update_coordinator_context_action,
     consensus_2pc_update_coordinator_context_action_participant,
     consensus_2pc_update_participant_context_action,
     consensus_2pc_update_participant_context_action_participant, scabbard_peer, scabbard_service,
@@ -208,7 +207,7 @@ impl From<&ConsensusDecision> for String {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_consensus_coordinator_context"]
+#[table_name = "consensus_2pc_coordinator_context"]
 #[primary_key(service_id, epoch)]
 pub struct Consensus2pcCoordinatorContextModel {
     pub service_id: String,
@@ -365,7 +364,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcCoordinatorCo
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_consensus_coordinator_context_participant"]
+#[table_name = "consensus_2pc_coordinator_context_participant"]
 #[primary_key(service_id, epoch, process)]
 pub struct Consensus2pcCoordinatorContextParticipantModel {
     pub service_id: String,

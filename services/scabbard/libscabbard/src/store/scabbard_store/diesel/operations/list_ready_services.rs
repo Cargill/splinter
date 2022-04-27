@@ -20,8 +20,8 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::schema::{
-    consensus_2pc_action, consensus_2pc_consensus_coordinator_context,
-    consensus_2pc_participant_context, scabbard_service,
+    consensus_2pc_action, consensus_2pc_coordinator_context, consensus_2pc_participant_context,
+    scabbard_service,
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 
@@ -49,13 +49,13 @@ where
             let current_time = get_timestamp(Some(SystemTime::now()))?;
 
             // get the service IDs of coordinators for which the alarm has passed
-            let mut ready_services = consensus_2pc_consensus_coordinator_context::table
+            let mut ready_services = consensus_2pc_coordinator_context::table
                 .filter(
-                    consensus_2pc_consensus_coordinator_context::service_id
+                    consensus_2pc_coordinator_context::service_id
                         .eq_any(&finalized_services)
-                        .and(consensus_2pc_consensus_coordinator_context::alarm.le(current_time)),
+                        .and(consensus_2pc_coordinator_context::alarm.le(current_time)),
                 )
-                .select(consensus_2pc_consensus_coordinator_context::service_id)
+                .select(consensus_2pc_coordinator_context::service_id)
                 .load::<String>(self.conn)?
                 .into_iter()
                 .collect::<Vec<String>>();

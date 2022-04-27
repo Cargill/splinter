@@ -22,8 +22,7 @@ use splinter::service::FullyQualifiedServiceId;
 use crate::store::scabbard_store::diesel::{
     models::{Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel},
     schema::{
-        consensus_2pc_action, consensus_2pc_consensus_coordinator_context,
-        consensus_2pc_participant_context,
+        consensus_2pc_action, consensus_2pc_coordinator_context, consensus_2pc_participant_context,
     },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -58,15 +57,10 @@ where
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
             // check to see if action a context exists with the given service_id and epoch
-            let coordinator_context = consensus_2pc_consensus_coordinator_context::table
-                .filter(
-                    consensus_2pc_consensus_coordinator_context::epoch
-                        .eq(epoch)
-                        .and(
-                            consensus_2pc_consensus_coordinator_context::service_id
-                                .eq(format!("{}", service_id)),
-                        ),
-                )
+            let coordinator_context = consensus_2pc_coordinator_context::table
+                .filter(consensus_2pc_coordinator_context::epoch.eq(epoch).and(
+                    consensus_2pc_coordinator_context::service_id.eq(format!("{}", service_id)),
+                ))
                 .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                 .optional()?;
 
