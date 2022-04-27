@@ -32,14 +32,15 @@ use crate::store::scabbard_store::{
 };
 
 use super::schema::{
-    consensus_action, consensus_coordinator_context, consensus_coordinator_context_participant,
-    consensus_coordinator_notification_action, consensus_coordinator_send_message_action,
-    consensus_participant_context, consensus_participant_context_participant,
-    consensus_participant_notification_action, consensus_participant_send_message_action,
-    consensus_update_coordinator_context_action,
-    consensus_update_coordinator_context_action_participant,
-    consensus_update_participant_context_action,
-    consensus_update_participant_context_action_participant, scabbard_peer, scabbard_service,
+    consensus_2pc_action, consensus_2pc_consensus_coordinator_context,
+    consensus_2pc_consensus_coordinator_context_participant,
+    consensus_2pc_coordinator_notification_action, consensus_2pc_coordinator_send_message_action,
+    consensus_2pc_participant_context, consensus_2pc_participant_context_participant,
+    consensus_2pc_participant_notification_action, consensus_2pc_participant_send_message_action,
+    consensus_2pc_update_coordinator_context_action,
+    consensus_2pc_update_coordinator_context_action_participant,
+    consensus_2pc_update_participant_context_action,
+    consensus_2pc_update_participant_context_action_participant, scabbard_peer, scabbard_service,
     scabbard_v3_commit_history, two_pc_consensus_deliver_event, two_pc_consensus_event,
     two_pc_consensus_start_event, two_pc_consensus_vote_event,
 };
@@ -207,7 +208,7 @@ impl From<&ConsensusDecision> for String {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_coordinator_context"]
+#[table_name = "consensus_2pc_consensus_coordinator_context"]
 #[primary_key(service_id, epoch)]
 pub struct Consensus2pcCoordinatorContextModel {
     pub service_id: String,
@@ -364,7 +365,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcCoordinatorCo
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_coordinator_context_participant"]
+#[table_name = "consensus_2pc_consensus_coordinator_context_participant"]
 #[primary_key(service_id, epoch, process)]
 pub struct Consensus2pcCoordinatorContextParticipantModel {
     pub service_id: String,
@@ -449,7 +450,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for CoordinatorContextPartici
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_update_coordinator_context_action"]
+#[table_name = "consensus_2pc_update_coordinator_context_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
 pub struct Consensus2pcUpdateCoordinatorContextActionModel {
@@ -528,7 +529,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_update_coordinator_context_action_participant"]
+#[table_name = "consensus_2pc_update_coordinator_context_action_participant"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[belongs_to(
     Consensus2pcUpdateCoordinatorContextActionModel,
@@ -586,7 +587,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)>
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_coordinator_send_message_action"]
+#[table_name = "consensus_2pc_coordinator_send_message_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
 pub struct Consensus2pcCoordinatorSendMessageActionModel {
@@ -599,7 +600,7 @@ pub struct Consensus2pcCoordinatorSendMessageActionModel {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_coordinator_notification_action"]
+#[table_name = "consensus_2pc_coordinator_notification_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
 pub struct Consensus2pcCoordinatorNotificationModel {
@@ -623,7 +624,7 @@ impl From<&CoordinatorState> for String {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_action"]
+#[table_name = "consensus_2pc_action"]
 #[belongs_to(Consensus2pcCoordinatorContextModel, foreign_key = "service_id")]
 #[primary_key(id)]
 pub struct Consensus2pcActionModel {
@@ -636,7 +637,7 @@ pub struct Consensus2pcActionModel {
 }
 
 #[derive(Debug, PartialEq, Insertable)]
-#[table_name = "consensus_action"]
+#[table_name = "consensus_2pc_action"]
 pub struct InsertableConsensus2pcActionModel {
     pub service_id: String,
     pub epoch: i64,
@@ -645,7 +646,7 @@ pub struct InsertableConsensus2pcActionModel {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_participant_context"]
+#[table_name = "consensus_2pc_participant_context"]
 #[primary_key(service_id, epoch)]
 pub struct Consensus2pcParticipantContextModel {
     pub service_id: String,
@@ -843,7 +844,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcParticipantCo
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_participant_context_participant"]
+#[table_name = "consensus_2pc_participant_context_participant"]
 #[primary_key(service_id, epoch, process)]
 pub struct Consensus2pcParticipantContextParticipantModel {
     pub service_id: String,
@@ -884,7 +885,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ParticipantContextPartici
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_update_participant_context_action"]
+#[table_name = "consensus_2pc_update_participant_context_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
 pub struct Consensus2pcUpdateParticipantContextActionModel {
@@ -971,7 +972,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_update_participant_context_action_participant"]
+#[table_name = "consensus_2pc_update_participant_context_action_participant"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[belongs_to(
     Consensus2pcUpdateParticipantContextActionModel,
@@ -1023,7 +1024,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)>
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_participant_send_message_action"]
+#[table_name = "consensus_2pc_participant_send_message_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
 pub struct Consensus2pcParticipantSendMessageActionModel {
@@ -1036,7 +1037,7 @@ pub struct Consensus2pcParticipantSendMessageActionModel {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_participant_notification_action"]
+#[table_name = "consensus_2pc_participant_notification_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
 pub struct Consensus2pcParticipantNotificationModel {

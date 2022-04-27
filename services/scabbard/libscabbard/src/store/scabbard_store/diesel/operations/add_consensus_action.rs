@@ -34,13 +34,15 @@ use crate::store::scabbard_store::diesel::{
         UpdateParticipantContextActionParticipantList,
     },
     schema::{
-        consensus_action, consensus_coordinator_context, consensus_coordinator_notification_action,
-        consensus_coordinator_send_message_action, consensus_participant_context,
-        consensus_participant_notification_action, consensus_participant_send_message_action,
-        consensus_update_coordinator_context_action,
-        consensus_update_coordinator_context_action_participant,
-        consensus_update_participant_context_action,
-        consensus_update_participant_context_action_participant,
+        consensus_2pc_action, consensus_2pc_consensus_coordinator_context,
+        consensus_2pc_coordinator_notification_action,
+        consensus_2pc_coordinator_send_message_action, consensus_2pc_participant_context,
+        consensus_2pc_participant_notification_action,
+        consensus_2pc_participant_send_message_action,
+        consensus_2pc_update_coordinator_context_action,
+        consensus_2pc_update_coordinator_context_action_participant,
+        consensus_2pc_update_participant_context_action,
+        consensus_2pc_update_participant_context_action_participant,
     },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -77,31 +79,34 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
             // check to see if a coordinator context with the given epoch and service_id exists
-            let coordinator_context =
-                consensus_coordinator_context::table
-                    .filter(consensus_coordinator_context::epoch.eq(epoch).and(
-                        consensus_coordinator_context::service_id.eq(format!("{}", service_id)),
-                    ))
-                    .first::<Consensus2pcCoordinatorContextModel>(self.conn)
-                    .optional()?;
+            let coordinator_context = consensus_2pc_consensus_coordinator_context::table
+                .filter(
+                    consensus_2pc_consensus_coordinator_context::epoch
+                        .eq(epoch)
+                        .and(
+                            consensus_2pc_consensus_coordinator_context::service_id
+                                .eq(format!("{}", service_id)),
+                        ),
+                )
+                .first::<Consensus2pcCoordinatorContextModel>(self.conn)
+                .optional()?;
 
             // check to see if a participant context with the given epoch and service_id exists
-            let participant_context =
-                consensus_participant_context::table
-                    .filter(consensus_participant_context::epoch.eq(epoch).and(
-                        consensus_participant_context::service_id.eq(format!("{}", service_id)),
-                    ))
-                    .first::<Consensus2pcParticipantContextModel>(self.conn)
-                    .optional()?;
+            let participant_context = consensus_2pc_participant_context::table
+                .filter(consensus_2pc_participant_context::epoch.eq(epoch).and(
+                    consensus_2pc_participant_context::service_id.eq(format!("{}", service_id)),
+                ))
+                .first::<Consensus2pcParticipantContextModel>(self.conn)
+                .optional()?;
 
-            let position = consensus_action::table
+            let position = consensus_2pc_action::table
                 .filter(
-                    consensus_action::service_id
+                    consensus_2pc_action::service_id
                         .eq(format!("{}", service_id))
-                        .and(consensus_action::epoch.eq(epoch)),
+                        .and(consensus_2pc_action::epoch.eq(epoch)),
                 )
-                .order(consensus_action::position.desc())
-                .select(consensus_action::position)
+                .order(consensus_2pc_action::position.desc())
+                .select(consensus_2pc_action::position)
                 .first::<i32>(self.conn)
                 .optional()?
                 .unwrap_or(0)
@@ -127,12 +132,12 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     position,
                 };
 
-                insert_into(consensus_action::table)
+                insert_into(consensus_2pc_action::table)
                     .values(vec![insertable_action])
                     .execute(self.conn)?;
-                let action_id = consensus_action::table
-                    .order(consensus_action::id.desc())
-                    .select(consensus_action::id)
+                let action_id = consensus_2pc_action::table
+                    .order(consensus_2pc_action::id.desc())
+                    .select(consensus_2pc_action::id)
                     .first::<i64>(self.conn)?;
 
                 match action {
@@ -148,7 +153,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                                     &coordinator_action_alarm,
                                 ))?;
 
-                            insert_into(consensus_update_coordinator_context_action::table)
+                            insert_into(consensus_2pc_update_coordinator_context_action::table)
                                 .values(vec![update_context_action])
                                 .execute(self.conn)?;
 
@@ -158,7 +163,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                                 ))?
                                 .inner;
                             insert_into(
-                                consensus_update_coordinator_context_action_participant::table,
+                                consensus_2pc_update_coordinator_context_action_participant::table,
                             )
                             .values(participants)
                             .execute(self.conn)?;
@@ -196,7 +201,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             message_type,
                             vote_response,
                         };
-                        insert_into(consensus_coordinator_send_message_action::table)
+                        insert_into(consensus_2pc_coordinator_send_message_action::table)
                             .values(vec![send_message_action])
                             .execute(self.conn)?;
                         Ok(action_id)
@@ -225,7 +230,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             notification_type,
                             dropped_message,
                         };
-                        insert_into(consensus_coordinator_notification_action::table)
+                        insert_into(consensus_2pc_coordinator_notification_action::table)
                             .values(vec![notification_action])
                             .execute(self.conn)?;
                         Ok(action_id)
@@ -239,12 +244,12 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     position,
                 };
 
-                insert_into(consensus_action::table)
+                insert_into(consensus_2pc_action::table)
                     .values(vec![insertable_action])
                     .execute(self.conn)?;
-                let action_id = consensus_action::table
-                    .order(consensus_action::id.desc())
-                    .select(consensus_action::id)
+                let action_id = consensus_2pc_action::table
+                    .order(consensus_2pc_action::id.desc())
+                    .select(consensus_2pc_action::id)
                     .first::<i64>(self.conn)?;
 
                 match action {
@@ -260,7 +265,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                                     &participant_action_alarm,
                                 ))?;
 
-                            insert_into(consensus_update_participant_context_action::table)
+                            insert_into(consensus_2pc_update_participant_context_action::table)
                                 .values(vec![update_context_action])
                                 .execute(self.conn)?;
 
@@ -270,7 +275,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                                 ))?
                                 .inner;
                             insert_into(
-                                consensus_update_participant_context_action_participant::table,
+                                consensus_2pc_update_participant_context_action_participant::table,
                             )
                             .values(participants)
                             .execute(self.conn)?;
@@ -306,7 +311,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             message_type,
                             vote_request,
                         };
-                        insert_into(consensus_participant_send_message_action::table)
+                        insert_into(consensus_2pc_participant_send_message_action::table)
                             .values(vec![send_message_action])
                             .execute(self.conn)?;
                         Ok(action_id)
@@ -341,7 +346,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             dropped_message,
                             request_for_vote_value,
                         };
-                        insert_into(consensus_participant_notification_action::table)
+                        insert_into(consensus_2pc_participant_notification_action::table)
                             .values(vec![notification_action])
                             .execute(self.conn)?;
                         Ok(action_id)
@@ -374,31 +379,34 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
             // check to see if a coordinator context with the given epoch and service_id exists
-            let coordinator_context =
-                consensus_coordinator_context::table
-                    .filter(consensus_coordinator_context::epoch.eq(epoch).and(
-                        consensus_coordinator_context::service_id.eq(format!("{}", service_id)),
-                    ))
-                    .first::<Consensus2pcCoordinatorContextModel>(self.conn)
-                    .optional()?;
+            let coordinator_context = consensus_2pc_consensus_coordinator_context::table
+                .filter(
+                    consensus_2pc_consensus_coordinator_context::epoch
+                        .eq(epoch)
+                        .and(
+                            consensus_2pc_consensus_coordinator_context::service_id
+                                .eq(format!("{}", service_id)),
+                        ),
+                )
+                .first::<Consensus2pcCoordinatorContextModel>(self.conn)
+                .optional()?;
 
             // check to see if a participant context with the given epoch and service_id exists
-            let participant_context =
-                consensus_participant_context::table
-                    .filter(consensus_participant_context::epoch.eq(epoch).and(
-                        consensus_participant_context::service_id.eq(format!("{}", service_id)),
-                    ))
-                    .first::<Consensus2pcParticipantContextModel>(self.conn)
-                    .optional()?;
+            let participant_context = consensus_2pc_participant_context::table
+                .filter(consensus_2pc_participant_context::epoch.eq(epoch).and(
+                    consensus_2pc_participant_context::service_id.eq(format!("{}", service_id)),
+                ))
+                .first::<Consensus2pcParticipantContextModel>(self.conn)
+                .optional()?;
 
-            let position = consensus_action::table
+            let position = consensus_2pc_action::table
                 .filter(
-                    consensus_action::service_id
+                    consensus_2pc_action::service_id
                         .eq(format!("{}", service_id))
-                        .and(consensus_action::epoch.eq(epoch)),
+                        .and(consensus_2pc_action::epoch.eq(epoch)),
                 )
-                .order(consensus_action::position.desc())
-                .select(consensus_action::position)
+                .order(consensus_2pc_action::position.desc())
+                .select(consensus_2pc_action::position)
                 .first::<i32>(self.conn)
                 .optional()?
                 .unwrap_or(0)
@@ -424,9 +432,9 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     position,
                 };
 
-                let action_id: i64 = insert_into(consensus_action::table)
+                let action_id: i64 = insert_into(consensus_2pc_action::table)
                     .values(vec![insertable_action])
-                    .returning(consensus_action::id)
+                    .returning(consensus_2pc_action::id)
                     .get_result(self.conn)?;
 
                 match action {
@@ -442,7 +450,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                                     &coordinator_action_alarm,
                                 ))?;
 
-                            insert_into(consensus_update_coordinator_context_action::table)
+                            insert_into(consensus_2pc_update_coordinator_context_action::table)
                                 .values(vec![update_context_action])
                                 .execute(self.conn)?;
 
@@ -452,7 +460,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                                 ))?
                                 .inner;
                             insert_into(
-                                consensus_update_coordinator_context_action_participant::table,
+                                consensus_2pc_update_coordinator_context_action_participant::table,
                             )
                             .values(participants)
                             .execute(self.conn)?;
@@ -490,7 +498,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             message_type,
                             vote_response,
                         };
-                        insert_into(consensus_coordinator_send_message_action::table)
+                        insert_into(consensus_2pc_coordinator_send_message_action::table)
                             .values(vec![send_message_action])
                             .execute(self.conn)?;
                         Ok(action_id)
@@ -519,7 +527,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             notification_type,
                             dropped_message,
                         };
-                        insert_into(consensus_coordinator_notification_action::table)
+                        insert_into(consensus_2pc_coordinator_notification_action::table)
                             .values(vec![notification_action])
                             .execute(self.conn)?;
                         Ok(action_id)
@@ -533,9 +541,9 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     position,
                 };
 
-                let action_id: i64 = insert_into(consensus_action::table)
+                let action_id: i64 = insert_into(consensus_2pc_action::table)
                     .values(vec![insertable_action])
-                    .returning(consensus_action::id)
+                    .returning(consensus_2pc_action::id)
                     .get_result(self.conn)?;
 
                 match action {
@@ -551,7 +559,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                                     &participant_action_alarm,
                                 ))?;
 
-                            insert_into(consensus_update_participant_context_action::table)
+                            insert_into(consensus_2pc_update_participant_context_action::table)
                                 .values(vec![update_context_action])
                                 .execute(self.conn)?;
 
@@ -561,7 +569,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                                 ))?
                                 .inner;
                             insert_into(
-                                consensus_update_participant_context_action_participant::table,
+                                consensus_2pc_update_participant_context_action_participant::table,
                             )
                             .values(participants)
                             .execute(self.conn)?;
@@ -597,7 +605,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             message_type,
                             vote_request,
                         };
-                        insert_into(consensus_participant_send_message_action::table)
+                        insert_into(consensus_2pc_participant_send_message_action::table)
                             .values(vec![send_message_action])
                             .execute(self.conn)?;
                         Ok(action_id)
@@ -632,7 +640,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             dropped_message,
                             request_for_vote_value,
                         };
-                        insert_into(consensus_participant_notification_action::table)
+                        insert_into(consensus_2pc_participant_notification_action::table)
                             .values(vec![notification_action])
                             .execute(self.conn)?;
                         Ok(action_id)
