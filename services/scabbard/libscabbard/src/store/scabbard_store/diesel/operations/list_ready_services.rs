@@ -20,8 +20,8 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::schema::{
-    consensus_action, consensus_coordinator_context, consensus_participant_context,
-    scabbard_service,
+    consensus_2pc_action, consensus_2pc_consensus_coordinator_context,
+    consensus_2pc_participant_context, scabbard_service,
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 
@@ -49,26 +49,26 @@ where
             let current_time = get_timestamp(Some(SystemTime::now()))?;
 
             // get the service IDs of coordinators for which the alarm has passed
-            let mut ready_services = consensus_coordinator_context::table
+            let mut ready_services = consensus_2pc_consensus_coordinator_context::table
                 .filter(
-                    consensus_coordinator_context::service_id
+                    consensus_2pc_consensus_coordinator_context::service_id
                         .eq_any(&finalized_services)
-                        .and(consensus_coordinator_context::alarm.le(current_time)),
+                        .and(consensus_2pc_consensus_coordinator_context::alarm.le(current_time)),
                 )
-                .select(consensus_coordinator_context::service_id)
+                .select(consensus_2pc_consensus_coordinator_context::service_id)
                 .load::<String>(self.conn)?
                 .into_iter()
                 .collect::<Vec<String>>();
 
             // get the service IDs of participants for which the alarm has passed
             ready_services.append(
-                &mut consensus_participant_context::table
+                &mut consensus_2pc_participant_context::table
                     .filter(
-                        consensus_participant_context::service_id
+                        consensus_2pc_participant_context::service_id
                             .eq_any(&finalized_services)
-                            .and(consensus_participant_context::alarm.le(current_time)),
+                            .and(consensus_2pc_participant_context::alarm.le(current_time)),
                     )
-                    .select(consensus_participant_context::service_id)
+                    .select(consensus_2pc_participant_context::service_id)
                     .load::<String>(self.conn)?
                     .into_iter()
                     .collect::<Vec<String>>(),
@@ -76,10 +76,10 @@ where
 
             // get the service IDs of any finalized services that have unexecuted actions
             ready_services.append(
-                &mut consensus_action::table
-                    .filter(consensus_action::service_id.eq_any(&finalized_services))
-                    .filter(consensus_action::executed_at.is_null())
-                    .select(consensus_action::service_id)
+                &mut consensus_2pc_action::table
+                    .filter(consensus_2pc_action::service_id.eq_any(&finalized_services))
+                    .filter(consensus_2pc_action::executed_at.is_null())
+                    .select(consensus_2pc_action::service_id)
                     .load::<String>(self.conn)?
                     .into_iter()
                     .collect::<Vec<String>>(),

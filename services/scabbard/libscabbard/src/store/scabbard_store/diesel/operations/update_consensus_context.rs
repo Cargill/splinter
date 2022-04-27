@@ -24,12 +24,13 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        CoordinatorContextModel, CoordinatorContextParticipantList, ParticipantContextModel,
-        ParticipantContextParticipantList,
+        Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel,
+        CoordinatorContextParticipantList, ParticipantContextParticipantList,
     },
     schema::{
-        consensus_coordinator_context, consensus_coordinator_context_participant,
-        consensus_participant_context, consensus_participant_context_participant,
+        consensus_2pc_consensus_coordinator_context,
+        consensus_2pc_consensus_coordinator_context_participant, consensus_2pc_participant_context,
+        consensus_2pc_participant_context_participant,
     },
 };
 use crate::store::scabbard_store::ScabbardContext;
@@ -59,36 +60,36 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                     })?;
                     // check to make sure the context exists
-                    let coordinator_context = consensus_coordinator_context::table
+                    let coordinator_context = consensus_2pc_consensus_coordinator_context::table
                         .filter(
-                            consensus_coordinator_context::epoch
+                            consensus_2pc_consensus_coordinator_context::epoch
                                 .eq(epoch)
                                 .and(
-                                    consensus_coordinator_context::service_id
+                                    consensus_2pc_consensus_coordinator_context::service_id
                                         .eq(format!("{}", service_id)),
                                 )
                                 .and(
-                                    consensus_coordinator_context::coordinator
+                                    consensus_2pc_consensus_coordinator_context::coordinator
                                         .eq(format!("{}", context.coordinator())),
                                 ),
                         )
-                        .first::<CoordinatorContextModel>(self.conn)
+                        .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                         .optional()?;
 
-                    let participant_context = consensus_participant_context::table
+                    let participant_context = consensus_2pc_participant_context::table
                         .filter(
-                            consensus_participant_context::epoch
+                            consensus_2pc_participant_context::epoch
                                 .eq(epoch)
                                 .and(
-                                    consensus_participant_context::service_id
+                                    consensus_2pc_participant_context::service_id
                                         .eq(format!("{}", service_id)),
                                 )
                                 .and(
-                                    consensus_participant_context::coordinator
+                                    consensus_2pc_participant_context::coordinator
                                         .eq(format!("{}", context.coordinator())),
                                 ),
                         )
-                        .first::<ParticipantContextModel>(self.conn)
+                        .first::<Consensus2pcParticipantContextModel>(self.conn)
                         .optional()?;
 
                     if coordinator_context.is_some() {
@@ -105,25 +106,25 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                         }
 
                         let update_coordinator_context =
-                            CoordinatorContextModel::try_from((&context, service_id))?;
+                            Consensus2pcCoordinatorContextModel::try_from((&context, service_id))?;
 
                         delete(
-                            consensus_coordinator_context::table.filter(
-                                consensus_coordinator_context::epoch
+                            consensus_2pc_consensus_coordinator_context::table.filter(
+                                consensus_2pc_consensus_coordinator_context::epoch
                                     .eq(epoch)
                                     .and(
-                                        consensus_coordinator_context::service_id
+                                        consensus_2pc_consensus_coordinator_context::service_id
                                             .eq(format!("{}", service_id)),
                                     )
                                     .and(
-                                        consensus_coordinator_context::coordinator
+                                        consensus_2pc_consensus_coordinator_context::coordinator
                                             .eq(format!("{}", context.coordinator())),
                                     ),
                             ),
                         )
                         .execute(self.conn)?;
 
-                        insert_into(consensus_coordinator_context::table)
+                        insert_into(consensus_2pc_consensus_coordinator_context::table)
                             .values(vec![update_coordinator_context])
                             .execute(self.conn)?;
 
@@ -132,42 +133,42 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                                 .inner;
 
                         delete(
-                            consensus_coordinator_context_participant::table.filter(
-                                consensus_coordinator_context_participant::service_id
+                            consensus_2pc_consensus_coordinator_context_participant::table.filter(
+                                consensus_2pc_consensus_coordinator_context_participant::service_id
                                     .eq(format!("{}", service_id))
                                     .and(
-                                        consensus_coordinator_context_participant::epoch.eq(epoch),
+                                        consensus_2pc_consensus_coordinator_context_participant::epoch.eq(epoch),
                                     ),
                             ),
                         )
                         .execute(self.conn)?;
 
-                        insert_into(consensus_coordinator_context_participant::table)
+                        insert_into(consensus_2pc_consensus_coordinator_context_participant::table)
                             .values(updated_participants)
                             .execute(self.conn)?;
 
                         Ok(())
                     } else if participant_context.is_some() {
                         let update_participant_context =
-                            ParticipantContextModel::try_from((&context, service_id))?;
+                            Consensus2pcParticipantContextModel::try_from((&context, service_id))?;
 
                         delete(
-                            consensus_participant_context::table.filter(
-                                consensus_participant_context::epoch
+                            consensus_2pc_participant_context::table.filter(
+                                consensus_2pc_participant_context::epoch
                                     .eq(epoch)
                                     .and(
-                                        consensus_participant_context::service_id
+                                        consensus_2pc_participant_context::service_id
                                             .eq(format!("{}", service_id)),
                                     )
                                     .and(
-                                        consensus_participant_context::coordinator
+                                        consensus_2pc_participant_context::coordinator
                                             .eq(format!("{}", context.coordinator())),
                                     ),
                             ),
                         )
                         .execute(self.conn)?;
 
-                        insert_into(consensus_participant_context::table)
+                        insert_into(consensus_2pc_participant_context::table)
                             .values(vec![update_participant_context])
                             .execute(self.conn)?;
 
@@ -176,17 +177,17 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                                 .inner;
 
                         delete(
-                            consensus_participant_context_participant::table.filter(
-                                consensus_participant_context_participant::service_id
+                            consensus_2pc_participant_context_participant::table.filter(
+                                consensus_2pc_participant_context_participant::service_id
                                     .eq(format!("{}", service_id))
                                     .and(
-                                        consensus_participant_context_participant::epoch.eq(epoch),
+                                        consensus_2pc_participant_context_participant::epoch.eq(epoch),
                                     ),
                             ),
                         )
                         .execute(self.conn)?;
 
-                        insert_into(consensus_participant_context_participant::table)
+                        insert_into(consensus_2pc_participant_context_participant::table)
                             .values(updated_participants)
                             .execute(self.conn)?;
 
@@ -220,27 +221,27 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                     })?;
                     // check to make sure the context exists
-                    let coordinator_context = consensus_coordinator_context::table
+                    let coordinator_context = consensus_2pc_consensus_coordinator_context::table
                         .filter(
-                            consensus_coordinator_context::epoch
+                            consensus_2pc_consensus_coordinator_context::epoch
                                 .eq(epoch)
                                 .and(
-                                    consensus_coordinator_context::service_id
+                                    consensus_2pc_consensus_coordinator_context::service_id
                                         .eq(format!("{}", service_id)),
                                 )
                                 .and(
-                                    consensus_coordinator_context::coordinator
+                                    consensus_2pc_consensus_coordinator_context::coordinator
                                         .eq(format!("{}", context.coordinator())),
                                 ),
                         )
-                        .first::<CoordinatorContextModel>(self.conn)
+                        .first::<Consensus2pcCoordinatorContextModel>(self.conn)
                         .optional()?;
 
-                    let participant_context = consensus_participant_context::table
-                        .filter(consensus_participant_context::epoch.eq(epoch).and(
-                            consensus_participant_context::service_id.eq(format!("{}", service_id)),
+                    let participant_context = consensus_2pc_participant_context::table
+                        .filter(consensus_2pc_participant_context::epoch.eq(epoch).and(
+                            consensus_2pc_participant_context::service_id.eq(format!("{}", service_id)),
                         ))
-                        .first::<ParticipantContextModel>(self.conn)
+                        .first::<Consensus2pcParticipantContextModel>(self.conn)
                         .optional()?;
 
                     if coordinator_context.is_some() {
@@ -257,25 +258,25 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                         }
 
                         let update_coordinator_context =
-                            CoordinatorContextModel::try_from((&context, service_id))?;
+                            Consensus2pcCoordinatorContextModel::try_from((&context, service_id))?;
 
                         delete(
-                            consensus_coordinator_context::table.filter(
-                                consensus_coordinator_context::epoch
+                            consensus_2pc_consensus_coordinator_context::table.filter(
+                                consensus_2pc_consensus_coordinator_context::epoch
                                     .eq(epoch)
                                     .and(
-                                        consensus_coordinator_context::service_id
+                                        consensus_2pc_consensus_coordinator_context::service_id
                                             .eq(format!("{}", service_id)),
                                     )
                                     .and(
-                                        consensus_coordinator_context::coordinator
+                                        consensus_2pc_consensus_coordinator_context::coordinator
                                             .eq(format!("{}", context.coordinator())),
                                     ),
                             ),
                         )
                         .execute(self.conn)?;
 
-                        insert_into(consensus_coordinator_context::table)
+                        insert_into(consensus_2pc_consensus_coordinator_context::table)
                             .values(vec![update_coordinator_context])
                             .execute(self.conn)?;
 
@@ -284,42 +285,42 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                                 .inner;
 
                         delete(
-                            consensus_coordinator_context_participant::table.filter(
-                                consensus_coordinator_context_participant::service_id
+                            consensus_2pc_consensus_coordinator_context_participant::table.filter(
+                                consensus_2pc_consensus_coordinator_context_participant::service_id
                                     .eq(format!("{}", service_id))
                                     .and(
-                                        consensus_coordinator_context_participant::epoch.eq(epoch),
+                                        consensus_2pc_consensus_coordinator_context_participant::epoch.eq(epoch),
                                     ),
                             ),
                         )
                         .execute(self.conn)?;
 
-                        insert_into(consensus_coordinator_context_participant::table)
+                        insert_into(consensus_2pc_consensus_coordinator_context_participant::table)
                             .values(updated_participants)
                             .execute(self.conn)?;
 
                         Ok(())
                     } else if participant_context.is_some() {
                         let update_participant_context =
-                            ParticipantContextModel::try_from((&context, service_id))?;
+                            Consensus2pcParticipantContextModel::try_from((&context, service_id))?;
 
                         delete(
-                            consensus_participant_context::table.filter(
-                                consensus_participant_context::epoch
+                            consensus_2pc_participant_context::table.filter(
+                                consensus_2pc_participant_context::epoch
                                     .eq(epoch)
                                     .and(
-                                        consensus_participant_context::service_id
+                                        consensus_2pc_participant_context::service_id
                                             .eq(format!("{}", service_id)),
                                     )
                                     .and(
-                                        consensus_participant_context::coordinator
+                                        consensus_2pc_participant_context::coordinator
                                             .eq(format!("{}", context.coordinator())),
                                     ),
                             ),
                         )
                         .execute(self.conn)?;
 
-                        insert_into(consensus_participant_context::table)
+                        insert_into(consensus_2pc_participant_context::table)
                             .values(vec![update_participant_context])
                             .execute(self.conn)?;
 
@@ -328,17 +329,17 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                                 .inner;
 
                         delete(
-                            consensus_participant_context_participant::table.filter(
-                                consensus_participant_context_participant::service_id
+                            consensus_2pc_participant_context_participant::table.filter(
+                                consensus_2pc_participant_context_participant::service_id
                                     .eq(format!("{}", service_id))
                                     .and(
-                                        consensus_participant_context_participant::epoch.eq(epoch),
+                                        consensus_2pc_participant_context_participant::epoch.eq(epoch),
                                     ),
                             ),
                         )
                         .execute(self.conn)?;
 
-                        insert_into(consensus_participant_context_participant::table)
+                        insert_into(consensus_2pc_participant_context_participant::table)
                             .values(updated_participants)
                             .execute(self.conn)?;
 

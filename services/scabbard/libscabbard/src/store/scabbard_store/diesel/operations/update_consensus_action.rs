@@ -20,8 +20,11 @@ use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
-    models::{CoordinatorContextModel, ParticipantContextModel},
-    schema::{consensus_action, consensus_coordinator_context, consensus_participant_context},
+    models::{Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel},
+    schema::{
+        consensus_2pc_action, consensus_2pc_consensus_coordinator_context,
+        consensus_2pc_participant_context,
+    },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 
@@ -55,21 +58,24 @@ where
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
             // check to see if action a context exists with the given service_id and epoch
-            let coordinator_context =
-                consensus_coordinator_context::table
-                    .filter(consensus_coordinator_context::epoch.eq(epoch).and(
-                        consensus_coordinator_context::service_id.eq(format!("{}", service_id)),
-                    ))
-                    .first::<CoordinatorContextModel>(self.conn)
-                    .optional()?;
+            let coordinator_context = consensus_2pc_consensus_coordinator_context::table
+                .filter(
+                    consensus_2pc_consensus_coordinator_context::epoch
+                        .eq(epoch)
+                        .and(
+                            consensus_2pc_consensus_coordinator_context::service_id
+                                .eq(format!("{}", service_id)),
+                        ),
+                )
+                .first::<Consensus2pcCoordinatorContextModel>(self.conn)
+                .optional()?;
 
-            let participant_context =
-                consensus_participant_context::table
-                    .filter(consensus_participant_context::epoch.eq(epoch).and(
-                        consensus_participant_context::service_id.eq(format!("{}", service_id)),
-                    ))
-                    .first::<ParticipantContextModel>(self.conn)
-                    .optional()?;
+            let participant_context = consensus_2pc_participant_context::table
+                .filter(consensus_2pc_participant_context::epoch.eq(epoch).and(
+                    consensus_2pc_participant_context::service_id.eq(format!("{}", service_id)),
+                ))
+                .first::<Consensus2pcParticipantContextModel>(self.conn)
+                .optional()?;
 
             let update_executed_at = i64::try_from(
                 executed_at
@@ -84,14 +90,14 @@ where
             })?;
 
             if coordinator_context.is_some() || participant_context.is_some() {
-                update(consensus_action::table)
+                update(consensus_2pc_action::table)
                     .filter(
-                        consensus_action::id
+                        consensus_2pc_action::id
                             .eq(action_id)
-                            .and(consensus_action::service_id.eq(format!("{}", service_id)))
-                            .and(consensus_action::epoch.eq(epoch)),
+                            .and(consensus_2pc_action::service_id.eq(format!("{}", service_id)))
+                            .and(consensus_2pc_action::epoch.eq(epoch)),
                     )
-                    .set(consensus_action::executed_at.eq(Some(update_executed_at)))
+                    .set(consensus_2pc_action::executed_at.eq(Some(update_executed_at)))
                     .execute(self.conn)
                     .map(|_| ())
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;

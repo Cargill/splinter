@@ -18,3 +18,9 @@ use crate::store::scabbard_store::two_phase::action::ConsensusAction;
 pub enum ScabbardConsensusAction {
     Scabbard2pcConsensusAction(ConsensusAction),
 }
+
+// A scabbard consensus action that includes the action ID associated with the action
+#[derive(Debug, PartialEq, Clone)]
+pub enum IdentifiedScabbardConsensusAction {
+    Scabbard2pcConsensusAction(i64, ConsensusAction),
+}

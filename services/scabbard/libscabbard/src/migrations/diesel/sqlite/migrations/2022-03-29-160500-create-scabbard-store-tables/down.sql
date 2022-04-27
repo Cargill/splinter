@@ -13,16 +13,16 @@
 -- limitations under the License.
 -- -----------------------------------------------------------------------------
 
-DROP TABLE IF EXISTS consensus_coordinator_context;
-DROP TABLE IF EXISTS consensus_coordinator_context_participant;
-DROP TABLE IF EXISTS consensus_action;
-DROP TABLE IF EXISTS consensus_update_coordinator_context_action;
-DROP TABLE IF EXISTS consensus_coordinator_send_message_action;
-DROP TABLE IF EXISTS consensus_coordinator_notification_action;
-DROP TABLE IF EXISTS consensus_update_coordinator_context_action_participant;
-DROP TABLE IF EXISTS consensus_participant_context;
-DROP TABLE IF EXISTS consensus_participant_context_participant;
-DROP TABLE IF EXISTS consensus_update_participant_context_action;
-DROP TABLE IF EXISTS consensus_update_participant_context_action_participant;
-DROP TABLE IF EXISTS consensus_participant_send_message_action;
-DROP TABLE IF EXISTS consensus_participant_notification_action;
+DROP TABLE IF EXISTS consensus_2pc_consensus_coordinator_context;
+DROP TABLE IF EXISTS consensus_2pc_consensus_coordinator_context_participant;
+DROP TABLE IF EXISTS consensus_2pc_action;
+DROP TABLE IF EXISTS consensus_2pc_update_coordinator_context_action;
+DROP TABLE IF EXISTS consensus_2pc_coordinator_send_message_action;
+DROP TABLE IF EXISTS consensus_2pc_coordinator_notification_action;
+DROP TABLE IF EXISTS consensus_2pc_update_coordinator_context_action_participant;
+DROP TABLE IF EXISTS consensus_2pc_participant_context;
+DROP TABLE IF EXISTS consensus_2pc_participant_context_participant;
+DROP TABLE IF EXISTS consensus_2pc_update_participant_context_action;
+DROP TABLE IF EXISTS consensus_2pc_update_participant_context_action_participant;
+DROP TABLE IF EXISTS consensus_2pc_participant_send_message_action;
+DROP TABLE IF EXISTS consensus_2pc_participant_notification_action;
