@@ -22,9 +22,9 @@ use splinter::service::ServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel,
-        TwoPcConsensusDeliverEventModel, TwoPcConsensusStartEventModel,
-        TwoPcConsensusVoteEventModel,
+        Consensus2pcCoordinatorContextModel, Consensus2pcDeliverEventModel,
+        Consensus2pcParticipantContextModel, Consensus2pcStartEventModel,
+        Consensus2pcVoteEventModel,
     },
     schema::{
         consensus_2pc_coordinator_context, consensus_2pc_deliver_event, consensus_2pc_event,
@@ -127,15 +127,15 @@ where
 
             let deliver_events = consensus_2pc_deliver_event::table
                 .filter(consensus_2pc_deliver_event::event_id.eq_any(&event_ids))
-                .load::<TwoPcConsensusDeliverEventModel>(self.conn)?;
+                .load::<Consensus2pcDeliverEventModel>(self.conn)?;
 
             let start_events = consensus_2pc_start_event::table
                 .filter(consensus_2pc_start_event::event_id.eq_any(&event_ids))
-                .load::<TwoPcConsensusStartEventModel>(self.conn)?;
+                .load::<Consensus2pcStartEventModel>(self.conn)?;
 
             let vote_events = consensus_2pc_vote_event::table
                 .filter(consensus_2pc_vote_event::event_id.eq_any(&event_ids))
-                .load::<TwoPcConsensusVoteEventModel>(self.conn)?;
+                .load::<Consensus2pcVoteEventModel>(self.conn)?;
 
             if coordinator_context.is_some() {
                 // return an error if there is both a coordinator and a participant context for the

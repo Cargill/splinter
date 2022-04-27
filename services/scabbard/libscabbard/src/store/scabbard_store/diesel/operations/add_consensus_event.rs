@@ -24,9 +24,9 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel,
-        InsertableTwoPcConsensusEventModel, TwoPcConsensusDeliverEventModel,
-        TwoPcConsensusStartEventModel, TwoPcConsensusVoteEventModel,
+        Consensus2pcCoordinatorContextModel, Consensus2pcDeliverEventModel,
+        Consensus2pcParticipantContextModel, Consensus2pcStartEventModel,
+        Consensus2pcVoteEventModel, InsertableConsensus2pcEventModel,
     },
     schema::{
         consensus_2pc_coordinator_context, consensus_2pc_deliver_event, consensus_2pc_event,
@@ -105,7 +105,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     ));
                 }
 
-                let insertable_event = InsertableTwoPcConsensusEventModel {
+                let insertable_event = InsertableConsensus2pcEventModel {
                     service_id: format!("{}", service_id),
                     epoch,
                     executed_at: None,
@@ -145,7 +145,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             }
                         };
 
-                        let deliver_event = TwoPcConsensusDeliverEventModel {
+                        let deliver_event = Consensus2pcDeliverEventModel {
                             event_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -160,7 +160,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         Ok(event_id)
                     }
                     Scabbard2pcEvent::Start(value) => {
-                        let start_event = TwoPcConsensusStartEventModel {
+                        let start_event = Consensus2pcStartEventModel {
                             event_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -176,7 +176,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             true => String::from("TRUE"),
                             false => String::from("FALSE"),
                         };
-                        let vote_event = TwoPcConsensusVoteEventModel {
+                        let vote_event = Consensus2pcVoteEventModel {
                             event_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -189,7 +189,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     }
                 }
             } else if participant_context.is_some() {
-                let insertable_event = InsertableTwoPcConsensusEventModel {
+                let insertable_event = InsertableConsensus2pcEventModel {
                     service_id: format!("{}", service_id),
                     epoch,
                     executed_at: None,
@@ -228,7 +228,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             }
                         };
 
-                        let deliver_event = TwoPcConsensusDeliverEventModel {
+                        let deliver_event = Consensus2pcDeliverEventModel {
                             event_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -247,7 +247,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             true => String::from("TRUE"),
                             false => String::from("FALSE"),
                         };
-                        let vote_event = TwoPcConsensusVoteEventModel {
+                        let vote_event = Consensus2pcVoteEventModel {
                             event_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -336,7 +336,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     ));
                 }
 
-                let insertable_event = InsertableTwoPcConsensusEventModel {
+                let insertable_event = InsertableConsensus2pcEventModel {
                     service_id: format!("{}", service_id),
                     epoch,
                     executed_at: None,
@@ -373,7 +373,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                             }
                         };
 
-                        let deliver_event = TwoPcConsensusDeliverEventModel {
+                        let deliver_event = Consensus2pcDeliverEventModel {
                             event_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -388,7 +388,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                         Ok(event_id)
                     }
                     Scabbard2pcEvent::Start(value) => {
-                        let start_event = TwoPcConsensusStartEventModel {
+                        let start_event = Consensus2pcStartEventModel {
                             event_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -404,7 +404,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                             true => String::from("TRUE"),
                             false => String::from("FALSE"),
                         };
-                        let vote_event = TwoPcConsensusVoteEventModel {
+                        let vote_event = Consensus2pcVoteEventModel {
                             event_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -417,7 +417,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     }
                 }
             } else if participant_context.is_some() {
-                let insertable_event = InsertableTwoPcConsensusEventModel {
+                let insertable_event = InsertableConsensus2pcEventModel {
                     service_id: format!("{}", service_id),
                     epoch,
                     executed_at: None,
@@ -453,7 +453,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                             }
                         };
 
-                        let deliver_event = TwoPcConsensusDeliverEventModel {
+                        let deliver_event = Consensus2pcDeliverEventModel {
                             event_id,
                             service_id: format!("{}", service_id),
                             epoch,
@@ -472,7 +472,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                             true => String::from("TRUE"),
                             false => String::from("FALSE"),
                         };
-                        let vote_event = TwoPcConsensusVoteEventModel {
+                        let vote_event = Consensus2pcVoteEventModel {
                             event_id,
                             service_id: format!("{}", service_id),
                             epoch,

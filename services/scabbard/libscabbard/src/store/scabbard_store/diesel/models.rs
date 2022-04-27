@@ -1093,7 +1093,7 @@ impl From<&Scabbard2pcMessage> for String {
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_event"]
 #[primary_key(id)]
-pub struct TwoPcConsensusEventModel {
+pub struct Consensus2pcEventModel {
     pub id: i64,
     pub service_id: String,
     pub epoch: i64,
@@ -1105,7 +1105,7 @@ pub struct TwoPcConsensusEventModel {
 
 #[derive(Debug, PartialEq, Insertable)]
 #[table_name = "consensus_2pc_event"]
-pub struct InsertableTwoPcConsensusEventModel {
+pub struct InsertableConsensus2pcEventModel {
     pub service_id: String,
     pub epoch: i64,
     pub executed_at: Option<i64>,
@@ -1126,9 +1126,9 @@ impl From<&Scabbard2pcEvent> for String {
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_deliver_event"]
-#[belongs_to(TwoPcConsensusEventModel, foreign_key = "event_id")]
+#[belongs_to(Consensus2pcEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]
-pub struct TwoPcConsensusDeliverEventModel {
+pub struct Consensus2pcDeliverEventModel {
     pub event_id: i64,
     pub service_id: String,
     pub epoch: i64,
@@ -1140,9 +1140,9 @@ pub struct TwoPcConsensusDeliverEventModel {
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_start_event"]
-#[belongs_to(TwoPcConsensusEventModel, foreign_key = "event_id")]
+#[belongs_to(Consensus2pcEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]
-pub struct TwoPcConsensusStartEventModel {
+pub struct Consensus2pcStartEventModel {
     pub event_id: i64,
     pub service_id: String,
     pub epoch: i64,
@@ -1151,9 +1151,9 @@ pub struct TwoPcConsensusStartEventModel {
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_vote_event"]
-#[belongs_to(TwoPcConsensusEventModel, foreign_key = "event_id")]
+#[belongs_to(Consensus2pcEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]
-pub struct TwoPcConsensusVoteEventModel {
+pub struct Consensus2pcVoteEventModel {
     pub event_id: i64,
     pub service_id: String,
     pub epoch: i64,
