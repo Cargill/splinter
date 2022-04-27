@@ -13,7 +13,7 @@
 -- limitations under the License.
 -- -----------------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS two_pc_consensus_event (
+CREATE TABLE IF NOT EXISTS consensus_2pc_event (
     id                        INTEGER PRIMARY KEY AUTOINCREMENT,
     service_id                TEXT NOT NULL,
     epoch                     BIGINT NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS two_pc_consensus_event (
     CHECK ( event_type IN ('ALARM', 'DELIVER', 'START', 'VOTE') )
 );
 
-CREATE TABLE IF NOT EXISTS two_pc_consensus_deliver_event (
+CREATE TABLE IF NOT EXISTS consensus_2pc_deliver_event (
     event_id                  INTEGER PRIMARY KEY,
     service_id                TEXT NOT NULL,
     epoch                     BIGINT NOT NULL,
@@ -35,25 +35,25 @@ CREATE TABLE IF NOT EXISTS two_pc_consensus_deliver_event (
     CHECK ( (vote_response IN ('TRUE', 'FALSE')) OR (message_type != 'VOTERESPONSE') ),
     vote_request              BINARY
     CHECK ( (vote_request IS NOT NULL) OR (message_type != 'VOTEREQUEST') ),
-    FOREIGN KEY (event_id) REFERENCES two_pc_consensus_event(id) ON DELETE CASCADE,
+    FOREIGN KEY (event_id) REFERENCES consensus_2pc_event(id) ON DELETE CASCADE,
     FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_coordinator_context(service_id, epoch) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS two_pc_consensus_start_event (
+CREATE TABLE IF NOT EXISTS consensus_2pc_start_event (
     event_id                  INTEGER PRIMARY KEY,
     service_id                TEXT NOT NULL,
     epoch                     BIGINT NOT NULL,
     value                     BINARY,
-    FOREIGN KEY (event_id) REFERENCES two_pc_consensus_event(id) ON DELETE CASCADE,
+    FOREIGN KEY (event_id) REFERENCES consensus_2pc_event(id) ON DELETE CASCADE,
     FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_coordinator_context(service_id, epoch) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS two_pc_consensus_vote_event (
+CREATE TABLE IF NOT EXISTS consensus_2pc_vote_event (
     event_id                  INTEGER PRIMARY KEY,
     service_id                TEXT NOT NULL,
     epoch                     BIGINT NOT NULL,
     vote                      TEXT
     CHECK ( vote IN ('TRUE' , 'FALSE') ),
-    FOREIGN KEY (event_id) REFERENCES two_pc_consensus_event(id) ON DELETE CASCADE,
+    FOREIGN KEY (event_id) REFERENCES consensus_2pc_event(id) ON DELETE CASCADE,
     FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_coordinator_context(service_id, epoch) ON DELETE CASCADE
 );

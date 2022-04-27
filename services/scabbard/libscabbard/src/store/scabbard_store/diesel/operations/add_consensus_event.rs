@@ -29,9 +29,8 @@ use crate::store::scabbard_store::diesel::{
         TwoPcConsensusStartEventModel, TwoPcConsensusVoteEventModel,
     },
     schema::{
-        consensus_2pc_coordinator_context, consensus_2pc_participant_context,
-        two_pc_consensus_deliver_event, two_pc_consensus_event, two_pc_consensus_start_event,
-        two_pc_consensus_vote_event,
+        consensus_2pc_coordinator_context, consensus_2pc_deliver_event, consensus_2pc_event,
+        consensus_2pc_participant_context, consensus_2pc_start_event, consensus_2pc_vote_event,
     },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -80,14 +79,14 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 .first::<Consensus2pcParticipantContextModel>(self.conn)
                 .optional()?;
 
-            let position = two_pc_consensus_event::table
+            let position = consensus_2pc_event::table
                 .filter(
-                    two_pc_consensus_event::service_id
+                    consensus_2pc_event::service_id
                         .eq(format!("{}", service_id))
-                        .and(two_pc_consensus_event::epoch.eq(epoch)),
+                        .and(consensus_2pc_event::epoch.eq(epoch)),
                 )
-                .order(two_pc_consensus_event::position.desc())
-                .select(two_pc_consensus_event::position)
+                .order(consensus_2pc_event::position.desc())
+                .select(consensus_2pc_event::position)
                 .first::<i32>(self.conn)
                 .optional()?
                 .unwrap_or(0)
@@ -114,12 +113,12 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     event_type: String::from(&event),
                 };
 
-                insert_into(two_pc_consensus_event::table)
+                insert_into(consensus_2pc_event::table)
                     .values(vec![insertable_event])
                     .execute(self.conn)?;
-                let event_id = two_pc_consensus_event::table
-                    .order(two_pc_consensus_event::id.desc())
-                    .select(two_pc_consensus_event::id)
+                let event_id = consensus_2pc_event::table
+                    .order(consensus_2pc_event::id.desc())
+                    .select(consensus_2pc_event::id)
                     .first::<i64>(self.conn)?;
 
                 match event {
@@ -155,7 +154,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             vote_response,
                             vote_request: None,
                         };
-                        insert_into(two_pc_consensus_deliver_event::table)
+                        insert_into(consensus_2pc_deliver_event::table)
                             .values(vec![deliver_event])
                             .execute(self.conn)?;
                         Ok(event_id)
@@ -167,7 +166,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             epoch,
                             value,
                         };
-                        insert_into(two_pc_consensus_start_event::table)
+                        insert_into(consensus_2pc_start_event::table)
                             .values(vec![start_event])
                             .execute(self.conn)?;
                         Ok(event_id)
@@ -183,7 +182,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             epoch,
                             vote,
                         };
-                        insert_into(two_pc_consensus_vote_event::table)
+                        insert_into(consensus_2pc_vote_event::table)
                             .values(vec![vote_event])
                             .execute(self.conn)?;
                         Ok(event_id)
@@ -198,12 +197,12 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     event_type: String::from(&event),
                 };
 
-                insert_into(two_pc_consensus_event::table)
+                insert_into(consensus_2pc_event::table)
                     .values(vec![insertable_event])
                     .execute(self.conn)?;
-                let event_id = two_pc_consensus_event::table
-                    .order(two_pc_consensus_event::id.desc())
-                    .select(two_pc_consensus_event::id)
+                let event_id = consensus_2pc_event::table
+                    .order(consensus_2pc_event::id.desc())
+                    .select(consensus_2pc_event::id)
                     .first::<i64>(self.conn)?;
 
                 match event {
@@ -238,7 +237,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             vote_response: None,
                             vote_request,
                         };
-                        insert_into(two_pc_consensus_deliver_event::table)
+                        insert_into(consensus_2pc_deliver_event::table)
                             .values(vec![deliver_event])
                             .execute(self.conn)?;
                         Ok(event_id)
@@ -254,7 +253,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             epoch,
                             vote,
                         };
-                        insert_into(two_pc_consensus_vote_event::table)
+                        insert_into(consensus_2pc_vote_event::table)
                             .values(vec![vote_event])
                             .execute(self.conn)?;
                         Ok(event_id)
@@ -311,14 +310,14 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                 .first::<Consensus2pcParticipantContextModel>(self.conn)
                 .optional()?;
 
-            let position = two_pc_consensus_event::table
+            let position = consensus_2pc_event::table
                 .filter(
-                    two_pc_consensus_event::service_id
+                    consensus_2pc_event::service_id
                         .eq(format!("{}", service_id))
-                        .and(two_pc_consensus_event::epoch.eq(epoch)),
+                        .and(consensus_2pc_event::epoch.eq(epoch)),
                 )
-                .order(two_pc_consensus_event::position.desc())
-                .select(two_pc_consensus_event::position)
+                .order(consensus_2pc_event::position.desc())
+                .select(consensus_2pc_event::position)
                 .first::<i32>(self.conn)
                 .optional()?
                 .unwrap_or(0)
@@ -345,9 +344,9 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     event_type: String::from(&event),
                 };
 
-                let event_id: i64 = insert_into(two_pc_consensus_event::table)
+                let event_id: i64 = insert_into(consensus_2pc_event::table)
                     .values(vec![insertable_event])
-                    .returning(two_pc_consensus_event::id)
+                    .returning(consensus_2pc_event::id)
                     .get_result(self.conn)?;
 
                 match event {
@@ -383,7 +382,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                             vote_response,
                             vote_request: None,
                         };
-                        insert_into(two_pc_consensus_deliver_event::table)
+                        insert_into(consensus_2pc_deliver_event::table)
                             .values(vec![deliver_event])
                             .execute(self.conn)?;
                         Ok(event_id)
@@ -395,7 +394,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                             epoch,
                             value,
                         };
-                        insert_into(two_pc_consensus_start_event::table)
+                        insert_into(consensus_2pc_start_event::table)
                             .values(vec![start_event])
                             .execute(self.conn)?;
                         Ok(event_id)
@@ -411,7 +410,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                             epoch,
                             vote,
                         };
-                        insert_into(two_pc_consensus_vote_event::table)
+                        insert_into(consensus_2pc_vote_event::table)
                             .values(vec![vote_event])
                             .execute(self.conn)?;
                         Ok(event_id)
@@ -426,9 +425,9 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     event_type: String::from(&event),
                 };
 
-                let event_id: i64 = insert_into(two_pc_consensus_event::table)
+                let event_id: i64 = insert_into(consensus_2pc_event::table)
                     .values(vec![insertable_event])
-                    .returning(two_pc_consensus_event::id)
+                    .returning(consensus_2pc_event::id)
                     .get_result(self.conn)?;
 
                 match event {
@@ -463,7 +462,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                             vote_response: None,
                             vote_request,
                         };
-                        insert_into(two_pc_consensus_deliver_event::table)
+                        insert_into(consensus_2pc_deliver_event::table)
                             .values(vec![deliver_event])
                             .execute(self.conn)?;
                         Ok(event_id)
@@ -479,7 +478,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                             epoch,
                             vote,
                         };
-                        insert_into(two_pc_consensus_vote_event::table)
+                        insert_into(consensus_2pc_vote_event::table)
                             .values(vec![vote_event])
                             .execute(self.conn)?;
                         Ok(event_id)

@@ -27,9 +27,8 @@ use crate::store::scabbard_store::diesel::{
         TwoPcConsensusVoteEventModel,
     },
     schema::{
-        consensus_2pc_coordinator_context, consensus_2pc_participant_context,
-        two_pc_consensus_deliver_event, two_pc_consensus_event, two_pc_consensus_start_event,
-        two_pc_consensus_vote_event,
+        consensus_2pc_coordinator_context, consensus_2pc_deliver_event, consensus_2pc_event,
+        consensus_2pc_participant_context, consensus_2pc_start_event, consensus_2pc_vote_event,
     },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -81,18 +80,18 @@ where
                 .first::<Consensus2pcParticipantContextModel>(self.conn)
                 .optional()?;
 
-            let consensus_events = two_pc_consensus_event::table
+            let consensus_events = consensus_2pc_event::table
                 .filter(
-                    two_pc_consensus_event::service_id
+                    consensus_2pc_event::service_id
                         .eq(format!("{}", service_id))
-                        .and(two_pc_consensus_event::epoch.eq(epoch))
-                        .and(two_pc_consensus_event::executed_at.is_null()),
+                        .and(consensus_2pc_event::epoch.eq(epoch))
+                        .and(consensus_2pc_event::executed_at.is_null()),
                 )
-                .order(two_pc_consensus_event::position.desc())
+                .order(consensus_2pc_event::position.desc())
                 .select((
-                    two_pc_consensus_event::id,
-                    two_pc_consensus_event::position,
-                    two_pc_consensus_event::event_type,
+                    consensus_2pc_event::id,
+                    consensus_2pc_event::position,
+                    consensus_2pc_event::event_type,
                 ))
                 .load::<(i64, i32, String)>(self.conn)?;
 
@@ -126,16 +125,16 @@ where
 
             all_events.append(&mut alarm_events);
 
-            let deliver_events = two_pc_consensus_deliver_event::table
-                .filter(two_pc_consensus_deliver_event::event_id.eq_any(&event_ids))
+            let deliver_events = consensus_2pc_deliver_event::table
+                .filter(consensus_2pc_deliver_event::event_id.eq_any(&event_ids))
                 .load::<TwoPcConsensusDeliverEventModel>(self.conn)?;
 
-            let start_events = two_pc_consensus_start_event::table
-                .filter(two_pc_consensus_start_event::event_id.eq_any(&event_ids))
+            let start_events = consensus_2pc_start_event::table
+                .filter(consensus_2pc_start_event::event_id.eq_any(&event_ids))
                 .load::<TwoPcConsensusStartEventModel>(self.conn)?;
 
-            let vote_events = two_pc_consensus_vote_event::table
-                .filter(two_pc_consensus_vote_event::event_id.eq_any(&event_ids))
+            let vote_events = consensus_2pc_vote_event::table
+                .filter(consensus_2pc_vote_event::event_id.eq_any(&event_ids))
                 .load::<TwoPcConsensusVoteEventModel>(self.conn)?;
 
             if coordinator_context.is_some() {

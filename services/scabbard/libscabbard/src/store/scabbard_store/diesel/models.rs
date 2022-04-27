@@ -34,14 +34,15 @@ use crate::store::scabbard_store::{
 use super::schema::{
     consensus_2pc_action, consensus_2pc_coordinator_context,
     consensus_2pc_coordinator_context_participant, consensus_2pc_coordinator_notification_action,
-    consensus_2pc_coordinator_send_message_action, consensus_2pc_participant_context,
+    consensus_2pc_coordinator_send_message_action, consensus_2pc_deliver_event,
+    consensus_2pc_event, consensus_2pc_participant_context,
     consensus_2pc_participant_context_participant, consensus_2pc_participant_notification_action,
-    consensus_2pc_participant_send_message_action, consensus_2pc_update_coordinator_context_action,
+    consensus_2pc_participant_send_message_action, consensus_2pc_start_event,
+    consensus_2pc_update_coordinator_context_action,
     consensus_2pc_update_coordinator_context_action_participant,
     consensus_2pc_update_participant_context_action,
-    consensus_2pc_update_participant_context_action_participant, scabbard_peer, scabbard_service,
-    scabbard_v3_commit_history, two_pc_consensus_deliver_event, two_pc_consensus_event,
-    two_pc_consensus_start_event, two_pc_consensus_vote_event,
+    consensus_2pc_update_participant_context_action_participant, consensus_2pc_vote_event,
+    scabbard_peer, scabbard_service, scabbard_v3_commit_history,
 };
 
 /// Database model representation of `ScabbardService`
@@ -1090,7 +1091,7 @@ impl From<&Scabbard2pcMessage> for String {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "two_pc_consensus_event"]
+#[table_name = "consensus_2pc_event"]
 #[primary_key(id)]
 pub struct TwoPcConsensusEventModel {
     pub id: i64,
@@ -1103,7 +1104,7 @@ pub struct TwoPcConsensusEventModel {
 }
 
 #[derive(Debug, PartialEq, Insertable)]
-#[table_name = "two_pc_consensus_event"]
+#[table_name = "consensus_2pc_event"]
 pub struct InsertableTwoPcConsensusEventModel {
     pub service_id: String,
     pub epoch: i64,
@@ -1124,7 +1125,7 @@ impl From<&Scabbard2pcEvent> for String {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "two_pc_consensus_deliver_event"]
+#[table_name = "consensus_2pc_deliver_event"]
 #[belongs_to(TwoPcConsensusEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]
 pub struct TwoPcConsensusDeliverEventModel {
@@ -1138,7 +1139,7 @@ pub struct TwoPcConsensusDeliverEventModel {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "two_pc_consensus_start_event"]
+#[table_name = "consensus_2pc_start_event"]
 #[belongs_to(TwoPcConsensusEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]
 pub struct TwoPcConsensusStartEventModel {
@@ -1149,7 +1150,7 @@ pub struct TwoPcConsensusStartEventModel {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "two_pc_consensus_vote_event"]
+#[table_name = "consensus_2pc_vote_event"]
 #[belongs_to(TwoPcConsensusEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]
 pub struct TwoPcConsensusVoteEventModel {

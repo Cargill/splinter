@@ -22,8 +22,7 @@ use splinter::service::FullyQualifiedServiceId;
 use crate::store::scabbard_store::diesel::{
     models::{Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel},
     schema::{
-        consensus_2pc_coordinator_context, consensus_2pc_participant_context,
-        two_pc_consensus_event,
+        consensus_2pc_coordinator_context, consensus_2pc_event, consensus_2pc_participant_context,
     },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -97,14 +96,14 @@ where
             })?;
 
             if coordinator_context.is_some() || participant_context.is_some() {
-                update(two_pc_consensus_event::table)
+                update(consensus_2pc_event::table)
                     .filter(
-                        two_pc_consensus_event::id
+                        consensus_2pc_event::id
                             .eq(event_id)
-                            .and(two_pc_consensus_event::service_id.eq(format!("{}", service_id)))
-                            .and(two_pc_consensus_event::epoch.eq(epoch)),
+                            .and(consensus_2pc_event::service_id.eq(format!("{}", service_id)))
+                            .and(consensus_2pc_event::epoch.eq(epoch)),
                     )
-                    .set(two_pc_consensus_event::executed_at.eq(Some(update_executed_at)))
+                    .set(consensus_2pc_event::executed_at.eq(Some(update_executed_at)))
                     .execute(self.conn)
                     .map(|_| ())
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
