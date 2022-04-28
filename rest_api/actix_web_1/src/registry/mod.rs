@@ -14,15 +14,16 @@
 
 //! This module defines the REST API endpoints for interacting with registries.
 
-mod actix;
 mod error;
+mod nodes;
+mod nodes_identity;
 mod resources;
 
-use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
+use splinter::rest_api::actix_web_1::{Resource, RestResourceProvider};
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::authorization::Permission;
+use splinter::rest_api::auth::authorization::Permission;
 
-use super::RwRegistry;
+use splinter::registry::RwRegistry;
 
 #[cfg(feature = "authorization")]
 const REGISTRY_READ_PERMISSION: Permission = Permission::Check {
@@ -42,10 +43,10 @@ pub struct RwRegistryRestResourceProvider {
 }
 
 impl RwRegistryRestResourceProvider {
-    pub fn new<R: RwRegistry>(registry: &R) -> Self {
+    pub fn new(registry: &dyn RwRegistry) -> Self {
         let resources = vec![
-            actix::nodes_identity::make_nodes_identity_resource(registry.clone_box()),
-            actix::nodes::make_nodes_resource(registry.clone_box()),
+            nodes_identity::make_nodes_identity_resource(registry.clone_box()),
+            nodes::make_nodes_resource(registry.clone_box()),
         ];
         Self { resources }
     }

@@ -20,21 +20,21 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
-use crate::error::InvalidStateError;
-use crate::futures::{future::IntoFuture, stream::Stream, Future};
-use crate::registry::rest_api::error::RegistryRestApiError;
-#[cfg(feature = "authorization")]
-use crate::registry::rest_api::{REGISTRY_READ_PERMISSION, REGISTRY_WRITE_PERMISSION};
-use crate::registry::{
-    rest_api::resources::nodes::{ListNodesResponse, NewNode, NodeResponse},
-    MetadataPredicate, Node, RegistryReader, RegistryWriter, RwRegistry,
-};
-use crate::rest_api::{
+use splinter::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use splinter::error::InvalidStateError;
+use splinter::futures::{future::IntoFuture, stream::Stream, Future};
+use splinter::registry::{MetadataPredicate, Node, RegistryReader, RegistryWriter, RwRegistry};
+use splinter::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    percent_encode_filter_query, ErrorResponse, SPLINTER_PROTOCOL_VERSION,
+    percent_encode_filter_query, ErrorResponse,
 };
+use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
+
+use super::error::RegistryRestApiError;
+use super::resources::nodes::{ListNodesResponse, NewNode, NodeResponse};
+#[cfg(feature = "authorization")]
+use super::{REGISTRY_READ_PERMISSION, REGISTRY_WRITE_PERMISSION};
 
 const REGISTRY_LIST_NODES_MIN: u32 = 1;
 
@@ -282,14 +282,16 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
-    use crate::error::InternalError;
-    use crate::error::InvalidStateError;
-    use crate::registry::{error::RegistryError, NodeIter};
-    use crate::rest_api::actix_web_1::AuthConfig;
-    use crate::rest_api::auth::authorization::{AuthorizationHandler, AuthorizationHandlerResult};
-    use crate::rest_api::auth::identity::{Identity, IdentityProvider};
-    use crate::rest_api::auth::AuthorizationHeader;
-    use crate::rest_api::{
+    use splinter::error::InternalError;
+    use splinter::error::InvalidStateError;
+    use splinter::registry::{NodeIter, RegistryError};
+    use splinter::rest_api::actix_web_1::AuthConfig;
+    use splinter::rest_api::auth::authorization::{
+        AuthorizationHandler, AuthorizationHandlerResult,
+    };
+    use splinter::rest_api::auth::identity::{Identity, IdentityProvider};
+    use splinter::rest_api::auth::AuthorizationHeader;
+    use splinter::rest_api::{
         actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
         paging::Paging,
     };
@@ -468,7 +470,8 @@ mod tests {
         #[cfg(not(feature = "https-bind"))]
         let bind = "127.0.0.1:0";
         #[cfg(feature = "https-bind")]
-        let bind = crate::rest_api::BindConfig::Http("127.0.0.1:0".into());
+        let bind = splinter::rest_api::BindConfig::Http("127.0.0.1:0".into());
+
         let identity_provider = MockIdentityProvider::default().clone_box();
         let auth_config = AuthConfig::Custom {
             resources: Vec::new(),
@@ -563,7 +566,7 @@ mod tests {
         fn new(nodes: Vec<Node>) -> Self {
             let mut nodes_map = HashMap::new();
             for node in nodes {
-                nodes_map.insert(node.identity.clone(), node);
+                nodes_map.insert(node.identity().to_string().clone(), node);
             }
             Self {
                 nodes: Arc::new(Mutex::new(nodes_map)),
@@ -604,21 +607,21 @@ mod tests {
             self.nodes
                 .lock()
                 .expect("mem registry lock was poisoned")
-                .insert(node.identity.clone(), node);
+                .insert(node.identity().to_string().clone(), node);
             Ok(())
         }
 
         fn update_node(&self, node: Node) -> Result<(), RegistryError> {
             let mut inner = self.nodes.lock().expect("mem registry lock was poisoned");
 
-            if inner.contains_key(&node.identity) {
-                inner.insert(node.identity.clone(), node);
+            if inner.contains_key(&node.identity().to_string()) {
+                inner.insert(node.identity().to_string(), node);
                 Ok(())
             } else {
                 Err(RegistryError::InvalidStateError(
                     InvalidStateError::with_message(format!(
                         "Node does not exist in the registry: {}",
-                        node.identity
+                        node.identity()
                     )),
                 ))
             }

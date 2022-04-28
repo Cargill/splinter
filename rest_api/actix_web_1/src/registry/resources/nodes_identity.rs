@@ -15,14 +15,7 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-use crate::registry::{error::InvalidNodeError, Node};
-use crate::rest_api::paging::Paging;
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ListNodesResponse<'a> {
-    pub data: Vec<NodeResponse<'a>>,
-    pub paging: Paging,
-}
+use splinter::registry::{InvalidNodeError, Node};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NodeResponse<'a> {
@@ -36,11 +29,11 @@ pub struct NodeResponse<'a> {
 impl<'a> From<&'a Node> for NodeResponse<'a> {
     fn from(node: &'a Node) -> Self {
         Self {
-            identity: &node.identity,
-            endpoints: &node.endpoints,
-            display_name: &node.display_name,
-            keys: &node.keys,
-            metadata: &node.metadata,
+            identity: node.identity(),
+            endpoints: node.endpoints(),
+            display_name: node.display_name(),
+            keys: node.keys(),
+            metadata: node.metadata(),
         }
     }
 }

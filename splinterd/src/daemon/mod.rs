@@ -69,7 +69,6 @@ use splinter::peer::PeerManager;
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::NetworkMessageType;
 use splinter::public_key::PublicKey;
-use splinter::registry::RwRegistryRestResourceProvider;
 use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RwRegistry, UnifiedRegistry,
 };
@@ -113,6 +112,7 @@ use splinter::transport::{
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
 #[cfg(feature = "biome-key-management")]
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
+use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
 
 use crate::node_id::get_node_id;
 use crate::routes;

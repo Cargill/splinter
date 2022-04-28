@@ -17,8 +17,8 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::error::InvalidStateError;
-use crate::registry::error::RegistryError;
+use splinter::error::InvalidStateError;
+use splinter::registry::RegistryError;
 
 /// Represents errors that occur with node registry operations while using the REST API
 #[derive(Debug)]
