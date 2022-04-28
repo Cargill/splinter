@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::marker::PhantomData;
+use std::sync::Arc;
 
 use splinter::{
     error::InternalError,
@@ -21,22 +21,20 @@ use splinter::{
 };
 
 use crate::store::{
+    service::{ScabbardServiceBuilder, ServiceStatus},
     ScabbardFinalizeServiceCommand, ScabbardPrepareServiceCommand, ScabbardPurgeServiceCommand,
-    ScabbardRetireServiceCommand,
+    ScabbardRetireServiceCommand, ScabbardStoreFactory,
 };
 
 use super::ScabbardArguments;
 
-#[derive(Default)]
 pub struct ScabbardLifecycle<K> {
-    _store_factory: PhantomData<K>,
+    store_factory: Arc<dyn ScabbardStoreFactory<K>>,
 }
 
 impl<K> ScabbardLifecycle<K> {
-    pub fn new() -> Self {
-        Self {
-            _store_factory: PhantomData,
-        }
+    pub fn new(store_factory: Arc<dyn ScabbardStoreFactory<K>>) -> Self {
+        Self { store_factory }
     }
 }
 
@@ -48,30 +46,50 @@ where
 
     fn command_to_prepare(
         &self,
-        _service: FullyQualifiedServiceId,
-        _arguments: Self::Arguments,
+        service: FullyQualifiedServiceId,
+        arguments: Self::Arguments,
     ) -> Result<Box<dyn StoreCommand<Context = K>>, InternalError> {
-        Ok(Box::new(ScabbardPrepareServiceCommand::new()))
+        let built_service = ScabbardServiceBuilder::default()
+            .with_service_id(&service)
+            .with_peers(arguments.peers())
+            .with_consensus(arguments.consensus())
+            .with_status(&ServiceStatus::Prepared)
+            .build()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        Ok(Box::new(ScabbardPrepareServiceCommand::new(
+            self.store_factory.clone(),
+            built_service,
+        )))
     }
 
     fn command_to_finalize(
         &self,
-        _service: FullyQualifiedServiceId,
+        service: FullyQualifiedServiceId,
     ) -> Result<Box<dyn StoreCommand<Context = K>>, InternalError> {
-        Ok(Box::new(ScabbardFinalizeServiceCommand::new()))
+        Ok(Box::new(ScabbardFinalizeServiceCommand::new(
+            self.store_factory.clone(),
+            service,
+        )))
     }
 
     fn command_to_retire(
         &self,
-        _service: FullyQualifiedServiceId,
+        service: FullyQualifiedServiceId,
     ) -> Result<Box<dyn StoreCommand<Context = K>>, InternalError> {
-        Ok(Box::new(ScabbardRetireServiceCommand::new()))
+        Ok(Box::new(ScabbardRetireServiceCommand::new(
+            self.store_factory.clone(),
+            service,
+        )))
     }
 
     fn command_to_purge(
         &self,
-        _service: FullyQualifiedServiceId,
+        service: FullyQualifiedServiceId,
     ) -> Result<Box<dyn StoreCommand<Context = K>>, InternalError> {
-        Ok(Box::new(ScabbardPurgeServiceCommand::new()))
+        Ok(Box::new(ScabbardPurgeServiceCommand::new(
+            self.store_factory.clone(),
+            service,
+        )))
     }
 }

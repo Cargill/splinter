@@ -12,20 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::marker::PhantomData;
+use std::sync::Arc;
+use std::time::SystemTime;
 
-use log::info;
-use splinter::{error::InternalError, store::command::StoreCommand};
+use splinter::{
+    error::InternalError, service::FullyQualifiedServiceId, store::command::StoreCommand,
+};
 
-#[derive(Default)]
+use crate::store::{context::ScabbardContext, service::ServiceStatus, ScabbardStoreFactory};
+
 pub struct ScabbardFinalizeServiceCommand<C> {
-    _store_factory: PhantomData<C>,
+    store_factory: Arc<dyn ScabbardStoreFactory<C>>,
+    service_id: FullyQualifiedServiceId,
 }
 
 impl<C> ScabbardFinalizeServiceCommand<C> {
-    pub fn new() -> Self {
+    pub fn new(
+        store_factory: Arc<dyn ScabbardStoreFactory<C>>,
+        service_id: FullyQualifiedServiceId,
+    ) -> Self {
         Self {
-            _store_factory: PhantomData,
+            store_factory,
+            service_id,
         }
     }
 }
@@ -33,8 +41,47 @@ impl<C> ScabbardFinalizeServiceCommand<C> {
 impl<C> StoreCommand for ScabbardFinalizeServiceCommand<C> {
     type Context = C;
 
-    fn execute(&self, _conn: &Self::Context) -> Result<(), InternalError> {
-        info!("executing finalize service command");
+    fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
+        let store = self.store_factory.new_store(conn);
+
+        let service = store
+            .get_service(&self.service_id)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?
+            .ok_or_else(|| {
+                InternalError::with_message(format!("Unable to fetch service {}", self.service_id))
+            })?
+            .into_builder()
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        // set alarm to current time so it will be considered passed next time the timer runs
+        let alarm = SystemTime::now();
+
+        let mut context = store
+            .get_current_consensus_context(&self.service_id)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?
+            .ok_or_else(|| {
+                InternalError::with_message(format!("No context found for {}", self.service_id))
+            })?;
+
+        context = match context {
+            ScabbardContext::Scabbard2pcContext(context) => ScabbardContext::Scabbard2pcContext(
+                context
+                    .into_builder()
+                    .with_alarm(alarm)
+                    .build()
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?,
+            ),
+        };
+
+        store
+            .update_service(service)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        store
+            .update_consensus_context(&self.service_id, context)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
         Ok(())
     }
 }
