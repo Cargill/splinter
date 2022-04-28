@@ -16,6 +16,7 @@
 
 use std::convert::TryFrom;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::hash::{Hash, Hasher};
 
 use crate::error::InvalidArgumentError;
 
@@ -154,7 +155,7 @@ impl<'a> Display for ServiceType<'a> {
     }
 }
 
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 enum ServiceTypeInner<'a> {
     Borrowed(&'a str),
     Owned(Box<str>),
@@ -186,9 +187,17 @@ impl<'a> PartialEq for ServiceTypeInner<'a> {
 
 impl<'a> Eq for ServiceTypeInner<'a> {}
 
+impl<'a> Hash for ServiceTypeInner<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.service_type().hash(state);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::collections::HashMap;
 
     const STATIC_TYPE: ServiceType = ServiceType::new_static("statictype");
     const STATIC_TYPE_WITH_VERSION: ServiceType = ServiceType::new_static("statictype:v2");
@@ -293,5 +302,20 @@ mod tests {
         assert_eq!(other_type, other_type2);
         assert!(other_type != STATIC_TYPE);
         assert!(other_type != compare_type);
+    }
+
+    /// This test validates hashing, through the use of a hashmap, is consistent between
+    /// Borrowed and Owned types
+    #[test]
+    fn test_hashmap() {
+        let mut test = HashMap::new();
+        let statictype = ServiceType::new("statictype").unwrap();
+        let statictype_borrowed = ServiceType::new_static("statictype");
+        let other_type = ServiceType::new("othertype").unwrap();
+
+        test.insert(statictype.clone(), 1);
+
+        assert_eq!(statictype, statictype_borrowed);
+        assert_eq!(test.get(&statictype_borrowed).unwrap(), &1);
     }
 }
