@@ -44,9 +44,9 @@ use crate::store::scabbard_store::diesel::{
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    context::{ContextBuilder, Participant},
     two_phase::{
         action::{ConsensusAction, ConsensusActionNotification},
+        context::{ContextBuilder, Participant},
         message::Scabbard2pcMessage,
         state::Scabbard2pcState,
     },

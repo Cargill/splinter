@@ -67,9 +67,10 @@ mod tests {
     use crate::store::ScabbardStore;
     use crate::store::{
         action::ScabbardConsensusAction,
-        context::{ContextBuilder, Participant, ScabbardContext},
+        context::ScabbardContext,
         two_phase::{
             action::{ConsensusAction, ConsensusActionNotification},
+            context::{ContextBuilder, Participant},
             state::Scabbard2pcState,
         },
     };

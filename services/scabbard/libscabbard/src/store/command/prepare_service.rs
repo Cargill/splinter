@@ -17,9 +17,10 @@ use std::sync::Arc;
 use splinter::{error::InternalError, service::ServiceId, store::command::StoreCommand};
 
 use crate::store::{
-    context::{Context, ContextBuilder, Participant, ScabbardContext},
+    context::ScabbardContext,
     service::ScabbardService,
     two_phase::{
+        context::{Context, ContextBuilder, Participant},
         state::Scabbard2pcState,
     },
     ScabbardStoreFactory,

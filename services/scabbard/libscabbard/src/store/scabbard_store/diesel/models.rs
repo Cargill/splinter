@@ -20,13 +20,16 @@ use splinter::service::{FullyQualifiedServiceId, ServiceId};
 
 use crate::store::scabbard_store::{
     commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision},
-    context::{
-        Context, ContextBuilder, CoordinatorContext, CoordinatorState, Participant,
-        ParticipantContext, ParticipantState, ScabbardContext,
-    },
+    context::ScabbardContext,
     service::{ConsensusType, ScabbardService, ServiceStatus},
     two_phase::{
-        action::ConsensusActionNotification, event::Scabbard2pcEvent, message::Scabbard2pcMessage,
+        action::ConsensusActionNotification,
+        context::{
+            Context, ContextBuilder, CoordinatorContext, CoordinatorState, Participant,
+            ParticipantContext, ParticipantState,
+        },
+        event::Scabbard2pcEvent,
+        message::Scabbard2pcMessage,
         state::Scabbard2pcState,
     },
 };
