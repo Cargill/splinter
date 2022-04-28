@@ -177,7 +177,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).update_service(service))
     }
-
+    /// Get a service
     fn get_service(
         &self,
         service_id: &FullyQualifiedServiceId,
@@ -185,7 +185,6 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         self.pool
             .execute_read(|conn| ScabbardStoreOperations::new(conn).get_service(service_id))
     }
-
     /// Add a new consensus event
     fn add_consensus_event(
         &self,
@@ -339,7 +338,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).update_service(service))
     }
-
+    /// Get a service
     fn get_service(
         &self,
         service_id: &FullyQualifiedServiceId,
@@ -347,7 +346,6 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         self.pool
             .execute_read(|conn| ScabbardStoreOperations::new(conn).get_service(service_id))
     }
-
     /// Add a new consensus event
     fn add_consensus_event(
         &self,
@@ -502,6 +500,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_service(service)
     }
+    /// Get service
     fn get_service(
         &self,
         service_id: &FullyQualifiedServiceId,
