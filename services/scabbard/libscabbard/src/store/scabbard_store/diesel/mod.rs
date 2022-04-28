@@ -52,6 +52,7 @@ use operations::get_service::GetServiceOperation as _;
 use operations::list_consensus_actions::ListActionsOperation as _;
 use operations::list_consensus_events::ListEventsOperation as _;
 use operations::list_ready_services::ListReadyServicesOperation as _;
+use operations::remove_service::RemoveServiceOperation as _;
 use operations::update_commit_entry::UpdateCommitEntryOperation as _;
 use operations::update_consensus_action::UpdateActionOperation as _;
 use operations::update_consensus_context::UpdateContextAction as _;
@@ -232,6 +233,15 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
             ScabbardStoreOperations::new(conn).get_current_consensus_context(service_id)
         })
     }
+
+    /// Remove existing service
+    fn remove_service(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool
+            .execute_write(|conn| ScabbardStoreOperations::new(conn).remove_service(service_id))
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -385,6 +395,15 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
             ScabbardStoreOperations::new(conn).get_current_consensus_context(service_id)
         })
     }
+
+    /// Remove existing service
+    fn remove_service(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool
+            .execute_write(|conn| ScabbardStoreOperations::new(conn).remove_service(service_id))
+    }
 }
 
 pub struct DieselConnectionScabbardStore<'a, C>
@@ -528,6 +547,13 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).get_current_consensus_context(service_id)
     }
+    /// Remove existing service
+    fn remove_service(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).remove_service(service_id)
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -652,6 +678,13 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         service_id: &FullyQualifiedServiceId,
     ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).get_current_consensus_context(service_id)
+    }
+    /// Remove existing service
+    fn remove_service(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).remove_service(service_id)
     }
 }
 
@@ -1841,6 +1874,92 @@ pub mod tests {
             .expect("failed to get current context");
 
         assert_eq!(current_context, Some(context4));
+    }
+
+    /// Test that the scabbard store `remove_service` operation is successful.
+    ///
+    /// 1. Add a services to the database
+    /// 2. Add a coordinator context for the service
+    /// 3. Verify both can be fetched
+    /// 4. Remove the service
+    /// 5. Verify that the service and context were both removed
+    #[test]
+    fn scabbard_store_remove_service() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let coordinator_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
+            .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
+
+        let participant_service_id = FullyQualifiedServiceId::new_random();
+
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&coordinator_fqsi)
+            .with_peers(&[participant_service_id.service_id().clone()])
+            .with_status(&ServiceStatus::Finalized)
+            .with_consensus(&ConsensusType::TwoPC)
+            .build()
+            .expect("failed to build service");
+
+        store
+            .add_service(service.clone())
+            .expect("failed to add service");
+
+        let alarm = SystemTime::UNIX_EPOCH
+            .checked_add(Duration::from_secs(
+                SystemTime::now()
+                    .checked_add(Duration::from_secs(60))
+                    .expect("failed to get alarm time")
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .expect("failed to get duration since UNIX EPOCH")
+                    .as_secs(),
+            ))
+            .unwrap();
+
+        let coordinator_context = ContextBuilder::default()
+            .with_alarm(alarm)
+            .with_coordinator(coordinator_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: participant_service_id.service_id().clone(),
+                vote: None,
+            }])
+            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_this_process(coordinator_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+
+        store
+            .add_consensus_context(&coordinator_fqsi, context.clone())
+            .expect("failed to add context");
+
+        let fetched_service = store
+            .get_service(&coordinator_fqsi)
+            .expect("failed to get service");
+
+        assert_eq!(fetched_service, Some(service));
+
+        let current_context = store
+            .get_current_consensus_context(&coordinator_fqsi)
+            .expect("failed to get current context");
+
+        assert_eq!(current_context, Some(context));
+
+        store
+            .remove_service(&coordinator_fqsi)
+            .expect("failed to get current context");
+
+        assert!(store
+            .get_service(&coordinator_fqsi)
+            .expect("failed to get current context")
+            .is_none());
+
+        assert!(store
+            .get_current_consensus_context(&coordinator_fqsi)
+            .expect("failed to get current context")
+            .is_none());
     }
 
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {

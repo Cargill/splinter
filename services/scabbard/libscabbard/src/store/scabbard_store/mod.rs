@@ -206,4 +206,13 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
     ) -> Result<Option<ScabbardContext>, ScabbardStoreError>;
+    /// Removes a scabbard service and all of its associated state
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The fully qualified service id for the `ScabbardService` to be removed
+    fn remove_service(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<(), ScabbardStoreError>;
 }

@@ -23,6 +23,7 @@ pub(super) mod get_service;
 pub(super) mod list_consensus_actions;
 pub(super) mod list_consensus_events;
 pub(super) mod list_ready_services;
+pub(super) mod remove_service;
 pub(super) mod update_commit_entry;
 pub(super) mod update_consensus_action;
 pub(super) mod update_consensus_context;
