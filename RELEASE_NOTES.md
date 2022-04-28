@@ -1,5 +1,21 @@
 # Release Notes
 
+## Changes in Splinter 0.6.12
+
+### splinter CLI
+
+* Add an option to dry-run the state migrate command. When this option is
+  enabled the command will check that the in and out databases are available
+  and that the in database has a commit hash. The command will not attempt to
+  move the state.
+
+### libsplinter
+
+* Remove the `"service-network"` feature. The component under this feature has
+  timing issues that were causing test failures in CI. Additionally, the
+  components are not compatible with the new Service API and will not be
+  completed.
+
 ## Changes in Splinter 0.6.11
 
 ### libsplinter
