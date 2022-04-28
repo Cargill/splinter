@@ -45,10 +45,10 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     context::{ContextBuilder, Participant},
-    state::Scabbard2pcState,
     two_phase::{
         action::{ConsensusAction, ConsensusActionNotification},
         message::Scabbard2pcMessage,
+        state::Scabbard2pcState,
     },
     IdentifiedScabbardConsensusAction, ScabbardContext,
 };

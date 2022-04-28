@@ -25,9 +25,9 @@ use crate::store::scabbard_store::{
         ParticipantContext, ParticipantState, ScabbardContext,
     },
     service::{ConsensusType, ScabbardService, ServiceStatus},
-    state::Scabbard2pcState,
     two_phase::{
         action::ConsensusActionNotification, event::Scabbard2pcEvent, message::Scabbard2pcMessage,
+        state::Scabbard2pcState,
     },
 };
 

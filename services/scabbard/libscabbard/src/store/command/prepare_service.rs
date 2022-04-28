@@ -19,7 +19,9 @@ use splinter::{error::InternalError, service::ServiceId, store::command::StoreCo
 use crate::store::{
     context::{Context, ContextBuilder, Participant, ScabbardContext},
     service::ScabbardService,
-    state::Scabbard2pcState,
+    two_phase::{
+        state::Scabbard2pcState,
+    },
     ScabbardStoreFactory,
 };
 

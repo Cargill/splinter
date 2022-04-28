@@ -701,11 +701,11 @@ pub mod tests {
         commit::{CommitEntryBuilder, ConsensusDecision},
         context::{ContextBuilder, Participant},
         service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
-        state::Scabbard2pcState,
         two_phase::{
             action::{ConsensusAction, ConsensusActionNotification},
             event::Scabbard2pcEvent,
             message::Scabbard2pcMessage,
+            state::Scabbard2pcState,
         },
     };
 
