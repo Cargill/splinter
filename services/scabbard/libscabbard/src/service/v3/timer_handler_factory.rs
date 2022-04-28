@@ -15,11 +15,21 @@
 use splinter::error::{InternalError, InvalidArgumentError};
 use splinter::service::{TimerHandler, TimerHandlerFactory};
 
+use crate::store::PooledScabbardStoreFactory;
+
 use super::ScabbardMessageByteConverter;
 use super::ScabbardTimerHandler;
 
-#[derive(Clone, Default)]
-pub struct ScabbardTimerHandlerFactory;
+#[derive(Clone)]
+pub struct ScabbardTimerHandlerFactory {
+    store_factory: Box<dyn PooledScabbardStoreFactory>,
+}
+
+impl ScabbardTimerHandlerFactory {
+    pub fn store_factory(&self) -> &dyn PooledScabbardStoreFactory {
+        &*self.store_factory
+    }
+}
 
 impl TimerHandlerFactory for ScabbardTimerHandlerFactory {
     type Message = Vec<u8>;
@@ -37,10 +47,24 @@ impl TimerHandlerFactory for ScabbardTimerHandlerFactory {
 }
 
 #[derive(Default)]
-pub struct ScabbardTimerHandlerFactoryBuilder {}
+pub struct ScabbardTimerHandlerFactoryBuilder {
+    store_factory: Option<Box<dyn PooledScabbardStoreFactory>>,
+}
 
 impl ScabbardTimerHandlerFactoryBuilder {
+    pub fn with_store_factory(
+        mut self,
+        store_factory: Box<dyn PooledScabbardStoreFactory>,
+    ) -> Self {
+        self.store_factory = Some(store_factory);
+        self
+    }
+
     pub fn build(self) -> Result<ScabbardTimerHandlerFactory, InvalidArgumentError> {
-        Ok(ScabbardTimerHandlerFactory {})
+        let store_factory = self
+            .store_factory
+            .ok_or_else(|| InvalidArgumentError::new("store_factory", "must be set"))?;
+
+        Ok(ScabbardTimerHandlerFactory { store_factory })
     }
 }
