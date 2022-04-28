@@ -49,6 +49,9 @@ COPY rest_api/actix_web_1/ /build/rest_api/actix_web_1/
 COPY rest_api/common/ /build/rest_api/common/
 COPY splinterd/ /build/splinterd
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
+COPY rest_api/actix_web_1/ /build/rest_api/actix_web_1/
+COPY rest_api/actix_web_4/ /build/rest_api/actix_web_4/
+COPY rest_api/common/ /build/rest_api/common/
 
 # Build splinterd
 ARG REPO_VERSION

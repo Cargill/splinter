@@ -25,7 +25,7 @@ COPY libsplinter /build/libsplinter
 COPY splinterd /build/splinterd
 COPY cli /build/cli
 COPY rest_api/actix_web_1/ /build/rest_api/actix_web_1/
-COPY rest_api/actix_web_4/Cargo.toml /build/rest_api/actix_web_4/Cargo.toml
+COPY rest_api/actix_web_4/ /build/rest_api/actix_web_4/
 COPY rest_api/common/ /build/rest_api/common/
 COPY services/scabbard/cli /build/services/scabbard/cli
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
