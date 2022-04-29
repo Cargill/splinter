@@ -734,29 +734,47 @@ impl BatchHistory {
         mut ids: HashSet<String>,
         timeout: Duration,
     ) -> Result<BatchInfoIter, ScabbardStateError> {
+        let mut ready = vec![];
+        let mut wait: HashMap<String, BatchInfo> = HashMap::new();
+
         // Get batches that are already completed
-        let iter = self
-            .no_wait_batch_info_iter(&ids)
-            .filter_map(|res| {
-                let info = res.ok()?;
-                match info.status {
-                    BatchStatus::Invalid(_) | BatchStatus::Committed(_) => {
-                        ids.remove(&info.id);
-                        Some(Ok(info))
+        for res in self.no_wait_batch_info_iter(&ids) {
+            match res {
+                Ok(info) => {
+                    match info.status {
+                        // Invalid and committed batches are "ready" and can be returned
+                        // immediately
+                        BatchStatus::Invalid(_) | BatchStatus::Committed(_) => {
+                            ids.remove(&info.id);
+                            ready.push(Ok(info));
+                        }
+                        // Other batches need to be waited on, but we'll still prepare a status to
+                        // return if the wait times out
+                        status => {
+                            wait.insert(
+                                info.id.clone(),
+                                BatchInfo {
+                                    id: info.id.clone(),
+                                    status,
+                                    timestamp: info.timestamp,
+                                },
+                            );
+                        }
                     }
-                    _ => None,
                 }
-            })
-            .collect::<Vec<_>>()
-            .into_iter();
+                Err(err) => {
+                    ready.push(Err(err));
+                }
+            }
+        }
 
         let (sender, receiver) = channel();
 
         self.batch_subscribers.push((ids.clone(), sender));
 
-        Ok(Box::new(
-            iter.chain(ChannelBatchInfoIter::new(receiver, timeout, ids)?),
-        ))
+        Ok(Box::new(ready.into_iter().chain(
+            ChannelBatchInfoIter::new(receiver, timeout, ids, wait)?,
+        )))
     }
 
     fn send_completed_batch_info_to_subscribers(&mut self, info: BatchInfo) {
@@ -802,6 +820,7 @@ pub struct ChannelBatchInfoIter {
     retry_interval: Duration,
     timeout: Instant,
     pending_ids: HashSet<String>,
+    history: HashMap<String, BatchInfo>,
 }
 
 impl ChannelBatchInfoIter {
@@ -809,6 +828,7 @@ impl ChannelBatchInfoIter {
         receiver: Receiver<BatchInfo>,
         timeout: Duration,
         pending_ids: HashSet<String>,
+        history: HashMap<String, BatchInfo>,
     ) -> Result<Self, ScabbardStateError> {
         Ok(Self {
             receiver,
@@ -817,6 +837,7 @@ impl ChannelBatchInfoIter {
                 .checked_add(timeout)
                 .ok_or_else(|| ScabbardStateError("failed to schedule timeout".into()))?,
             pending_ids,
+            history,
         })
     }
 }
@@ -842,10 +863,16 @@ impl Iterator for ChannelBatchInfoIter {
                 Err(TryRecvError::Empty) => {
                     // Check if the timeout has expired
                     if Instant::now() >= self.timeout {
-                        return Some(Err(format!(
-                            "timeout expired while waiting for incompleted batches: {:?}",
-                            self.pending_ids
-                        )));
+                        return Some(match self.pending_ids.iter().next() {
+                            Some(id) => {
+                                let id = id.to_string();
+                                self.pending_ids.remove(&id);
+                                self.history
+                                    .remove(&id)
+                                    .ok_or_else(|| format!("error getting id '{id}'"))
+                            }
+                            None => Err("error getting pending id".to_string()),
+                        });
                     }
                     std::thread::sleep(self.retry_interval);
                 }
@@ -878,19 +905,54 @@ mod tests {
 
     use super::merkle_state::{MerkleState, MerkleStateConfig};
 
-    /// Verify that the ChannelBatchInfoIter returns an error if no results are returned before the
-    /// timeout.
+    /// Verify that the ChannelBatchInfoIter returns results as they are passed in after timeout
     #[test]
-    fn channel_batch_iter_no_resuls_before_timeout() -> Result<(), Box<dyn std::error::Error>> {
+    fn channel_batch_iter_results_after_timeout() -> Result<(), Box<dyn std::error::Error>> {
         let (_tx, rx) = channel();
 
-        let mut iter = ChannelBatchInfoIter::new(
+        let history: HashMap<String, BatchInfo> = vec![
+            (
+                "batch-id-1".to_string(),
+                BatchInfo {
+                    id: "batch-id-1".to_string(),
+                    status: BatchStatus::Unknown,
+                    timestamp: SystemTime::now(),
+                },
+            ),
+            (
+                "batch-id-2".to_string(),
+                BatchInfo {
+                    id: "batch-id-2".to_string(),
+                    status: BatchStatus::Pending,
+                    timestamp: SystemTime::now(),
+                },
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        let results: HashMap<String, BatchStatus> = ChannelBatchInfoIter::new(
             rx,
             Duration::from_secs(0),
-            vec!["batch-id-1".to_string()].into_iter().collect(),
-        )?;
+            vec!["batch-id-1", "batch-id-2"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            history,
+        )?
+        .map(|result| {
+            let result = result.unwrap();
+            (result.id, result.status)
+        })
+        .into_iter()
+        .collect();
 
-        assert!(iter.next().unwrap().is_err());
+        // Validate the results match what was passed in
+        assert_eq!(results.get("batch-id-1").unwrap(), &BatchStatus::Unknown);
+        assert_eq!(results.get("batch-id-2").unwrap(), &BatchStatus::Pending);
+
+        // Validate the result length is what we expect
+        assert_eq!(results.values().count(), 2);
 
         Ok(())
     }
@@ -904,6 +966,7 @@ mod tests {
             rx,
             Duration::from_secs(0),
             vec!["batch-id-1".to_string()].into_iter().collect(),
+            HashMap::new(),
         )?;
 
         tx.send(BatchInfo {
@@ -919,6 +982,14 @@ mod tests {
         let info = info.unwrap();
 
         assert_eq!(&info.id, "batch-id-1");
+
+        match info.status {
+            BatchStatus::Committed(_) => (), // Expected
+            status => panic!(
+                "Unexpected batch status {:?}. Expected BatchStatus::Committed",
+                status
+            ),
+        }
 
         let info = iter.next();
 
@@ -940,6 +1011,7 @@ mod tests {
                 rx,
                 Duration::from_secs(1),
                 vec!["batch-id-1".to_string()].into_iter().collect(),
+                HashMap::new(),
             )
             .unwrap();
 
@@ -952,6 +1024,14 @@ mod tests {
             let info = info.unwrap();
 
             assert_eq!(&info.id, "batch-id-1");
+
+            match info.status {
+                BatchStatus::Committed(_) => (), // Expected
+                status => panic!(
+                    "Unexpected batch status {:?}. Expected BatchStatus::Committed",
+                    status
+                ),
+            }
 
             let info = iter.next();
 
@@ -1235,5 +1315,39 @@ mod tests {
         let mut indexes = INDEXES.to_vec();
         indexes.push(CURRENT_STATE_ROOT_INDEX);
         BTreeDatabase::new(&indexes)
+    }
+
+    #[test]
+    fn batch_history_correctly_fetches_batch_info() {
+        let mut history = BatchHistory::new();
+        history.add_batch("batch-id-1");
+        history.add_batch("batch-id-2");
+
+        // Add one batch id that we know is not part of the set (batch-id-3)
+        let ids: HashSet<String> = vec!["batch-id-1", "batch-id-2", "batch-id-3"]
+            .into_iter()
+            .map(String::from)
+            .collect::<HashSet<_>>();
+        let duration = Duration::from_secs(0);
+        let result = history
+            .get_batch_info(ids, Some(duration))
+            .expect("received unexpected error");
+        let results: HashMap<String, BatchStatus> = result
+            .map(|result| {
+                let result = result.unwrap();
+                (result.id, result.status)
+            })
+            .into_iter()
+            .collect();
+
+        // The items scabbard is aware of should be Pending
+        assert_eq!(results.get("batch-id-1").unwrap(), &BatchStatus::Pending);
+        assert_eq!(results.get("batch-id-2").unwrap(), &BatchStatus::Pending);
+
+        // The item that has timed out should be Unknown
+        assert_eq!(results.get("batch-id-3").unwrap(), &BatchStatus::Unknown);
+
+        // Validate there are no extra items
+        assert_eq!(results.values().count(), 3);
     }
 }
