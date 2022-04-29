@@ -40,6 +40,8 @@ use std::iter::ExactSizeIterator;
 #[cfg(feature = "diesel")]
 pub use self::diesel::DieselRegistry;
 pub use error::{InvalidNodeError, RegistryError};
+#[cfg(feature = "rest-api-actix-web-1")]
+pub use rest_api::RwRegistryRestResourceProvider;
 pub use unified::UnifiedRegistry;
 pub use yaml::{LocalYamlRegistry, YamlNode};
 #[cfg(feature = "registry-remote")]

@@ -69,6 +69,7 @@ use splinter::peer::PeerManager;
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::NetworkMessageType;
 use splinter::public_key::PublicKey;
+use splinter::registry::RwRegistryRestResourceProvider;
 use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RwRegistry, UnifiedRegistry,
 };
@@ -661,8 +662,8 @@ impl SplinterDaemon {
         #[allow(unused_mut)]
         let mut rest_api_builder = RestApiBuilder::new()
             .with_bind(bind)
-            .add_resources(registry.resources())
             .add_resources(AdminServiceRestProvider::new(&admin_service).resources())
+            .add_resources(RwRegistryRestResourceProvider::new(&registry).resources())
             .add_resources(orchestrator_resources)
             .add_resources(circuit_resource_provider.resources());
 
