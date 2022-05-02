@@ -90,7 +90,7 @@ where
     fn signal_shutdown(&mut self) {
         self.pacemaker.shutdown_signaler().shutdown();
         if self.sender.send(ExecutorMessage::Shutdown).is_err() {
-            warn!("Timer is no longer running");
+            warn!("Lifecycle executor is no longer running");
         }
     }
 

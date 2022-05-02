@@ -311,7 +311,6 @@ mod tests {
         let mut test = HashMap::new();
         let statictype = ServiceType::new("statictype").unwrap();
         let statictype_borrowed = ServiceType::new_static("statictype");
-        let other_type = ServiceType::new("othertype").unwrap();
 
         test.insert(statictype.clone(), 1);
 
