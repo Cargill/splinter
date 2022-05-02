@@ -17,15 +17,17 @@ use std::convert::TryFrom;
 use splinter::error::InvalidArgumentError;
 use splinter::service::ServiceId;
 
+use crate::store::service::ConsensusType;
+
 pub struct ScabbardArguments {
     peers: Vec<ServiceId>,
-    consensus: ScabbardConsensus,
+    consensus: ConsensusType,
 }
 
 impl ScabbardArguments {
     pub fn new(
         peers: Vec<ServiceId>,
-        consensus: ScabbardConsensus,
+        consensus: ConsensusType,
     ) -> Result<Self, InvalidArgumentError> {
         Ok(Self { peers, consensus })
     }
@@ -34,7 +36,7 @@ impl ScabbardArguments {
         &self.peers
     }
 
-    pub fn consensus(&self) -> &ScabbardConsensus {
+    pub fn consensus(&self) -> &ConsensusType {
         &self.consensus
     }
 }
@@ -42,7 +44,7 @@ impl ScabbardArguments {
 #[derive(Default)]
 pub struct ScabbardArgumentsBuilder {
     peers: Option<Vec<ServiceId>>,
-    consensus: Option<ScabbardConsensus>,
+    consensus: Option<ConsensusType>,
 }
 
 impl ScabbardArgumentsBuilder {
@@ -58,7 +60,7 @@ impl ScabbardArgumentsBuilder {
         self
     }
 
-    pub fn with_consensus(mut self, consensus: ScabbardConsensus) -> Self {
+    pub fn with_consensus(mut self, consensus: ConsensusType) -> Self {
         self.consensus = Some(consensus);
         self
     }
@@ -69,22 +71,18 @@ impl ScabbardArgumentsBuilder {
             .ok_or_else(|| InvalidArgumentError::new("peers", "must be set"))?;
 
         // currently defaults to TwoPC if none is provided
-        let consensus = self.consensus.unwrap_or(ScabbardConsensus::TwoPC);
+        let consensus = self.consensus.unwrap_or(ConsensusType::TwoPC);
 
         ScabbardArguments::new(peers, consensus)
     }
 }
 
-pub enum ScabbardConsensus {
-    TwoPC,
-}
-
-impl TryFrom<String> for ScabbardConsensus {
+impl TryFrom<String> for ConsensusType {
     type Error = InvalidArgumentError;
 
     fn try_from(consensus: String) -> Result<Self, Self::Error> {
         match consensus.as_str() {
-            "2PC" => Ok(ScabbardConsensus::TwoPC),
+            "2PC" => Ok(ConsensusType::TwoPC),
             _ => Err(InvalidArgumentError::new(
                 "consensus",
                 "provided consensus type is not supported",

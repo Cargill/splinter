@@ -19,7 +19,9 @@ use splinter::{
     service::{ArgumentsConverter, ServiceId},
 };
 
-use super::{ScabbardArguments, ScabbardArgumentsBuilder, ScabbardConsensus};
+use crate::store::service::ConsensusType;
+
+use super::{ScabbardArguments, ScabbardArgumentsBuilder};
 
 pub struct ScabbardArgumentsVecConverter {}
 
@@ -52,7 +54,7 @@ impl ArgumentsConverter<ScabbardArguments, Vec<(String, String)>>
                     arg_builder = arg_builder.with_peers(peers);
                 }
                 "consensus" => {
-                    let consensus = ScabbardConsensus::try_from(value)
+                    let consensus = ConsensusType::try_from(value)
                         .map_err(|err| InternalError::from_source(Box::new(err)))?;
                     arg_builder = arg_builder.with_consensus(consensus);
                 }

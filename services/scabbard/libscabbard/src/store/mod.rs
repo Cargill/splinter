@@ -35,11 +35,13 @@ pub use commit_hash::{CommitHashStore, CommitHashStoreError};
 
 #[cfg(all(feature = "scabbardv3", feature = "diesel"))]
 pub use scabbard_store::diesel::DieselScabbardStore;
-#[cfg(all(feature = "scabbardv3", feature = "postgres"))]
-pub use scabbard_store::PooledPgScabbardStoreFactory;
 #[cfg(feature = "scabbardv3")]
 pub use scabbard_store::PooledScabbardStoreFactory;
-#[cfg(all(feature = "scabbardv3", feature = "sqlite"))]
-pub use scabbard_store::PooledSqliteScabbardStoreFactory;
 #[cfg(feature = "scabbardv3")]
-pub use scabbard_store::{action, context, service, state, two_phase, ScabbardStore};
+pub use scabbard_store::{
+    action, context, service, state, two_phase, ScabbardStore, ScabbardStoreFactory,
+};
+#[cfg(all(feature = "scabbardv3", feature = "postgres"))]
+pub use scabbard_store::{PgScabbardStoreFactory, PooledPgScabbardStoreFactory};
+#[cfg(all(feature = "scabbardv3", feature = "sqlite"))]
+pub use scabbard_store::{PooledSqliteScabbardStoreFactory, SqliteScabbardStoreFactory};

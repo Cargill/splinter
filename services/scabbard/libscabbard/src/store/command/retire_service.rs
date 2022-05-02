@@ -12,20 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::marker::PhantomData;
+use std::sync::Arc;
 
-use log::info;
-use splinter::{error::InternalError, store::command::StoreCommand};
+use splinter::{
+    error::InternalError, service::FullyQualifiedServiceId, store::command::StoreCommand,
+};
 
-#[derive(Default)]
+use crate::store::{service::ServiceStatus, ScabbardStoreFactory};
+
 pub struct ScabbardRetireServiceCommand<C> {
-    _store_factory: PhantomData<C>,
+    store_factory: Arc<dyn ScabbardStoreFactory<C>>,
+    service_id: FullyQualifiedServiceId,
 }
 
 impl<C> ScabbardRetireServiceCommand<C> {
-    pub fn new() -> Self {
+    pub fn new(
+        store_factory: Arc<dyn ScabbardStoreFactory<C>>,
+        service_id: FullyQualifiedServiceId,
+    ) -> Self {
         Self {
-            _store_factory: PhantomData,
+            store_factory,
+            service_id,
         }
     }
 }
@@ -33,8 +40,24 @@ impl<C> ScabbardRetireServiceCommand<C> {
 impl<C> StoreCommand for ScabbardRetireServiceCommand<C> {
     type Context = C;
 
-    fn execute(&self, _conn: &Self::Context) -> Result<(), InternalError> {
-        info!("executing retire service command");
+    fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
+        let store = self.store_factory.new_store(conn);
+
+        let service = store
+            .get_service(&self.service_id)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?
+            .ok_or_else(|| {
+                InternalError::with_message(format!("Unable to fetch service {}", self.service_id))
+            })?
+            .into_builder()
+            .with_status(&ServiceStatus::Retired)
+            .build()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        store
+            .update_service(service)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
         Ok(())
     }
 }

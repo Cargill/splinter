@@ -12,20 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::marker::PhantomData;
+use std::sync::Arc;
 
-use log::info;
-use splinter::{error::InternalError, store::command::StoreCommand};
+use splinter::{
+    error::InternalError, service::FullyQualifiedServiceId, store::command::StoreCommand,
+};
 
-#[derive(Default)]
+use crate::store::ScabbardStoreFactory;
+
 pub struct ScabbardPurgeServiceCommand<C> {
-    _store_factory: PhantomData<C>,
+    store_factory: Arc<dyn ScabbardStoreFactory<C>>,
+    service_id: FullyQualifiedServiceId,
 }
 
 impl<C> ScabbardPurgeServiceCommand<C> {
-    pub fn new() -> Self {
+    pub fn new(
+        store_factory: Arc<dyn ScabbardStoreFactory<C>>,
+        service_id: FullyQualifiedServiceId,
+    ) -> Self {
         Self {
-            _store_factory: PhantomData,
+            store_factory,
+            service_id,
         }
     }
 }
@@ -33,8 +40,10 @@ impl<C> ScabbardPurgeServiceCommand<C> {
 impl<C> StoreCommand for ScabbardPurgeServiceCommand<C> {
     type Context = C;
 
-    fn execute(&self, _conn: &Self::Context) -> Result<(), InternalError> {
-        info!("executing purge service command");
-        Ok(())
+    fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
+        self.store_factory
+            .new_store(conn)
+            .remove_service(&self.service_id)
+            .map_err(|err| InternalError::from_source(Box::new(err)))
     }
 }

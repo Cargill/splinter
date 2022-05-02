@@ -59,6 +59,34 @@ impl Context {
     pub fn this_process(&self) -> &ServiceId {
         &self.this_process
     }
+
+    pub fn into_builder(self) -> ContextBuilder {
+        let mut builder = ContextBuilder::default()
+            .with_coordinator(&self.coordinator)
+            .with_epoch(self.epoch)
+            .with_this_process(&self.this_process);
+
+        match self.role_context.inner {
+            InnerContext::Participant(context) => {
+                builder = builder.with_participant_processes(context.participant_processes);
+                builder = builder.with_state(context.state.into());
+            }
+            InnerContext::Coordinator(context) => {
+                builder = builder.with_participants(context.participants);
+                builder = builder.with_state(context.state.into());
+            }
+        }
+
+        if let Some(alarm) = self.alarm {
+            builder = builder.with_alarm(alarm);
+        }
+
+        if let Some(last_commit_epoch) = self.last_commit_epoch {
+            builder = builder.with_last_commit_epoch(last_commit_epoch);
+        }
+
+        builder
+    }
 }
 
 #[derive(Default, Clone)]
