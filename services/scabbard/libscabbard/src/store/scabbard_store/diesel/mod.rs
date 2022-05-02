@@ -699,13 +699,13 @@ pub mod tests {
 
     use crate::store::scabbard_store::{
         commit::{CommitEntryBuilder, ConsensusDecision},
-        context::{ContextBuilder, Participant},
         service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
-        state::Scabbard2pcState,
         two_phase::{
             action::{ConsensusAction, ConsensusActionNotification},
+            context::{ContextBuilder, Participant},
             event::Scabbard2pcEvent,
             message::Scabbard2pcMessage,
+            state::Scabbard2pcState,
         },
     };
 

@@ -15,5 +15,7 @@
 //! Structs and enums specific to the two phase commit consensus algorithm
 
 pub mod action;
+pub mod context;
 pub mod event;
 pub mod message;
+pub mod state;
