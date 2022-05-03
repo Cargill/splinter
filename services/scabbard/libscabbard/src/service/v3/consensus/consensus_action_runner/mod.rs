@@ -17,3 +17,4 @@
 
 mod commands;
 mod context_updater;
+mod notify_observer;
