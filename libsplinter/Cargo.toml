@@ -28,12 +28,9 @@ repository = "https://github.com/cargill/splinter"
 
 [dependencies]
 actix = { version = "0.8", optional = true, default-features = false }
-actix-0-10 = { package = "actix", version = "0.10", optional = true, default-features = false }
 actix-http = { version = "0.2", optional = true, default-features = false }
-actix-service-1-0 = { package = "actix-service", version = "1.0", optional = true }
 actix-web = { version = "1.0", optional = true, default-features = false }
 actix-web-actors = { version = "1.0", optional = true }
-actix-web-3 = { package = "actix-web", version = "3", optional = true, features = ["openssl"] }
 awc = { version = "0.2", optional = true, default-features = false }
 base64 = { version = "0.13", optional = true }
 bcrypt = {version = "0.10", optional = true}
@@ -125,7 +122,6 @@ experimental = [
     "https-bind",
     "registry-client",
     "registry-client-reqwest",
-    "rest-api-actix-web-3",
     "service-arguments-converter",
     "service-lifecycle",
     "service-lifecycle-executor",
@@ -190,7 +186,6 @@ rest-api-actix-web-1 = [
     "futures",
     "rest-api",
 ]
-rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
 service-arguments-converter = []
 service-lifecycle = ["service-arguments-converter", "store"]
