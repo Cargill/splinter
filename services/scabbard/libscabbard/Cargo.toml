@@ -40,6 +40,11 @@ serde_json = "1.0"
 splinter = { path = "../../../libsplinter" }
 transact = { version = "0.5", features = ["state-merkle-sql", "family-sabre"] }
 
+[dependencies.augrim]
+version = "0.1"
+optional = true
+features = ["algorithm-two-phase-commit"]
+
 [dependencies.sawtooth]
 version = "0.8"
 optional = true
@@ -88,6 +93,7 @@ postgres = ["diesel/postgres", "diesel_migrations", "log", "sawtooth/postgres", 
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix-web-1 = ["actix-web", "rest-api", "splinter/rest-api-actix-web-1"]
 scabbardv3 = [
+    "augrim",
     "splinter/service-arguments-converter",
     "splinter/service-lifecycle",
     "splinter/service-message-converter",

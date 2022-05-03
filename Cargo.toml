@@ -29,6 +29,7 @@ members = [
 ]
 
 [patch.crates-io]
+augrim = { git = "https://github.com/augrim/augrim" }
 transact = { git = "https://github.com/hyperledger/transact" }
 sabre-sdk = { git = "https://github.com/hyperledger/sawtooth-sabre" }
 sawtooth = { git = "https://github.com/hyperledger/sawtooth-lib" }
