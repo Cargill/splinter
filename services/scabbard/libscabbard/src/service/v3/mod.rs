@@ -31,6 +31,8 @@ pub use consensus::consensus_action_runner::{
     CommandNotifyObserver, ConsensusActionRunner, ContextUpdater, NotifyObserver,
     ScabbardStoreContextUpdater,
 };
+#[cfg(feature = "scabbardv3-consensus")]
+pub use consensus::ScabbardProcess;
 pub use lifecycle::ScabbardLifecycle;
 pub use message_converter::ScabbardMessageByteConverter;
 pub use message_handler::ScabbardMessageHandler;
