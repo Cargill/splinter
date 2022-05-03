@@ -167,7 +167,10 @@ fn query_list_circuits(
             }
         };
         if let Some(status) = status_filter {
-            filters.push(CircuitPredicate::CircuitStatus(CircuitStatus::from(status)));
+            filters.push(CircuitPredicate::CircuitStatus(
+                CircuitStatus::try_from(status)
+                    .map_err(|e| CircuitListError::CircuitStatusError(e.to_string()))?,
+            ));
         }
 
         let circuits = store

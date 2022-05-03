@@ -335,12 +335,17 @@ impl From<&messages::CircuitStatus> for CircuitStatus {
     }
 }
 
-impl From<String> for CircuitStatus {
-    fn from(str: String) -> Self {
+impl TryFrom<String> for CircuitStatus {
+    type Error = InvalidStateError;
+
+    fn try_from(str: String) -> Result<Self, Self::Error> {
         match &*str {
-            "disbanded" => CircuitStatus::Disbanded,
-            "abandoned" => CircuitStatus::Abandoned,
-            _ => CircuitStatus::Active,
+            "disbanded" => Ok(CircuitStatus::Disbanded),
+            "abandoned" => Ok(CircuitStatus::Abandoned),
+            "active" => Ok(CircuitStatus::Active),
+            s => Err(InvalidStateError::with_message(format!(
+                "could not form CircuitStatus from: {s}"
+            ))),
         }
     }
 }
