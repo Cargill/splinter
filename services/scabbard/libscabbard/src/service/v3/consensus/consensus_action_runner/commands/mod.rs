@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The `ConsensusActionRunner` is in charge of execution the actions that have been returned from
-//! the 2PC algorithm
+//! This module contains the commands that will be used by the `ConsensusActionRunner`
 
-mod commands;
+pub mod actions;
+pub mod context;
+pub mod notifications;
