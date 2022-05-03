@@ -35,7 +35,6 @@ use splinter::registry::{
     RegistryWriter,
 };
 use splinter::rest_api::actix_web_1::RestApiShutdownHandle;
-use splinter::rest_api::actix_web_3::RestApi;
 use splinter::threading::lifecycle::ShutdownHandle;
 use std::time::Duration;
 
@@ -43,7 +42,6 @@ use super::{running::admin::AdminSubsystem, NodeBuilder, RestApiVariant, Runnabl
 
 pub(super) enum NodeRestApiVariant {
     ActixWeb1(RestApiShutdownHandle, JoinHandle<()>),
-    ActixWeb3(RestApi),
 }
 
 /// A running instance of a Splinter node.
@@ -195,13 +193,6 @@ impl Node {
 
                 RestApiVariant::ActixWeb1
             }
-            NodeRestApiVariant::ActixWeb3(rest_api) => {
-                rest_api
-                    .wait_for_shutdown()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-
-                RestApiVariant::ActixWeb3
-            }
         };
 
         let AdminSubsystem { store_factory, .. } = admin_subsystem;
@@ -254,10 +245,6 @@ impl Node {
 impl ShutdownHandle for Node {
     fn signal_shutdown(&mut self) {
         self.admin_subsystem.signal_shutdown();
-
-        if let NodeRestApiVariant::ActixWeb3(ref mut rest_api) = self.rest_api_variant {
-            rest_api.signal_shutdown();
-        }
     }
 
     fn wait_for_shutdown(mut self) -> Result<(), InternalError> {
@@ -272,11 +259,6 @@ impl ShutdownHandle for Node {
                     errors.push(InternalError::with_message(
                         "REST API thread panicked, join() failed".to_string(),
                     ));
-                }
-            }
-            NodeRestApiVariant::ActixWeb3(rest_api) => {
-                if let Err(err) = rest_api.wait_for_shutdown() {
-                    errors.push(err);
                 }
             }
         }
