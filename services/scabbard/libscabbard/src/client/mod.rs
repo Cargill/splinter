@@ -347,13 +347,13 @@ fn wait_for_batches(
                 )));
             }
         } else {
-            let any_invalid_batches = batch_infos
+            let any_invalid_or_unknown = batch_infos
                 .iter()
-                .any(|info| matches!(info.status, BatchStatus::Invalid(_)));
+                .any(|info| matches!(info.status, BatchStatus::Invalid(_) | BatchStatus::Unknown));
 
-            if any_invalid_batches {
+            if any_invalid_or_unknown {
                 return Err(ScabbardClientError::new(&format!(
-                    "one or more batches were invalid: {:?}",
+                    "one or more batches are invalid or unknown: {:?}",
                     batch_infos
                 )));
             } else {
