@@ -24,3 +24,13 @@ pub enum ScabbardConsensusEvent {
 pub enum ReturnedScabbardConsensusEvent {
     Scabbard2pcConsensusEvent(i64, Scabbard2pcEvent),
 }
+
+impl ReturnedScabbardConsensusEvent {
+    pub fn deconstruct(self) -> (i64, ScabbardConsensusEvent) {
+        match self {
+            Self::Scabbard2pcConsensusEvent(id, event) => {
+                (id, ScabbardConsensusEvent::Scabbard2pcConsensusEvent(event))
+            }
+        }
+    }
+}
