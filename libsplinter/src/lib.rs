@@ -23,7 +23,7 @@ extern crate serde_derive;
 #[cfg(feature = "rest-api-actix-web-1")]
 extern crate serde_json;
 #[macro_use]
-#[cfg(feature = "diesel")]
+#[cfg(all(feature = "diesel", feature = "store"))]
 extern crate diesel;
 #[macro_use]
 #[cfg(feature = "diesel")]

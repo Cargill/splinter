@@ -132,7 +132,7 @@ experimental = [
 # used for turning benchmark tests on
 benchmark = []
 
-admin-service = []
+admin-service = ["store"]
 admin-service-client = ["admin-service"]
 admin-service-event-client = ["admin-service-client" ]
 admin-service-event-client-actix-web-client = [
@@ -159,7 +159,7 @@ https-bind = ["actix-web/ssl"]
 memory = ["sqlite"]
 node-id-store = []
 oauth = ["biome", "base64", "oauth2", "reqwest", "rest-api"]
-postgres = ["diesel/postgres", "diesel_migrations", "store"]
+postgres = ["diesel/postgres", "diesel_migrations"]
 registry = []
 registry-client = ["registry"]
 registry-client-reqwest = ["registry-client", "reqwest"]
@@ -175,7 +175,7 @@ rest-api-actix-web-1 = [
 ]
 rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
-sqlite = ["diesel/sqlite", "diesel_migrations", "store"]
+sqlite = ["diesel/sqlite", "diesel_migrations"]
 store = []
 store-factory = ["store"]
 tap = ["chrono", "futures-0-3", "influxdb", "metrics", "tokio-1"]
