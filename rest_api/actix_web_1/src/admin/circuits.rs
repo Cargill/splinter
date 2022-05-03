@@ -229,6 +229,10 @@ fn query_list_circuits(
                     error!("{}", err);
                     Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
                 }
+                CircuitListError::CircuitStatusError(msg) => {
+                    error!("{msg}");
+                    Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
+                }
             },
             _ => {
                 error!("{}", err);
