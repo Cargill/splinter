@@ -14,6 +14,8 @@
 
 mod arguments;
 mod arguments_converter;
+#[cfg(feature = "scabbardv3-consensus-action-runner")]
+mod consensus;
 mod lifecycle;
 mod message_converter;
 mod message_handler;
