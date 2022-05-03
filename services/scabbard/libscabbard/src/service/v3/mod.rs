@@ -32,7 +32,7 @@ pub use consensus::consensus_action_runner::{
     ScabbardStoreContextUpdater,
 };
 #[cfg(feature = "scabbardv3-consensus")]
-pub use consensus::ScabbardProcess;
+pub use consensus::{ScabbardProcess, ScabbardValue};
 pub use lifecycle::ScabbardLifecycle;
 pub use message_converter::ScabbardMessageByteConverter;
 pub use message_handler::ScabbardMessageHandler;
