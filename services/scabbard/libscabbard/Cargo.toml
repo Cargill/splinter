@@ -93,7 +93,9 @@ lmdb = []
 postgres = ["diesel/postgres", "diesel_migrations", "log", "sawtooth/postgres", "transact/postgres"]
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix-web-1 = ["actix-web", "rest-api", "splinter/rest-api-actix-web-1"]
-scabbardv3-consensus-action-runner = []
+scabbardv3-consensus-action-runner = [
+    "splinter/service-message-sender-factory",
+    ]
 scabbardv3 = [
     "augrim",
     "splinter/service-arguments-converter",
