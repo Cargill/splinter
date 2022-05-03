@@ -28,9 +28,8 @@ use crate::store::scabbard_store::diesel::{
         CoordinatorContextParticipantList, ParticipantContextParticipantList,
     },
     schema::{
-        consensus_2pc_consensus_coordinator_context,
-        consensus_2pc_consensus_coordinator_context_participant, consensus_2pc_participant_context,
-        consensus_2pc_participant_context_participant,
+        consensus_2pc_coordinator_context, consensus_2pc_coordinator_context_participant,
+        consensus_2pc_participant_context, consensus_2pc_participant_context_participant,
     },
 };
 use crate::store::scabbard_store::ScabbardContext;
@@ -62,14 +61,12 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                                 &context, service_id,
                             ))?
                             .inner;
-                            insert_into(consensus_2pc_consensus_coordinator_context::table)
+                            insert_into(consensus_2pc_coordinator_context::table)
                                 .values(vec![new_coordinator_context])
                                 .execute(self.conn)?;
-                            insert_into(
-                                consensus_2pc_consensus_coordinator_context_participant::table,
-                            )
-                            .values(participants)
-                            .execute(self.conn)?;
+                            insert_into(consensus_2pc_coordinator_context_participant::table)
+                                .values(participants)
+                                .execute(self.conn)?;
                         }
                         Err(_) => match Consensus2pcParticipantContextModel::try_from((
                             &context, service_id,
@@ -116,14 +113,12 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, PgConnection> {
                                 &context, service_id,
                             ))?
                             .inner;
-                            insert_into(consensus_2pc_consensus_coordinator_context::table)
+                            insert_into(consensus_2pc_coordinator_context::table)
                                 .values(vec![new_coordinator_context])
                                 .execute(self.conn)?;
-                            insert_into(
-                                consensus_2pc_consensus_coordinator_context_participant::table,
-                            )
-                            .values(participants)
-                            .execute(self.conn)?;
+                            insert_into(consensus_2pc_coordinator_context_participant::table)
+                                .values(participants)
+                                .execute(self.conn)?;
                         }
                         Err(_) => match Consensus2pcParticipantContextModel::try_from((
                             &context, service_id,

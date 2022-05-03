@@ -21,7 +21,7 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::operations::get_service::GetServiceOperation;
 use crate::store::scabbard_store::diesel::schema::{
-    consensus_2pc_consensus_coordinator_context, consensus_2pc_participant_context, scabbard_peer,
+    consensus_2pc_coordinator_context, consensus_2pc_participant_context, scabbard_peer,
     scabbard_service, scabbard_v3_commit_history,
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -60,9 +60,10 @@ impl<'a> RemoveServiceOperation for ScabbardStoreOperations<'a, SqliteConnection
                 // delete all consensus state associated with the services
                 //
                 // delete cascade will remove the remaining associated consensus components
-                delete(consensus_2pc_consensus_coordinator_context::table.filter(
-                    consensus_2pc_consensus_coordinator_context::service_id.eq(&service_id),
-                ))
+                delete(
+                    consensus_2pc_coordinator_context::table
+                        .filter(consensus_2pc_coordinator_context::service_id.eq(&service_id)),
+                )
                 .execute(self.conn)?;
 
                 delete(
@@ -103,9 +104,10 @@ impl<'a> RemoveServiceOperation for ScabbardStoreOperations<'a, PgConnection> {
                     // delete all consensus state associated with the services
                     //
                     // delete cascade will remove the remaining associated consensus components
-                    delete(consensus_2pc_consensus_coordinator_context::table.filter(
-                        consensus_2pc_consensus_coordinator_context::service_id.eq(&service_id),
-                    ))
+                    delete(
+                        consensus_2pc_coordinator_context::table
+                            .filter(consensus_2pc_coordinator_context::service_id.eq(&service_id)),
+                    )
                     .execute(self.conn)?;
 
                     delete(

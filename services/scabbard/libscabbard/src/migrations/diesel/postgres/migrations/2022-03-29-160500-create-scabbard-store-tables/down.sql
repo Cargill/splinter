@@ -13,8 +13,8 @@
 -- limitations under the License.
 -- -----------------------------------------------------------------------------
 
-DROP TABLE IF EXISTS consensus_2pc_consensus_coordinator_context;
-DROP TABLE IF EXISTS consensus_2pc_consensus_coordinator_context_participant;
+DROP TABLE IF EXISTS consensus_2pc_coordinator_context;
+DROP TABLE IF EXISTS consensus_2pc_coordinator_context_participant;
 DROP TABLE IF EXISTS consensus_2pc_action;
 DROP TABLE IF EXISTS consensus_2pc_update_coordinator_context_action;
 DROP TABLE IF EXISTS consensus_2pc_coordinator_send_message_action;

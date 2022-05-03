@@ -13,7 +13,7 @@
 -- limitations under the License.
 -- -----------------------------------------------------------------------------
 
-DROP TABLE IF EXISTS two_pc_consensus_event;
-DROP TABLE IF EXISTS two_pc_consensus_deliver_event;
-DROP TABLE IF EXISTS two_pc_consensus_start_event;
-DROP TABLE IF EXISTS two_pc_consensus_vote_event;
+DROP TABLE IF EXISTS consensus_2pc_event;
+DROP TABLE IF EXISTS consensus_2pc_deliver_event;
+DROP TABLE IF EXISTS consensus_2pc_start_event;
+DROP TABLE IF EXISTS consensus_2pc_vote_event;
