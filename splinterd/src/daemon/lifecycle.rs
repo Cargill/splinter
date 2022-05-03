@@ -15,6 +15,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[cfg(feature = "scabbardv3")]
+use scabbard::service::v3::{ScabbardArgumentsVecConverter, ScabbardLifecycle};
+#[cfg(all(feature = "scabbardv3", feature = "database-postgres"))]
+use scabbard::store::PgScabbardStoreFactory;
+#[cfg(all(feature = "scabbardv3", feature = "database-sqlite"))]
+use scabbard::store::SqliteScabbardStoreFactory;
 use splinter::error::InternalError;
 #[cfg(feature = "database-postgres")]
 use splinter::runtime::service::PostgresLifecycleStoreFactory;
@@ -24,10 +30,13 @@ use splinter::runtime::service::{
     ExecutorAlarm, LifecycleCommandGenerator, LifecycleExecutor, LifecycleStore,
     LifecycleStoreFactory,
 };
+#[cfg(feature = "scabbardv3")]
+use splinter::service::{Lifecycle, ServiceType};
 use splinter::store::command::DieselStoreCommandExecutor;
 use splinter::threading::lifecycle::ShutdownHandle;
 
 use super::store::ConnectionPool;
+use super::SCABBARD_SERVICE_TYPE;
 
 pub enum DaemonLifecycleExecutor {
     #[cfg(feature = "database-sqlite")]
@@ -80,7 +89,18 @@ pub fn create_lifecycle_executor(
     match connection_pool {
         #[cfg(feature = "database-sqlite")]
         ConnectionPool::Sqlite { pool } => {
-            let lifecycles = HashMap::new();
+            #[cfg_attr(not(feature = "scabbardv3"), allow(usused_mut))]
+            let mut lifecycles: SqliteLifecycles = HashMap::new();
+
+            #[cfg(feature = "scabbardv3")]
+            {
+                let scabbard_lifecycle =
+                    ScabbardLifecycle::new(Arc::new(SqliteScabbardStoreFactory));
+                let scabbard_vec_lifecycle =
+                    scabbard_lifecycle.into_lifecycle(ScabbardArgumentsVecConverter {});
+                lifecycles.insert(SCABBARD_SERVICE_TYPE, Box::new(scabbard_vec_lifecycle));
+            }
+
             let lifecycle_pool = pool.write().unwrap().clone();
             let lifecycle_store_factory: Arc<
                 (dyn LifecycleStoreFactory<diesel::sqlite::SqliteConnection>),
@@ -100,7 +120,17 @@ pub fn create_lifecycle_executor(
         }
         #[cfg(feature = "database-postgres")]
         ConnectionPool::Postgres { pool } => {
-            let lifecycles = HashMap::new();
+            #[cfg_attr(not(feature = "scabbardv3"), allow(usused_mut))]
+            let mut lifecycles: PostgresLifecycles = HashMap::new();
+
+            #[cfg(feature = "scabbardv3")]
+            {
+                let scabbard_lifecycle = ScabbardLifecycle::new(Arc::new(PgScabbardStoreFactory));
+                let scabbard_vec_lifecycle =
+                    scabbard_lifecycle.into_lifecycle(ScabbardArgumentsVecConverter {});
+                lifecycles.insert(SCABBARD_SERVICE_TYPE, Box::new(scabbard_vec_lifecycle));
+            }
+
             let lifecycle_pool = pool.clone();
             let lifecycle_store_factory: Arc<
                 (dyn LifecycleStoreFactory<diesel::pg::PgConnection>),
@@ -124,3 +154,15 @@ pub fn create_lifecycle_executor(
         )),
     }
 }
+
+#[cfg(feature = "database-sqlite")]
+type SqliteLifecycles = HashMap<
+    ServiceType<'static>,
+    Box<dyn Lifecycle<diesel::sqlite::SqliteConnection, Arguments = Vec<(String, String)>> + Send>,
+>;
+
+#[cfg(feature = "database-postgres")]
+type PostgresLifecycles = HashMap<
+    ServiceType<'static>,
+    Box<dyn Lifecycle<diesel::pg::PgConnection, Arguments = Vec<(String, String)>> + Send>,
+>;

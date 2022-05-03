@@ -106,6 +106,7 @@ experimental = [
     "https-bind",
     "lifecycle-executor-interval",
     "node",
+    "scabbardv3",
     "service-endpoint",
     "service-timer-interval",
     "service2",
@@ -158,6 +159,7 @@ oauth = [
     "splinter/oauth"
 ]
 rest-api-cors = ["splinter/rest-api-cors"]
+scabbardv3 = ["scabbard/scabbardv3", "service2"]
 service-endpoint = []
 service-timer-interval = []
 service2 = [

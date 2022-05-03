@@ -30,6 +30,11 @@ use std::thread;
 use std::time::Duration;
 
 use cylinder::{secp256k1::Secp256k1Context, Signer, SigningError, VerifierFactory};
+#[cfg(feature = "scabbardv3")]
+use scabbard::service::v3::{
+    ScabbardMessageByteConverter, ScabbardMessageHandlerFactory, ScabbardTimerFilter,
+    ScabbardTimerHandlerFactoryBuilder,
+};
 use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactoryBuilder;
 #[cfg(feature = "service2")]
@@ -98,6 +103,10 @@ use splinter::runtime::service::{
     RoutingTableServiceTypeResolver, ServiceDispatcher, Timer,
 };
 use splinter::service::instance::ServiceArgValidator;
+#[cfg(feature = "scabbardv3")]
+use splinter::service::{
+    MessageHandler, MessageHandlerFactory, ServiceType, TimerFilter, TimerHandlerFactory,
+};
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, Connection, Incoming, Listener,
@@ -116,6 +125,18 @@ const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 #[cfg(feature = "service2")]
 const ADMIN_SERVICE_LIFECYCLE_TIMEOUT: u64 = 30;
+#[cfg(feature = "scabbardv3")]
+const SCABBARD_SERVICE_TYPE: ServiceType = ServiceType::new_static("scabbard:v3");
+
+#[cfg(feature = "service2")]
+type TimerFilterCollection = Vec<(
+    Box<dyn TimerFilter + Send>,
+    Box<dyn TimerHandlerFactory<Message = Vec<u8>>>,
+)>;
+
+#[cfg(feature = "service2")]
+type BoxedByteMessageHandlerFactory =
+    Box<dyn MessageHandlerFactory<MessageHandler = Box<dyn MessageHandler<Message = Vec<u8>>>>>;
 
 pub struct SplinterDaemon {
     #[cfg(feature = "authorization-handler-allow-keys")]
@@ -357,6 +378,14 @@ impl SplinterDaemon {
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
+        #[cfg(feature = "service2")]
+        let message_handlers: Vec<BoxedByteMessageHandlerFactory> = vec![
+            #[cfg(feature = "scabbardv3")]
+            ScabbardMessageHandlerFactory::new()
+                .into_factory(ScabbardMessageByteConverter {})
+                .into_boxed(),
+        ];
+
         // Set up the Circuit dispatcher
         let circuit_dispatcher = set_up_circuit_dispatcher(
             network_sender.clone(),
@@ -374,6 +403,8 @@ impl SplinterDaemon {
                         err
                     ))
                 })?,
+            #[cfg(feature = "service2")]
+            message_handlers,
             #[cfg(feature = "service2")]
             message_handler_task_pool.task_runner(),
         );
@@ -461,6 +492,9 @@ impl SplinterDaemon {
             }
         }
 
+        #[cfg(feature = "scabbardv3")]
+        let mut timer_scabbard_factory_builder = ScabbardTimerHandlerFactoryBuilder::default();
+
         #[cfg(feature = "service2")]
         let mut executor = lifecycle::create_lifecycle_executor(
             &connection_pool,
@@ -473,14 +507,32 @@ impl SplinterDaemon {
 
         match connection_pool {
             #[cfg(feature = "database-postgres")]
+            #[cfg_attr(not(feature = "scabbardv3"), allow(clippy::redundant_clone))]
             store::ConnectionPool::Postgres { pool } => {
                 scabbard_factory_builder =
-                    scabbard_factory_builder.with_storage_configuration(pool.into());
+                    scabbard_factory_builder.with_storage_configuration(pool.clone().into());
+                #[cfg(feature = "scabbardv3")]
+                {
+                    timer_scabbard_factory_builder = timer_scabbard_factory_builder
+                        .with_store_factory(Box::new(
+                            scabbard::store::PooledPgScabbardStoreFactory::new(pool),
+                        ));
+                }
             }
             #[cfg(feature = "database-sqlite")]
+            #[cfg_attr(not(feature = "scabbardv3"), allow(clippy::redundant_clone))]
             store::ConnectionPool::Sqlite { pool } => {
                 scabbard_factory_builder =
-                    scabbard_factory_builder.with_storage_configuration(pool.into());
+                    scabbard_factory_builder.with_storage_configuration(pool.clone().into());
+                #[cfg(feature = "scabbardv3")]
+                {
+                    timer_scabbard_factory_builder =
+                        timer_scabbard_factory_builder.with_store_factory(
+                        Box::new(
+                            scabbard::store::PooledSqliteScabbardStoreFactory::new_with_write_exclusivity(pool)
+                        ),
+                    );
+                }
             }
             // This will have failed in create_store_factory above, but we return () to make
             // the compiler/linter happy under the following conditions
@@ -532,7 +584,10 @@ impl SplinterDaemon {
             vec![Box::new(orchestrator)];
 
         #[cfg(feature = "service2")]
-        let supported_types = vec![];
+        let supported_types = vec![
+            #[cfg(feature = "scabbardv3")]
+            SCABBARD_SERVICE_TYPE.to_string(),
+        ];
         #[cfg(feature = "service2")]
         lifecycle_dispatches.push(Box::new(SyncLifecycleInterface::new(
             store_factory.get_lifecycle_store(),
@@ -844,8 +899,26 @@ impl SplinterDaemon {
         let mut admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
 
         #[cfg(feature = "service2")]
+        let mut timer_filter_collection: TimerFilterCollection = Vec::new();
+
+        #[cfg(feature = "scabbardv3")]
+        {
+            let timer_scabbard_factory = timer_scabbard_factory_builder
+                .build()
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+            let scabbard_timer_filter =
+                ScabbardTimerFilter::new(timer_scabbard_factory.store_factory().clone_box());
+
+            timer_filter_collection.push((
+                Box::new(scabbard_timer_filter),
+                Box::new(timer_scabbard_factory),
+            ))
+        };
+
+        #[cfg(feature = "service2")]
         let mut timer = Timer::new(
-            vec![],
+            timer_filter_collection,
             self.service_timer_interval,
             Box::new(NetworkMessageSenderFactory::new(
                 &node_id,
@@ -1096,6 +1169,7 @@ fn set_up_circuit_dispatcher(
     routing_reader: Box<dyn RoutingTableReader>,
     routing_writer: Box<dyn RoutingTableWriter>,
     public_keys: Vec<PublicKey>,
+    #[cfg(feature = "service2")] message_handlers: Vec<BoxedByteMessageHandlerFactory>,
     #[cfg(feature = "service2")] message_handler_task_runner: impl MessageHandlerTaskRunner
         + Send
         + 'static,
@@ -1121,7 +1195,7 @@ fn set_up_circuit_dispatcher(
         routing_reader.clone(),
         #[cfg(feature = "service2")]
         ServiceDispatcher::new(
-            vec![],
+            message_handlers,
             Box::new(NetworkMessageSenderFactory::new(
                 node_id,
                 network_sender,
