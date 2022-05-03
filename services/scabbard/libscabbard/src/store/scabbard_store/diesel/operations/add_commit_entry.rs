@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::convert::TryFrom;
+
 #[cfg(feature = "postgres")]
 use diesel::pg::PgConnection;
 #[cfg(feature = "sqlite")]
@@ -48,7 +50,7 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnectio
                 })?;
 
             insert_into(scabbard_v3_commit_history::table)
-                .values(vec![CommitEntryModel::from(&commit_entry)])
+                .values(vec![CommitEntryModel::try_from(&commit_entry)?])
                 .execute(self.conn)?;
 
             Ok(())
@@ -72,7 +74,7 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection> {
                 })?;
 
             insert_into(scabbard_v3_commit_history::table)
-                .values(vec![CommitEntryModel::from(&commit_entry)])
+                .values(vec![CommitEntryModel::try_from(&commit_entry)?])
                 .execute(self.conn)?;
 
             Ok(())
