@@ -26,6 +26,11 @@ mod timer_handler_factory;
 
 pub use arguments::{ScabbardArguments, ScabbardArgumentsBuilder};
 pub use arguments_converter::ScabbardArgumentsVecConverter;
+#[cfg(feature = "scabbardv3-consensus-action-runner")]
+pub use consensus::consensus_action_runner::{
+    CommandNotifyObserver, ConsensusActionRunner, ContextUpdater, NotifyObserver,
+    ScabbardStoreContextUpdater,
+};
 pub use lifecycle::ScabbardLifecycle;
 pub use message_converter::ScabbardMessageByteConverter;
 pub use message_handler::ScabbardMessageHandler;
