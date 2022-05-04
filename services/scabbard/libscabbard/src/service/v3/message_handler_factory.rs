@@ -36,7 +36,7 @@ impl MessageHandlerFactory for ScabbardMessageHandlerFactory {
     type MessageHandler = ScabbardMessageHandler;
 
     fn new_handler(&self) -> Self::MessageHandler {
-        ScabbardMessageHandler::new()
+        ScabbardMessageHandler::new(self.store_factory.new_store())
     }
 
     fn clone_boxed(&self) -> Box<dyn MessageHandlerFactory<MessageHandler = Self::MessageHandler>> {

@@ -19,13 +19,15 @@ use splinter::{
 };
 
 use crate::protocol::v3::message::ScabbardMessage;
+use crate::store::ScabbardStore;
 
-#[derive(Default)]
-pub struct ScabbardMessageHandler {}
+pub struct ScabbardMessageHandler {
+    store: Box<dyn ScabbardStore>,
+}
 
 impl ScabbardMessageHandler {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(store: Box<dyn ScabbardStore>) -> Self {
+        Self { store }
     }
 }
 
