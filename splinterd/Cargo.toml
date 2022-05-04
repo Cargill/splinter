@@ -149,7 +149,6 @@ node = [
     "splinter/admin-service-event-client-actix-web-client",
     "splinter/admin-service-event-subscriber-glob",
     "splinter/client-reqwest",
-    "splinter/rest-api-actix-web-3",
     "splinter/registry-client",
     "splinter/registry-client-reqwest",
     "splinter/service-message-handler-dispatch",
