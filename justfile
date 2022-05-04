@@ -53,7 +53,7 @@ build:
         do
             cmd="cargo build --tests --manifest-path=$crate/Cargo.toml $BUILD_MODE $feature"
             echo "\033[1m$cmd\033[0m"
-            $cmd
+            RUSTFLAGS="-D warnings" $cmd
         done
     done
     echo "\n\033[92mBuild Success\033[0m\n"
