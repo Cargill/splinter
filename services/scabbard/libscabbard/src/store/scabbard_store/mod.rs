@@ -54,6 +54,7 @@ pub trait ScabbardStore {
         service_id: &FullyQualifiedServiceId,
         context: ScabbardContext,
     ) -> Result<(), ScabbardStoreError>;
+
     /// Update an existing context
     ///
     /// # Arguments
@@ -67,6 +68,7 @@ pub trait ScabbardStore {
         service_id: &FullyQualifiedServiceId,
         context: ScabbardContext,
     ) -> Result<(), ScabbardStoreError>;
+
     /// Add a 2 phase commit coordinator action
     ///
     /// # Arguments
@@ -81,6 +83,7 @@ pub trait ScabbardStore {
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<i64, ScabbardStoreError>;
+
     /// Update an existing 2 phase commit action
     ///
     /// # Arguments
@@ -97,6 +100,7 @@ pub trait ScabbardStore {
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError>;
+
     /// List all coordinator actions for a given service_id and epoch
     ///
     /// # Arguments
@@ -109,20 +113,24 @@ pub trait ScabbardStore {
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError>;
+
     /// List ready services
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError>;
+
     /// Add a new scabbard service
     ///
     /// # Arguments
     ///
     /// * `service` - The `ScabbardService` that is to be added to the database
     fn add_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError>;
+
     /// Add a new commit entry
     ///
     /// # Arguments
     ///
     /// * `commit_entry` - The `CommitEntry` that is to be added to the database
     fn add_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError>;
+
     /// Get the commit entry for the specified service_id and epoch
     ///
     /// # Arguments
@@ -133,18 +141,21 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
     ) -> Result<Option<CommitEntry>, ScabbardStoreError>;
+
     /// Update an existing commit entry
     ///
     /// # Arguments
     ///
     /// * `commit_entry` - The `CommitEntry` to be updated in the database
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError>;
+
     /// Update an existing scabbard service
     ///
     /// # Arguments
     ///
     /// * `service` - The `ScabbardService` to be updated
     fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError>;
+
     /// Returns a scabbard service
     ///
     /// # Arguments
@@ -154,6 +165,7 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
     ) -> Result<Option<ScabbardService>, ScabbardStoreError>;
+
     /// Add a new consensus event
     ///
     /// # Arguments
@@ -168,6 +180,7 @@ pub trait ScabbardStore {
         epoch: u64,
         event: ScabbardConsensusEvent,
     ) -> Result<i64, ScabbardStoreError>;
+
     /// Update an existing consensus event
     ///
     /// # Arguments
@@ -184,6 +197,7 @@ pub trait ScabbardStore {
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError>;
+
     /// List all consensus events for a given service_id and epoch
     ///
     /// # Arguments
@@ -196,6 +210,7 @@ pub trait ScabbardStore {
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError>;
+
     /// Get the current context for a given service
     ///
     /// # Arguments
@@ -206,6 +221,7 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
     ) -> Result<Option<ScabbardContext>, ScabbardStoreError>;
+
     /// Removes a scabbard service and all of its associated state
     ///
     /// # Arguments
