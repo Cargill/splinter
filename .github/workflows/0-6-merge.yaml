@@ -307,8 +307,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   stop_cluster:
-    if: >-
-      github.repository_owner == 'Cargill'
+    if: ${{ github.repository == 'Cargill/splinter' && always() }}
     name: Stop buildx cluster
     needs:
       - start_cluster
@@ -416,8 +415,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   stop_cluster_experimental:
-    if: >-
-      github.repository_owner == 'Cargill'
+    if: ${{ github.repository == 'Cargill/splinter' && always() }}
     name: Stop buildx cluster
     needs:
       - start_cluster_experimental
