@@ -113,7 +113,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 if participant_context.is_some() {
                     return Err(ScabbardStoreError::InvalidState(
                         InvalidStateError::with_message(format!(
-                            "Failed to add consensus action, contexts found for 
+                            "Failed to add consensus action, contexts found for
                                 participant and coordinator with service_id: {} epoch: {} ",
                             service_id, epoch
                         )),
@@ -180,7 +180,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             _ => {
                                 return Err(ScabbardStoreError::InvalidState(
                                     InvalidStateError::with_message(format!(
-                                        "Failed to add consensus send message action, 
+                                        "Failed to add consensus send message action, \
                                         invalid coordinator message type {}",
                                         String::from(&message)
                                     )),
@@ -209,7 +209,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             ConsensusActionNotification::ParticipantRequestForVote(_) => {
                                 return Err(ScabbardStoreError::InvalidState(
                                     InvalidStateError::with_message(format!(
-                                        "Failed to add consensus notify action, 
+                                        "Failed to add consensus notify action,
                                             invalid coordinator notification type {}",
                                         String::from(&notification)
                                     )),
@@ -290,7 +290,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             _ => {
                                 return Err(ScabbardStoreError::InvalidState(
                                     InvalidStateError::with_message(format!(
-                                        "Failed to add consensus send message action, 
+                                        "Failed to add consensus send message action, \
                                             invalid participant message type {}",
                                         String::from(&message)
                                     )),
@@ -324,7 +324,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                                 | ConsensusActionNotification::CoordinatorRequestForVote() => {
                                     return Err(ScabbardStoreError::InvalidState(
                                         InvalidStateError::with_message(format!(
-                                            "Failed to add consensus notify action, invalid 
+                                            "Failed to add consensus notify action, invalid
                                             participant notification type {}",
                                             String::from(&notification)
                                         )),
@@ -350,7 +350,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
             } else {
                 Err(ScabbardStoreError::InvalidState(
                     InvalidStateError::with_message(format!(
-                        "Faild to add consensus action, a context with service_id: {} and epoch: {} 
+                        "Faild to add consensus action, a context with service_id: {} and epoch: {}
                         does not exist",
                         service_id, epoch
                     )),
@@ -408,7 +408,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 if participant_context.is_some() {
                     return Err(ScabbardStoreError::InvalidState(
                         InvalidStateError::with_message(format!(
-                            "Failed to add consensus action, contexts found for 
+                            "Failed to add consensus action, contexts found for
                                 participant and coordinator with service_id: {} epoch: {} ",
                             service_id, epoch
                         )),
@@ -472,7 +472,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             _ => {
                                 return Err(ScabbardStoreError::InvalidState(
                                     InvalidStateError::with_message(format!(
-                                        "Failed to add consensus send message action, 
+                                        "Failed to add consensus send message action, \
                                         invalid coordinator message type {}",
                                         String::from(&message)
                                     )),
@@ -501,7 +501,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             ConsensusActionNotification::ParticipantRequestForVote(_) => {
                                 return Err(ScabbardStoreError::InvalidState(
                                     InvalidStateError::with_message(format!(
-                                        "Failed to add consensus notify action, 
+                                        "Failed to add consensus notify action,
                                             invalid coordinator notification type {}",
                                         String::from(&notification)
                                     )),
@@ -579,7 +579,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                             _ => {
                                 return Err(ScabbardStoreError::InvalidState(
                                     InvalidStateError::with_message(format!(
-                                        "Failed to add consensus send message action, 
+                                        "Failed to add consensus send message action, \
                                             invalid participant message type {}",
                                         String::from(&message)
                                     )),
@@ -613,7 +613,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                                 | ConsensusActionNotification::CoordinatorRequestForVote() => {
                                     return Err(ScabbardStoreError::InvalidState(
                                         InvalidStateError::with_message(format!(
-                                            "Failed to add consensus notify action, invalid 
+                                            "Failed to add consensus notify action, invalid
                                             participant notification type {}",
                                             String::from(&notification)
                                         )),
@@ -639,7 +639,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
             } else {
                 Err(ScabbardStoreError::InvalidState(
                     InvalidStateError::with_message(format!(
-                        "Faild to add consensus action, a context with service_id: {} and epoch: {} 
+                        "Faild to add consensus action, a context with service_id: {} and epoch: {}
                         does not exist",
                         service_id, epoch
                     )),

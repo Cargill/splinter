@@ -97,7 +97,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                         if participant_context.is_some() {
                             return Err(ScabbardStoreError::InvalidState(
                                 InvalidStateError::with_message(format!(
-                                    "Failed to update consensus action, contexts found for 
+                                    "Failed to update consensus action, contexts found for
                                         participant and coordinator with service_id: {} epoch: {} ",
                                     service_id, epoch
                                 )),
@@ -196,7 +196,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                     } else {
                         Err(ScabbardStoreError::InvalidState(
                             InvalidStateError::with_message(format!(
-                                "Faild to update context, a context with service_id: {} and
+                                "Faild to update context, a context with service_id: {} and \
                                 epoch: {} does not exist",
                                 service_id, epoch
                             )),
@@ -254,7 +254,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                         if participant_context.is_some() {
                             return Err(ScabbardStoreError::InvalidState(
                                 InvalidStateError::with_message(format!(
-                                    "Failed to update consensus action, contexts found for 
+                                    "Failed to update consensus action, contexts found for
                                         participant and coordinator with service_id: {} epoch: {} ",
                                     service_id, epoch
                                 )),
@@ -353,7 +353,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                     } else {
                         Err(ScabbardStoreError::InvalidState(
                             InvalidStateError::with_message(format!(
-                                "Faild to update context, a context with service_id: {} and
+                                "Faild to update context, a context with service_id: {} and \
                                 epoch: {} does not exist",
                                 service_id, epoch
                             )),
