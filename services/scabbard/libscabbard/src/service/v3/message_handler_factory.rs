@@ -11,18 +11,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use splinter::service::{MessageHandlerFactory, Routable, ServiceType};
+
+use crate::store::PooledScabbardStoreFactory;
 
 use super::message_handler::ScabbardMessageHandler;
 
 const SCABBARD_SERVICE_TYPES: &[ServiceType<'static>] = &[ServiceType::new_static("scabbard:v3")];
 
-#[derive(Clone, Default)]
-pub struct ScabbardMessageHandlerFactory {}
+#[derive(Clone)]
+pub struct ScabbardMessageHandlerFactory {
+    store_factory: Arc<dyn PooledScabbardStoreFactory>,
+}
 
 impl ScabbardMessageHandlerFactory {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(store_factory: Arc<dyn PooledScabbardStoreFactory>) -> Self {
+        Self { store_factory }
     }
 }
 
