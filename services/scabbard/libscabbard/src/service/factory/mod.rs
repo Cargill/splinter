@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "rest-api")]
+mod endpoint_provider;
+
 use std::collections::HashMap;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::collections::HashSet;
