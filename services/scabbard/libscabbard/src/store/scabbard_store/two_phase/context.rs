@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::convert::{TryFrom, TryInto};
 use std::time::SystemTime;
 
 use splinter::error::InvalidStateError;
@@ -26,8 +25,9 @@ pub struct Context {
     coordinator: ServiceId,
     epoch: u64,
     last_commit_epoch: Option<u64>,
-    role_context: TwoPhaseCommitRoleContext,
     this_process: ServiceId,
+    participants: Vec<Participant>,
+    state: Scabbard2pcState,
 }
 
 impl Context {
@@ -47,30 +47,25 @@ impl Context {
         self.last_commit_epoch
     }
 
-    pub fn role_context(&self) -> &TwoPhaseCommitRoleContext {
-        &self.role_context
-    }
-
     pub fn this_process(&self) -> &ServiceId {
         &self.this_process
+    }
+
+    pub fn participants(&self) -> &[Participant] {
+        &self.participants
+    }
+
+    pub fn state(&self) -> &Scabbard2pcState {
+        &self.state
     }
 
     pub fn into_builder(self) -> ContextBuilder {
         let mut builder = ContextBuilder::default()
             .with_coordinator(&self.coordinator)
             .with_epoch(self.epoch)
-            .with_this_process(&self.this_process);
-
-        match self.role_context.inner {
-            InnerContext::Participant(context) => {
-                builder = builder.with_participant_processes(context.participant_processes);
-                builder = builder.with_state(context.state.into());
-            }
-            InnerContext::Coordinator(context) => {
-                builder = builder.with_participants(context.participants);
-                builder = builder.with_state(context.state.into());
-            }
-        }
+            .with_this_process(&self.this_process)
+            .with_state(self.state)
+            .with_participants(self.participants);
 
         if let Some(alarm) = self.alarm {
             builder = builder.with_alarm(alarm);
@@ -91,7 +86,6 @@ pub struct ContextBuilder {
     epoch: Option<u64>,
     last_commit_epoch: Option<u64>,
     participants: Option<Vec<Participant>>,
-    participant_processes: Option<Vec<ServiceId>>,
     state: Option<Scabbard2pcState>,
     this_process: Option<ServiceId>,
 }
@@ -119,14 +113,6 @@ impl ContextBuilder {
 
     pub fn with_participants(mut self, participants: Vec<Participant>) -> ContextBuilder {
         self.participants = Some(participants);
-        self
-    }
-
-    pub fn with_participant_processes(
-        mut self,
-        participant_processes: Vec<ServiceId>,
-    ) -> ContextBuilder {
-        self.participant_processes = Some(participant_processes);
         self
     }
 
@@ -161,114 +147,26 @@ impl ContextBuilder {
             )
         })?;
 
-        let role_context = match (self.participants, self.participant_processes) {
-            (Some(participants), None) => Ok(TwoPhaseCommitRoleContext {
-                inner: InnerContext::Coordinator(CoordinatorContext {
-                    participants,
-                    state: state.try_into()?,
-                }),
-            }),
-            (None, Some(participant_processes)) => Ok(TwoPhaseCommitRoleContext {
-                inner: InnerContext::Participant(ParticipantContext {
-                    participant_processes,
-                    state: state.try_into()?,
-                }),
-            }),
-            (Some(_), Some(_)) => Err(InvalidStateError::with_message(
-                "participant and participant_processes fields are mutually exclusive".into(),
-            )),
-            (None, None) => Err(InvalidStateError::with_message(
-                "exactly one of participant or particpant_processes fields required".into(),
-            )),
-        }?;
+        let participants = self.participants.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `participants`".to_string(),
+            )
+        })?;
 
         Ok(Context {
             alarm: self.alarm,
             coordinator,
             epoch,
             last_commit_epoch: self.last_commit_epoch,
-            role_context,
             this_process,
+            participants,
+            state,
         })
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TwoPhaseCommitRoleContext {
-    inner: InnerContext,
-}
-
-impl TryFrom<TwoPhaseCommitRoleContext> for CoordinatorContext {
-    type Error = InvalidStateError;
-
-    fn try_from(context: TwoPhaseCommitRoleContext) -> Result<Self, Self::Error> {
-        match context.inner {
-            InnerContext::Coordinator(c) => Ok(c),
-            InnerContext::Participant(_) => Err(InvalidStateError::with_message(
-                "unable to convert TwoPhaseCommitRoleContext to CoordinatorContext \
-                because inner context type is Participant"
-                    .into(),
-            )),
-        }
-    }
-}
-
-impl TryFrom<TwoPhaseCommitRoleContext> for ParticipantContext {
-    type Error = InvalidStateError;
-
-    fn try_from(context: TwoPhaseCommitRoleContext) -> Result<Self, Self::Error> {
-        match context.inner {
-            InnerContext::Participant(c) => Ok(c),
-            InnerContext::Coordinator(_) => Err(InvalidStateError::with_message(
-                "unable to convert TwoPhaseCommitRoleContext to ParticipantContext \
-                because inner context type is Coordinator"
-                    .into(),
-            )),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-enum InnerContext {
-    Coordinator(CoordinatorContext),
-    Participant(ParticipantContext),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct CoordinatorContext {
-    pub participants: Vec<Participant>,
-    pub state: CoordinatorState,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Participant {
     pub process: ServiceId,
     pub vote: Option<bool>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum CoordinatorState {
-    Abort,
-    Commit,
-    Voting { vote_timeout_start: SystemTime },
-    WaitingForStart,
-    WaitingForVote,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ParticipantContext {
-    pub participant_processes: Vec<ServiceId>,
-    pub state: ParticipantState,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ParticipantState {
-    Abort,
-    Commit,
-    Voted {
-        vote: bool,
-        decision_timeout_start: SystemTime,
-    },
-    WaitingForVoteRequest,
-    WaitingForVote,
 }

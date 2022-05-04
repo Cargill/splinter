@@ -1528,9 +1528,15 @@ pub mod tests {
             .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
-            .with_participant_processes(vec![
-                participant_fqsi.service_id().clone(),
-                participant2_fqsi.service_id().clone(),
+            .with_participants(vec![
+                Participant {
+                    process: participant_fqsi.service_id().clone(),
+                    vote: None,
+                },
+                Participant {
+                    process: participant2_fqsi.service_id().clone(),
+                    vote: None,
+                },
             ])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(participant_fqsi.clone().service_id())
@@ -1585,9 +1591,15 @@ pub mod tests {
             .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
-            .with_participant_processes(vec![
-                participant_fqsi.service_id().clone(),
-                participant2_fqsi.service_id().clone(),
+            .with_participants(vec![
+                Participant {
+                    process: participant_fqsi.service_id().clone(),
+                    vote: None,
+                },
+                Participant {
+                    process: participant2_fqsi.service_id().clone(),
+                    vote: None,
+                },
             ])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(participant_fqsi.clone().service_id())
@@ -1641,9 +1653,15 @@ pub mod tests {
             .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
-            .with_participant_processes(vec![
-                participant_fqsi.service_id().clone(),
-                participant2_fqsi.service_id().clone(),
+            .with_participants(vec![
+                Participant {
+                    process: participant_fqsi.service_id().clone(),
+                    vote: None,
+                },
+                Participant {
+                    process: participant2_fqsi.service_id().clone(),
+                    vote: None,
+                },
             ])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(participant_fqsi.clone().service_id())
@@ -1806,7 +1824,10 @@ pub mod tests {
             .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
-            .with_participant_processes(vec![participant_service_id.service_id().clone()])
+            .with_participants(vec![Participant {
+                process: participant_service_id.service_id().clone(),
+                vote: None,
+            }])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(participant_service_id.clone().service_id())
             .build()
@@ -1857,7 +1878,10 @@ pub mod tests {
             .with_alarm(alarm)
             .with_coordinator(participant_service_id.clone().service_id())
             .with_epoch(3)
-            .with_participant_processes(vec![coordinator_fqsi.service_id().clone()])
+            .with_participants(vec![Participant {
+                process: coordinator_fqsi.service_id().clone(),
+                vote: None,
+            }])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()

@@ -395,7 +395,13 @@ where
                             ScabbardStoreError::Internal(
                                 InternalError::from_source(Box::new(err))
                             )
-                        })?;
+                        })?
+                        .into_iter()
+                        .map(|process| Participant {
+                            process,
+                            vote: None,
+                        })
+                        .collect::<Vec<Participant>>();
 
                     let state = match update_context.state.as_str() {
                         "WAITINGFORVOTE" => Scabbard2pcState::WaitingForStart,
@@ -463,7 +469,7 @@ where
                             },
                         )?)
                         .with_epoch(update_context.epoch as u64)
-                        .with_participant_processes(participants)
+                        .with_participants(participants)
                         .with_state(state)
                         .with_this_process(
                             FullyQualifiedServiceId::new_from_string(update_context.service_id)
