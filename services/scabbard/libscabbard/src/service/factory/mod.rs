@@ -42,14 +42,14 @@ use splinter::service::instance::{
     FactoryCreateError, ServiceArgValidator, ServiceFactory, ServiceInstance,
 };
 use splinter::service::instance::{OrchestratableService, OrchestratableServiceFactory};
+#[cfg(feature = "rest-api")]
+use splinter::service::rest_api::ServiceEndpointProvider;
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 use transact::database::Database;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use transact::state::merkle::sql;
 
 use crate::hex::parse_hex;
-#[cfg(feature = "rest-api-actix-web-1")]
-use crate::service::rest_api::actix;
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 use crate::service::ScabbardStatePurgeHandler;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
@@ -599,25 +599,8 @@ impl ServiceFactory for ScabbardFactory {
     /// * `rest-api-actix`
     ///
     /// [`ServiceEndpoint`]: ../rest_api/struct.ServiceEndpoint.html
-    fn get_rest_endpoints(&self) -> Vec<splinter::service::rest_api::ServiceEndpoint> {
-        // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
-        // enabled
-        #[allow(unused_mut)]
-        let mut endpoints = vec![];
-
-        #[cfg(feature = "rest-api-actix-web-1")]
-        {
-            endpoints.append(&mut vec![
-                actix::batches::make_add_batches_to_queue_endpoint(),
-                actix::ws_subscribe::make_subscribe_endpoint(),
-                actix::batch_statuses::make_get_batch_status_endpoint(),
-                actix::state_address::make_get_state_at_address_endpoint(),
-                actix::state::make_get_state_with_prefix_endpoint(),
-                actix::state_root::make_get_state_root_endpoint(),
-            ])
-        }
-
-        endpoints
+    fn get_rest_endpoint_provider(&self) -> Box<dyn ServiceEndpointProvider> {
+        Box::new(endpoint_provider::ScabbardServiceEndpointProvider {})
     }
 }
 

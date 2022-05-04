@@ -37,7 +37,8 @@ impl RestResourceProvider for ServiceOrchestrator {
             .fold(vec![], |mut acc, factory| {
                 // Get all endpoints for the factory
                 let mut resources = factory
-                    .get_rest_endpoints()
+                    .get_rest_endpoint_provider()
+                    .endpoints()
                     .into_iter()
                     .map(|endpoint| {
                         let route = format!(
