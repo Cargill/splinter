@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(any(feature = "database-sqlite", feature = "scabbardv3"))]
+use std::sync::Arc;
 #[cfg(feature = "database-sqlite")]
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 #[cfg(feature = "diesel")]
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -27,6 +29,13 @@ use splinter::{
 };
 use std::fmt::Display;
 use std::str::FromStr;
+
+#[cfg(all(feature = "scabbardv3", feature = "database-postgres"))]
+use scabbard::store::PooledPgScabbardStoreFactory;
+#[cfg(feature = "scabbardv3")]
+use scabbard::store::PooledScabbardStoreFactory;
+#[cfg(all(feature = "scabbardv3", feature = "database-sqlite"))]
+use scabbard::store::PooledSqliteScabbardStoreFactory;
 
 pub enum ConnectionPool {
     #[cfg(feature = "database-postgres")]
@@ -87,6 +96,31 @@ pub fn create_store_factory(
         #[cfg(feature = "database-sqlite")]
         ConnectionPool::Sqlite { pool } => Ok(Box::new(
             sqlite::SqliteStoreFactory::new_with_write_exclusivity(pool.clone()),
+        )),
+        #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
+        ConnectionPool::Unsupported => Err(InternalError::with_message(
+            "Connection pools are unavailable in this configuration".into(),
+        )),
+    }
+}
+
+/// Creates a `ScabbardStoreFactory` backed by the given connection pool
+///
+/// # Arguments
+///
+/// * `connection_pool` - the connection pool to use to create the store factory
+#[cfg(feature = "scabbardv3")]
+pub fn create_scabbard_store_factory(
+    connection_pool: &ConnectionPool,
+) -> Result<Arc<dyn PooledScabbardStoreFactory>, InternalError> {
+    match connection_pool {
+        #[cfg(feature = "database-postgres")]
+        ConnectionPool::Postgres { pool } => {
+            Ok(Arc::new(PooledPgScabbardStoreFactory::new(pool.clone())))
+        }
+        #[cfg(feature = "database-sqlite")]
+        ConnectionPool::Sqlite { pool } => Ok(Arc::new(
+            PooledSqliteScabbardStoreFactory::new_with_write_exclusivity(pool.clone()),
         )),
         #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
         ConnectionPool::Unsupported => Err(InternalError::with_message(
