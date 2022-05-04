@@ -378,10 +378,13 @@ impl SplinterDaemon {
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
+        #[cfg(feature = "scabbardv3")]
+        let scabbard_store_factory = store::create_scabbard_store_factory(&connection_pool)?;
+
         #[cfg(feature = "service2")]
         let message_handlers: Vec<BoxedByteMessageHandlerFactory> = vec![
             #[cfg(feature = "scabbardv3")]
-            ScabbardMessageHandlerFactory::new()
+            ScabbardMessageHandlerFactory::new(scabbard_store_factory)
                 .into_factory(ScabbardMessageByteConverter {})
                 .into_boxed(),
         ];

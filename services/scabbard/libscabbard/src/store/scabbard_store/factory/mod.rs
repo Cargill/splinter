@@ -34,7 +34,7 @@ impl<C> ScabbardStoreFactory<C> for Box<dyn ScabbardStoreFactory<C>> {
     }
 }
 
-pub trait PooledScabbardStoreFactory: Send {
+pub trait PooledScabbardStoreFactory: Sync + Send {
     fn new_store(&self) -> Box<dyn ScabbardStore + Send>;
 
     fn clone_box(&self) -> Box<dyn PooledScabbardStoreFactory>;

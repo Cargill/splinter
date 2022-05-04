@@ -24,6 +24,18 @@ pub enum TwoPhaseCommitMessage {
     DecisionRequest(DecisionRequest),
 }
 
+impl TwoPhaseCommitMessage {
+    pub fn epoch(&self) -> u64 {
+        match self {
+            Self::VoteRequest(VoteRequest { epoch, .. }) => *epoch,
+            Self::VoteResponse(VoteResponse { epoch, .. }) => *epoch,
+            Self::Commit(Commit { epoch, .. }) => *epoch,
+            Self::Abort(Abort { epoch, .. }) => *epoch,
+            Self::DecisionRequest(DecisionRequest { epoch, .. }) => *epoch,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct VoteRequest {
     pub epoch: u64,
