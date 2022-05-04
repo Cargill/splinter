@@ -19,18 +19,19 @@ use std::convert::TryFrom;
 use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
 
-#[cfg(feature = "authorization")]
-use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
-use crate::admin::service::proposal_store::ProposalStoreFactory;
-use crate::admin::store::CircuitPredicate;
-use crate::rest_api::{
+use splinter::admin::service::proposal_store::ProposalStoreFactory;
+use splinter::admin::store::CircuitPredicate;
+use splinter::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
+    ErrorResponse,
 };
+use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
 
-use super::super::error::ProposalListError;
-use super::super::resources;
+use super::error::ProposalListError;
+use super::resources;
+#[cfg(feature = "authorization")]
+use super::CIRCUIT_READ_PERMISSION;
 
 const ADMIN_LIST_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 
@@ -241,7 +242,7 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
-    use crate::admin::{
+    use splinter::admin::{
         messages::{
             AuthorizationType, CircuitProposal, CircuitStatus, CreateCircuit, DurabilityType,
             PersistenceType, ProposalType, RouteType, SplinterNode,
@@ -254,8 +255,15 @@ mod tests {
             ProposedCircuitBuilder, ProposedNodeBuilder,
         },
     };
-    use crate::public_key::PublicKey;
-    use crate::rest_api::{
+    use splinter::error::InternalError;
+    use splinter::public_key::PublicKey;
+    use splinter::rest_api::actix_web_1::AuthConfig;
+    use splinter::rest_api::auth::authorization::{
+        AuthorizationHandler, AuthorizationHandlerResult,
+    };
+    use splinter::rest_api::auth::identity::{Identity, IdentityProvider};
+    use splinter::rest_api::auth::AuthorizationHeader;
+    use splinter::rest_api::{
         actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
         paging::Paging,
     };
@@ -270,6 +278,7 @@ mod tests {
             .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
+            .header("Authorization", "custom")
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
@@ -328,6 +337,7 @@ mod tests {
             .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
+            .header("Authorization", "custom")
             .header("SplinterProtocolVersion", "1");
         let resp = req.send().expect("Failed to perform request");
 
@@ -386,6 +396,7 @@ mod tests {
         .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
+            .header("Authorization", "custom")
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
@@ -437,6 +448,7 @@ mod tests {
         .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
+            .header("Authorization", "custom")
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
@@ -490,6 +502,7 @@ mod tests {
         .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
+            .header("Authorization", "custom")
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
@@ -537,6 +550,7 @@ mod tests {
             .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
+            .header("Authorization", "custom")
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
@@ -584,6 +598,7 @@ mod tests {
             .expect("Failed to parse URL");
         let req = Client::new()
             .get(url)
+            .header("Authorization", "custom")
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION);
         let resp = req.send().expect("Failed to perform request");
 
@@ -861,20 +876,59 @@ mod tests {
         #[cfg(not(feature = "https-bind"))]
         let bind = "127.0.0.1:0";
         #[cfg(feature = "https-bind")]
-        let bind = crate::rest_api::BindConfig::Http("127.0.0.1:0".into());
+        let bind = splinter::rest_api::BindConfig::Http("127.0.0.1:0".into());
+        let identity_provider = MockIdentityProvider::default().clone_box();
+        let auth_config = AuthConfig::Custom {
+            resources: Vec::new(),
+            identity_provider,
+        };
+        let authorization_handlers = vec![MockAuthorizationHandler::default().clone_box()];
 
         let result = RestApiBuilder::new()
             .with_bind(bind)
             .add_resources(resources.clone())
-            .build_insecure()
+            .push_auth_config(auth_config)
+            .with_authorization_handlers(authorization_handlers)
+            .build()
             .expect("Failed to build REST API")
-            .run_insecure();
+            .run();
         match result {
             Ok((shutdown_handle, join_handle)) => {
                 let port = shutdown_handle.port_numbers()[0];
                 (shutdown_handle, join_handle, format!("127.0.0.1:{}", port))
             }
             Err(err) => panic!("Failed to run REST API: {}", err),
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct MockIdentityProvider {}
+
+    impl IdentityProvider for MockIdentityProvider {
+        fn get_identity(
+            &self,
+            _authorization: &AuthorizationHeader,
+        ) -> Result<Option<Identity>, InternalError> {
+            Ok(Some(Identity::Custom("custom".to_string())))
+        }
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct MockAuthorizationHandler {}
+
+    impl AuthorizationHandler for MockAuthorizationHandler {
+        fn has_permission(
+            &self,
+            _identity: &Identity,
+            _permission_id: &str,
+        ) -> Result<AuthorizationHandlerResult, InternalError> {
+            Ok(AuthorizationHandlerResult::Allow)
+        }
+        fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
+            Box::new(self.clone())
         }
     }
 }

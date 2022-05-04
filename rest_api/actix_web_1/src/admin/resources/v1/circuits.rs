@@ -14,8 +14,8 @@
 
 use std::collections::BTreeMap;
 
-use crate::admin::store::{Circuit, Service};
-use crate::rest_api::paging::Paging;
+use splinter::admin::store::{Circuit, Service};
+use splinter::rest_api::paging::Paging;
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
 pub(crate) struct ListCircuitsResponse<'a> {

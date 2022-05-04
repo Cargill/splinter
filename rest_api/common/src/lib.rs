@@ -14,3 +14,5 @@
 
 pub mod error;
 pub mod paging;
+
+pub const SPLINTER_PROTOCOL_VERSION: u32 = 2;

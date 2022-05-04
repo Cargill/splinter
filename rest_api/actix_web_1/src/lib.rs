@@ -11,3 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+#[macro_use]
+#[cfg(feature = "admin-service")]
+extern crate log;
+#[macro_use]
+#[cfg(feature = "admin-service")]
+extern crate serde;
+#[macro_use]
+#[cfg(feature = "admin-service")]
+extern crate serde_json;
+
+#[cfg(feature = "admin-service")]
+pub mod admin;
+
+mod hex;

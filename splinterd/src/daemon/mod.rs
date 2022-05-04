@@ -40,7 +40,6 @@ use scabbard::service::ScabbardFactoryBuilder;
 #[cfg(feature = "service2")]
 use splinter::admin::lifecycle::sync::SyncLifecycleInterface;
 use splinter::admin::lifecycle::LifecycleDispatch;
-use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService, AdminServiceBuilder};
 #[cfg(feature = "biome-credentials")]
 use splinter::biome::credentials::rest_api::BiomeCredentialsRestResourceProviderBuilder;
@@ -112,6 +111,7 @@ use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, Connection, Incoming, Listener,
     Transport,
 };
+use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
 
 use crate::node_id::get_node_id;
 use crate::routes;
@@ -659,7 +659,7 @@ impl SplinterDaemon {
         let mut rest_api_builder = RestApiBuilder::new()
             .with_bind(bind)
             .add_resources(registry.resources())
-            .add_resources(admin_service.resources())
+            .add_resources(AdminServiceRestProvider::from(&admin_service).resources())
             .add_resources(orchestrator_resources)
             .add_resources(circuit_resource_provider.resources());
 

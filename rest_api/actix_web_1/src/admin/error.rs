@@ -84,6 +84,7 @@ impl std::fmt::Display for CircuitFetchError {
 #[derive(Debug)]
 pub enum CircuitListError {
     CircuitStoreError(String),
+    CircuitStatusError(String),
 }
 
 impl Error for CircuitListError {}
@@ -92,6 +93,7 @@ impl std::fmt::Display for CircuitListError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             CircuitListError::CircuitStoreError(msg) => write!(f, "{}", msg),
+            CircuitListError::CircuitStatusError(msg) => write!(f, "{}", msg),
         }
     }
 }

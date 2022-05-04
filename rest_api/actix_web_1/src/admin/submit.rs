@@ -10,20 +10,18 @@
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
-// limitations under the License.
 
 use actix_web::HttpResponse;
 use futures::{Future, IntoFuture};
 
+use splinter::admin::service::{AdminCommands, AdminServiceError};
+use splinter::protos::admin::CircuitManagementPayload;
+use splinter::rest_api::actix_web_1::{into_protobuf, Method, ProtocolVersionRangeGuard, Resource};
+use splinter::service::instance::ServiceError;
+use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
+
 #[cfg(feature = "authorization")]
-use crate::admin::rest_api::CIRCUIT_WRITE_PERMISSION;
-use crate::admin::service::{AdminCommands, AdminServiceError};
-use crate::protos::admin::CircuitManagementPayload;
-use crate::rest_api::{
-    actix_web_1::{into_protobuf, Method, ProtocolVersionRangeGuard, Resource},
-    SPLINTER_PROTOCOL_VERSION,
-};
-use crate::service::instance::ServiceError;
+use super::CIRCUIT_WRITE_PERMISSION;
 
 const ADMIN_SUBMIT_PROTOCOL_MIN: u32 = 1;
 

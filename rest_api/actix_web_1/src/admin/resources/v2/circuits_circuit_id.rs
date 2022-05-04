@@ -14,15 +14,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::admin::store::{Circuit, CircuitNode, CircuitStatus, Service};
-use crate::hex::to_hex;
-use crate::rest_api::paging::Paging;
+use splinter::admin::store::{Circuit, CircuitNode, CircuitStatus, Service};
 
-#[derive(Debug, Serialize, Clone, PartialEq)]
-pub(crate) struct ListCircuitsResponse<'a> {
-    pub data: Vec<CircuitResponse<'a>>,
-    pub paging: Paging,
-}
+use crate::hex::to_hex;
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
 pub(crate) struct CircuitResponse<'a> {
@@ -72,16 +66,6 @@ impl<'a> From<&'a Service> for ServiceResponse<'a> {
                 .iter()
                 .map(|(key, value)| (key.to_string(), value.to_string()))
                 .collect::<BTreeMap<String, String>>(),
-        }
-    }
-}
-
-impl From<String> for CircuitStatus {
-    fn from(str: String) -> Self {
-        match &*str {
-            "disbanded" => CircuitStatus::Disbanded,
-            "abandoned" => CircuitStatus::Abandoned,
-            _ => CircuitStatus::Active,
         }
     }
 }

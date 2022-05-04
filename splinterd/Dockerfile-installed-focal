@@ -45,6 +45,8 @@ COPY examples/gameroom/database/Cargo.toml \
 # Copy over source files
 COPY cli /build/cli
 COPY libsplinter /build/libsplinter
+COPY rest_api/actix_web_1/ /build/rest_api/actix_web_1/
+COPY rest_api/common/ /build/rest_api/common/
 COPY splinterd/ /build/splinterd
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
 

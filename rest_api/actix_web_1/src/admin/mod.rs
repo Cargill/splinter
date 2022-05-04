@@ -12,69 +12,54 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This module defines the REST API endpoints for interacting with the Splinter admin service.
-
-#[cfg(feature = "rest-api-actix-web-1")]
-mod actix;
-#[cfg(feature = "rest-api-actix-web-3")]
-pub mod actix_web_3;
-#[cfg(feature = "rest-api-actix-web-1")]
+mod circuits;
+mod circuits_circuit_id;
 mod error;
+mod proposals;
+mod proposals_circuit_id;
 mod resources;
+mod submit;
+mod ws_register_type;
 
-use crate::admin::service::AdminService;
-use crate::admin::store::AdminServiceStore;
-use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
-use crate::rest_api::auth::authorization::Permission;
+use splinter::admin::service::AdminService;
+use splinter::admin::store::AdminServiceStore;
+#[cfg(feature = "authorization")]
+use splinter::rest_api::auth::authorization::Permission;
+use splinter::rest_api::Resource;
+use splinter::rest_api::RestResourceProvider;
 
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
+#[cfg(feature = "authorization")]
 const CIRCUIT_READ_PERMISSION: Permission = Permission::Check {
     permission_id: "circuit.read",
     permission_display_name: "Circuit read",
     permission_description: "Allows the client to read circuit state",
 };
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
+#[cfg(feature = "authorization")]
 const CIRCUIT_WRITE_PERMISSION: Permission = Permission::Check {
     permission_id: "circuit.write",
     permission_display_name: "Circuit write",
     permission_description: "Allows the client to modify circuit state",
 };
 
-/// The admin service provides the following endpoints as REST API resources:
-///
-/// * `GET /ws/admin/register/{type}` - Register as an application authorization handler for the
-///   given circuit management type
-/// * `POST /admin/submit` - Submit a circuit management payload
-/// * `GET /admin/proposals` - List circuit proposals in Splinter's state
-/// * `GET /admin/proposals/{circuit_id}` - Fetch a specific circuit proposal in Splinter's state
-///   by circuit ID
-///
-/// These endpoints are only available if the following REST API backend feature is enabled:
-///
-/// * `rest-api-actix-web-1`
-impl RestResourceProvider for AdminService {
+pub struct AdminServiceRestProvider {
+    resources: Vec<Resource>,
+}
+
+impl From<&AdminService> for AdminServiceRestProvider {
+    fn from(source: &AdminService) -> Self {
+        let resources = vec![
+            ws_register_type::make_application_handler_registration_route(source.commands()),
+            submit::make_submit_route(source.commands()),
+            proposals_circuit_id::make_fetch_proposal_resource(source.proposal_store_factory()),
+            proposals::make_list_proposals_resource(source.proposal_store_factory()),
+        ];
+        Self { resources }
+    }
+}
+
+impl RestResourceProvider for AdminServiceRestProvider {
     fn resources(&self) -> Vec<Resource> {
-        // Allowing unused_mut because resources must be mutable if feature rest-api-actix-web-1 is
-        // enabled
-        #[allow(unused_mut)]
-        let mut resources = Vec::new();
-
-        #[cfg(feature = "rest-api-actix-web-1")]
-        {
-            resources.append(&mut vec![
-                actix::ws_register_type::make_application_handler_registration_route(
-                    self.commands(),
-                ),
-                actix::submit::make_submit_route(self.commands()),
-                actix::proposals_circuit_id::make_fetch_proposal_resource(
-                    self.proposal_store_factory(),
-                ),
-                actix::proposals::make_list_proposals_resource(self.proposal_store_factory()),
-            ]);
-        }
-
-        resources
+        self.resources.clone()
     }
 }
 
@@ -117,14 +102,10 @@ impl RestResourceProvider for CircuitResourceProvider {
         #[allow(unused_mut)]
         let mut resources = Vec::new();
 
-        #[cfg(feature = "rest-api-actix-web-1")]
-        {
-            resources.append(&mut vec![
-                actix::circuits_circuit_id::make_fetch_circuit_resource(self.store.clone()),
-                actix::circuits::make_list_circuits_resource(self.store.clone()),
-            ]);
-        }
-
+        resources.append(&mut vec![
+            circuits_circuit_id::make_fetch_circuit_resource(self.store.clone()),
+            circuits::make_list_circuits_resource(self.store.clone()),
+        ]);
         resources
     }
 }
