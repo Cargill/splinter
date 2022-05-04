@@ -28,6 +28,12 @@ pub trait ScabbardStoreFactory<C>: Sync + Send {
     fn new_store<'a>(&'a self, conn: &'a C) -> Box<dyn ScabbardStore + 'a>;
 }
 
+impl<C> ScabbardStoreFactory<C> for Box<dyn ScabbardStoreFactory<C>> {
+    fn new_store<'a>(&'a self, conn: &'a C) -> Box<dyn ScabbardStore + 'a> {
+        (&**self).new_store(conn)
+    }
+}
+
 pub trait PooledScabbardStoreFactory: Send {
     fn new_store(&self) -> Box<dyn ScabbardStore + Send>;
 

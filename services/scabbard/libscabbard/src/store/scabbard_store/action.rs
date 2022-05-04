@@ -24,3 +24,14 @@ pub enum ScabbardConsensusAction {
 pub enum IdentifiedScabbardConsensusAction {
     Scabbard2pcConsensusAction(i64, ConsensusAction),
 }
+
+impl IdentifiedScabbardConsensusAction {
+    pub fn deconstruct(self) -> (i64, ScabbardConsensusAction) {
+        match self {
+            Self::Scabbard2pcConsensusAction(id, action) => (
+                id,
+                ScabbardConsensusAction::Scabbard2pcConsensusAction(action),
+            ),
+        }
+    }
+}
