@@ -101,7 +101,7 @@ pub trait ScabbardStore {
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError>;
 
-    /// List all coordinator actions for a given service_id and epoch
+    /// List all pending consensus actions for a given service_id and epoch
     ///
     /// # Arguments
     ///
@@ -198,7 +198,7 @@ pub trait ScabbardStore {
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError>;
 
-    /// List all consensus events for a given service_id and epoch
+    /// List all pending consensus events for a given service_id and epoch
     ///
     /// # Arguments
     ///
