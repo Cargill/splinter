@@ -37,7 +37,7 @@ table! {
 }
 
 table! {
-    consensus_2pc_coordinator_context (service_id, epoch) {
+    consensus_2pc_context (service_id, epoch) {
         service_id -> Text,
         alarm -> Nullable<BigInt>,
         coordinator -> Text,
@@ -45,11 +45,13 @@ table! {
         last_commit_epoch -> Nullable<BigInt>,
         state -> Text,
         vote_timeout_start -> Nullable<BigInt>,
+        vote -> Nullable<Text>,
+        decision_timeout_start -> Nullable<BigInt>,
     }
 }
 
 table! {
-    consensus_2pc_coordinator_context_participant (service_id, epoch, process) {
+    consensus_2pc_context_participant (service_id, epoch, process) {
         service_id -> Text,
         epoch -> BigInt,
         process -> Text,
@@ -58,28 +60,30 @@ table! {
 }
 
 table! {
-    consensus_2pc_coordinator_notification_action (action_id) {
+    consensus_2pc_notification_action (action_id) {
         action_id -> Int8,
         service_id -> Text,
         epoch -> BigInt,
         notification_type -> Text,
         dropped_message -> Nullable<Text>,
+        request_for_vote_value -> Nullable<Binary>,
     }
 }
 
 table! {
-    consensus_2pc_coordinator_send_message_action (action_id) {
+    consensus_2pc_send_message_action (action_id) {
         action_id -> Int8,
         service_id -> Text,
         epoch -> BigInt,
         receiver_service_id -> Text,
         message_type -> Text,
         vote_response -> Nullable<Text>,
+        vote_request -> Nullable<Binary>,
     }
 }
 
 table! {
-    consensus_2pc_update_coordinator_context_action (action_id) {
+    consensus_2pc_update_context_action (action_id) {
         action_id -> Int8,
         service_id -> Text,
         alarm -> Nullable<BigInt>,
@@ -88,12 +92,14 @@ table! {
         last_commit_epoch -> Nullable<BigInt>,
         state -> Text,
         vote_timeout_start -> Nullable<BigInt>,
-        coordinator_action_alarm -> Nullable<BigInt>,
+        vote -> Nullable<Text>,
+        decision_timeout_start -> Nullable<BigInt>,
+        action_alarm -> Nullable<BigInt>,
     }
 }
 
 table! {
-    consensus_2pc_update_coordinator_context_action_participant (action_id) {
+    consensus_2pc_update_context_action_participant (action_id) {
         action_id -> Int8,
         service_id -> Text,
         epoch -> BigInt,
@@ -110,73 +116,6 @@ table! {
         created_at -> Timestamp,
         executed_at -> Nullable<BigInt>,
         position -> Integer,
-    }
-}
-
-table! {
-    consensus_2pc_participant_context (service_id, epoch) {
-        service_id -> Text,
-        alarm -> Nullable<BigInt>,
-        coordinator -> Text,
-        epoch -> BigInt,
-        last_commit_epoch -> Nullable<BigInt>,
-        state -> Text,
-        vote -> Nullable<Text>,
-        decision_timeout_start -> Nullable<BigInt>,
-    }
-}
-
-table! {
-    consensus_2pc_participant_context_participant (service_id, epoch, process) {
-        service_id -> Text,
-        epoch -> BigInt,
-        process -> Text,
-    }
-}
-
-table! {
-    consensus_2pc_participant_notification_action (action_id) {
-        action_id -> Int8,
-        service_id -> Text,
-        epoch -> BigInt,
-        notification_type -> Text,
-        dropped_message -> Nullable<Text>,
-        request_for_vote_value -> Nullable<Binary>,
-    }
-}
-
-table! {
-    consensus_2pc_participant_send_message_action (action_id) {
-        action_id -> Int8,
-        service_id -> Text,
-        epoch -> BigInt,
-        receiver_service_id -> Text,
-        message_type -> Text,
-        vote_request -> Nullable<Binary>,
-    }
-}
-
-table! {
-    consensus_2pc_update_participant_context_action (action_id) {
-        action_id -> Int8,
-        service_id -> Text,
-        alarm -> Nullable<BigInt>,
-        coordinator -> Text,
-        epoch -> BigInt,
-        last_commit_epoch -> Nullable<BigInt>,
-        state -> Text,
-        vote -> Nullable<Text>,
-        decision_timeout_start -> Nullable<BigInt>,
-        participant_action_alarm -> Nullable<BigInt>,
-    }
-}
-
-table! {
-    consensus_2pc_update_participant_context_action_participant (action_id) {
-        action_id -> Int8,
-        service_id -> Text,
-        epoch -> BigInt,
-        process -> Text,
     }
 }
 
@@ -222,34 +161,24 @@ table! {
     }
 }
 
-joinable!(consensus_2pc_coordinator_notification_action -> consensus_2pc_action (action_id));
-joinable!(consensus_2pc_coordinator_send_message_action -> consensus_2pc_action (action_id));
-joinable!(consensus_2pc_update_coordinator_context_action -> consensus_2pc_action (action_id));
-joinable!(consensus_2pc_update_coordinator_context_action_participant -> consensus_2pc_update_coordinator_context_action (action_id));
-joinable!(consensus_2pc_update_coordinator_context_action_participant -> consensus_2pc_action (action_id));
-
-joinable!(consensus_2pc_participant_notification_action -> consensus_2pc_action (action_id));
-joinable!(consensus_2pc_participant_send_message_action -> consensus_2pc_action (action_id));
-joinable!(consensus_2pc_update_participant_context_action -> consensus_2pc_action (action_id));
+joinable!(consensus_2pc_notification_action -> consensus_2pc_action (action_id));
+joinable!(consensus_2pc_send_message_action -> consensus_2pc_action (action_id));
+joinable!(consensus_2pc_update_context_action -> consensus_2pc_action (action_id));
+joinable!(consensus_2pc_update_context_action_participant -> consensus_2pc_update_context_action (action_id));
+joinable!(consensus_2pc_update_context_action_participant -> consensus_2pc_action (action_id));
 
 joinable!(consensus_2pc_deliver_event -> consensus_2pc_event(event_id));
 joinable!(consensus_2pc_start_event -> consensus_2pc_event(event_id));
 joinable!(consensus_2pc_vote_event -> consensus_2pc_event(event_id));
 
 allow_tables_to_appear_in_same_query!(
-    consensus_2pc_coordinator_context,
-    consensus_2pc_coordinator_context_participant,
+    consensus_2pc_context,
+    consensus_2pc_context_participant,
     consensus_2pc_action,
-    consensus_2pc_update_coordinator_context_action,
-    consensus_2pc_coordinator_send_message_action,
-    consensus_2pc_coordinator_notification_action,
-    consensus_2pc_update_coordinator_context_action_participant,
-    consensus_2pc_participant_context,
-    consensus_2pc_participant_context_participant,
-    consensus_2pc_update_participant_context_action,
-    consensus_2pc_update_participant_context_action_participant,
-    consensus_2pc_participant_send_message_action,
-    consensus_2pc_participant_notification_action,
+    consensus_2pc_update_context_action,
+    consensus_2pc_send_message_action,
+    consensus_2pc_notification_action,
+    consensus_2pc_update_context_action_participant,
     consensus_2pc_event,
     consensus_2pc_deliver_event,
     consensus_2pc_start_event,

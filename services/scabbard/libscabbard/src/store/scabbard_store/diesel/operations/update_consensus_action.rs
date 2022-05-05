@@ -20,10 +20,8 @@ use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
-    models::{Consensus2pcCoordinatorContextModel, Consensus2pcParticipantContextModel},
-    schema::{
-        consensus_2pc_action, consensus_2pc_coordinator_context, consensus_2pc_participant_context,
-    },
+    models::Consensus2pcContextModel,
+    schema::{consensus_2pc_action, consensus_2pc_context},
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 
@@ -56,20 +54,21 @@ where
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
-            // check to see if action a context exists with the given service_id and epoch
-            let coordinator_context = consensus_2pc_coordinator_context::table
-                .filter(consensus_2pc_coordinator_context::epoch.eq(epoch).and(
-                    consensus_2pc_coordinator_context::service_id.eq(format!("{}", service_id)),
-                ))
-                .first::<Consensus2pcCoordinatorContextModel>(self.conn)
-                .optional()?;
-
-            let participant_context = consensus_2pc_participant_context::table
-                .filter(consensus_2pc_participant_context::epoch.eq(epoch).and(
-                    consensus_2pc_participant_context::service_id.eq(format!("{}", service_id)),
-                ))
-                .first::<Consensus2pcParticipantContextModel>(self.conn)
-                .optional()?;
+            // check to see if a context with the given epoch and service_id exists
+            consensus_2pc_context::table
+                .filter(
+                    consensus_2pc_context::epoch
+                        .eq(epoch)
+                        .and(consensus_2pc_context::service_id.eq(format!("{}", service_id))),
+                )
+                .first::<Consensus2pcContextModel>(self.conn)
+                .optional()?
+                .ok_or_else(|| {
+                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
+                        "Context with service ID {} and epoch {} does not exist",
+                        service_id, epoch,
+                    )))
+                })?;
 
             let update_executed_at = i64::try_from(
                 executed_at
@@ -83,28 +82,18 @@ where
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
 
-            if coordinator_context.is_some() || participant_context.is_some() {
-                update(consensus_2pc_action::table)
-                    .filter(
-                        consensus_2pc_action::id
-                            .eq(action_id)
-                            .and(consensus_2pc_action::service_id.eq(format!("{}", service_id)))
-                            .and(consensus_2pc_action::epoch.eq(epoch)),
-                    )
-                    .set(consensus_2pc_action::executed_at.eq(Some(update_executed_at)))
-                    .execute(self.conn)
-                    .map(|_| ())
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                Ok(())
-            } else {
-                Err(ScabbardStoreError::InvalidState(
-                    InvalidStateError::with_message(format!(
-                        "Faild to update 'executed at' time for consensus action, a context with
-                        service_id: {} and epoch: {} does not exist",
-                        service_id, epoch
-                    )),
-                ))
-            }
+            update(consensus_2pc_action::table)
+                .filter(
+                    consensus_2pc_action::id
+                        .eq(action_id)
+                        .and(consensus_2pc_action::service_id.eq(format!("{}", service_id)))
+                        .and(consensus_2pc_action::epoch.eq(epoch)),
+                )
+                .set(consensus_2pc_action::executed_at.eq(Some(update_executed_at)))
+                .execute(self.conn)
+                .map(|_| ())
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            Ok(())
         })
     }
 }
