@@ -30,7 +30,8 @@ use super::schema::{
     consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_notification_action,
     consensus_2pc_send_message_action, consensus_2pc_start_event,
     consensus_2pc_update_context_action, consensus_2pc_update_context_action_participant,
-    consensus_2pc_vote_event, scabbard_peer, scabbard_service, scabbard_v3_commit_history,
+    consensus_2pc_vote_event, scabbard_alarm, scabbard_peer, scabbard_service,
+    scabbard_v3_commit_history,
 };
 
 /// Database model representation of `ScabbardService`
@@ -199,6 +200,15 @@ impl From<&ConsensusDecision> for String {
             ConsensusDecision::Commit => "COMMIT".into(),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "scabbard_alarm"]
+#[primary_key(service_id, alarm_type)]
+pub struct ScabbardAlarmModel {
+    pub service_id: String,
+    pub alarm_type: String,
+    pub alarm: i64, // timestamp, when to wake up
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
