@@ -1197,6 +1197,10 @@ pub mod tests {
             .add_consensus_context(&service_fqsi, context)
             .expect("failed to add context to store");
 
+        store
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, SystemTime::now())
+            .expect("failed to add alarm to store");
+
         let ready_services = store
             .list_ready_services()
             .expect("failed to list ready services");
@@ -1211,25 +1215,10 @@ pub mod tests {
             .checked_add(Duration::from_secs(604800))
             .expect("failed to get alarm time");
 
-        let update_context = ContextBuilder::default()
-            .with_coordinator(service_fqsi.clone().service_id())
-            .with_epoch(1)
-            .with_participants(vec![Participant {
-                process: peer_service_id.clone(),
-                vote: None,
-            }])
-            .with_state(State::WaitingForStart)
-            .with_this_process(service_fqsi.clone().service_id())
-            .build()
-            .expect("failed to build context");
-
         // update the context to have an alarm far in the future
         store
-            .update_consensus_context(
-                &service_fqsi,
-                ConsensusContext::TwoPhaseCommit(update_context),
-            )
-            .expect("failed to update context");
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, updated_alarm)
+            .expect("failed to add alarm to store");
 
         // add an action for the service
         let action_id = store
@@ -1475,6 +1464,10 @@ pub mod tests {
         store
             .add_consensus_context(&service_fqsi, context)
             .expect("failed to add context to store");
+
+        store
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, SystemTime::now())
+            .expect("failed to add alarm to store");
 
         let ready_services = store
             .list_ready_services()
@@ -1901,6 +1894,14 @@ pub mod tests {
         store
             .add_consensus_context(&coordinator_fqsi, context.clone())
             .expect("failed to add context");
+
+        store
+            .set_alarm(
+                &coordinator_fqsi,
+                &AlarmType::TwoPhaseCommit,
+                SystemTime::now(),
+            )
+            .expect("failed to add alarm to store");
 
         let fetched_service = store
             .get_service(&coordinator_fqsi)

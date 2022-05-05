@@ -67,6 +67,7 @@ mod tests {
     use crate::store::ScabbardStore;
     use crate::store::{
         action::ConsensusAction,
+        alarm::AlarmType,
         context::ConsensusContext,
         event::ConsensusEvent,
         two_phase_commit::{Action, ContextBuilder, Event, Notification, Participant, State},
@@ -75,7 +76,7 @@ mod tests {
     /// Test that the `ScabbardTimerFilter`'s `filter` function works
     ///
     /// 1. Add two services in the finalized state to the database
-    /// 2. Add a context with a past due alarm and an unexecuted action for the first service
+    /// 2. Add a context, a past due alarm, and an unexecuted action for the first service
     /// 3. Create a new `ScabbardTimerFilter` and call the `filter` method, check that only the
     ///    first service is returned
     /// 4. Add a context with a past due alarm for the second service
@@ -147,6 +148,10 @@ mod tests {
             .add_consensus_context(&fqsi, context)
             .expect("failed to add context to store");
 
+        store
+            .set_alarm(&fqsi, &AlarmType::TwoPhaseCommit, SystemTime::now())
+            .expect("failed to add alarm to store");
+
         let notification = Notification::RequestForStart();
         let action = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
 
@@ -185,6 +190,10 @@ mod tests {
             .add_consensus_context(&fqsi2, context2)
             .expect("failed to add context to store");
 
+        store
+            .set_alarm(&fqsi2, &AlarmType::TwoPhaseCommit, SystemTime::now())
+            .expect("failed to add alarm to store");
+
         let ids = scabbard_timer_filter.filter().expect("failed to filter");
 
         // check that both services are listed because both have past due alarms
@@ -211,6 +220,14 @@ mod tests {
         let updated_alarm = SystemTime::now()
             .checked_add(Duration::from_secs(604800))
             .expect("failed to get alarm time");
+
+        store
+            .set_alarm(&fqsi2, &AlarmType::TwoPhaseCommit, updated_alarm.clone())
+            .expect("failed to add alarm to store");
+
+        store
+            .set_alarm(&fqsi, &AlarmType::TwoPhaseCommit, updated_alarm)
+            .expect("failed to add alarm to store");
 
         // update the second service's action's executed_at time so that it appears to have
         // been executed
