@@ -19,7 +19,7 @@ use splinter::{
     error::InternalError, service::FullyQualifiedServiceId, store::command::StoreCommand,
 };
 
-use crate::store::{context::ConsensusContext, service::ServiceStatus, ScabbardStoreFactory};
+use crate::store::{alarm::AlarmType, service::ServiceStatus, ScabbardStoreFactory};
 
 pub struct ScabbardFinalizeServiceCommand<C> {
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,
@@ -55,28 +55,15 @@ impl<C> StoreCommand for ScabbardFinalizeServiceCommand<C> {
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        let mut context = store
-            .get_current_consensus_context(&self.service_id)
-            .map_err(|err| InternalError::from_source(Box::new(err)))?
-            .ok_or_else(|| {
-                InternalError::with_message(format!("No context found for {}", self.service_id))
-            })?;
-
-        context = match context {
-            ConsensusContext::TwoPhaseCommit(context) => ConsensusContext::TwoPhaseCommit(
-                context
-                    .into_builder()
-                    .build()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?,
-            ),
-        };
+        // set alarm to current time so it will be considered passed next time the timer runs
+        let alarm = SystemTime::now();
 
         store
             .update_service(service)
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         store
-            .update_consensus_context(&self.service_id, context)
+            .set_alarm(&self.service_id, &AlarmType::TwoPhaseCommit, alarm)
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
         Ok(())
     }

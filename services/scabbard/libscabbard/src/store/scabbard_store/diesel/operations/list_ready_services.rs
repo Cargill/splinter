@@ -19,8 +19,9 @@ use diesel::prelude::*;
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
+use crate::store::alarm::AlarmType;
 use crate::store::scabbard_store::diesel::schema::{
-    consensus_2pc_action, consensus_2pc_context, consensus_2pc_event, scabbard_service,
+    consensus_2pc_action, consensus_2pc_event, scabbard_alarm, scabbard_service,
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 
@@ -44,6 +45,23 @@ where
                 .load::<String>(self.conn)?
                 .into_iter()
                 .collect();
+
+            let current_time = get_timestamp(SystemTime::now())?;
+
+            // get the service IDs of services with alarms which have passed
+            let mut ready_services = scabbard_alarm::table
+                .filter(
+                    scabbard_alarm::service_id
+                        .eq_any(&finalized_services)
+                        .and(
+                            scabbard_alarm::alarm_type.eq(String::from(&AlarmType::TwoPhaseCommit)),
+                        )
+                        .and(scabbard_alarm::alarm.le(current_time)),
+                )
+                .select(scabbard_alarm::service_id)
+                .load::<String>(self.conn)?
+                .into_iter()
+                .collect::<Vec<String>>();
 
             // get the service IDs of any finalized services that have unexecuted actions
             ready_services.append(
@@ -83,20 +101,11 @@ where
     }
 }
 
-fn get_timestamp(time: Option<SystemTime>) -> Result<Option<i64>, ScabbardStoreError> {
-    match time {
-        Some(time) => Ok(Some(
-            i64::try_from(
-                time.duration_since(SystemTime::UNIX_EPOCH)
-                    .map_err(|err| {
-                        ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-                    })?
-                    .as_secs(),
-            )
-            .map_err(|err| {
-                ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-            })?,
-        )),
-        None => Ok(None),
-    }
+fn get_timestamp(time: SystemTime) -> Result<i64, ScabbardStoreError> {
+    i64::try_from(
+        time.duration_since(SystemTime::UNIX_EPOCH)
+            .map_err(|err| ScabbardStoreError::Internal(InternalError::from_source(Box::new(err))))?
+            .as_secs(),
+    )
+    .map_err(|err| ScabbardStoreError::Internal(InternalError::from_source(Box::new(err))))
 }
