@@ -70,11 +70,6 @@ impl Network {
         self
     }
 
-    pub fn without_cylinder_auth(mut self) -> Self {
-        self.cylinder_auth = false;
-        self
-    }
-
     pub fn add_nodes_with_defaults(mut self, count: i32) -> Result<Network, InternalError> {
         let mut registry_info = vec![];
         let context = Secp256k1Context::new();
@@ -168,11 +163,6 @@ impl Network {
 
     pub fn with_default_rest_api_variant(mut self, variant: RestApiVariant) -> Self {
         self.default_rest_api_variant = variant;
-        self
-    }
-
-    pub fn with_external_registries(mut self, files: Vec<String>) -> Self {
-        self.external_registries = Some(files);
         self
     }
 

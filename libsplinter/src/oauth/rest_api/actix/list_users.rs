@@ -134,10 +134,9 @@ mod tests {
         paging::Paging,
     };
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Deserialize)]
     struct TestClientOAuthUser {
         subject: String,
-        user_id: String,
     }
 
     #[derive(Deserialize)]
