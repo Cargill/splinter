@@ -33,6 +33,7 @@ use crate::store::pool::ConnectionPool;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     action::IdentifiedConsensusAction,
+    alarm::AlarmType,
     commit::CommitEntry,
     event::{ConsensusEvent, IdentifiedConsensusEvent},
     service::ScabbardService,
@@ -53,6 +54,7 @@ use operations::list_consensus_actions::ListActionsOperation as _;
 use operations::list_consensus_events::ListEventsOperation as _;
 use operations::list_ready_services::ListReadyServicesOperation as _;
 use operations::remove_service::RemoveServiceOperation as _;
+use operations::set_alarm::SetAlarmOperation as _;
 use operations::update_commit_entry::UpdateCommitEntryOperation as _;
 use operations::update_consensus_action::UpdateActionOperation as _;
 use operations::update_consensus_context::UpdateContextAction as _;
@@ -241,6 +243,18 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).remove_service(service_id))
     }
+
+    /// Set a scabbard alarm
+    fn set_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+        alarm: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).set_alarm(service_id, alarm_type, alarm)
+        })
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -402,6 +416,18 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).remove_service(service_id))
     }
+
+    /// Set a scabbard alarm
+    fn set_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+        alarm: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).set_alarm(service_id, alarm_type, alarm)
+        })
+    }
 }
 
 pub struct DieselConnectionScabbardStore<'a, C>
@@ -553,6 +579,16 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).remove_service(service_id)
     }
+
+    /// Set a scabbard alarm
+    fn set_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+        alarm: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).set_alarm(service_id, alarm_type, alarm)
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -684,6 +720,16 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         service_id: &FullyQualifiedServiceId,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).remove_service(service_id)
+    }
+
+    /// Set a scabbard alarm
+    fn set_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+        alarm: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).set_alarm(service_id, alarm_type, alarm)
     }
 }
 
@@ -1881,6 +1927,74 @@ pub mod tests {
             .get_current_consensus_context(&coordinator_fqsi)
             .expect("failed to get current context")
             .is_none());
+    }
+
+    /// Test that the scabbard store `set_alarm` operation is successful.
+    ///
+    /// 1. Add a service to the database
+    /// 2. Add a context to the database for the service
+    /// 3. Call `list_ready_services` and check that the service is not returned
+    /// 4. Set an alarm for the service and check that the operation was successful
+    /// 5. Call `list_ready_services` and check that the service is returned because it
+    ///    has an alarm that has passed
+    #[test]
+    fn scabbard_store_set_alarm() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
+            .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
+
+        let peer_service_id = ServiceId::new_random();
+
+        // service with finalized status
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&service_fqsi)
+            .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        assert!(store.add_service(service.clone()).is_ok());
+
+        let coordinator_context = ContextBuilder::default()
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+            }])
+            .with_state(State::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
+
+        store
+            .add_consensus_context(&service_fqsi, context)
+            .expect("failed to add context to store");
+
+        let ready_services = store
+            .list_ready_services()
+            .expect("failed to list ready services");
+
+        // Check that the service is not returned yet because it does not have an alarm that has
+        // passed or outstanding actions
+        assert!(ready_services.is_empty());
+
+        assert!(store
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, SystemTime::now())
+            .is_ok());
+
+        let ready_services = store
+            .list_ready_services()
+            .expect("failed to list ready services");
+
+        // check that the service is returned because it has an alarm that has passed
+        assert_eq!(&ready_services[0], &service_fqsi);
     }
 
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {

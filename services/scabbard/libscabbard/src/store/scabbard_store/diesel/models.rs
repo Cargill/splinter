@@ -19,6 +19,7 @@ use splinter::error::InternalError;
 use splinter::service::{FullyQualifiedServiceId, ServiceId};
 
 use crate::store::scabbard_store::{
+    alarm::AlarmType,
     commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision},
     context::ConsensusContext,
     service::{ConsensusType, ScabbardService, ServiceStatus},
@@ -771,4 +772,12 @@ pub struct Consensus2pcVoteEventModel {
     pub service_id: String,
     pub epoch: i64,
     pub vote: String, // TRUE or FALSE
+}
+
+impl From<&AlarmType> for String {
+    fn from(status: &AlarmType) -> Self {
+        match *status {
+            AlarmType::TwoPhaseCommit => "TWOPHASECOMMIT".into(),
+        }
+    }
 }
