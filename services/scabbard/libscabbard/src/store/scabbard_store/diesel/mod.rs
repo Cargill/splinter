@@ -725,12 +725,7 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -748,7 +743,6 @@ pub mod tests {
             .is_ok());
 
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -782,12 +776,7 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -828,19 +817,7 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
-        let alarm = SystemTime::UNIX_EPOCH
-            .checked_add(Duration::from_secs(
-                SystemTime::now()
-                    .checked_add(Duration::from_secs(60))
-                    .expect("failed to get alarm time")
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .expect("failed to get duration since UNIX EPOCH")
-                    .as_secs(),
-            ))
-            .unwrap();
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -872,7 +849,6 @@ pub mod tests {
             .unwrap();
 
         let update_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -901,7 +877,6 @@ pub mod tests {
             .expect("failed to list all actions");
 
         let expected_update_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -950,12 +925,7 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -984,7 +954,6 @@ pub mod tests {
             .unwrap();
 
         let update_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1004,7 +973,6 @@ pub mod tests {
             .is_ok());
 
         let bad_update_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(0)
             .with_participants(vec![Participant {
@@ -1041,12 +1009,7 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1075,7 +1038,6 @@ pub mod tests {
             .unwrap();
 
         let update_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1172,7 +1134,6 @@ pub mod tests {
         assert!(store.add_service(service).is_ok());
 
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(SystemTime::now())
             .with_coordinator(service_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1205,7 +1166,6 @@ pub mod tests {
             .expect("failed to get alarm time");
 
         let update_context = ContextBuilder::default()
-            .with_alarm(updated_alarm)
             .with_coordinator(service_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1453,7 +1413,6 @@ pub mod tests {
         assert!(store.add_service(service.clone()).is_ok());
 
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(SystemTime::now())
             .with_coordinator(service_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1511,12 +1470,7 @@ pub mod tests {
         let participant_fqsi = FullyQualifiedServiceId::new_random();
         let participant2_fqsi = FullyQualifiedServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let participant_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![
@@ -1570,12 +1524,7 @@ pub mod tests {
         let participant_fqsi = FullyQualifiedServiceId::new_random();
         let participant2_fqsi = FullyQualifiedServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let participant_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![
@@ -1632,12 +1581,7 @@ pub mod tests {
         let participant_fqsi = FullyQualifiedServiceId::new_random();
         let participant2_fqsi = FullyQualifiedServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let participant_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![
@@ -1772,19 +1716,7 @@ pub mod tests {
 
         store.add_service(service).expect("faield to add service");
 
-        let alarm = SystemTime::UNIX_EPOCH
-            .checked_add(Duration::from_secs(
-                SystemTime::now()
-                    .checked_add(Duration::from_secs(60))
-                    .expect("failed to get alarm time")
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .expect("failed to get duration since UNIX EPOCH")
-                    .as_secs(),
-            ))
-            .unwrap();
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1802,7 +1734,6 @@ pub mod tests {
             .expect("failed to add context");
 
         let participant_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1832,7 +1763,6 @@ pub mod tests {
         assert_eq!(current_context, Some(context2));
 
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(2)
             .with_participants(vec![Participant {
@@ -1856,7 +1786,6 @@ pub mod tests {
         assert_eq!(current_context, Some(context3));
 
         let participant_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(participant_service_id.clone().service_id())
             .with_epoch(3)
             .with_participants(vec![Participant {
@@ -1910,19 +1839,7 @@ pub mod tests {
             .add_service(service.clone())
             .expect("failed to add service");
 
-        let alarm = SystemTime::UNIX_EPOCH
-            .checked_add(Duration::from_secs(
-                SystemTime::now()
-                    .checked_add(Duration::from_secs(60))
-                    .expect("failed to get alarm time")
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .expect("failed to get duration since UNIX EPOCH")
-                    .as_secs(),
-            ))
-            .unwrap();
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {

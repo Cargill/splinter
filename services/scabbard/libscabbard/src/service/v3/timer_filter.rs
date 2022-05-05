@@ -129,7 +129,6 @@ mod tests {
         store.add_service(service2).expect("failed to add service2");
 
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(SystemTime::now())
             .with_coordinator(fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -169,7 +168,6 @@ mod tests {
         assert!(ids.contains(&fqsi));
 
         let participant_context = ContextBuilder::default()
-            .with_alarm(SystemTime::now())
             .with_coordinator(fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -209,48 +207,10 @@ mod tests {
         assert!(ids.contains(&fqsi));
         assert!(ids.contains(&fqsi2));
 
-        let updated_alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(604800))
-            .expect("failed to get alarm time");
-
-        let update_context2 = ContextBuilder::default()
-            .with_alarm(updated_alarm)
-            .with_coordinator(fqsi.clone().service_id())
-            .with_epoch(1)
-            .with_participants(vec![Participant {
-                process: peer_service1.clone(),
-                vote: None,
-            }])
-            .with_state(State::WaitingForVoteRequest)
-            .with_this_process(fqsi2.clone().service_id())
-            .build()
-            .expect("failed to build context");
-
         // reset the alarms for both services to far in the future
-        store
-            .update_consensus_context(&fqsi2, ConsensusContext::TwoPhaseCommit(update_context2))
-            .expect("failed to update context");
-
         let updated_alarm = SystemTime::now()
             .checked_add(Duration::from_secs(604800))
             .expect("failed to get alarm time");
-
-        let update_context1 = ContextBuilder::default()
-            .with_alarm(updated_alarm)
-            .with_coordinator(fqsi.clone().service_id())
-            .with_epoch(1)
-            .with_participants(vec![Participant {
-                process: peer_service1.clone(),
-                vote: None,
-            }])
-            .with_state(State::WaitingForStart)
-            .with_this_process(fqsi.clone().service_id())
-            .build()
-            .expect("failed to build context");
-
-        store
-            .update_consensus_context(&fqsi, ConsensusContext::TwoPhaseCommit(update_context1))
-            .expect("failed to update context");
 
         // update the second service's action's executed_at time so that it appears to have
         // been executed

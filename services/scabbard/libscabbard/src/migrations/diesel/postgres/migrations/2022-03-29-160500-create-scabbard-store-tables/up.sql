@@ -19,7 +19,6 @@ CREATE TYPE notification_type AS ENUM ('REQUESTFORSTART', 'COORDINATORREQUESTFOR
 
 CREATE TABLE IF NOT EXISTS consensus_2pc_context (
     service_id                TEXT NOT NULL,
-    alarm                     BIGINT,
     coordinator               TEXT NOT NULL,
     epoch                     BIGINT NOT NULL,
     last_commit_epoch         BIGINT,
@@ -56,7 +55,6 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_action (
 CREATE TABLE IF NOT EXISTS consensus_2pc_update_context_action (
     action_id                 INTEGER PRIMARY KEY,
     service_id                TEXT NOT NULL,
-    alarm                     BIGINT,
     coordinator               TEXT NOT NULL,
     epoch                     BIGINT NOT NULL,
     last_commit_epoch         BIGINT,

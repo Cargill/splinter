@@ -55,9 +55,6 @@ impl<C> StoreCommand for ScabbardFinalizeServiceCommand<C> {
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        // set alarm to current time so it will be considered passed next time the timer runs
-        let alarm = SystemTime::now();
-
         let mut context = store
             .get_current_consensus_context(&self.service_id)
             .map_err(|err| InternalError::from_source(Box::new(err)))?
@@ -69,7 +66,6 @@ impl<C> StoreCommand for ScabbardFinalizeServiceCommand<C> {
             ConsensusContext::TwoPhaseCommit(context) => ConsensusContext::TwoPhaseCommit(
                 context
                     .into_builder()
-                    .with_alarm(alarm)
                     .build()
                     .map_err(|err| InternalError::from_source(Box::new(err)))?,
             ),

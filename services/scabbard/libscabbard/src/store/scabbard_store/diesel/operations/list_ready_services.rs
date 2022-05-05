@@ -45,20 +45,6 @@ where
                 .into_iter()
                 .collect();
 
-            let current_time = get_timestamp(Some(SystemTime::now()))?;
-
-            // get the service IDs of services with alarms which have passed
-            let mut ready_services = consensus_2pc_context::table
-                .filter(
-                    consensus_2pc_context::service_id
-                        .eq_any(&finalized_services)
-                        .and(consensus_2pc_context::alarm.le(current_time)),
-                )
-                .select(consensus_2pc_context::service_id)
-                .load::<String>(self.conn)?
-                .into_iter()
-                .collect::<Vec<String>>();
-
             // get the service IDs of any finalized services that have unexecuted actions
             ready_services.append(
                 &mut consensus_2pc_action::table
