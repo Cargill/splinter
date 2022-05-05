@@ -22,7 +22,7 @@ use crate::error::InvalidArgumentError;
 
 /// Defines the validation rules for a given service type.
 ///
-/// This is a macro, due to the due to the inability to use different error types (panic vs
+/// This is a macro, due to the inability to use different error types (panic vs
 /// InvalidArgumentError) in the const function vs the heap function.
 macro_rules! validate_service_type {
     ($service_type:ident, $err_macro:ident) => {
