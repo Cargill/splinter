@@ -248,4 +248,17 @@ pub trait ScabbardStore {
         alarm_type: &AlarmType,
         alarm: SystemTime,
     ) -> Result<(), ScabbardStoreError>;
+
+    /// Unset a scabbard alarm of a specified type for a given service
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The fully qualified service id for the `ScabbardService` that the alarm
+    ///   will be unset for
+    /// * `alarm_type` - The type of alarm being unset
+    fn unset_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<(), ScabbardStoreError>;
 }
