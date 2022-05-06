@@ -224,7 +224,7 @@ impl AdminServiceBuilder {
             lifecycle_dispatch,
             service_arg_validators,
             peer_connector.clone(),
-            admin_store,
+            admin_store.clone(),
             signature_verifier,
             key_verifier,
             key_permission_manager,
@@ -241,6 +241,7 @@ impl AdminServiceBuilder {
             consensus: None,
             peer_connector,
             peer_notification_run_state: None,
+            admin_store,
         })
     }
 }

@@ -143,8 +143,8 @@ pub struct AdminService {
     coordinator_timeout: Duration,
     consensus: Option<AdminConsensusManager>,
     peer_connector: PeerManagerConnector,
-
     peer_notification_run_state: Option<(usize, JoinHandle<()>)>,
+    admin_store: Box<dyn AdminServiceStore>,
 }
 
 impl AdminService {
@@ -193,7 +193,7 @@ impl AdminService {
     }
 
     pub fn proposal_store_factory(&self) -> impl ProposalStoreFactory {
-        AdminServiceProposalsFactory::new(&self.admin_service_shared)
+        AdminServiceProposalsFactory::new(self.admin_store.clone())
     }
 
     /// On restart of a splinter node, all services that this node should run on the existing

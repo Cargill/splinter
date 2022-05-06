@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, Mutex};
-
 use crate::admin::service::messages::CircuitProposal;
-use crate::admin::service::shared::AdminServiceShared;
+use crate::admin::store::AdminServiceStore;
 use crate::admin::store::CircuitPredicate;
 
 use super::error::ProposalStoreError;
@@ -24,14 +22,12 @@ use super::ProposalStore;
 
 #[derive(Clone)]
 pub struct AdminServiceProposals {
-    shared: Arc<Mutex<AdminServiceShared>>,
+    admin_store: Box<dyn AdminServiceStore>,
 }
 
 impl AdminServiceProposals {
-    pub fn new(shared: &Arc<Mutex<AdminServiceShared>>) -> Self {
-        Self {
-            shared: Arc::clone(shared),
-        }
+    pub fn new(admin_store: Box<dyn AdminServiceStore>) -> Self {
+        Self { admin_store }
     }
 }
 
@@ -40,22 +36,15 @@ impl ProposalStore for AdminServiceProposals {
         &self,
         filters: Vec<CircuitPredicate>,
     ) -> Result<ProposalIter, ProposalStoreError> {
-        let proposals = self
-            .shared
-            .lock()
-            .map_err(|_| ProposalStoreError::new("Admin shared lock was lock poisoned"))?
-            .get_proposals(&filters)
-            .map_err(|err| {
-                ProposalStoreError::from_source("Unable to get proposals", Box::new(err))
-            })?;
+        let proposals = self.admin_store.list_proposals(&filters).map_err(|err| {
+            ProposalStoreError::from_source("Unable to get proposals", Box::new(err))
+        })?;
 
         Ok(ProposalIter::new(proposals))
     }
 
     fn proposal(&self, circuit_id: &str) -> Result<Option<CircuitProposal>, ProposalStoreError> {
-        self.shared
-            .lock()
-            .map_err(|_| ProposalStoreError::new("Admin shared lock was lock poisoned"))?
+        self.admin_store
             .get_proposal(circuit_id)
             .map_err(|err| {
                 ProposalStoreError::from_source("Unable to get proposal", Box::new(err))
