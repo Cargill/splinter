@@ -275,7 +275,7 @@ impl
                         })?
                 } else {
                     return Err(InternalError::with_message(
-                        "Failed to convert to ScabbardContext, context has state 'voting' but 
+                        "Failed to convert to ScabbardContext, context has state 'voting' but \
                         no vote timeout start time set"
                             .to_string(),
                     ));
