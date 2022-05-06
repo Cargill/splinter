@@ -662,7 +662,7 @@ impl SplinterDaemon {
         let mut rest_api_builder = RestApiBuilder::new()
             .with_bind(bind)
             .add_resources(registry.resources())
-            .add_resources(AdminServiceRestProvider::from(&admin_service).resources())
+            .add_resources(AdminServiceRestProvider::new(&admin_service).resources())
             .add_resources(orchestrator_resources)
             .add_resources(circuit_resource_provider.resources());
 
