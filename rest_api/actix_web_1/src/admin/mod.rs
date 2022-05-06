@@ -45,8 +45,8 @@ pub struct AdminServiceRestProvider {
     resources: Vec<Resource>,
 }
 
-impl From<&AdminService> for AdminServiceRestProvider {
-    fn from(source: &AdminService) -> Self {
+impl AdminServiceRestProvider {
+    pub fn new(source: &AdminService) -> Self {
         let resources = vec![
             ws_register_type::make_application_handler_registration_route(source.commands()),
             submit::make_submit_route(source.commands()),

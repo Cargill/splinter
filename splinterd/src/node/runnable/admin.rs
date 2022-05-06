@@ -151,7 +151,7 @@ impl RunnableAdminSubsystem {
 
         let mut actix1_resources = vec![];
 
-        actix1_resources.append(&mut AdminServiceRestProvider::from(&admin_service).resources());
+        actix1_resources.append(&mut AdminServiceRestProvider::new(&admin_service).resources());
         actix1_resources.append(&mut circuit_resource_provider.resources());
         actix1_resources.append(&mut registry.resources());
         actix1_resources.append(&mut orchestrator_resources);
