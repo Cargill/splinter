@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, Mutex};
-
-use crate::admin::service::shared::AdminServiceShared;
+use crate::admin::store::AdminServiceStore;
 
 use super::admin_service_proposals::AdminServiceProposals;
 use super::factory::ProposalStoreFactory;
@@ -22,19 +20,17 @@ use super::store::ProposalStore;
 
 #[derive(Clone)]
 pub struct AdminServiceProposalsFactory {
-    admin_service_shared: Arc<Mutex<AdminServiceShared>>,
+    admin_store: Box<dyn AdminServiceStore>,
 }
 
 impl ProposalStoreFactory for AdminServiceProposalsFactory {
     fn new_proposal_store<'a>(&'a self) -> Box<dyn ProposalStore + 'a> {
-        Box::new(AdminServiceProposals::new(&self.admin_service_shared))
+        Box::new(AdminServiceProposals::new(self.admin_store.clone()))
     }
 }
 
 impl AdminServiceProposalsFactory {
-    pub fn new(admin_service_shared: &Arc<Mutex<AdminServiceShared>>) -> Self {
-        Self {
-            admin_service_shared: Arc::clone(admin_service_shared),
-        }
+    pub fn new(admin_store: Box<dyn AdminServiceStore>) -> Self {
+        Self { admin_store }
     }
 }

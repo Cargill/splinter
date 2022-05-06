@@ -15,7 +15,7 @@
 #[derive(Debug)]
 pub struct ProposalStoreError {
     context: String,
-    source: Option<Box<dyn std::error::Error + Send + 'static>>,
+    source: Option<Box<dyn std::error::Error + 'static>>,
 }
 
 impl std::error::Error for ProposalStoreError {}
@@ -28,7 +28,7 @@ impl ProposalStoreError {
         }
     }
 
-    pub fn from_source<T: std::error::Error + Send + 'static>(context: &str, source: T) -> Self {
+    pub fn from_source<T: std::error::Error + 'static>(context: &str, source: T) -> Self {
         Self {
             context: context.into(),
             source: Some(Box::new(source)),
