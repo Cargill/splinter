@@ -81,7 +81,8 @@ experimental = [
   # The following features are experimental:
   "https",
   "scabbardv3",
-  "scabbardv3-consensus-action-runner"
+  "scabbardv3-consensus-action-runner",
+  "scabbardv3-store"
 ]
 
 authorization = ["splinter/authorization"]
@@ -98,6 +99,7 @@ scabbardv3-consensus-action-runner = [
     ]
 scabbardv3 = [
     "augrim",
+    "scabbardv3-store",
     "splinter/service-arguments-converter",
     "splinter/service-lifecycle",
     "splinter/service-message-converter",
@@ -110,5 +112,6 @@ scabbardv3 = [
     "splinter/service-timer-handler-factory",
     "splinter/service-type",
     ]
+scabbardv3-store = []
 splinter-service = ["log", "sawtooth"]
 sqlite = ["diesel/sqlite", "diesel_migrations", "log", "sawtooth/sqlite", "transact/sqlite"]

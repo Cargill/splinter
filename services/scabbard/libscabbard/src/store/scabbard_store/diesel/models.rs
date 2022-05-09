@@ -24,10 +24,7 @@ use crate::store::scabbard_store::{
     service::{ConsensusType, ScabbardService, ServiceStatus},
     two_phase::{
         action::ConsensusActionNotification,
-        context::{
-            Context, ContextBuilder, CoordinatorContext, CoordinatorState, Participant,
-            ParticipantContext, ParticipantState,
-        },
+        context::{Context, ContextBuilder, Participant},
         event::Scabbard2pcEvent,
         message::Scabbard2pcMessage,
         state::Scabbard2pcState,
@@ -35,17 +32,11 @@ use crate::store::scabbard_store::{
 };
 
 use super::schema::{
-    consensus_2pc_action, consensus_2pc_coordinator_context,
-    consensus_2pc_coordinator_context_participant, consensus_2pc_coordinator_notification_action,
-    consensus_2pc_coordinator_send_message_action, consensus_2pc_deliver_event,
-    consensus_2pc_event, consensus_2pc_participant_context,
-    consensus_2pc_participant_context_participant, consensus_2pc_participant_notification_action,
-    consensus_2pc_participant_send_message_action, consensus_2pc_start_event,
-    consensus_2pc_update_coordinator_context_action,
-    consensus_2pc_update_coordinator_context_action_participant,
-    consensus_2pc_update_participant_context_action,
-    consensus_2pc_update_participant_context_action_participant, consensus_2pc_vote_event,
-    scabbard_peer, scabbard_service, scabbard_v3_commit_history,
+    consensus_2pc_action, consensus_2pc_context, consensus_2pc_context_participant,
+    consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_notification_action,
+    consensus_2pc_send_message_action, consensus_2pc_start_event,
+    consensus_2pc_update_context_action, consensus_2pc_update_context_action_participant,
+    consensus_2pc_vote_event, scabbard_peer, scabbard_service, scabbard_v3_commit_history,
 };
 
 /// Database model representation of `ScabbardService`
@@ -217,9 +208,9 @@ impl From<&ConsensusDecision> for String {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_coordinator_context"]
+#[table_name = "consensus_2pc_context"]
 #[primary_key(service_id, epoch)]
-pub struct Consensus2pcCoordinatorContextModel {
+pub struct Consensus2pcContextModel {
     pub service_id: String,
     pub alarm: Option<i64>, // timestamp, when to wake up
     pub coordinator: String,
@@ -227,20 +218,22 @@ pub struct Consensus2pcCoordinatorContextModel {
     pub last_commit_epoch: Option<i64>,
     pub state: String,
     pub vote_timeout_start: Option<i64>,
+    pub vote: Option<String>,
+    pub decision_timeout_start: Option<i64>,
 }
 
 impl
     TryFrom<(
-        &Consensus2pcCoordinatorContextModel,
-        Vec<Consensus2pcCoordinatorContextParticipantModel>,
+        &Consensus2pcContextModel,
+        Vec<Consensus2pcContextParticipantModel>,
     )> for ScabbardContext
 {
     type Error = InternalError;
 
     fn try_from(
         (context, participants): (
-            &Consensus2pcCoordinatorContextModel,
-            Vec<Consensus2pcCoordinatorContextParticipantModel>,
+            &Consensus2pcContextModel,
+            Vec<Consensus2pcContextParticipantModel>,
         ),
     ) -> Result<Self, Self::Error> {
         let epoch = u64::try_from(context.epoch)
@@ -266,7 +259,7 @@ impl
             .map(u64::try_from)
             .transpose()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
-        let participants = CoordinatorParticipantList::try_from(participants)?.inner;
+        let participants = ParticipantList::try_from(participants)?.inner;
 
         let state = match context.state.as_str() {
             "WAITINGFORSTART" => Scabbard2pcState::WaitingForStart,
@@ -282,7 +275,7 @@ impl
                         })?
                 } else {
                     return Err(InternalError::with_message(
-                        "Failed to convert to ScabbardContext, context has state 'voting' but 
+                        "Failed to convert to ScabbardContext, context has state 'voting' but \
                         no vote timeout start time set"
                             .to_string(),
                     ));
@@ -292,421 +285,6 @@ impl
             "WAITINGFORVOTE" => Scabbard2pcState::WaitingForVote,
             "ABORT" => Scabbard2pcState::Abort,
             "COMMIT" => Scabbard2pcState::Commit,
-            _ => {
-                return Err(InternalError::with_message(
-                    "Failed to convert to ScabbardContext, invalid state value found".to_string(),
-                ))
-            }
-        };
-
-        let mut builder = ContextBuilder::default()
-            .with_coordinator(&coordinator)
-            .with_epoch(epoch)
-            .with_state(state)
-            .with_participants(participants)
-            .with_this_process(&coordinator);
-
-        if let Some(alarm) = alarm {
-            builder = builder.with_alarm(alarm);
-        }
-        if let Some(last_commit_epoch) = last_commit_epoch {
-            builder = builder.with_last_commit_epoch(last_commit_epoch);
-        }
-        let context = builder
-            .build()
-            .map_err(|e| InternalError::from_source(Box::new(e)))?;
-        Ok(ScabbardContext::Scabbard2pcContext(context))
-    }
-}
-
-impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcCoordinatorContextModel {
-    type Error = InternalError;
-
-    fn try_from(
-        (context, service_id): (&Context, &FullyQualifiedServiceId),
-    ) -> Result<Self, Self::Error> {
-        match CoordinatorContext::try_from(context.role_context().clone()) {
-            Ok(coordinator_context) => {
-                let epoch = i64::try_from(*context.epoch())
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let last_commit_epoch = context
-                    .last_commit_epoch()
-                    .map(i64::try_from)
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let vote_timeout_start = match coordinator_context.state {
-                    CoordinatorState::Voting { vote_timeout_start } => {
-                        let time = i64::try_from(
-                            vote_timeout_start
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .map_err(|err| InternalError::from_source(Box::new(err)))?
-                                .as_secs(),
-                        )
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                        Some(time)
-                    }
-                    _ => None,
-                };
-                let state = String::from(&coordinator_context.state);
-                let alarm = context
-                    .alarm()
-                    .map(|a| {
-                        a.duration_since(SystemTime::UNIX_EPOCH)
-                            .map(|r| i64::try_from(r.as_secs()))
-                    })
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                Ok(Consensus2pcCoordinatorContextModel {
-                    service_id: format!("{}", service_id),
-                    alarm,
-                    coordinator: format!("{}", context.coordinator()),
-                    epoch,
-                    last_commit_epoch,
-                    state,
-                    vote_timeout_start,
-                })
-            }
-            Err(e) => Err(InternalError::from_source(Box::new(e))),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_coordinator_context_participant"]
-#[primary_key(service_id, epoch, process)]
-pub struct Consensus2pcCoordinatorContextParticipantModel {
-    pub service_id: String,
-    pub epoch: i64,
-    pub process: String,
-    pub vote: Option<String>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct CoordinatorParticipantList {
-    pub inner: Vec<Participant>,
-}
-
-impl TryFrom<Vec<Consensus2pcCoordinatorContextParticipantModel>> for CoordinatorParticipantList {
-    type Error = InternalError;
-
-    fn try_from(
-        participants: Vec<Consensus2pcCoordinatorContextParticipantModel>,
-    ) -> Result<Self, Self::Error> {
-        let mut all_participants = Vec::new();
-        for p in participants {
-            let vote = if let Some(vote) = p.vote {
-                match vote.as_str() {
-                    "TRUE" => Some(true),
-                    "FALSE" => Some(false),
-                    _ => return Err(InternalError::with_message(
-                        "Failed to convert coordinator context participant model to participant, 
-                        invalid vote value found"
-                            .to_string(),
-                    )),
-                }
-            } else {
-                None
-            };
-            all_participants.push(Participant {
-                process: ServiceId::new(p.process)
-                    .map_err(|e| InternalError::from_source(Box::new(e)))?,
-                vote,
-            });
-        }
-        Ok(CoordinatorParticipantList {
-            inner: all_participants,
-        })
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct CoordinatorContextParticipantList {
-    pub inner: Vec<Consensus2pcCoordinatorContextParticipantModel>,
-}
-
-impl TryFrom<(&Context, &FullyQualifiedServiceId)> for CoordinatorContextParticipantList {
-    type Error = InternalError;
-
-    fn try_from(
-        (context, service_id): (&Context, &FullyQualifiedServiceId),
-    ) -> Result<Self, Self::Error> {
-        match CoordinatorContext::try_from(context.role_context().clone()) {
-            Ok(coordinator_context) => {
-                let epoch = i64::try_from(*context.epoch())
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let mut coordinator_participants = Vec::new();
-                for participant in coordinator_context.participants {
-                    let vote = participant.vote.map(|vote| match vote {
-                        true => "TRUE".to_string(),
-                        false => "FALSE".to_string(),
-                    });
-                    coordinator_participants.push(Consensus2pcCoordinatorContextParticipantModel {
-                        service_id: format!("{}", service_id),
-                        epoch,
-                        process: format!("{}", participant.process),
-                        vote,
-                    })
-                }
-                Ok(CoordinatorContextParticipantList {
-                    inner: coordinator_participants,
-                })
-            }
-            Err(e) => Err(InternalError::from_source(Box::new(e))),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_update_coordinator_context_action"]
-#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
-#[primary_key(action_id)]
-pub struct Consensus2pcUpdateCoordinatorContextActionModel {
-    pub action_id: i64,
-    pub service_id: String,
-    pub alarm: Option<i64>,
-    pub coordinator: String,
-    pub epoch: i64,
-    pub last_commit_epoch: Option<i64>,
-    pub state: String,
-    pub vote_timeout_start: Option<i64>,
-    pub coordinator_action_alarm: Option<i64>,
-}
-
-impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
-    for Consensus2pcUpdateCoordinatorContextActionModel
-{
-    type Error = InternalError;
-
-    fn try_from(
-        (context, service_id, action_id, action_alarm): (
-            &Context,
-            &FullyQualifiedServiceId,
-            &i64,
-            &Option<i64>,
-        ),
-    ) -> Result<Self, Self::Error> {
-        match CoordinatorContext::try_from(context.role_context().clone()) {
-            Ok(coordinator_context) => {
-                let epoch = i64::try_from(*context.epoch())
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let last_commit_epoch = context
-                    .last_commit_epoch()
-                    .map(i64::try_from)
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let vote_timeout_start = match coordinator_context.state {
-                    CoordinatorState::Voting { vote_timeout_start } => {
-                        let time = i64::try_from(
-                            vote_timeout_start
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .map_err(|err| InternalError::from_source(Box::new(err)))?
-                                .as_secs(),
-                        )
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                        Some(time)
-                    }
-                    _ => None,
-                };
-                let state = String::from(&coordinator_context.state);
-                let alarm = context
-                    .alarm()
-                    .map(|a| {
-                        a.duration_since(SystemTime::UNIX_EPOCH)
-                            .map(|r| i64::try_from(r.as_secs()))
-                    })
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                Ok(Consensus2pcUpdateCoordinatorContextActionModel {
-                    action_id: *action_id,
-                    service_id: format!("{}", service_id),
-                    alarm,
-                    coordinator: format!("{}", context.coordinator()),
-                    epoch,
-                    last_commit_epoch,
-                    state,
-                    vote_timeout_start,
-                    coordinator_action_alarm: *action_alarm,
-                })
-            }
-            Err(e) => Err(InternalError::from_source(Box::new(e))),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_update_coordinator_context_action_participant"]
-#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
-#[belongs_to(
-    Consensus2pcUpdateCoordinatorContextActionModel,
-    foreign_key = "action_id"
-)]
-#[primary_key(action_id, process)]
-pub struct Consensus2pcUpdateCoordinatorContextActionParticipantModel {
-    pub action_id: i64,
-    pub service_id: String,
-    pub epoch: i64,
-    pub process: String,
-    pub vote: Option<String>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct UpdateCoordinatorContextActionParticipantList {
-    pub inner: Vec<Consensus2pcUpdateCoordinatorContextActionParticipantModel>,
-}
-
-impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)>
-    for UpdateCoordinatorContextActionParticipantList
-{
-    type Error = InternalError;
-
-    fn try_from(
-        (context, service_id, action_id): (&Context, &FullyQualifiedServiceId, &i64),
-    ) -> Result<Self, Self::Error> {
-        match CoordinatorContext::try_from(context.role_context().clone()) {
-            Ok(coordinator_context) => {
-                let epoch = i64::try_from(*context.epoch())
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let mut coordinator_participants = Vec::new();
-                for participant in coordinator_context.participants {
-                    let vote = participant.vote.map(|vote| match vote {
-                        true => "TRUE".to_string(),
-                        false => "FALSE".to_string(),
-                    });
-                    coordinator_participants.push(
-                        Consensus2pcUpdateCoordinatorContextActionParticipantModel {
-                            action_id: *action_id,
-                            service_id: format!("{}", service_id),
-                            epoch,
-                            process: format!("{}", participant.process),
-                            vote,
-                        },
-                    )
-                }
-                Ok(UpdateCoordinatorContextActionParticipantList {
-                    inner: coordinator_participants,
-                })
-            }
-            Err(e) => Err(InternalError::from_source(Box::new(e))),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_coordinator_send_message_action"]
-#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
-#[primary_key(action_id)]
-pub struct Consensus2pcCoordinatorSendMessageActionModel {
-    pub action_id: i64,
-    pub service_id: String,
-    pub epoch: i64,
-    pub receiver_service_id: String,
-    pub message_type: String,
-    pub vote_response: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_coordinator_notification_action"]
-#[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
-#[primary_key(action_id)]
-pub struct Consensus2pcCoordinatorNotificationModel {
-    pub action_id: i64,
-    pub service_id: String,
-    pub epoch: i64,
-    pub notification_type: String,
-    pub dropped_message: Option<String>,
-}
-
-impl From<&CoordinatorState> for String {
-    fn from(state: &CoordinatorState) -> Self {
-        match *state {
-            CoordinatorState::WaitingForStart => String::from("WAITINGFORSTART"),
-            CoordinatorState::Voting { .. } => String::from("VOTING"),
-            CoordinatorState::WaitingForVote => String::from("WAITINGFORVOTE"),
-            CoordinatorState::Abort => String::from("ABORT"),
-            CoordinatorState::Commit => String::from("COMMIT"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_action"]
-#[belongs_to(Consensus2pcCoordinatorContextModel, foreign_key = "service_id")]
-#[primary_key(id)]
-pub struct Consensus2pcActionModel {
-    pub id: i64,
-    pub service_id: String,
-    pub epoch: i64,
-    pub created_at: SystemTime,
-    pub executed_at: Option<i64>,
-    pub position: i32,
-}
-
-#[derive(Debug, PartialEq, Insertable)]
-#[table_name = "consensus_2pc_action"]
-pub struct InsertableConsensus2pcActionModel {
-    pub service_id: String,
-    pub epoch: i64,
-    pub executed_at: Option<i64>,
-    pub position: i32,
-}
-
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_participant_context"]
-#[primary_key(service_id, epoch)]
-pub struct Consensus2pcParticipantContextModel {
-    pub service_id: String,
-    pub alarm: Option<i64>,
-    pub coordinator: String,
-    pub epoch: i64,
-    pub last_commit_epoch: Option<i64>,
-    pub state: String,
-    pub vote: Option<String>,
-    pub decision_timeout_start: Option<i64>,
-}
-
-impl
-    TryFrom<(
-        &Consensus2pcParticipantContextModel,
-        Vec<Consensus2pcParticipantContextParticipantModel>,
-    )> for ScabbardContext
-{
-    type Error = InternalError;
-
-    fn try_from(
-        (context, participants): (
-            &Consensus2pcParticipantContextModel,
-            Vec<Consensus2pcParticipantContextParticipantModel>,
-        ),
-    ) -> Result<Self, Self::Error> {
-        let epoch = u64::try_from(context.epoch)
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
-        let alarm = if let Some(alarm) = context.alarm {
-            Some(
-                SystemTime::UNIX_EPOCH
-                    .checked_add(Duration::from_secs(alarm as u64))
-                    .ok_or_else(|| {
-                        InternalError::with_message(
-                            "'alarm' timestamp could not be represented as a `SystemTime`"
-                                .to_string(),
-                        )
-                    })?,
-            )
-        } else {
-            None
-        };
-        let coordinator = ServiceId::new(&context.coordinator)
-            .map_err(|e| InternalError::from_source(Box::new(e)))?;
-        let last_commit_epoch = context
-            .last_commit_epoch
-            .map(u64::try_from)
-            .transpose()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
-
-        let state = match context.state.as_str() {
             "WAITINGFORVOTEREQUEST" => Scabbard2pcState::WaitingForVoteRequest,
             "VOTED" => {
                 let vote = context
@@ -719,15 +297,15 @@ impl
                     })
                     .ok_or_else(|| {
                         InternalError::with_message(
-                        "Failed to convert to ScabbardContext, context has state 'voted' but vote
+                        "Failed to convert to ScabbardContext, context has state 'voted' but vote \
                         is unset"
                         .to_string(),
                     )
                     })?
                     .ok_or_else(|| {
                         InternalError::with_message(
-                            "Failed to convert to ScabbardContext, context has state 'voted' but an
-                        invalid vote response was found"
+                            "Failed to convert to ScabbardContext, context has state 'voted' but \
+                        an invalid vote response was found"
                                 .to_string(),
                         )
                     })?;
@@ -742,7 +320,7 @@ impl
                         })?
                 } else {
                     return Err(InternalError::with_message(
-                        "Failed to convert to ScabbardContext, context has state 'voted' but 
+                        "Failed to convert to ScabbardContext, context has state 'voted' but \
                         'decision_timeout_start' is unset"
                             .to_string(),
                     ));
@@ -752,26 +330,18 @@ impl
                     decision_timeout_start,
                 }
             }
-            "WAITINGFORVOTE" => Scabbard2pcState::WaitingForVote,
-            "ABORT" => Scabbard2pcState::Abort,
-            "COMMIT" => Scabbard2pcState::Commit,
             _ => {
                 return Err(InternalError::with_message(
                     "Failed to convert to ScabbardContext, invalid state value found".to_string(),
                 ))
             }
         };
-        let participant_processes = participants
-            .into_iter()
-            .map(|p| ServiceId::new(p.process))
-            .collect::<Result<Vec<ServiceId>, _>>()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         let mut builder = ContextBuilder::default()
             .with_coordinator(&coordinator)
             .with_epoch(epoch)
             .with_state(state)
-            .with_participant_processes(participant_processes)
+            .with_participants(participants)
             .with_this_process(
                 FullyQualifiedServiceId::new_from_string(&context.service_id)
                     .map_err(|err| InternalError::from_source(Box::new(err)))?
@@ -791,113 +361,161 @@ impl
     }
 }
 
-impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcParticipantContextModel {
+impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel {
     type Error = InternalError;
 
     fn try_from(
         (context, service_id): (&Context, &FullyQualifiedServiceId),
     ) -> Result<Self, Self::Error> {
-        match ParticipantContext::try_from(context.role_context().clone()) {
-            Ok(participant_context) => {
-                let epoch = i64::try_from(*context.epoch())
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let last_commit_epoch = context
-                    .last_commit_epoch()
-                    .map(i64::try_from)
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let (vote, decision_timeout_start) = match participant_context.state {
-                    ParticipantState::Voted {
-                        vote,
-                        decision_timeout_start,
-                    } => {
-                        let time = i64::try_from(
-                            decision_timeout_start
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .map_err(|err| InternalError::from_source(Box::new(err)))?
-                                .as_secs(),
-                        )
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                        match vote {
-                            true => (Some("TRUE".to_string()), Some(time)),
-                            false => (Some("FALSE".to_string()), Some(time)),
-                        }
-                    }
-                    _ => (None, None),
-                };
-                let state = String::from(&participant_context.state);
-                let alarm = context
-                    .alarm()
-                    .map(|a| {
-                        a.duration_since(SystemTime::UNIX_EPOCH)
-                            .map(|r| i64::try_from(r.as_secs()))
-                    })
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                Ok(Consensus2pcParticipantContextModel {
-                    service_id: format!("{}", service_id),
-                    alarm,
-                    coordinator: format!("{}", context.coordinator()),
-                    epoch,
-                    last_commit_epoch,
-                    state,
-                    vote,
-                    decision_timeout_start,
-                })
+        let epoch = i64::try_from(*context.epoch())
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let last_commit_epoch = context
+            .last_commit_epoch()
+            .map(i64::try_from)
+            .transpose()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let (vote_timeout_start, vote, decision_timeout_start) = match context.state() {
+            Scabbard2pcState::Voting { vote_timeout_start } => {
+                let time = i64::try_from(
+                    vote_timeout_start
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .map_err(|err| InternalError::from_source(Box::new(err)))?
+                        .as_secs(),
+                )
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                (Some(time), None, None)
             }
-            Err(e) => Err(InternalError::from_source(Box::new(e))),
-        }
+            Scabbard2pcState::Voted {
+                vote,
+                decision_timeout_start,
+            } => {
+                let time = i64::try_from(
+                    decision_timeout_start
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .map_err(|err| InternalError::from_source(Box::new(err)))?
+                        .as_secs(),
+                )
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                let vote = match vote {
+                    true => "TRUE",
+                    false => "FALSE",
+                };
+                (None, Some(vote.to_string()), Some(time))
+            }
+            _ => (None, None, None),
+        };
+        let state = String::from(context.state());
+        let alarm = context
+            .alarm()
+            .map(|a| {
+                a.duration_since(SystemTime::UNIX_EPOCH)
+                    .map(|r| i64::try_from(r.as_secs()))
+            })
+            .transpose()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?
+            .transpose()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        Ok(Consensus2pcContextModel {
+            service_id: format!("{}", service_id),
+            alarm,
+            coordinator: format!("{}", context.coordinator()),
+            epoch,
+            last_commit_epoch,
+            state,
+            vote_timeout_start,
+            vote,
+            decision_timeout_start,
+        })
     }
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_participant_context_participant"]
+#[table_name = "consensus_2pc_context_participant"]
 #[primary_key(service_id, epoch, process)]
-pub struct Consensus2pcParticipantContextParticipantModel {
+pub struct Consensus2pcContextParticipantModel {
     pub service_id: String,
     pub epoch: i64,
     pub process: String,
+    pub vote: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ParticipantContextParticipantList {
-    pub inner: Vec<Consensus2pcParticipantContextParticipantModel>,
+pub struct ParticipantList {
+    pub inner: Vec<Participant>,
 }
 
-impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ParticipantContextParticipantList {
+impl TryFrom<Vec<Consensus2pcContextParticipantModel>> for ParticipantList {
+    type Error = InternalError;
+
+    fn try_from(
+        participants: Vec<Consensus2pcContextParticipantModel>,
+    ) -> Result<Self, Self::Error> {
+        let mut all_participants = Vec::new();
+        for p in participants {
+            let vote = if let Some(vote) = p.vote {
+                match vote.as_str() {
+                    "TRUE" => Some(true),
+                    "FALSE" => Some(false),
+                    _ => {
+                        return Err(InternalError::with_message(format!(
+                        "Failed to convert context participant model to participant, invalid vote \
+                        value found: {}",
+                        vote,
+                    )))
+                    }
+                }
+            } else {
+                None
+            };
+            all_participants.push(Participant {
+                process: ServiceId::new(p.process)
+                    .map_err(|e| InternalError::from_source(Box::new(e)))?,
+                vote,
+            });
+        }
+        Ok(ParticipantList {
+            inner: all_participants,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ContextParticipantList {
+    pub inner: Vec<Consensus2pcContextParticipantModel>,
+}
+
+impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ContextParticipantList {
     type Error = InternalError;
 
     fn try_from(
         (context, service_id): (&Context, &FullyQualifiedServiceId),
     ) -> Result<Self, Self::Error> {
-        match ParticipantContext::try_from(context.role_context().clone()) {
-            Ok(participant_context) => {
-                let epoch = i64::try_from(*context.epoch())
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let mut participants = Vec::new();
-                for participant in participant_context.participant_processes {
-                    participants.push(Consensus2pcParticipantContextParticipantModel {
-                        service_id: format!("{}", service_id),
-                        epoch,
-                        process: format!("{}", participant),
-                    })
-                }
-                Ok(ParticipantContextParticipantList {
-                    inner: participants,
-                })
-            }
-            Err(e) => Err(InternalError::from_source(Box::new(e))),
+        let epoch = i64::try_from(*context.epoch())
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let mut participants = Vec::new();
+        for participant in context.participants() {
+            let vote = participant.vote.map(|vote| match vote {
+                true => "TRUE".to_string(),
+                false => "FALSE".to_string(),
+            });
+            participants.push(Consensus2pcContextParticipantModel {
+                service_id: format!("{}", service_id),
+                epoch,
+                process: format!("{}", participant.process),
+                vote,
+            })
         }
+        Ok(ContextParticipantList {
+            inner: participants,
+        })
     }
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_update_participant_context_action"]
+#[table_name = "consensus_2pc_update_context_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
-pub struct Consensus2pcUpdateParticipantContextActionModel {
+pub struct Consensus2pcUpdateContextActionModel {
     pub action_id: i64,
     pub service_id: String,
     pub alarm: Option<i64>,
@@ -905,13 +523,14 @@ pub struct Consensus2pcUpdateParticipantContextActionModel {
     pub epoch: i64,
     pub last_commit_epoch: Option<i64>,
     pub state: String,
+    pub vote_timeout_start: Option<i64>,
     pub vote: Option<String>,
     pub decision_timeout_start: Option<i64>,
-    pub participant_action_alarm: Option<i64>,
+    pub action_alarm: Option<i64>,
 }
 
 impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
-    for Consensus2pcUpdateParticipantContextActionModel
+    for Consensus2pcUpdateContextActionModel
 {
     type Error = InternalError;
 
@@ -923,133 +542,135 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
             &Option<i64>,
         ),
     ) -> Result<Self, Self::Error> {
-        match ParticipantContext::try_from(context.role_context().clone()) {
-            Ok(participant_context) => {
-                let epoch = i64::try_from(*context.epoch())
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let last_commit_epoch = context
-                    .last_commit_epoch()
-                    .map(i64::try_from)
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let (vote, decision_timeout_start) = match participant_context.state {
-                    ParticipantState::Voted {
-                        vote,
-                        decision_timeout_start,
-                    } => {
-                        let time = i64::try_from(
-                            decision_timeout_start
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .map_err(|err| InternalError::from_source(Box::new(err)))?
-                                .as_secs(),
-                        )
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                        let vote = match vote {
-                            true => String::from("TRUE"),
-                            false => String::from("FALSE"),
-                        };
-                        (Some(vote), Some(time))
-                    }
-                    _ => (None, None),
-                };
-                let alarm = context
-                    .alarm()
-                    .map(|a| {
-                        a.duration_since(SystemTime::UNIX_EPOCH)
-                            .map(|r| i64::try_from(r.as_secs()))
-                    })
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?
-                    .transpose()
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                Ok(Consensus2pcUpdateParticipantContextActionModel {
-                    action_id: *action_id,
-                    service_id: format!("{}", service_id),
-                    alarm,
-                    coordinator: format!("{}", context.coordinator()),
-                    epoch,
-                    last_commit_epoch,
-                    state: String::from(&participant_context.state),
-                    vote,
-                    decision_timeout_start,
-                    participant_action_alarm: *action_alarm,
-                })
+        let epoch = i64::try_from(*context.epoch())
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let last_commit_epoch = context
+            .last_commit_epoch()
+            .map(i64::try_from)
+            .transpose()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let (vote_timeout_start, vote, decision_timeout_start) = match context.state() {
+            Scabbard2pcState::Voting { vote_timeout_start } => {
+                let time = i64::try_from(
+                    vote_timeout_start
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .map_err(|err| InternalError::from_source(Box::new(err)))?
+                        .as_secs(),
+                )
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                (Some(time), None, None)
             }
-            Err(e) => Err(InternalError::from_source(Box::new(e))),
-        }
+            Scabbard2pcState::Voted {
+                vote,
+                decision_timeout_start,
+            } => {
+                let time = i64::try_from(
+                    decision_timeout_start
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .map_err(|err| InternalError::from_source(Box::new(err)))?
+                        .as_secs(),
+                )
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                let vote = match vote {
+                    true => "TRUE",
+                    false => "FALSE",
+                };
+                (None, Some(vote.to_string()), Some(time))
+            }
+            _ => (None, None, None),
+        };
+        let state = String::from(context.state());
+        let alarm = context
+            .alarm()
+            .map(|a| {
+                a.duration_since(SystemTime::UNIX_EPOCH)
+                    .map(|r| i64::try_from(r.as_secs()))
+            })
+            .transpose()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?
+            .transpose()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        Ok(Consensus2pcUpdateContextActionModel {
+            action_id: *action_id,
+            service_id: format!("{}", service_id),
+            alarm,
+            coordinator: format!("{}", context.coordinator()),
+            epoch,
+            last_commit_epoch,
+            state,
+            vote_timeout_start,
+            vote,
+            decision_timeout_start,
+            action_alarm: *action_alarm,
+        })
     }
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_update_participant_context_action_participant"]
+#[table_name = "consensus_2pc_update_context_action_participant"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
-#[belongs_to(
-    Consensus2pcUpdateParticipantContextActionModel,
-    foreign_key = "action_id"
-)]
+#[belongs_to(Consensus2pcUpdateContextActionModel, foreign_key = "action_id")]
 #[primary_key(action_id, process)]
-pub struct Consensus2pcUpdateParticipantContextActionParticipantModel {
+pub struct Consensus2pcUpdateContextActionParticipantModel {
     pub action_id: i64,
     pub service_id: String,
     pub epoch: i64,
     pub process: String,
+    pub vote: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct UpdateParticipantContextActionParticipantList {
-    pub inner: Vec<Consensus2pcUpdateParticipantContextActionParticipantModel>,
+pub struct UpdateContextActionParticipantList {
+    pub inner: Vec<Consensus2pcUpdateContextActionParticipantModel>,
 }
 
-impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)>
-    for UpdateParticipantContextActionParticipantList
-{
+impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)> for UpdateContextActionParticipantList {
     type Error = InternalError;
 
     fn try_from(
         (context, service_id, action_id): (&Context, &FullyQualifiedServiceId, &i64),
     ) -> Result<Self, Self::Error> {
-        match ParticipantContext::try_from(context.role_context().clone()) {
-            Ok(participant_context) => {
-                let epoch = i64::try_from(*context.epoch())
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let mut participant_participants = Vec::new();
-                for participant in participant_context.participant_processes {
-                    participant_participants.push(
-                        Consensus2pcUpdateParticipantContextActionParticipantModel {
-                            action_id: *action_id,
-                            service_id: format!("{}", service_id),
-                            epoch,
-                            process: format!("{}", participant),
-                        },
-                    )
-                }
-                Ok(UpdateParticipantContextActionParticipantList {
-                    inner: participant_participants,
-                })
-            }
-            Err(e) => Err(InternalError::from_source(Box::new(e))),
+        let epoch = i64::try_from(*context.epoch())
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let mut participants = Vec::new();
+        for participant in context.participants() {
+            let vote = participant.vote.map(|vote| match vote {
+                true => "TRUE".to_string(),
+                false => "FALSE".to_string(),
+            });
+            participants.push(Consensus2pcUpdateContextActionParticipantModel {
+                action_id: *action_id,
+                service_id: format!("{}", service_id),
+                epoch,
+                process: format!("{}", participant.process),
+                vote,
+            })
         }
+        Ok(UpdateContextActionParticipantList {
+            inner: participants,
+        })
     }
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_participant_send_message_action"]
+#[table_name = "consensus_2pc_send_message_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
-pub struct Consensus2pcParticipantSendMessageActionModel {
+pub struct Consensus2pcSendMessageActionModel {
     pub action_id: i64,
     pub service_id: String,
     pub epoch: i64,
     pub receiver_service_id: String,
     pub message_type: String,
+    pub vote_response: Option<String>,
     pub vote_request: Option<Vec<u8>>,
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "consensus_2pc_participant_notification_action"]
+#[table_name = "consensus_2pc_notification_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
-pub struct Consensus2pcParticipantNotificationModel {
+pub struct Consensus2pcNotificationModel {
     pub action_id: i64,
     pub service_id: String,
     pub epoch: i64,
@@ -1058,16 +679,40 @@ pub struct Consensus2pcParticipantNotificationModel {
     pub request_for_vote_value: Option<Vec<u8>>,
 }
 
-impl From<&ParticipantState> for String {
-    fn from(state: &ParticipantState) -> Self {
+impl From<&Scabbard2pcState> for String {
+    fn from(state: &Scabbard2pcState) -> Self {
         match *state {
-            ParticipantState::WaitingForVoteRequest => String::from("WAITINGFORVOTEREQUEST"),
-            ParticipantState::Voted { .. } => String::from("VOTED"),
-            ParticipantState::WaitingForVote => String::from("WAITINGFORVOTE"),
-            ParticipantState::Abort => String::from("ABORT"),
-            ParticipantState::Commit => String::from("COMMIT"),
+            Scabbard2pcState::WaitingForStart => String::from("WAITINGFORSTART"),
+            Scabbard2pcState::Voting { .. } => String::from("VOTING"),
+            Scabbard2pcState::WaitingForVote => String::from("WAITINGFORVOTE"),
+            Scabbard2pcState::Abort => String::from("ABORT"),
+            Scabbard2pcState::Commit => String::from("COMMIT"),
+            Scabbard2pcState::WaitingForVoteRequest => String::from("WAITINGFORVOTEREQUEST"),
+            Scabbard2pcState::Voted { .. } => String::from("VOTED"),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "consensus_2pc_action"]
+#[belongs_to(Consensus2pcContextModel, foreign_key = "service_id")]
+#[primary_key(id)]
+pub struct Consensus2pcActionModel {
+    pub id: i64,
+    pub service_id: String,
+    pub epoch: i64,
+    pub created_at: SystemTime,
+    pub executed_at: Option<i64>,
+    pub position: i32,
+}
+
+#[derive(Debug, PartialEq, Insertable)]
+#[table_name = "consensus_2pc_action"]
+pub struct InsertableConsensus2pcActionModel {
+    pub service_id: String,
+    pub epoch: i64,
+    pub executed_at: Option<i64>,
+    pub position: i32,
 }
 
 impl From<&ConsensusActionNotification> for String {

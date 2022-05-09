@@ -22,13 +22,12 @@ use splinter::service::ServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        Consensus2pcCoordinatorContextModel, Consensus2pcDeliverEventModel,
-        Consensus2pcParticipantContextModel, Consensus2pcStartEventModel,
+        Consensus2pcContextModel, Consensus2pcDeliverEventModel, Consensus2pcStartEventModel,
         Consensus2pcVoteEventModel,
     },
     schema::{
-        consensus_2pc_coordinator_context, consensus_2pc_deliver_event, consensus_2pc_event,
-        consensus_2pc_participant_context, consensus_2pc_start_event, consensus_2pc_vote_event,
+        consensus_2pc_context, consensus_2pc_deliver_event, consensus_2pc_event,
+        consensus_2pc_start_event, consensus_2pc_vote_event,
     },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -64,21 +63,21 @@ where
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
-            // check to see if a coordinator context with the given epoch and service_id exists
-            let coordinator_context = consensus_2pc_coordinator_context::table
-                .filter(consensus_2pc_coordinator_context::epoch.eq(epoch).and(
-                    consensus_2pc_coordinator_context::service_id.eq(format!("{}", service_id)),
-                ))
-                .first::<Consensus2pcCoordinatorContextModel>(self.conn)
-                .optional()?;
-
-            // check to see if a participant context with the given epoch and service_id exists
-            let participant_context = consensus_2pc_participant_context::table
-                .filter(consensus_2pc_participant_context::epoch.eq(epoch).and(
-                    consensus_2pc_participant_context::service_id.eq(format!("{}", service_id)),
-                ))
-                .first::<Consensus2pcParticipantContextModel>(self.conn)
-                .optional()?;
+            // check to see if a context with the given epoch and service_id exists
+            consensus_2pc_context::table
+                .filter(
+                    consensus_2pc_context::epoch
+                        .eq(epoch)
+                        .and(consensus_2pc_context::service_id.eq(format!("{}", service_id))),
+                )
+                .first::<Consensus2pcContextModel>(self.conn)
+                .optional()?
+                .ok_or_else(|| {
+                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
+                        "Context with service ID {} and epoch {} does not exist",
+                        service_id, epoch,
+                    )))
+                })?;
 
             let consensus_events = consensus_2pc_event::table
                 .filter(
@@ -137,186 +136,106 @@ where
                 .filter(consensus_2pc_vote_event::event_id.eq_any(&event_ids))
                 .load::<Consensus2pcVoteEventModel>(self.conn)?;
 
-            if coordinator_context.is_some() {
-                // return an error if there is both a coordinator and a participant context for the
-                // given service_id and epoch
-                if participant_context.is_some() {
-                    return Err(ScabbardStoreError::InvalidState(
-                        InvalidStateError::with_message(format!(
-                            "Failed to list events, contexts found for both participant and
-                            coordinator with service_id: {} epoch: {} ",
-                            service_id, epoch
-                        )),
-                    ));
-                }
+            for deliver in deliver_events {
+                let position = events_map.get(&deliver.event_id).ok_or_else(|| {
+                    ScabbardStoreError::Internal(InternalError::with_message(
+                        "Failed to list consensus events, invalid event ID".to_string(),
+                    ))
+                })?;
+                let process = ServiceId::new(deliver.receiver_service_id).map_err(|err| {
+                    ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
+                })?;
 
-                for deliver in deliver_events {
-                    let position = events_map.get(&deliver.event_id).ok_or_else(|| {
-                        ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list consensus events, invalid event ID".to_string(),
-                        ))
-                    })?;
-                    let process = ServiceId::new(deliver.receiver_service_id).map_err(|err| {
-                        ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-                    })?;
-
-                    let message = match deliver.message_type.as_str() {
-                        "VOTERESPONSE" => {
-                            let vote_response = deliver
-                                .vote_response
-                                .map(|v| match v.as_str() {
-                                    "TRUE" => Some(true),
-                                    "FALSE" => Some(false),
-                                    _ => None,
-                                })
-                                .ok_or_else(|| {
-                                    ScabbardStoreError::Internal(InternalError::with_message(
-                                        "Failed to get vote response for message in 'deliver' 
-                                        event, no associated vote response found"
-                                            .to_string(),
-                                    ))
-                                })?
-                                .ok_or_else(|| {
-                                    ScabbardStoreError::Internal(InternalError::with_message(
-                                "Failed to get 'vote response' for message in 'deliver' event, 
-                                invalid vote response found".to_string(),
-                            ))
-                                })?;
-                            Scabbard2pcMessage::VoteResponse(deliver.epoch as u64, vote_response)
-                        }
-                        "DECISIONREQUEST" => {
-                            Scabbard2pcMessage::DecisionRequest(deliver.epoch as u64)
-                        }
-                        _ => {
-                            return Err(ScabbardStoreError::InvalidState(
-                                InvalidStateError::with_message(
-                                    "Failed to list events, invalid message type found for deliver 
-                                    event"
+                let message = match deliver.message_type.as_str() {
+                    "VOTERESPONSE" => {
+                        let vote_response = deliver
+                            .vote_response
+                            .map(|v| match v.as_str() {
+                                "TRUE" => Some(true),
+                                "FALSE" => Some(false),
+                                _ => None,
+                            })
+                            .ok_or_else(|| {
+                                ScabbardStoreError::Internal(InternalError::with_message(
+                                    "Failed to get vote response for message in 'deliver' \
+                                    event, no associated vote response found"
                                         .to_string(),
-                                ),
-                            ))
-                        }
-                    };
-                    let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
-                        deliver.event_id,
-                        Scabbard2pcEvent::Deliver(process, message),
-                    );
-                    all_events.push((*position, event));
-                }
-
-                for start in start_events {
-                    let position = events_map.get(&start.event_id).ok_or_else(|| {
-                        ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list consensus events, invalid event ID".to_string(),
-                        ))
-                    })?;
-                    let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
-                        start.event_id,
-                        Scabbard2pcEvent::Start(start.value),
-                    );
-                    all_events.push((*position, event));
-                }
-
-                for vote in vote_events {
-                    let position = events_map.get(&vote.event_id).ok_or_else(|| {
-                        ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list consensus events, invalid event ID".to_string(),
-                        ))
-                    })?;
-                    let vote_decision = match vote.vote.as_str() {
-                        "TRUE" => true,
-                        "FALSE" => false,
-                        _ => {
-                            return Err(ScabbardStoreError::InvalidState(
-                                InvalidStateError::with_message(
-                                    "Failed to list consensus events, 
-                                invalid vote found"
-                                        .to_string(),
-                                ),
-                            ))
-                        }
-                    };
-                    let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
-                        vote.event_id,
-                        Scabbard2pcEvent::Vote(vote_decision),
-                    );
-                    all_events.push((*position, event));
-                }
-            } else if participant_context.is_some() {
-                for deliver in deliver_events {
-                    let position = events_map.get(&deliver.event_id).ok_or_else(|| {
-                        ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list consensus events, invalid event ID".to_string(),
-                        ))
-                    })?;
-                    let process = ServiceId::new(deliver.receiver_service_id).map_err(|err| {
-                        ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-                    })?;
-                    let message =
-                        match deliver.message_type.as_str() {
-                            "VOTEREQUEST" => Scabbard2pcMessage::VoteRequest(
-                                deliver.epoch as u64,
-                                deliver.vote_request.ok_or_else(|| {
-                                    ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to list events, deliver event has message type 'vote 
-                                    request' but no associated value"
+                                ))
+                            })?
+                            .ok_or_else(|| {
+                                ScabbardStoreError::Internal(InternalError::with_message(
+                                    "Failed to get 'vote response' for message in 'deliver' event, \
+                                    invalid vote response found"
                                     .to_string(),
                                 ))
-                                })?,
-                            ),
-                            "COMMIT" => Scabbard2pcMessage::Commit(deliver.epoch as u64),
-                            "ABORT" => Scabbard2pcMessage::Abort(deliver.epoch as u64),
-                            "DECISIONREQUEST" => {
-                                Scabbard2pcMessage::DecisionRequest(deliver.epoch as u64)
-                            }
-                            _ => return Err(ScabbardStoreError::InvalidState(
-                                InvalidStateError::with_message(
-                                    "Failed to list events, invalid message type found for deliver 
-                                    event"
-                                        .to_string(),
-                                ),
-                            )),
-                        };
-                    let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
-                        deliver.event_id,
-                        Scabbard2pcEvent::Deliver(process, message),
-                    );
-                    all_events.push((*position, event));
-                }
-
-                for vote in vote_events {
-                    let position = events_map.get(&vote.event_id).ok_or_else(|| {
-                        ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list consensus events, invalid event ID".to_string(),
-                        ))
-                    })?;
-                    let vote_decision = match vote.vote.as_str() {
-                        "TRUE" => true,
-                        "FALSE" => false,
-                        _ => {
-                            return Err(ScabbardStoreError::InvalidState(
-                                InvalidStateError::with_message(
-                                    "Failed to list consensus events, 
-                                invalid vote found"
-                                        .to_string(),
-                                ),
+                            })?;
+                        Scabbard2pcMessage::VoteResponse(deliver.epoch as u64, vote_response)
+                    }
+                    "DECISIONREQUEST" => Scabbard2pcMessage::DecisionRequest(deliver.epoch as u64),
+                    "VOTEREQUEST" => Scabbard2pcMessage::VoteRequest(
+                        deliver.epoch as u64,
+                        deliver.vote_request.ok_or_else(|| {
+                            ScabbardStoreError::Internal(InternalError::with_message(
+                                "Failed to list events, deliver event has message type 'vote \
+                                request' but no associated value"
+                                    .to_string(),
                             ))
-                        }
-                    };
-                    let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
-                        vote.event_id,
-                        Scabbard2pcEvent::Vote(vote_decision),
-                    );
-                    all_events.push((*position, event));
-                }
-            } else {
-                return Err(ScabbardStoreError::InvalidState(
-                    InvalidStateError::with_message(format!(
-                        "Failed to list events, a context with service_id: {} and epoch: {} does 
-                        not exist in ScabbardStore",
-                        service_id, epoch
-                    )),
-                ));
+                        })?,
+                    ),
+                    "COMMIT" => Scabbard2pcMessage::Commit(deliver.epoch as u64),
+                    "ABORT" => Scabbard2pcMessage::Abort(deliver.epoch as u64),
+                    _ => {
+                        return Err(ScabbardStoreError::InvalidState(
+                            InvalidStateError::with_message(
+                                "Failed to list events, invalid message type found for deliver \
+                                event"
+                                    .to_string(),
+                            ),
+                        ))
+                    }
+                };
+                let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                    deliver.event_id,
+                    Scabbard2pcEvent::Deliver(process, message),
+                );
+                all_events.push((*position, event));
+            }
+
+            for start in start_events {
+                let position = events_map.get(&start.event_id).ok_or_else(|| {
+                    ScabbardStoreError::Internal(InternalError::with_message(
+                        "Failed to list consensus events, invalid event ID".to_string(),
+                    ))
+                })?;
+                let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                    start.event_id,
+                    Scabbard2pcEvent::Start(start.value),
+                );
+                all_events.push((*position, event));
+            }
+
+            for vote in vote_events {
+                let position = events_map.get(&vote.event_id).ok_or_else(|| {
+                    ScabbardStoreError::Internal(InternalError::with_message(
+                        "Failed to list consensus events, invalid event ID".to_string(),
+                    ))
+                })?;
+                let vote_decision = match vote.vote.as_str() {
+                    "TRUE" => true,
+                    "FALSE" => false,
+                    _ => {
+                        return Err(ScabbardStoreError::InvalidState(
+                            InvalidStateError::with_message(
+                                "Failed to list consensus events, invalid vote found".to_string(),
+                            ),
+                        ))
+                    }
+                };
+                let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                    vote.event_id,
+                    Scabbard2pcEvent::Vote(vote_decision),
+                );
+                all_events.push((*position, event));
             }
 
             all_events.sort_by(|a, b| a.0.cmp(&b.0));

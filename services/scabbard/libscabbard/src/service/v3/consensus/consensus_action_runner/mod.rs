@@ -318,7 +318,16 @@ mod tests {
             ContextBuilder::default()
                 .with_coordinator(&coordinator)
                 .with_epoch(1)
-                .with_participant_processes(service.peers().to_vec())
+                .with_participants(
+                    service
+                        .peers()
+                        .iter()
+                        .map(|participant| Participant {
+                            process: participant.clone(),
+                            vote: None,
+                        })
+                        .collect(),
+                )
                 .with_state(Scabbard2pcState::WaitingForVoteRequest)
                 .with_this_process(service.service_id().clone().service_id())
                 .build()

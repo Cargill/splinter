@@ -19,7 +19,7 @@ mod command;
 mod commit_hash;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 pub(crate) mod pool;
-#[cfg(feature = "scabbardv3")]
+#[cfg(feature = "scabbardv3-store")]
 mod scabbard_store;
 
 #[cfg(feature = "scabbardv3")]
@@ -33,15 +33,15 @@ pub use commit_hash::diesel;
 pub use commit_hash::transact;
 pub use commit_hash::{CommitHashStore, CommitHashStoreError};
 
-#[cfg(all(feature = "scabbardv3", feature = "diesel"))]
+#[cfg(all(feature = "scabbardv3-store", feature = "diesel"))]
 pub use scabbard_store::diesel::DieselScabbardStore;
-#[cfg(feature = "scabbardv3")]
+#[cfg(feature = "scabbardv3-store")]
 pub use scabbard_store::PooledScabbardStoreFactory;
-#[cfg(feature = "scabbardv3")]
+#[cfg(feature = "scabbardv3-store")]
 pub use scabbard_store::{
     action, commit, context, event, service, two_phase, ScabbardStore, ScabbardStoreFactory,
 };
-#[cfg(all(feature = "scabbardv3", feature = "postgres"))]
+#[cfg(all(feature = "scabbardv3-store", feature = "postgres"))]
 pub use scabbard_store::{PgScabbardStoreFactory, PooledPgScabbardStoreFactory};
-#[cfg(all(feature = "scabbardv3", feature = "sqlite"))]
+#[cfg(all(feature = "scabbardv3-store", feature = "sqlite"))]
 pub use scabbard_store::{PooledSqliteScabbardStoreFactory, SqliteScabbardStoreFactory};

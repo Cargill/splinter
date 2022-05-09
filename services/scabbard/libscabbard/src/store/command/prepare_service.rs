@@ -77,34 +77,28 @@ fn create_context(service: &ScabbardService) -> Result<Context, InternalError> {
         ))
     })?;
 
-    if service.service_id().service_id() == &coordinator {
-        ContextBuilder::default()
-            .with_coordinator(&coordinator)
-            .with_epoch(1)
-            .with_participants(
-                service
-                    .peers()
-                    .iter()
-                    .map(|participant| Participant {
-                        process: participant.clone(),
-                        vote: None,
-                    })
-                    .collect(),
-            )
-            .with_state(Scabbard2pcState::WaitingForStart)
-            .with_this_process(service.service_id().clone().service_id())
-            .build()
-            .map_err(|err| InternalError::from_source(Box::new(err)))
+    let state = if service.service_id().service_id() == &coordinator {
+        Scabbard2pcState::WaitingForStart
     } else {
-        ContextBuilder::default()
-            .with_coordinator(&coordinator)
-            .with_epoch(1)
-            .with_participant_processes(service.peers().to_vec())
-            .with_state(Scabbard2pcState::WaitingForVoteRequest)
-            .with_this_process(service.service_id().clone().service_id())
-            .build()
-            .map_err(|err| InternalError::from_source(Box::new(err)))
-    }
+        Scabbard2pcState::WaitingForVoteRequest
+    };
+    ContextBuilder::default()
+        .with_coordinator(&coordinator)
+        .with_epoch(1)
+        .with_participants(
+            service
+                .peers()
+                .iter()
+                .map(|participant| Participant {
+                    process: participant.clone(),
+                    vote: None,
+                })
+                .collect(),
+        )
+        .with_state(state)
+        .with_this_process(service.service_id().clone().service_id())
+        .build()
+        .map_err(|err| InternalError::from_source(Box::new(err)))
 }
 
 /// Gets the ID of the coordinator. The coordinator is the node with the lowest ID in the set of

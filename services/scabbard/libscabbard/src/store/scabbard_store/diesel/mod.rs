@@ -1508,7 +1508,8 @@ pub mod tests {
     ///
     /// 1. Add a valid participant context to the store
     /// 2. Attempt to add a valid event to the store and check that the operation was successful
-    /// 3. Attempt to add a coordinator specific event and check that an error is returned
+    /// 3. Attempt to add a an event for a service_id that does not exist check that an error is
+    ///    returned
     #[test]
     fn scabbard_store_add_event() {
         let pool = create_connection_pool_and_migrate();
@@ -1528,9 +1529,15 @@ pub mod tests {
             .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
-            .with_participant_processes(vec![
-                participant_fqsi.service_id().clone(),
-                participant2_fqsi.service_id().clone(),
+            .with_participants(vec![
+                Participant {
+                    process: participant_fqsi.service_id().clone(),
+                    vote: None,
+                },
+                Participant {
+                    process: participant2_fqsi.service_id().clone(),
+                    vote: None,
+                },
             ])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(participant_fqsi.clone().service_id())
@@ -1548,15 +1555,11 @@ pub mod tests {
         ));
 
         assert!(store
-            .add_consensus_event(&participant_fqsi, 1, event)
+            .add_consensus_event(&participant_fqsi, 1, event.clone())
             .is_ok());
 
-        let bad_event = ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Start(
-            vec![1].into(),
-        ));
-
         assert!(store
-            .add_consensus_event(&participant_fqsi, 1, bad_event)
+            .add_consensus_event(&participant2_fqsi, 1, event)
             .is_err());
     }
 
@@ -1585,9 +1588,15 @@ pub mod tests {
             .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
-            .with_participant_processes(vec![
-                participant_fqsi.service_id().clone(),
-                participant2_fqsi.service_id().clone(),
+            .with_participants(vec![
+                Participant {
+                    process: participant_fqsi.service_id().clone(),
+                    vote: None,
+                },
+                Participant {
+                    process: participant2_fqsi.service_id().clone(),
+                    vote: None,
+                },
             ])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(participant_fqsi.clone().service_id())
@@ -1641,9 +1650,15 @@ pub mod tests {
             .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
-            .with_participant_processes(vec![
-                participant_fqsi.service_id().clone(),
-                participant2_fqsi.service_id().clone(),
+            .with_participants(vec![
+                Participant {
+                    process: participant_fqsi.service_id().clone(),
+                    vote: None,
+                },
+                Participant {
+                    process: participant2_fqsi.service_id().clone(),
+                    vote: None,
+                },
             ])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(participant_fqsi.clone().service_id())
@@ -1806,7 +1821,10 @@ pub mod tests {
             .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
-            .with_participant_processes(vec![participant_service_id.service_id().clone()])
+            .with_participants(vec![Participant {
+                process: participant_service_id.service_id().clone(),
+                vote: None,
+            }])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(participant_service_id.clone().service_id())
             .build()
@@ -1857,7 +1875,10 @@ pub mod tests {
             .with_alarm(alarm)
             .with_coordinator(participant_service_id.clone().service_id())
             .with_epoch(3)
-            .with_participant_processes(vec![coordinator_fqsi.service_id().clone()])
+            .with_participants(vec![Participant {
+                process: coordinator_fqsi.service_id().clone(),
+                vote: None,
+            }])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()

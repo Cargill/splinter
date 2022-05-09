@@ -21,8 +21,7 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::operations::get_service::GetServiceOperation;
 use crate::store::scabbard_store::diesel::schema::{
-    consensus_2pc_coordinator_context, consensus_2pc_participant_context, scabbard_peer,
-    scabbard_service, scabbard_v3_commit_history,
+    consensus_2pc_context, scabbard_peer, scabbard_service, scabbard_v3_commit_history,
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 
@@ -61,14 +60,8 @@ impl<'a> RemoveServiceOperation for ScabbardStoreOperations<'a, SqliteConnection
                 //
                 // delete cascade will remove the remaining associated consensus components
                 delete(
-                    consensus_2pc_coordinator_context::table
-                        .filter(consensus_2pc_coordinator_context::service_id.eq(&service_id)),
-                )
-                .execute(self.conn)?;
-
-                delete(
-                    consensus_2pc_participant_context::table
-                        .filter(consensus_2pc_participant_context::service_id.eq(&service_id)),
+                    consensus_2pc_context::table
+                        .filter(consensus_2pc_context::service_id.eq(&service_id)),
                 )
                 .execute(self.conn)?;
 
@@ -105,14 +98,8 @@ impl<'a> RemoveServiceOperation for ScabbardStoreOperations<'a, PgConnection> {
                     //
                     // delete cascade will remove the remaining associated consensus components
                     delete(
-                        consensus_2pc_coordinator_context::table
-                            .filter(consensus_2pc_coordinator_context::service_id.eq(&service_id)),
-                    )
-                    .execute(self.conn)?;
-
-                    delete(
-                        consensus_2pc_participant_context::table
-                            .filter(consensus_2pc_participant_context::service_id.eq(&service_id)),
+                        consensus_2pc_context::table
+                            .filter(consensus_2pc_context::service_id.eq(&service_id)),
                     )
                     .execute(self.conn)?;
 

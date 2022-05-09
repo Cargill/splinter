@@ -174,7 +174,10 @@ mod tests {
             .with_alarm(SystemTime::now())
             .with_coordinator(fqsi.clone().service_id())
             .with_epoch(1)
-            .with_participant_processes(vec![peer_service1.clone()])
+            .with_participants(vec![Participant {
+                process: peer_service1.clone(),
+                vote: None,
+            }])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(fqsi2.clone().service_id())
             .build()
@@ -219,7 +222,10 @@ mod tests {
             .with_alarm(updated_alarm)
             .with_coordinator(fqsi.clone().service_id())
             .with_epoch(1)
-            .with_participant_processes(vec![peer_service1.clone()])
+            .with_participants(vec![Participant {
+                process: peer_service1.clone(),
+                vote: None,
+            }])
             .with_state(Scabbard2pcState::WaitingForVoteRequest)
             .with_this_process(fqsi2.clone().service_id())
             .build()
