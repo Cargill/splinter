@@ -20,7 +20,7 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::schema::{
-    consensus_2pc_action, consensus_2pc_context, scabbard_service,
+    consensus_2pc_action, consensus_2pc_context, consensus_2pc_event, scabbard_service,
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 
@@ -65,6 +65,17 @@ where
                     .filter(consensus_2pc_action::service_id.eq_any(&finalized_services))
                     .filter(consensus_2pc_action::executed_at.is_null())
                     .select(consensus_2pc_action::service_id)
+                    .load::<String>(self.conn)?
+                    .into_iter()
+                    .collect::<Vec<String>>(),
+            );
+
+            // get the service IDs of any finalized services that have unexecuted events
+            ready_services.append(
+                &mut consensus_2pc_event::table
+                    .filter(consensus_2pc_event::service_id.eq_any(&finalized_services))
+                    .filter(consensus_2pc_event::executed_at.is_null())
+                    .select(consensus_2pc_event::service_id)
                     .load::<String>(self.conn)?
                     .into_iter()
                     .collect::<Vec<String>>(),

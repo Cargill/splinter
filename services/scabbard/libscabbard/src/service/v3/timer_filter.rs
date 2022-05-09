@@ -68,7 +68,8 @@ mod tests {
     use crate::store::{
         action::ConsensusAction,
         context::ConsensusContext,
-        two_phase_commit::{Action, ContextBuilder, Notification, Participant, State},
+        event::ConsensusEvent,
+        two_phase_commit::{Action, ContextBuilder, Event, Notification, Participant, State},
     };
 
     /// Test that the `ScabbardTimerFilter`'s `filter` function works
@@ -86,8 +87,11 @@ mod tests {
     /// 10. Call `filter` and check that the first service IDs is returned because it still has
     ///     outstanding actions
     /// 11. Update the `executed_at` time for the first service's action
-    /// 10. Call `filter` and check that no service IDs are returned because there are no services
-    ///     with past due timers or outstanding actions
+    /// 12. Call `filter` and check that no service IDs are returned because there are no services
+    ///     with past due alarms or outstanding actions
+    /// 13. Add an event for the second service
+    /// 14. Call `filter` and check that the second service ID is returned because it has
+    ///     outstanding events
     #[test]
     fn test_scabbard_timer_filter() {
         let pool = create_connection_pool_and_migrate();
@@ -270,6 +274,17 @@ mod tests {
 
         // check that no services are listed
         assert_eq!(ids.len(), 0);
+
+        // add a new event for the second service
+        store
+            .add_consensus_event(&fqsi2, 1, ConsensusEvent::TwoPhaseCommit(Event::Alarm()))
+            .expect("failed to add event for second service");
+
+        let ids = scabbard_timer_filter.filter().expect("failed to filter");
+
+        // check that only the second service is listed because it has outstanding events
+        assert_eq!(ids.len(), 1);
+        assert!(ids.contains(&fqsi2));
     }
 
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {
