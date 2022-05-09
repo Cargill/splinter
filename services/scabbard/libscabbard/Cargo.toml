@@ -81,6 +81,7 @@ experimental = [
   # The following features are experimental:
   "https",
   "scabbardv3",
+  "scabbardv3-consensus",
   "scabbardv3-consensus-action-runner",
   "scabbardv3-store"
 ]
@@ -94,11 +95,12 @@ lmdb = []
 postgres = ["diesel/postgres", "diesel_migrations", "log", "sawtooth/postgres", "transact/postgres"]
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix-web-1 = ["actix-web", "rest-api", "splinter/rest-api-actix-web-1"]
+scabbardv3-consensus = ["augrim"]
 scabbardv3-consensus-action-runner = [
+    "scabbardv3-consensus",
     "splinter/service-message-sender-factory",
     ]
 scabbardv3 = [
-    "augrim",
     "scabbardv3-store",
     "splinter/service-arguments-converter",
     "splinter/service-lifecycle",

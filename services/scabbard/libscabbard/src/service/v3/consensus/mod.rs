@@ -14,4 +14,5 @@
 
 //! Consensus components to work with Augrim
 
+#[cfg(feature = "scabbardv3-consensus-action-runner")]
 pub mod consensus_action_runner;
