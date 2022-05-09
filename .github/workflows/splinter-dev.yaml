@@ -55,11 +55,12 @@ jobs:
       - name: Buildx ls
         run: docker buildx ls
 
-      - name: Login to DockerHub
+      - name: Login to ghcr.io
         uses: docker/login-action@v1
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          registry: ghcr.io
+          username: splintercommunity
+          password: ${{ secrets.SPLINTERCOMMUNITY_GH_PAT }}
 
       - uses: actions/checkout@v2
         with:
