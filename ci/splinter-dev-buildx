@@ -20,3 +20,10 @@ docker buildx build \
   -t ghcr.io/splintercommunity/splinter-dev:v11 \
   -f ci/splinter-dev.dockerfile \
   --push .
+
+docker run quay.io/skopeo/stable \
+  copy \
+  --dest-creds "${DOCKER_HUB_USERNAME}:${DOCKER_HUB_ACCESS_TOKEN}" \
+  --multi-arch all \
+  "docker://ghcr.io/splintercommunity/splinter-dev:v11" \
+  "docker://docker.io/splintercommunity/splinter-dev:v11"

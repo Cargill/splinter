@@ -82,6 +82,8 @@ jobs:
         env:
           VERSION: AUTO_STRICT
           CARGO_TERM_COLOR: always
+          DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
 
       - name: Notify Slack of Failure
         if: failure()
@@ -191,6 +193,8 @@ jobs:
         env:
           VERSION: AUTO_STRICT
           CARGO_TERM_COLOR: always
+          DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
 
       - name: Notify Slack of Failure
         if: failure()
