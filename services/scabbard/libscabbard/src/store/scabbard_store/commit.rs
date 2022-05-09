@@ -20,7 +20,7 @@ use splinter::service::FullyQualifiedServiceId;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitEntry {
     service_id: FullyQualifiedServiceId,
-    epoch: i64,
+    epoch: u64,
     value: String,
     decision: Option<ConsensusDecision>,
 }
@@ -32,7 +32,7 @@ impl CommitEntry {
     }
 
     /// Returns the epoch for the commit entry
-    pub fn epoch(&self) -> i64 {
+    pub fn epoch(&self) -> u64 {
         self.epoch
     }
 
@@ -59,7 +59,7 @@ impl CommitEntry {
 #[derive(Default, Clone)]
 pub struct CommitEntryBuilder {
     service_id: Option<FullyQualifiedServiceId>,
-    epoch: Option<i64>,
+    epoch: Option<u64>,
     value: Option<String>,
     decision: Option<ConsensusDecision>,
 }
@@ -71,7 +71,7 @@ impl CommitEntryBuilder {
     }
 
     /// Returns the epoch for the commit entry
-    pub fn epoch(&self) -> Option<i64> {
+    pub fn epoch(&self) -> Option<u64> {
         self.epoch
     }
 
@@ -100,7 +100,7 @@ impl CommitEntryBuilder {
     /// # Arguments
     ///
     ///  * `epoch` - The epoch for commit entry
-    pub fn with_epoch(mut self, epoch: i64) -> CommitEntryBuilder {
+    pub fn with_epoch(mut self, epoch: u64) -> CommitEntryBuilder {
         self.epoch = Some(epoch);
         self
     }

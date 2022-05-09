@@ -101,17 +101,20 @@ pub struct CommitEntryModel {
     pub decision: Option<String>,
 }
 
-impl From<&CommitEntry> for CommitEntryModel {
-    fn from(entry: &CommitEntry) -> Self {
-        CommitEntryModel {
+impl TryFrom<&CommitEntry> for CommitEntryModel {
+    type Error = InternalError;
+
+    fn try_from(entry: &CommitEntry) -> Result<Self, Self::Error> {
+        Ok(CommitEntryModel {
             service_id: entry.service_id().to_string(),
-            epoch: entry.epoch(),
+            epoch: i64::try_from(entry.epoch())
+                .map_err(|err| InternalError::from_source(Box::new(err)))?,
             value: entry.value().to_string(),
             decision: entry
                 .decision()
                 .clone()
                 .map(|decision| String::from(&decision)),
-        }
+        })
     }
 }
 
@@ -124,7 +127,10 @@ impl TryFrom<CommitEntryModel> for CommitEntry {
 
         let mut builder = CommitEntryBuilder::default()
             .with_service_id(&service_id)
-            .with_epoch(entry.epoch)
+            .with_epoch(
+                u64::try_from(entry.epoch)
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?,
+            )
             .with_value(&entry.value);
 
         if let Some(d) = entry.decision {
