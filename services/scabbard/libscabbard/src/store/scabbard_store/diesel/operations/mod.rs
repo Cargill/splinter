@@ -17,6 +17,7 @@ pub(super) mod add_consensus_action;
 pub(super) mod add_consensus_context;
 pub(super) mod add_consensus_event;
 pub(super) mod add_service;
+pub(super) mod get_alarm;
 pub(super) mod get_current_consensus_context;
 pub(super) mod get_last_commit_entry;
 pub(super) mod get_service;

@@ -47,6 +47,7 @@ use operations::add_consensus_action::AddActionOperation as _;
 use operations::add_consensus_context::AddContextOperation as _;
 use operations::add_consensus_event::AddEventOperation as _;
 use operations::add_service::AddServiceOperation as _;
+use operations::get_alarm::GetAlarmOperation as _;
 use operations::get_current_consensus_context::GetCurrentContextAction as _;
 use operations::get_last_commit_entry::GetLastCommitEntryOperation as _;
 use operations::get_service::GetServiceOperation as _;
@@ -267,6 +268,17 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
             ScabbardStoreOperations::new(conn).unset_alarm(service_id, alarm_type)
         })
     }
+
+    /// Get the scabbard alarm of a specified type for the given service
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).get_alarm(service_id, alarm_type)
+        })
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -451,6 +463,17 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
             ScabbardStoreOperations::new(conn).unset_alarm(service_id, alarm_type)
         })
     }
+
+    /// Get the scabbard alarm of a specified type for the given service
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).get_alarm(service_id, alarm_type)
+        })
+    }
 }
 
 pub struct DieselConnectionScabbardStore<'a, C>
@@ -621,6 +644,15 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).unset_alarm(service_id, alarm_type)
     }
+
+    /// Get the scabbard alarm of a specified type for the given service
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).get_alarm(service_id, alarm_type)
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -771,6 +803,15 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         alarm_type: &AlarmType,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).unset_alarm(service_id, alarm_type)
+    }
+
+    /// Get the scabbard alarm of a specified type for the given service
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).get_alarm(service_id, alarm_type)
     }
 }
 
@@ -2120,6 +2161,89 @@ pub mod tests {
         // Check that the service is not returned because it does not have an alarm that has passed
         // or outstanding actions
         assert!(ready_services.is_empty());
+    }
+
+    /// Test that the scabbard store `get_alarm` operation is successful.
+    ///
+    /// 1. Add a service to the database
+    /// 2. Add a context to the database for the service
+    /// 3. Set an alarm for the service
+    /// 4. Call `get_alarm` and check that the alarm is returned
+    /// 5. Unset the alarm
+    /// 6. Call `get_alarm` and check that the alarm is no longer returned
+    #[test]
+    fn scabbard_store_get_alarm() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
+            .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
+
+        let peer_service_id = ServiceId::new_random();
+
+        // service with finalized status
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&service_fqsi)
+            .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        assert!(store.add_service(service.clone()).is_ok());
+
+        let coordinator_context = ContextBuilder::default()
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+            }])
+            .with_state(State::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
+
+        store
+            .add_consensus_context(&service_fqsi, context)
+            .expect("failed to add context to store");
+
+        let alarm = SystemTime::UNIX_EPOCH
+            .checked_add(Duration::from_secs(
+                SystemTime::now()
+                    .checked_add(Duration::from_secs(60))
+                    .expect("failed to get alarm time")
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .expect("failed to get duration since UNIX EPOCH")
+                    .as_secs(),
+            ))
+            .unwrap();
+
+        store
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, alarm)
+            .expect("failed to set alarm");
+
+        let retrieved_alarm = store
+            .get_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit)
+            .expect("failed to list ready services");
+
+        // check that the alarm is returned
+        assert_eq!(retrieved_alarm, Some(alarm));
+
+        // unset the alarm
+        store
+            .unset_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit)
+            .expect("failed to unset alarm");
+
+        let retrieved_alarm = store
+            .get_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit)
+            .expect("failed to list ready services");
+
+        // Check that the alarm is not returned because it was unset
+        assert_eq!(retrieved_alarm, None);
     }
 
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {

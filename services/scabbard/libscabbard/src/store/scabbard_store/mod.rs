@@ -261,4 +261,17 @@ pub trait ScabbardStore {
         service_id: &FullyQualifiedServiceId,
         alarm_type: &AlarmType,
     ) -> Result<(), ScabbardStoreError>;
+
+    /// Get the scabbard alarm of a specified type for the given service
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The fully qualified service id for the `ScabbardService` to retrieve the
+    ///    alarm for
+    /// * `alarm_type` - The type of alarm to retrieve
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError>;
 }
