@@ -69,7 +69,7 @@ mod tests {
         action::ConsensusAction,
         context::ConsensusContext,
         two_phase::{
-            action::{Action, ConsensusActionNotification},
+            action::{Action, Notification},
             context::{ContextBuilder, Participant},
             state::State,
         },
@@ -148,7 +148,7 @@ mod tests {
             .add_consensus_context(&fqsi, context)
             .expect("failed to add context to store");
 
-        let notification = ConsensusActionNotification::RequestForStart();
+        let notification = Notification::RequestForStart();
         let action = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
 
         // add an unexecuted action for the first service
@@ -194,8 +194,7 @@ mod tests {
         assert!(ids.contains(&fqsi));
         assert!(ids.contains(&fqsi2));
 
-        let notification2 =
-            ConsensusActionNotification::MessageDropped("test dropped message".to_string());
+        let notification2 = Notification::MessageDropped("test dropped message".to_string());
         let action2 = ConsensusAction::TwoPhaseCommit(Action::Notify(notification2));
 
         // add an unexecuted action for the second service

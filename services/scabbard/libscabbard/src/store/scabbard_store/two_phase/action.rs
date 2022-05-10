@@ -23,11 +23,11 @@ use crate::store::scabbard_store::context::ConsensusContext;
 pub enum Action {
     Update(ConsensusContext, Option<SystemTime>),
     SendMessage(ServiceId, Message),
-    Notify(ConsensusActionNotification),
+    Notify(Notification),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum ConsensusActionNotification {
+pub enum Notification {
     Abort(),
     Commit(),
     MessageDropped(String),

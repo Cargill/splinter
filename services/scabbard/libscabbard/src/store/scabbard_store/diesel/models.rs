@@ -23,7 +23,7 @@ use crate::store::scabbard_store::{
     context::ConsensusContext,
     service::{ConsensusType, ScabbardService, ServiceStatus},
     two_phase::{
-        action::ConsensusActionNotification,
+        action::Notification,
         context::{Context, ContextBuilder, Participant},
         event::Event,
         message::Message,
@@ -715,19 +715,15 @@ pub struct InsertableConsensus2pcActionModel {
     pub position: i32,
 }
 
-impl From<&ConsensusActionNotification> for String {
-    fn from(notification: &ConsensusActionNotification) -> Self {
+impl From<&Notification> for String {
+    fn from(notification: &Notification) -> Self {
         match *notification {
-            ConsensusActionNotification::RequestForStart() => String::from("REQUESTFORSTART"),
-            ConsensusActionNotification::CoordinatorRequestForVote() => {
-                String::from("COORDINATORREQUESTFORVOTE")
-            }
-            ConsensusActionNotification::ParticipantRequestForVote(_) => {
-                String::from("PARTICIPANTREQUESTFORVOTE")
-            }
-            ConsensusActionNotification::Commit() => String::from("COMMIT"),
-            ConsensusActionNotification::Abort() => String::from("ABORT"),
-            ConsensusActionNotification::MessageDropped(_) => String::from("MESSAGEDROPPED"),
+            Notification::RequestForStart() => String::from("REQUESTFORSTART"),
+            Notification::CoordinatorRequestForVote() => String::from("COORDINATORREQUESTFORVOTE"),
+            Notification::ParticipantRequestForVote(_) => String::from("PARTICIPANTREQUESTFORVOTE"),
+            Notification::Commit() => String::from("COMMIT"),
+            Notification::Abort() => String::from("ABORT"),
+            Notification::MessageDropped(_) => String::from("MESSAGEDROPPED"),
         }
     }
 }

@@ -36,7 +36,7 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     two_phase::{
-        action::{Action, ConsensusActionNotification},
+        action::{Action, Notification},
         context::{ContextBuilder, Participant},
         message::Message,
         state::State,
@@ -332,24 +332,20 @@ where
                     ))
                 })?;
                 let notification_action = match notification.notification_type.as_str() {
-                    "REQUESTFORSTART" => ConsensusActionNotification::RequestForStart(),
-                    "COORDINATORREQUESTFORVOTE" => {
-                        ConsensusActionNotification::CoordinatorRequestForVote()
-                    }
-                    "PARTICIPANTREQUESTFORVOTE" => {
-                        ConsensusActionNotification::ParticipantRequestForVote(
-                            notification.request_for_vote_value.ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get 'request for vote' notification action, no \
+                    "REQUESTFORSTART" => Notification::RequestForStart(),
+                    "COORDINATORREQUESTFORVOTE" => Notification::CoordinatorRequestForVote(),
+                    "PARTICIPANTREQUESTFORVOTE" => Notification::ParticipantRequestForVote(
+                        notification.request_for_vote_value.ok_or_else(|| {
+                            ScabbardStoreError::Internal(InternalError::with_message(
+                                "Failed to get 'request for vote' notification action, no \
                                     associated value"
-                                        .to_string(),
-                                ))
-                            })?,
-                        )
-                    }
-                    "COMMIT" => ConsensusActionNotification::Commit(),
-                    "ABORT" => ConsensusActionNotification::Abort(),
-                    "MESSAGEDROPPED" => ConsensusActionNotification::MessageDropped(
+                                    .to_string(),
+                            ))
+                        })?,
+                    ),
+                    "COMMIT" => Notification::Commit(),
+                    "ABORT" => Notification::Abort(),
+                    "MESSAGEDROPPED" => Notification::MessageDropped(
                         notification.dropped_message.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
                                 "Failed to get 'message dropped' notification action, no \

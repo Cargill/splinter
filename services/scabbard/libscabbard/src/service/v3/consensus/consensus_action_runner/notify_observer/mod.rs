@@ -23,7 +23,7 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
-use crate::store::two_phase::action::ConsensusActionNotification;
+use crate::store::two_phase::action::Notification;
 
 pub use command::CommandNotifyObserver;
 
@@ -38,7 +38,7 @@ pub trait NotifyObserver<C> {
     /// * `epoch` - The current epoch of the consensus algorithm
     fn notify(
         &self,
-        notification: ConsensusActionNotification,
+        notification: Notification,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError>;

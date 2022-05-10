@@ -38,7 +38,7 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     two_phase::{
-        action::{Action, ConsensusActionNotification},
+        action::{Action, Notification},
         message::Message,
     },
     ConsensusAction, ConsensusContext,
@@ -169,10 +169,10 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 Action::Notify(notification) => {
                     let (notification_type, dropped_message, request_for_vote_value) =
                         match &notification {
-                            ConsensusActionNotification::MessageDropped(message) => {
+                            Notification::MessageDropped(message) => {
                                 (String::from(&notification), Some(message.clone()), None)
                             }
-                            ConsensusActionNotification::ParticipantRequestForVote(value) => {
+                            Notification::ParticipantRequestForVote(value) => {
                                 (String::from(&notification), None, Some(value.clone()))
                             }
                             _ => (String::from(&notification), None, None),
@@ -307,10 +307,10 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 Action::Notify(notification) => {
                     let (notification_type, dropped_message, request_for_vote_value) =
                         match &notification {
-                            ConsensusActionNotification::MessageDropped(message) => {
+                            Notification::MessageDropped(message) => {
                                 (String::from(&notification), Some(message.clone()), None)
                             }
-                            ConsensusActionNotification::ParticipantRequestForVote(value) => {
+                            Notification::ParticipantRequestForVote(value) => {
                                 (String::from(&notification), None, Some(value.clone()))
                             }
                             _ => (String::from(&notification), None, None),

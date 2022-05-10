@@ -700,7 +700,7 @@ pub mod tests {
         commit::{CommitEntryBuilder, ConsensusDecision},
         service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
         two_phase::{
-            action::{Action, ConsensusActionNotification},
+            action::{Action, Notification},
             context::{ContextBuilder, Participant},
             event::Event,
             message::Message,
@@ -808,7 +808,7 @@ pub mod tests {
             .add_consensus_context(&coordinator_fqsi, context)
             .expect("failed to add context");
 
-        let notification = ConsensusActionNotification::RequestForStart();
+        let notification = Notification::RequestForStart();
         let action = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
 
         assert!(store
@@ -861,7 +861,7 @@ pub mod tests {
             .add_consensus_context(&coordinator_fqsi, context)
             .expect("failed to add context");
 
-        let notification = ConsensusActionNotification::RequestForStart();
+        let notification = Notification::RequestForStart();
         let action1 = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
 
         let vote_timeout_start = SystemTime::UNIX_EPOCH
@@ -921,7 +921,7 @@ pub mod tests {
             action_list[0],
             IdentifiedConsensusAction::TwoPhaseCommit(
                 action_id1,
-                Action::Notify(ConsensusActionNotification::RequestForStart())
+                Action::Notify(Notification::RequestForStart())
             )
         );
         assert_eq!(
@@ -1201,7 +1201,7 @@ pub mod tests {
         // check that the one service is returned because its alarm has passed
         assert_eq!(&ready_services[0], &service_fqsi);
 
-        let notification = ConsensusActionNotification::RequestForStart();
+        let notification = Notification::RequestForStart();
         let action = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
 
         let updated_alarm = SystemTime::now()

@@ -24,7 +24,7 @@ use splinter::store::command::StoreCommand;
 use crate::service::v3::consensus::consensus_action_runner::commands::notifications::{
     AddCommitEntryCommand, AddEventCommand, UpdateCommitEntryCommand,
 };
-use crate::store::two_phase::action::ConsensusActionNotification;
+use crate::store::two_phase::action::Notification;
 use crate::store::{
     commit::{CommitEntryBuilder, ConsensusDecision},
     event::ConsensusEvent,
@@ -68,7 +68,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
     /// * `epoch` - The current epoch of the consensus algorithm
     fn notify(
         &self,
-        notification: ConsensusActionNotification,
+        notification: Notification,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError> {
@@ -76,7 +76,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
         match notification {
             // Generates a new value to agree on and creates commands to add a commit entry to
             // track the value and an new event to start agreement on that value
-            ConsensusActionNotification::RequestForStart() => {
+            Notification::RequestForStart() => {
                 // Use the current system time as a string for the value that will be agreed upon
                 let s = SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
@@ -103,7 +103,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                 )));
             }
             // if we are the coordiantor always, vote yes
-            ConsensusActionNotification::CoordinatorRequestForVote() => {
+            Notification::CoordinatorRequestForVote() => {
                 commands.push(Box::new(AddEventCommand::new(
                     self.store_factory.clone(),
                     service_id.clone(),
@@ -113,7 +113,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
             }
             // vote on a the provided value
             // creates commands to add a new commit entry and an event for voting
-            ConsensusActionNotification::ParticipantRequestForVote(value) => {
+            Notification::ParticipantRequestForVote(value) => {
                 let entry = CommitEntryBuilder::default()
                     .with_service_id(service_id)
                     .with_value(
@@ -137,7 +137,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
             }
             // Commit pending value
             // creates a command to update the current commit entry withs status commited
-            ConsensusActionNotification::Commit() => {
+            Notification::Commit() => {
                 if let Some(commit_entry) = self
                     .store
                     .get_last_commit_entry(service_id)
@@ -162,7 +162,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
             }
             // Abort pending value
             // creates a command to update the current commit entry withs status aborted
-            ConsensusActionNotification::Abort() => {
+            Notification::Abort() => {
                 if let Some(commit_entry) = self
                     .store
                     .get_last_commit_entry(service_id)
@@ -186,7 +186,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                 }
             }
             // log dropped message
-            ConsensusActionNotification::MessageDropped(msg) => {
+            Notification::MessageDropped(msg) => {
                 trace!("Message Dropper: {}", msg);
                 return Ok(vec![]);
             }

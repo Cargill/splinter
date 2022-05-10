@@ -193,7 +193,7 @@ mod tests {
         action::ConsensusAction,
         context::ConsensusContext,
         service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus},
-        two_phase::action::ConsensusActionNotification,
+        two_phase::action::Notification,
         two_phase::context::{Context, ContextBuilder, Participant},
         two_phase::message::Message,
         two_phase::state::State,
@@ -454,9 +454,7 @@ mod tests {
 
         scabbard_store
             .add_consensus_action(
-                ConsensusAction::TwoPhaseCommit(Action::Notify(
-                    ConsensusActionNotification::RequestForStart(),
-                )),
+                ConsensusAction::TwoPhaseCommit(Action::Notify(Notification::RequestForStart())),
                 &service_fqsi,
                 1,
             )
