@@ -326,6 +326,20 @@ impl Clone for Box<dyn RwRegistry> {
     }
 }
 
+impl RwRegistry for Box<dyn RwRegistry> {
+    fn clone_box(&self) -> Box<dyn RwRegistry> {
+        (**self).clone_box()
+    }
+
+    fn clone_box_as_reader(&self) -> Box<dyn RegistryReader> {
+        (**self).clone_box_as_reader()
+    }
+
+    fn clone_box_as_writer(&self) -> Box<dyn RegistryWriter> {
+        (**self).clone_box_as_writer()
+    }
+}
+
 impl<NR> RegistryReader for Box<NR>
 where
     NR: RegistryReader + ?Sized,
