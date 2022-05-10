@@ -700,7 +700,7 @@ pub mod tests {
         commit::{CommitEntryBuilder, ConsensusDecision},
         service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
         two_phase::{
-            action::{ConsensusAction, ConsensusActionNotification},
+            action::{Action, ConsensusActionNotification},
             context::{ContextBuilder, Participant},
             event::Scabbard2pcEvent,
             message::Scabbard2pcMessage,
@@ -809,9 +809,8 @@ pub mod tests {
             .expect("failed to add context");
 
         let notification = ConsensusActionNotification::RequestForStart();
-        let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Notify(
-            notification,
-        ));
+        let action =
+            ScabbardConsensusAction::Scabbard2pcConsensusAction(Action::Notify(notification));
 
         assert!(store
             .add_consensus_action(action, &coordinator_fqsi, 1)
@@ -864,9 +863,8 @@ pub mod tests {
             .expect("failed to add context");
 
         let notification = ConsensusActionNotification::RequestForStart();
-        let action1 = ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Notify(
-            notification,
-        ));
+        let action1 =
+            ScabbardConsensusAction::Scabbard2pcConsensusAction(Action::Notify(notification));
 
         let vote_timeout_start = SystemTime::UNIX_EPOCH
             .checked_add(Duration::from_secs(
@@ -892,7 +890,7 @@ pub mod tests {
             .build()
             .expect("failed to build update context");
 
-        let action2 = ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Update(
+        let action2 = ScabbardConsensusAction::Scabbard2pcConsensusAction(Action::Update(
             ConsensusContext::TwoPhaseCommit(update_context),
             None,
         ));
@@ -925,14 +923,14 @@ pub mod tests {
             action_list[0],
             IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
                 action_id1,
-                ConsensusAction::Notify(ConsensusActionNotification::RequestForStart())
+                Action::Notify(ConsensusActionNotification::RequestForStart())
             )
         );
         assert_eq!(
             action_list[1],
             IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
                 action_id2,
-                ConsensusAction::Update(
+                Action::Update(
                     ConsensusContext::TwoPhaseCommit(expected_update_context),
                     None,
                 )
@@ -1094,7 +1092,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build update context");
-        let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Update(
+        let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(Action::Update(
             ConsensusContext::TwoPhaseCommit(update_context),
             None,
         ));
@@ -1206,9 +1204,8 @@ pub mod tests {
         assert_eq!(&ready_services[0], &service_fqsi);
 
         let notification = ConsensusActionNotification::RequestForStart();
-        let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Notify(
-            notification,
-        ));
+        let action =
+            ScabbardConsensusAction::Scabbard2pcConsensusAction(Action::Notify(notification));
 
         let updated_alarm = SystemTime::now()
             .checked_add(Duration::from_secs(604800))

@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::store::scabbard_store::two_phase::action::ConsensusAction;
+use crate::store::scabbard_store::two_phase::action::Action;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ScabbardConsensusAction {
-    Scabbard2pcConsensusAction(ConsensusAction),
+    Scabbard2pcConsensusAction(Action),
 }
 
 // A scabbard consensus action that includes the action ID associated with the action
 #[derive(Debug, PartialEq, Clone)]
 pub enum IdentifiedScabbardConsensusAction {
-    Scabbard2pcConsensusAction(i64, ConsensusAction),
+    Scabbard2pcConsensusAction(i64, Action),
 }
 
 impl IdentifiedScabbardConsensusAction {

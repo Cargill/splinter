@@ -36,7 +36,7 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     two_phase::{
-        action::{ConsensusAction, ConsensusActionNotification},
+        action::{Action, ConsensusActionNotification},
         context::{ContextBuilder, Participant},
         message::Scabbard2pcMessage,
         state::Scabbard2pcState,
@@ -257,10 +257,7 @@ where
                 let action_alarm = get_system_time(update_context.action_alarm)?;
                 let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
                     update_context.action_id,
-                    ConsensusAction::Update(
-                        ConsensusContext::TwoPhaseCommit(context),
-                        action_alarm,
-                    ),
+                    Action::Update(ConsensusContext::TwoPhaseCommit(context), action_alarm),
                 );
                 all_actions.push((position, action));
             }
@@ -325,7 +322,7 @@ where
                 };
                 let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
                     send_message.action_id,
-                    ConsensusAction::SendMessage(service_id, message),
+                    Action::SendMessage(service_id, message),
                 );
                 all_actions.push((position, action));
             }
@@ -371,7 +368,7 @@ where
                 };
                 let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
                     notification.action_id,
-                    ConsensusAction::Notify(notification_action),
+                    Action::Notify(notification_action),
                 );
                 all_actions.push((position, action));
             }

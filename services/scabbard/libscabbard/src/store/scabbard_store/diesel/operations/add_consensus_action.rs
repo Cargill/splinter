@@ -38,7 +38,7 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     two_phase::{
-        action::{ConsensusAction, ConsensusActionNotification},
+        action::{Action, ConsensusActionNotification},
         message::Scabbard2pcMessage,
     },
     ConsensusContext, ScabbardConsensusAction,
@@ -113,7 +113,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 .first::<i64>(self.conn)?;
 
             match action {
-                ConsensusAction::Update(context, alarm) => match context {
+                Action::Update(context, alarm) => match context {
                     ConsensusContext::TwoPhaseCommit(context) => {
                         let action_alarm = get_timestamp(alarm)?;
 
@@ -136,7 +136,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         Ok(action_id)
                     }
                 },
-                ConsensusAction::SendMessage(receiving_process, message) => {
+                Action::SendMessage(receiving_process, message) => {
                     let (message_type, vote_response, vote_request) = match message {
                         Scabbard2pcMessage::DecisionRequest(_) => {
                             (String::from(&message), None, None)
@@ -168,7 +168,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         .execute(self.conn)?;
                     Ok(action_id)
                 }
-                ConsensusAction::Notify(notification) => {
+                Action::Notify(notification) => {
                     let (notification_type, dropped_message, request_for_vote_value) =
                         match &notification {
                             ConsensusActionNotification::MessageDropped(message) => {
@@ -253,7 +253,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 .get_result(self.conn)?;
 
             match action {
-                ConsensusAction::Update(context, alarm) => match context {
+                Action::Update(context, alarm) => match context {
                     ConsensusContext::TwoPhaseCommit(context) => {
                         let action_alarm = get_timestamp(alarm)?;
 
@@ -276,7 +276,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                         Ok(action_id)
                     }
                 },
-                ConsensusAction::SendMessage(receiving_process, message) => {
+                Action::SendMessage(receiving_process, message) => {
                     let (message_type, vote_response, vote_request) = match message {
                         Scabbard2pcMessage::DecisionRequest(_) => {
                             (String::from(&message), None, None)
@@ -308,7 +308,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                         .execute(self.conn)?;
                     Ok(action_id)
                 }
-                ConsensusAction::Notify(notification) => {
+                Action::Notify(notification) => {
                     let (notification_type, dropped_message, request_for_vote_value) =
                         match &notification {
                             ConsensusActionNotification::MessageDropped(message) => {

@@ -20,7 +20,7 @@ use super::message::Scabbard2pcMessage;
 use crate::store::scabbard_store::context::ConsensusContext;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ConsensusAction {
+pub enum Action {
     Update(ConsensusContext, Option<SystemTime>),
     SendMessage(ServiceId, Scabbard2pcMessage),
     Notify(ConsensusActionNotification),
