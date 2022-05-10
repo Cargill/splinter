@@ -12,12 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Consensus components to work with Augrim
+use augrim::Value;
 
-#[cfg(feature = "scabbardv3-consensus-action-runner")]
-pub mod consensus_action_runner;
-mod process;
-mod value;
+#[derive(Clone)]
+pub struct ScabbardValue(Vec<u8>);
 
-pub use process::ScabbardProcess;
-pub use value::ScabbardValue;
+impl ScabbardValue {
+    pub fn new(val: Vec<u8>) -> Self {
+        Self(val)
+    }
+}
+
+impl Value for ScabbardValue {}
+
+impl From<Vec<u8>> for ScabbardValue {
+    fn from(val: Vec<u8>) -> Self {
+        Self(val)
+    }
+}
+
+impl From<ScabbardValue> for Vec<u8> {
+    fn from(val: ScabbardValue) -> Self {
+        val.0
+    }
+}

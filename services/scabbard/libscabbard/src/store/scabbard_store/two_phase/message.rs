@@ -14,14 +14,20 @@
 
 use std::convert::TryFrom;
 
+#[cfg(feature = "scabbardv3-consensus")]
+use augrim::error::InternalError;
+#[cfg(feature = "scabbardv3-consensus")]
+use augrim::two_phase_commit::TwoPhaseCommitMessage as AugrimTwoPhaseCommitMessage;
+
 use crate::protocol::v3::{
     message::ScabbardMessage,
     two_phase_commit::{
         Abort, Commit, DecisionRequest, TwoPhaseCommitMessage, VoteRequest, VoteResponse,
     },
 };
-
 use crate::protos::{scabbard_v3, IntoBytes, ProtoConversionError};
+#[cfg(feature = "scabbardv3-consensus")]
+use crate::service::v3::ScabbardValue;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Scabbard2pcMessage {
@@ -65,5 +71,24 @@ impl TryFrom<Scabbard2pcMessage> for Vec<u8> {
         IntoBytes::<scabbard_v3::ScabbardMessageV3>::into_bytes(ScabbardMessage::try_from(
             store_msg,
         )?)
+    }
+}
+
+#[cfg(feature = "scabbardv3-consensus")]
+impl TryFrom<AugrimTwoPhaseCommitMessage<ScabbardValue>> for Scabbard2pcMessage {
+    type Error = InternalError;
+
+    fn try_from(msg: AugrimTwoPhaseCommitMessage<ScabbardValue>) -> Result<Self, Self::Error> {
+        Ok(match msg {
+            AugrimTwoPhaseCommitMessage::VoteRequest(epoch, val) => {
+                Self::VoteRequest(epoch, val.into())
+            }
+            AugrimTwoPhaseCommitMessage::Commit(epoch) => Self::Commit(epoch),
+            AugrimTwoPhaseCommitMessage::Abort(epoch) => Self::Abort(epoch),
+            AugrimTwoPhaseCommitMessage::DecisionRequest(epoch) => Self::DecisionRequest(epoch),
+            AugrimTwoPhaseCommitMessage::VoteResponse(epoch, vote) => {
+                Self::VoteResponse(epoch, vote)
+            }
+        })
     }
 }

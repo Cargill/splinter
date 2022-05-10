@@ -12,12 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Consensus components to work with Augrim
+use augrim::Process;
+use splinter::service::ServiceId;
 
-#[cfg(feature = "scabbardv3-consensus-action-runner")]
-pub mod consensus_action_runner;
-mod process;
-mod value;
+/// A process identifier for Scabbard Processes.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ScabbardProcess(ServiceId);
 
-pub use process::ScabbardProcess;
-pub use value::ScabbardValue;
+impl Process for ScabbardProcess {}
+
+impl From<ServiceId> for ScabbardProcess {
+    fn from(service_id: ServiceId) -> Self {
+        Self(service_id)
+    }
+}
+
+impl From<ScabbardProcess> for ServiceId {
+    fn from(process: ScabbardProcess) -> Self {
+        process.0
+    }
+}

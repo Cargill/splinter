@@ -14,7 +14,7 @@
 
 mod arguments;
 mod arguments_converter;
-#[cfg(feature = "scabbardv3-consensus-action-runner")]
+#[cfg(feature = "scabbardv3-consensus")]
 mod consensus;
 mod lifecycle;
 mod message_converter;
@@ -31,6 +31,8 @@ pub use consensus::consensus_action_runner::{
     CommandNotifyObserver, ConsensusActionRunner, ContextUpdater, NotifyObserver,
     ScabbardStoreContextUpdater,
 };
+#[cfg(feature = "scabbardv3-consensus")]
+pub use consensus::{ScabbardProcess, ScabbardValue};
 pub use lifecycle::ScabbardLifecycle;
 pub use message_converter::ScabbardMessageByteConverter;
 pub use message_handler::ScabbardMessageHandler;
