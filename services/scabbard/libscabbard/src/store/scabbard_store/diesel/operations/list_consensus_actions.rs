@@ -41,7 +41,7 @@ use crate::store::scabbard_store::{
         message::Scabbard2pcMessage,
         state::Scabbard2pcState,
     },
-    ConsensusContext, IdentifiedScabbardConsensusAction,
+    ConsensusContext, IdentifiedConsensusAction,
 };
 
 use super::ScabbardStoreOperations;
@@ -51,7 +51,7 @@ pub(in crate::store::scabbard_store::diesel) trait ListActionsOperation {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError>;
+    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError>;
 }
 
 impl<'a, C> ListActionsOperation for ScabbardStoreOperations<'a, C>
@@ -66,7 +66,7 @@ where
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
@@ -255,7 +255,7 @@ where
                 })?;
 
                 let action_alarm = get_system_time(update_context.action_alarm)?;
-                let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                let action = IdentifiedConsensusAction::TwoPhaseCommit(
                     update_context.action_id,
                     Action::Update(ConsensusContext::TwoPhaseCommit(context), action_alarm),
                 );
@@ -320,7 +320,7 @@ where
                         ))
                     }
                 };
-                let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                let action = IdentifiedConsensusAction::TwoPhaseCommit(
                     send_message.action_id,
                     Action::SendMessage(service_id, message),
                 );
@@ -366,7 +366,7 @@ where
                         )))
                     }
                 };
-                let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                let action = IdentifiedConsensusAction::TwoPhaseCommit(
                     notification.action_id,
                     Action::Notify(notification_action),
                 );

@@ -27,7 +27,7 @@ use splinter::service::FullyQualifiedServiceId;
 use splinter::service::MessageSenderFactory;
 use splinter::store::command::StoreCommandExecutor;
 
-use crate::store::action::IdentifiedScabbardConsensusAction;
+use crate::store::action::IdentifiedConsensusAction;
 use crate::store::two_phase::action::Action;
 use crate::store::ScabbardStoreFactory;
 
@@ -96,14 +96,14 @@ where
     /// * `epoch` - The current epoch of the consensus algorithm
     pub fn run_actions(
         &self,
-        actions: Vec<IdentifiedScabbardConsensusAction>,
+        actions: Vec<IdentifiedConsensusAction>,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<(), InternalError> {
         for action in actions {
             let mut commands = Vec::new();
             match &action {
-                IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                IdentifiedConsensusAction::TwoPhaseCommit(
                     action_id,
                     Action::Update(context, alarm),
                 ) => {
@@ -121,7 +121,7 @@ where
                         self.store_factory.clone(),
                     )));
                 }
-                IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                IdentifiedConsensusAction::TwoPhaseCommit(
                     action_id,
                     Action::SendMessage(to_service, msg),
                 ) => {
@@ -145,7 +145,7 @@ where
                         self.store_factory.clone(),
                     )));
                 }
-                IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                IdentifiedConsensusAction::TwoPhaseCommit(
                     action_id,
                     Action::Notify(notification),
                 ) => {

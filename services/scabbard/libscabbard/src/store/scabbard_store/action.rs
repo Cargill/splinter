@@ -21,11 +21,11 @@ pub enum ScabbardConsensusAction {
 
 // A scabbard consensus action that includes the action ID associated with the action
 #[derive(Debug, PartialEq, Clone)]
-pub enum IdentifiedScabbardConsensusAction {
-    Scabbard2pcConsensusAction(i64, Action),
+pub enum IdentifiedConsensusAction {
+    TwoPhaseCommit(i64, Action),
 }
 
-impl IdentifiedScabbardConsensusAction {
+impl IdentifiedConsensusAction {
     pub fn deconstruct(self) -> (i64, ScabbardConsensusAction) {
         match self {
             Self::Scabbard2pcConsensusAction(id, action) => (
