@@ -24,11 +24,11 @@ use splinter::store::command::StoreCommand;
 use crate::service::v3::consensus::consensus_action_runner::commands::notifications::{
     AddCommitEntryCommand, AddEventCommand, UpdateCommitEntryCommand,
 };
-use crate::store::two_phase::Notification;
+use crate::store::two_phase_commit::Notification;
 use crate::store::{
     commit::{CommitEntryBuilder, ConsensusDecision},
     event::ConsensusEvent,
-    two_phase::Event,
+    two_phase_commit::Event,
 };
 use crate::store::{ScabbardStore, ScabbardStoreFactory};
 

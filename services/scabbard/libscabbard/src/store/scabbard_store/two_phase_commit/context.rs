@@ -17,7 +17,7 @@ use std::time::SystemTime;
 use splinter::error::InvalidStateError;
 use splinter::service::ServiceId;
 
-use crate::store::scabbard_store::two_phase::State;
+use crate::store::scabbard_store::two_phase_commit::State;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Context {

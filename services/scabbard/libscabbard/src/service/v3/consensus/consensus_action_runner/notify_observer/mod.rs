@@ -23,7 +23,7 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
-use crate::store::two_phase::Notification;
+use crate::store::two_phase_commit::Notification;
 
 pub use command::CommandNotifyObserver;
 

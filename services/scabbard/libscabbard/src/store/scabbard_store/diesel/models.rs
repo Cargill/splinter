@@ -22,7 +22,7 @@ use crate::store::scabbard_store::{
     commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision},
     context::ConsensusContext,
     service::{ConsensusType, ScabbardService, ServiceStatus},
-    two_phase::{Context, ContextBuilder, Event, Message, Notification, Participant, State},
+    two_phase_commit::{Context, ContextBuilder, Event, Message, Notification, Participant, State},
 };
 
 use super::schema::{

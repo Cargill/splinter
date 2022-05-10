@@ -22,7 +22,7 @@ mod error;
 pub mod event;
 mod factory;
 pub mod service;
-pub mod two_phase;
+pub mod two_phase_commit;
 
 use std::time::SystemTime;
 

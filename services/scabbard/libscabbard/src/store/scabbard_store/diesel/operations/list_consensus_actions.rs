@@ -35,7 +35,7 @@ use crate::store::scabbard_store::diesel::{
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    two_phase::{Action, ContextBuilder, Message, Notification, Participant, State},
+    two_phase_commit::{Action, ContextBuilder, Message, Notification, Participant, State},
     ConsensusContext, IdentifiedConsensusAction,
 };
 

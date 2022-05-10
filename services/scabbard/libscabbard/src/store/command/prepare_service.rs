@@ -19,7 +19,7 @@ use splinter::{error::InternalError, service::ServiceId, store::command::StoreCo
 use crate::store::{
     context::ConsensusContext,
     service::ScabbardService,
-    two_phase::{Context, ContextBuilder, Participant, State},
+    two_phase_commit::{Context, ContextBuilder, Participant, State},
     ScabbardStoreFactory,
 };
 

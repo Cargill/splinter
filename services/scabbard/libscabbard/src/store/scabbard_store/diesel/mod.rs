@@ -699,7 +699,9 @@ pub mod tests {
     use crate::store::scabbard_store::{
         commit::{CommitEntryBuilder, ConsensusDecision},
         service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
-        two_phase::{Action, ContextBuilder, Event, Message, Notification, Participant, State},
+        two_phase_commit::{
+            Action, ContextBuilder, Event, Message, Notification, Participant, State,
+        },
     };
 
     use diesel::{

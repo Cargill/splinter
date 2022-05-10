@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::store::scabbard_store::two_phase::Context;
+use crate::store::scabbard_store::two_phase_commit::Context;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConsensusContext {
