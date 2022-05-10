@@ -17,7 +17,7 @@ use splinter::service::ServiceId;
 use super::message::Scabbard2pcMessage;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Scabbard2pcEvent {
+pub enum Event {
     Alarm(),
     Deliver(ServiceId, Scabbard2pcMessage),
     Start(Vec<u8>),

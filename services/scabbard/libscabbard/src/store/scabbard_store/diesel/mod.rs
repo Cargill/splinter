@@ -702,7 +702,7 @@ pub mod tests {
         two_phase::{
             action::{Action, ConsensusActionNotification},
             context::{ContextBuilder, Participant},
-            event::Scabbard2pcEvent,
+            event::Event,
             message::Scabbard2pcMessage,
             state::Scabbard2pcState,
         },
@@ -1543,7 +1543,7 @@ pub mod tests {
             .add_consensus_context(&participant_fqsi, context)
             .expect("failed to add context");
 
-        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
+        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Event::Deliver(
             participant2_fqsi.service_id().clone(),
             Scabbard2pcMessage::DecisionRequest(1),
         ));
@@ -1602,7 +1602,7 @@ pub mod tests {
             .add_consensus_context(&participant_fqsi, context)
             .expect("failed to add context");
 
-        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
+        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Event::Deliver(
             participant2_fqsi.service_id().clone(),
             Scabbard2pcMessage::DecisionRequest(1),
         ));
@@ -1664,7 +1664,7 @@ pub mod tests {
             .add_consensus_context(&participant_fqsi, context)
             .expect("failed to add context");
 
-        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
+        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Event::Deliver(
             participant2_fqsi.service_id().clone(),
             Scabbard2pcMessage::DecisionRequest(1),
         ));
@@ -1682,14 +1682,14 @@ pub mod tests {
             events[0],
             IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                 event_id,
-                Scabbard2pcEvent::Deliver(
+                Event::Deliver(
                     participant2_fqsi.service_id().clone(),
                     Scabbard2pcMessage::DecisionRequest(1)
                 )
             )
         );
 
-        let event2 = ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Alarm());
+        let event2 = ConsensusEvent::Scabbard2pcConsensusEvent(Event::Alarm());
 
         let event_id2 = store
             .add_consensus_event(&participant_fqsi, 1, event2)
@@ -1704,7 +1704,7 @@ pub mod tests {
             events[0],
             IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                 event_id,
-                Scabbard2pcEvent::Deliver(
+                Event::Deliver(
                     participant2_fqsi.service_id().clone(),
                     Scabbard2pcMessage::DecisionRequest(1)
                 )
@@ -1712,10 +1712,7 @@ pub mod tests {
         );
         assert_eq!(
             events[1],
-            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
-                event_id2,
-                Scabbard2pcEvent::Alarm()
-            ),
+            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(event_id2, Event::Alarm()),
         );
 
         store
@@ -1729,10 +1726,7 @@ pub mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0],
-            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
-                event_id2,
-                Scabbard2pcEvent::Alarm()
-            ),
+            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(event_id2, Event::Alarm()),
         );
     }
 

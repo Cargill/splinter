@@ -33,7 +33,7 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     event::IdentifiedConsensusEvent,
-    two_phase::{event::Scabbard2pcEvent, message::Scabbard2pcMessage},
+    two_phase::{event::Event, message::Scabbard2pcMessage},
 };
 
 use super::ScabbardStoreOperations;
@@ -113,10 +113,7 @@ where
                 .filter_map(|(id, position, event_type)| match event_type.as_str() {
                     "ALARM" => Some((
                         position,
-                        IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
-                            id,
-                            Scabbard2pcEvent::Alarm(),
-                        ),
+                        IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(id, Event::Alarm()),
                     )),
                     _ => None,
                 })
@@ -196,7 +193,7 @@ where
                 };
                 let event = IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                     deliver.event_id,
-                    Scabbard2pcEvent::Deliver(process, message),
+                    Event::Deliver(process, message),
                 );
                 all_events.push((*position, event));
             }
@@ -209,7 +206,7 @@ where
                 })?;
                 let event = IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                     start.event_id,
-                    Scabbard2pcEvent::Start(start.value),
+                    Event::Start(start.value),
                 );
                 all_events.push((*position, event));
             }
@@ -233,7 +230,7 @@ where
                 };
                 let event = IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                     vote.event_id,
-                    Scabbard2pcEvent::Vote(vote_decision),
+                    Event::Vote(vote_decision),
                 );
                 all_events.push((*position, event));
             }

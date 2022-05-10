@@ -28,7 +28,7 @@ use crate::protos::FromBytes as _;
 use crate::store::{
     event::ConsensusEvent,
     service::ConsensusType,
-    two_phase::{event::Scabbard2pcEvent, message::Scabbard2pcMessage},
+    two_phase::{event::Event, message::Scabbard2pcMessage},
     ScabbardStore,
 };
 
@@ -78,7 +78,7 @@ impl MessageHandler for ScabbardMessageHandler {
                         .add_consensus_event(
                             &to_service,
                             message.epoch(),
-                            ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
+                            ConsensusEvent::Scabbard2pcConsensusEvent(Event::Deliver(
                                 from_service,
                                 into_store_msg(message),
                             )),

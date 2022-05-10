@@ -25,7 +25,7 @@ use crate::store::scabbard_store::{
     two_phase::{
         action::ConsensusActionNotification,
         context::{Context, ContextBuilder, Participant},
-        event::Scabbard2pcEvent,
+        event::Event,
         message::Scabbard2pcMessage,
         state::Scabbard2pcState,
     },
@@ -767,13 +767,13 @@ pub struct InsertableConsensus2pcEventModel {
     pub event_type: String,
 }
 
-impl From<&Scabbard2pcEvent> for String {
-    fn from(event: &Scabbard2pcEvent) -> Self {
+impl From<&Event> for String {
+    fn from(event: &Event) -> Self {
         match *event {
-            Scabbard2pcEvent::Alarm() => "ALARM".into(),
-            Scabbard2pcEvent::Deliver(..) => "DELIVER".into(),
-            Scabbard2pcEvent::Start(..) => "START".into(),
-            Scabbard2pcEvent::Vote(..) => "VOTE".into(),
+            Event::Alarm() => "ALARM".into(),
+            Event::Deliver(..) => "DELIVER".into(),
+            Event::Start(..) => "START".into(),
+            Event::Vote(..) => "VOTE".into(),
         }
     }
 }

@@ -35,7 +35,7 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     event::ConsensusEvent,
-    two_phase::{event::Scabbard2pcEvent, message::Scabbard2pcMessage},
+    two_phase::{event::Event, message::Scabbard2pcMessage},
 };
 
 use super::ScabbardStoreOperations;
@@ -108,8 +108,8 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 .first::<i64>(self.conn)?;
 
             match event {
-                Scabbard2pcEvent::Alarm() => Ok(event_id),
-                Scabbard2pcEvent::Deliver(receiving_process, message) => {
+                Event::Alarm() => Ok(event_id),
+                Event::Deliver(receiving_process, message) => {
                     let (message_type, vote_response, vote_request) = match message {
                         Scabbard2pcMessage::DecisionRequest(_) => {
                             (String::from(&message), None, None)
@@ -141,7 +141,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         .execute(self.conn)?;
                     Ok(event_id)
                 }
-                Scabbard2pcEvent::Start(value) => {
+                Event::Start(value) => {
                     let start_event = Consensus2pcStartEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
@@ -153,7 +153,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         .execute(self.conn)?;
                     Ok(event_id)
                 }
-                Scabbard2pcEvent::Vote(vote) => {
+                Event::Vote(vote) => {
                     let vote = match vote {
                         true => String::from("TRUE"),
                         false => String::from("FALSE"),
@@ -230,8 +230,8 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                 .get_result(self.conn)?;
 
             match event {
-                Scabbard2pcEvent::Alarm() => Ok(event_id),
-                Scabbard2pcEvent::Deliver(receiving_process, message) => {
+                Event::Alarm() => Ok(event_id),
+                Event::Deliver(receiving_process, message) => {
                     let (message_type, vote_response, vote_request) = match message {
                         Scabbard2pcMessage::DecisionRequest(_) => {
                             (String::from(&message), None, None)
@@ -263,7 +263,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                         .execute(self.conn)?;
                     Ok(event_id)
                 }
-                Scabbard2pcEvent::Start(value) => {
+                Event::Start(value) => {
                     let start_event = Consensus2pcStartEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
@@ -275,7 +275,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                         .execute(self.conn)?;
                     Ok(event_id)
                 }
-                Scabbard2pcEvent::Vote(vote) => {
+                Event::Vote(vote) => {
                     let vote = match vote {
                         true => String::from("TRUE"),
                         false => String::from("FALSE"),

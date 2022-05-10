@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::store::scabbard_store::two_phase::event::Scabbard2pcEvent;
+use crate::store::scabbard_store::two_phase::event::Event;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConsensusEvent {
-    Scabbard2pcConsensusEvent(Scabbard2pcEvent),
+    Scabbard2pcConsensusEvent(Event),
 }
 
 // A scabbard consensus event that includes the event ID associated with the event
 #[derive(Debug, PartialEq, Clone)]
 pub enum IdentifiedConsensusEvent {
-    Scabbard2pcConsensusEvent(i64, Scabbard2pcEvent),
+    Scabbard2pcConsensusEvent(i64, Event),
 }
 
 impl IdentifiedConsensusEvent {
