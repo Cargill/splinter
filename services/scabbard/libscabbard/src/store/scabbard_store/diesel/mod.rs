@@ -1680,7 +1680,7 @@ pub mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0],
-            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
+            IdentifiedConsensusEvent::TwoPhaseCommit(
                 event_id,
                 Event::Deliver(
                     participant2_fqsi.service_id().clone(),
@@ -1702,7 +1702,7 @@ pub mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(
             events[0],
-            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
+            IdentifiedConsensusEvent::TwoPhaseCommit(
                 event_id,
                 Event::Deliver(
                     participant2_fqsi.service_id().clone(),
@@ -1712,7 +1712,7 @@ pub mod tests {
         );
         assert_eq!(
             events[1],
-            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(event_id2, Event::Alarm()),
+            IdentifiedConsensusEvent::TwoPhaseCommit(event_id2, Event::Alarm()),
         );
 
         store
@@ -1726,7 +1726,7 @@ pub mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0],
-            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(event_id2, Event::Alarm()),
+            IdentifiedConsensusEvent::TwoPhaseCommit(event_id2, Event::Alarm()),
         );
     }
 

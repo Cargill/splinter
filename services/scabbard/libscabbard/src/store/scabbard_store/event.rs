@@ -22,15 +22,13 @@ pub enum ConsensusEvent {
 // A scabbard consensus event that includes the event ID associated with the event
 #[derive(Debug, PartialEq, Clone)]
 pub enum IdentifiedConsensusEvent {
-    Scabbard2pcConsensusEvent(i64, Event),
+    TwoPhaseCommit(i64, Event),
 }
 
 impl IdentifiedConsensusEvent {
     pub fn deconstruct(self) -> (i64, ConsensusEvent) {
         match self {
-            Self::Scabbard2pcConsensusEvent(id, event) => {
-                (id, ConsensusEvent::Scabbard2pcConsensusEvent(event))
-            }
+            Self::TwoPhaseCommit(id, event) => (id, ConsensusEvent::TwoPhaseCommit(event)),
         }
     }
 }

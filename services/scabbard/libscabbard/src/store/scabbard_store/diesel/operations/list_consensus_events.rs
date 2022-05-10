@@ -113,7 +113,7 @@ where
                 .filter_map(|(id, position, event_type)| match event_type.as_str() {
                     "ALARM" => Some((
                         position,
-                        IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(id, Event::Alarm()),
+                        IdentifiedConsensusEvent::TwoPhaseCommit(id, Event::Alarm()),
                     )),
                     _ => None,
                 })
@@ -191,7 +191,7 @@ where
                         ))
                     }
                 };
-                let event = IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
+                let event = IdentifiedConsensusEvent::TwoPhaseCommit(
                     deliver.event_id,
                     Event::Deliver(process, message),
                 );
@@ -204,7 +204,7 @@ where
                         "Failed to list consensus events, invalid event ID".to_string(),
                     ))
                 })?;
-                let event = IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
+                let event = IdentifiedConsensusEvent::TwoPhaseCommit(
                     start.event_id,
                     Event::Start(start.value),
                 );
@@ -228,7 +228,7 @@ where
                         ))
                     }
                 };
-                let event = IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
+                let event = IdentifiedConsensusEvent::TwoPhaseCommit(
                     vote.event_id,
                     Event::Vote(vote_decision),
                 );
