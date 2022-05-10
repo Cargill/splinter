@@ -28,7 +28,7 @@ use crate::protos::FromBytes as _;
 use crate::store::{
     event::ConsensusEvent,
     service::ConsensusType,
-    two_phase::{event::Event, message::Message},
+    two_phase::{Event, Message},
     ScabbardStore,
 };
 

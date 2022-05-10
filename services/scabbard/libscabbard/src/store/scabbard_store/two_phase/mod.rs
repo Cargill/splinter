@@ -14,8 +14,14 @@
 
 //! Structs and enums specific to the two phase commit consensus algorithm
 
-pub mod action;
-pub mod context;
-pub mod event;
-pub mod message;
-pub mod state;
+mod action;
+mod context;
+mod event;
+mod message;
+mod state;
+
+pub use action::{Action, Notification};
+pub use context::{Context, ContextBuilder, Participant};
+pub use event::Event;
+pub use message::Message;
+pub use state::State;

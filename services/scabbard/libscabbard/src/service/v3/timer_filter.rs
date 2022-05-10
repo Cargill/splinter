@@ -68,11 +68,7 @@ mod tests {
     use crate::store::{
         action::ConsensusAction,
         context::ConsensusContext,
-        two_phase::{
-            action::{Action, Notification},
-            context::{ContextBuilder, Participant},
-            state::State,
-        },
+        two_phase::{Action, ContextBuilder, Notification, Participant, State},
     };
 
     /// Test that the `ScabbardTimerFilter`'s `filter` function works

@@ -28,7 +28,7 @@ use splinter::service::MessageSenderFactory;
 use splinter::store::command::StoreCommandExecutor;
 
 use crate::store::action::IdentifiedConsensusAction;
-use crate::store::two_phase::action::Action;
+use crate::store::two_phase::Action;
 use crate::store::ScabbardStoreFactory;
 
 pub use self::commands::actions::ExecuteActionCommand;
@@ -193,10 +193,10 @@ mod tests {
         action::ConsensusAction,
         context::ConsensusContext,
         service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus},
-        two_phase::action::Notification,
-        two_phase::context::{Context, ContextBuilder, Participant},
-        two_phase::message::Message,
-        two_phase::state::State,
+        two_phase::Message,
+        two_phase::Notification,
+        two_phase::State,
+        two_phase::{Context, ContextBuilder, Participant},
         DieselScabbardStore, ScabbardStore, SqliteScabbardStoreFactory,
     };
 

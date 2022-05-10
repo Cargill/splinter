@@ -35,7 +35,7 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     event::ConsensusEvent,
-    two_phase::{event::Event, message::Message},
+    two_phase::{Event, Message},
 };
 
 use super::ScabbardStoreOperations;
