@@ -12,9 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "scabbardv3-consensus")]
+use std::convert::{TryFrom, TryInto as _};
+#[cfg(feature = "scabbardv3-consensus")]
+use std::time::SystemTime;
+
+#[cfg(feature = "scabbardv3-consensus")]
+use augrim::{error::InternalError, two_phase_commit::TwoPhaseCommitContext};
+
+#[cfg(feature = "scabbardv3-consensus")]
+use crate::service::v3::ScabbardProcess;
 use crate::store::scabbard_store::two_phase_commit::Context;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConsensusContext {
     TwoPhaseCommit(Context),
+}
+
+#[cfg(feature = "scabbardv3-consensus")]
+impl TryFrom<ConsensusContext> for TwoPhaseCommitContext<ScabbardProcess, SystemTime> {
+    type Error = InternalError;
+
+    fn try_from(ctx: ConsensusContext) -> Result<Self, Self::Error> {
+        match ctx {
+            ConsensusContext::TwoPhaseCommit(context) => context.try_into(),
+        }
+    }
+}
+
+#[cfg(feature = "scabbardv3-consensus")]
+impl TryFrom<TwoPhaseCommitContext<ScabbardProcess, SystemTime>> for ConsensusContext {
+    type Error = InternalError;
+
+    fn try_from(
+        ctx: TwoPhaseCommitContext<ScabbardProcess, SystemTime>,
+    ) -> Result<Self, Self::Error> {
+        ctx.try_into().map(Self::TwoPhaseCommit)
+    }
 }
