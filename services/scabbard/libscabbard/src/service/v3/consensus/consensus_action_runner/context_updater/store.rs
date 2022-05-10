@@ -56,11 +56,12 @@ impl<C: 'static> ContextUpdater<C> for ScabbardStoreContextUpdater<C> {
         &self,
         context: ConsensusContext,
         service_id: &FullyQualifiedServiceId,
-        _alarm: Option<SystemTime>,
+        alarm: Option<SystemTime>,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError> {
         Ok(vec![Box::new(UpdateContextCommand::new(
             context,
             service_id.clone(),
+            alarm,
             self.store_factory.clone(),
         ))])
     }
