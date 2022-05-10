@@ -41,7 +41,7 @@ use crate::store::scabbard_store::{
         action::{Action, ConsensusActionNotification},
         message::Scabbard2pcMessage,
     },
-    ConsensusContext, ScabbardConsensusAction,
+    ConsensusAction, ConsensusContext,
 };
 
 use super::ScabbardStoreOperations;
@@ -49,7 +49,7 @@ use super::ScabbardStoreOperations;
 pub(in crate::store::scabbard_store::diesel) trait AddActionOperation {
     fn add_consensus_action(
         &self,
-        action: ScabbardConsensusAction,
+        action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<i64, ScabbardStoreError>;
@@ -59,12 +59,12 @@ pub(in crate::store::scabbard_store::diesel) trait AddActionOperation {
 impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
     fn add_consensus_action(
         &self,
-        action: ScabbardConsensusAction,
+        action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let ScabbardConsensusAction::Scabbard2pcConsensusAction(action) = action;
+            let ConsensusAction::TwoPhaseCommit(action) = action;
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
@@ -202,12 +202,12 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
     fn add_consensus_action(
         &self,
-        action: ScabbardConsensusAction,
+        action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let ScabbardConsensusAction::Scabbard2pcConsensusAction(action) = action;
+            let ConsensusAction::TwoPhaseCommit(action) = action;
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;

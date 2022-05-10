@@ -22,7 +22,7 @@ use crate::store::scabbard_store::{
     commit::CommitEntry,
     event::{ConsensusEvent, IdentifiedConsensusEvent},
     service::ScabbardService,
-    ConsensusContext, ScabbardConsensusAction,
+    ConsensusAction, ConsensusContext,
 };
 
 use super::ScabbardStore;
@@ -63,13 +63,13 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     ///
     /// # Arguments
     ///
-    /// * `action` - The `ScabbardConsensusAction` to be added to the database
+    /// * `action` - The `ConsensusAction` to be added to the database
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the action
     ///    belongs to
     /// * `epoch` - The epoch that the given action belongs to
     fn add_consensus_action(
         &self,
-        action: ScabbardConsensusAction,
+        action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<i64, ScabbardStoreError> {

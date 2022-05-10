@@ -66,7 +66,7 @@ mod tests {
     use crate::store::PooledSqliteScabbardStoreFactory;
     use crate::store::ScabbardStore;
     use crate::store::{
-        action::ScabbardConsensusAction,
+        action::ConsensusAction,
         context::ConsensusContext,
         two_phase::{
             action::{Action, ConsensusActionNotification},
@@ -149,8 +149,7 @@ mod tests {
             .expect("failed to add context to store");
 
         let notification = ConsensusActionNotification::RequestForStart();
-        let action =
-            ScabbardConsensusAction::Scabbard2pcConsensusAction(Action::Notify(notification));
+        let action = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
 
         // add an unexecuted action for the first service
         let action_id = store
@@ -197,8 +196,7 @@ mod tests {
 
         let notification2 =
             ConsensusActionNotification::MessageDropped("test dropped message".to_string());
-        let action2 =
-            ScabbardConsensusAction::Scabbard2pcConsensusAction(Action::Notify(notification2));
+        let action2 = ConsensusAction::TwoPhaseCommit(Action::Notify(notification2));
 
         // add an unexecuted action for the second service
         let action_id2 = store

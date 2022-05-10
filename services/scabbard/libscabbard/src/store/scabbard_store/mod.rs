@@ -28,7 +28,7 @@ use std::time::SystemTime;
 
 pub(crate) use error::ScabbardStoreError;
 
-use action::{IdentifiedConsensusAction, ScabbardConsensusAction};
+use action::{ConsensusAction, IdentifiedConsensusAction};
 use commit::CommitEntry;
 use context::ConsensusContext;
 use event::{ConsensusEvent, IdentifiedConsensusEvent};
@@ -73,13 +73,13 @@ pub trait ScabbardStore {
     ///
     /// # Arguments
     ///
-    /// * `action` - The `ScabbardConsensusAction` to be added to the database
+    /// * `action` - The `ConsensusAction` to be added to the database
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the action
     ///    belongs to
     /// * `epoch` - The epoch that the given action belongs to
     fn add_consensus_action(
         &self,
-        action: ScabbardConsensusAction,
+        action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<i64, ScabbardStoreError>;

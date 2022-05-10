@@ -15,8 +15,8 @@
 use crate::store::scabbard_store::two_phase::action::Action;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ScabbardConsensusAction {
-    Scabbard2pcConsensusAction(Action),
+pub enum ConsensusAction {
+    TwoPhaseCommit(Action),
 }
 
 // A scabbard consensus action that includes the action ID associated with the action
@@ -26,12 +26,9 @@ pub enum IdentifiedConsensusAction {
 }
 
 impl IdentifiedConsensusAction {
-    pub fn deconstruct(self) -> (i64, ScabbardConsensusAction) {
+    pub fn deconstruct(self) -> (i64, ConsensusAction) {
         match self {
-            Self::Scabbard2pcConsensusAction(id, action) => (
-                id,
-                ScabbardConsensusAction::Scabbard2pcConsensusAction(action),
-            ),
+            Self::TwoPhaseCommit(id, action) => (id, ConsensusAction::TwoPhaseCommit(action)),
         }
     }
 }

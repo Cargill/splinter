@@ -190,7 +190,7 @@ mod tests {
     use crate::migrations::run_sqlite_migrations;
     use crate::store::pool::ConnectionPool;
     use crate::store::{
-        action::ScabbardConsensusAction,
+        action::ConsensusAction,
         context::ConsensusContext,
         service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus},
         two_phase::action::ConsensusActionNotification,
@@ -432,7 +432,7 @@ mod tests {
         // add actions
         scabbard_store
             .add_consensus_action(
-                ScabbardConsensusAction::Scabbard2pcConsensusAction(Action::Update(
+                ConsensusAction::TwoPhaseCommit(Action::Update(
                     ConsensusContext::TwoPhaseCommit(context),
                     Some(SystemTime::now()),
                 )),
@@ -443,7 +443,7 @@ mod tests {
 
         scabbard_store
             .add_consensus_action(
-                ScabbardConsensusAction::Scabbard2pcConsensusAction(Action::SendMessage(
+                ConsensusAction::TwoPhaseCommit(Action::SendMessage(
                     peer_service_id.clone(),
                     Scabbard2pcMessage::DecisionRequest(1),
                 )),
@@ -454,7 +454,7 @@ mod tests {
 
         scabbard_store
             .add_consensus_action(
-                ScabbardConsensusAction::Scabbard2pcConsensusAction(Action::Notify(
+                ConsensusAction::TwoPhaseCommit(Action::Notify(
                     ConsensusActionNotification::RequestForStart(),
                 )),
                 &service_fqsi,
