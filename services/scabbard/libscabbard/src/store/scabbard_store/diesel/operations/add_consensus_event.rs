@@ -58,7 +58,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let ConsensusEvent::Scabbard2pcConsensusEvent(event) = event;
+            let ConsensusEvent::TwoPhaseCommit(event) = event;
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
@@ -183,7 +183,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let ConsensusEvent::Scabbard2pcConsensusEvent(event) = event;
+            let ConsensusEvent::TwoPhaseCommit(event) = event;
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;

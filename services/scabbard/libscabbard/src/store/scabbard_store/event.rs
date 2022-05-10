@@ -16,7 +16,7 @@ use crate::store::scabbard_store::two_phase::event::Event;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConsensusEvent {
-    Scabbard2pcConsensusEvent(Event),
+    TwoPhaseCommit(Event),
 }
 
 // A scabbard consensus event that includes the event ID associated with the event

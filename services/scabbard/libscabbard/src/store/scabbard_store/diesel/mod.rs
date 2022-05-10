@@ -1543,7 +1543,7 @@ pub mod tests {
             .add_consensus_context(&participant_fqsi, context)
             .expect("failed to add context");
 
-        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Event::Deliver(
+        let event = ConsensusEvent::TwoPhaseCommit(Event::Deliver(
             participant2_fqsi.service_id().clone(),
             Scabbard2pcMessage::DecisionRequest(1),
         ));
@@ -1602,7 +1602,7 @@ pub mod tests {
             .add_consensus_context(&participant_fqsi, context)
             .expect("failed to add context");
 
-        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Event::Deliver(
+        let event = ConsensusEvent::TwoPhaseCommit(Event::Deliver(
             participant2_fqsi.service_id().clone(),
             Scabbard2pcMessage::DecisionRequest(1),
         ));
@@ -1664,7 +1664,7 @@ pub mod tests {
             .add_consensus_context(&participant_fqsi, context)
             .expect("failed to add context");
 
-        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Event::Deliver(
+        let event = ConsensusEvent::TwoPhaseCommit(Event::Deliver(
             participant2_fqsi.service_id().clone(),
             Scabbard2pcMessage::DecisionRequest(1),
         ));
@@ -1689,7 +1689,7 @@ pub mod tests {
             )
         );
 
-        let event2 = ConsensusEvent::Scabbard2pcConsensusEvent(Event::Alarm());
+        let event2 = ConsensusEvent::TwoPhaseCommit(Event::Alarm());
 
         let event_id2 = store
             .add_consensus_event(&participant_fqsi, 1, event2)

@@ -95,7 +95,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                     self.store_factory.clone(),
                     service_id.clone(),
                     epoch,
-                    ConsensusEvent::Scabbard2pcConsensusEvent(Event::Start(s.into_bytes())),
+                    ConsensusEvent::TwoPhaseCommit(Event::Start(s.into_bytes())),
                 )));
                 commands.push(Box::new(AddCommitEntryCommand::new(
                     self.store_factory.clone(),
@@ -108,7 +108,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                     self.store_factory.clone(),
                     service_id.clone(),
                     epoch,
-                    ConsensusEvent::Scabbard2pcConsensusEvent(Event::Vote(true)),
+                    ConsensusEvent::TwoPhaseCommit(Event::Vote(true)),
                 )));
             }
             // vote on a the provided value
@@ -128,7 +128,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                     self.store_factory.clone(),
                     service_id.clone(),
                     epoch,
-                    ConsensusEvent::Scabbard2pcConsensusEvent(Event::Vote(true)),
+                    ConsensusEvent::TwoPhaseCommit(Event::Vote(true)),
                 )));
                 commands.push(Box::new(AddCommitEntryCommand::new(
                     self.store_factory.clone(),
