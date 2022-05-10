@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod action;
+pub mod alarm;
 mod boxed;
 pub mod commit;
 pub mod context;
