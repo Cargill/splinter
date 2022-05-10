@@ -15,6 +15,6 @@
 use crate::store::scabbard_store::two_phase::context::Context;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ScabbardContext {
-    Scabbard2pcContext(Context),
+pub enum ConsensusContext {
+    TwoPhaseCommit(Context),
 }

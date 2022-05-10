@@ -36,7 +36,7 @@ use crate::store::scabbard_store::{
     commit::CommitEntry,
     event::{ConsensusEvent, IdentifiedConsensusEvent},
     service::ScabbardService,
-    ScabbardConsensusAction, ScabbardContext,
+    ConsensusContext, ScabbardConsensusAction,
 };
 
 use super::ScabbardStore;
@@ -88,7 +88,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).add_consensus_context(service_id, context)
@@ -98,7 +98,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_context(service_id, context)
@@ -227,7 +227,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).get_current_consensus_context(service_id)
         })
@@ -249,7 +249,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).add_consensus_context(service_id, context)
@@ -259,7 +259,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_context(service_id, context)
@@ -388,7 +388,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).get_current_consensus_context(service_id)
         })
@@ -428,7 +428,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).add_consensus_context(service_id, context)
     }
@@ -436,7 +436,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_context(service_id, context)
     }
@@ -543,7 +543,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).get_current_consensus_context(service_id)
     }
     /// Remove existing service
@@ -561,7 +561,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).add_consensus_context(service_id, context)
     }
@@ -569,7 +569,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_context(service_id, context)
     }
@@ -675,7 +675,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).get_current_consensus_context(service_id)
     }
     /// Remove existing service
@@ -745,7 +745,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         assert!(store
             .add_consensus_context(&coordinator_fqsi, context)
@@ -763,7 +763,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         assert!(store
             .add_consensus_context(&coordinator_fqsi, context)
@@ -802,7 +802,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
             .add_consensus_context(&coordinator_fqsi, context)
@@ -857,7 +857,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
             .add_consensus_context(&coordinator_fqsi, context)
@@ -893,7 +893,7 @@ pub mod tests {
             .expect("failed to build update context");
 
         let action2 = ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Update(
-            ScabbardContext::Scabbard2pcContext(update_context),
+            ConsensusContext::TwoPhaseCommit(update_context),
             None,
         ));
 
@@ -933,7 +933,7 @@ pub mod tests {
             IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
                 action_id2,
                 ConsensusAction::Update(
-                    ScabbardContext::Scabbard2pcContext(expected_update_context),
+                    ConsensusContext::TwoPhaseCommit(expected_update_context),
                     None,
                 )
             )
@@ -974,7 +974,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
             .add_consensus_context(&coordinator_fqsi, context)
@@ -1007,7 +1007,7 @@ pub mod tests {
         assert!(store
             .update_consensus_context(
                 &coordinator_fqsi,
-                ScabbardContext::Scabbard2pcContext(update_context)
+                ConsensusContext::TwoPhaseCommit(update_context)
             )
             .is_ok());
 
@@ -1027,7 +1027,7 @@ pub mod tests {
         assert!(store
             .update_consensus_context(
                 &coordinator_fqsi,
-                ScabbardContext::Scabbard2pcContext(bad_update_context)
+                ConsensusContext::TwoPhaseCommit(bad_update_context)
             )
             .is_err());
     }
@@ -1065,7 +1065,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
             .add_consensus_context(&coordinator_fqsi, context)
@@ -1095,7 +1095,7 @@ pub mod tests {
             .build()
             .expect("failed to build update context");
         let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Update(
-            ScabbardContext::Scabbard2pcContext(update_context),
+            ConsensusContext::TwoPhaseCommit(update_context),
             None,
         ));
 
@@ -1192,7 +1192,7 @@ pub mod tests {
             .build()
             .expect("failed to build context");
 
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
             .add_consensus_context(&service_fqsi, context)
@@ -1231,7 +1231,7 @@ pub mod tests {
         store
             .update_consensus_context(
                 &service_fqsi,
-                ScabbardContext::Scabbard2pcContext(update_context),
+                ConsensusContext::TwoPhaseCommit(update_context),
             )
             .expect("failed to update context");
 
@@ -1475,7 +1475,7 @@ pub mod tests {
             .build()
             .expect("failed to build context");
 
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
             .add_consensus_context(&service_fqsi, context)
@@ -1543,7 +1543,7 @@ pub mod tests {
             .with_this_process(participant_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(participant_context);
+        let context = ConsensusContext::TwoPhaseCommit(participant_context);
 
         store
             .add_consensus_context(&participant_fqsi, context)
@@ -1602,7 +1602,7 @@ pub mod tests {
             .with_this_process(participant_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(participant_context);
+        let context = ConsensusContext::TwoPhaseCommit(participant_context);
 
         store
             .add_consensus_context(&participant_fqsi, context)
@@ -1664,7 +1664,7 @@ pub mod tests {
             .with_this_process(participant_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(participant_context);
+        let context = ConsensusContext::TwoPhaseCommit(participant_context);
 
         store
             .add_consensus_context(&participant_fqsi, context)
@@ -1811,7 +1811,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
             .add_consensus_context(&coordinator_fqsi, context.clone())
@@ -1829,7 +1829,7 @@ pub mod tests {
             .with_this_process(participant_service_id.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context2 = ScabbardContext::Scabbard2pcContext(participant_context);
+        let context2 = ConsensusContext::TwoPhaseCommit(participant_context);
 
         store
             .add_consensus_context(&participant_service_id.clone(), context2.clone())
@@ -1859,7 +1859,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context3 = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context3 = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
             .add_consensus_context(&coordinator_fqsi, context3.clone())
@@ -1883,7 +1883,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context4 = ScabbardContext::Scabbard2pcContext(participant_context);
+        let context4 = ConsensusContext::TwoPhaseCommit(participant_context);
 
         store
             .add_consensus_context(&coordinator_fqsi.clone(), context4.clone())
@@ -1949,7 +1949,7 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
             .add_consensus_context(&coordinator_fqsi, context.clone())

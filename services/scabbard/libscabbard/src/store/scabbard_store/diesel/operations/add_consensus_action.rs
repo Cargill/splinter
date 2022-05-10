@@ -41,7 +41,7 @@ use crate::store::scabbard_store::{
         action::{ConsensusAction, ConsensusActionNotification},
         message::Scabbard2pcMessage,
     },
-    ScabbardConsensusAction, ScabbardContext,
+    ConsensusContext, ScabbardConsensusAction,
 };
 
 use super::ScabbardStoreOperations;
@@ -114,7 +114,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
             match action {
                 ConsensusAction::Update(context, alarm) => match context {
-                    ScabbardContext::Scabbard2pcContext(context) => {
+                    ConsensusContext::TwoPhaseCommit(context) => {
                         let action_alarm = get_timestamp(alarm)?;
 
                         let update_context_action = Consensus2pcUpdateContextActionModel::try_from(
@@ -254,7 +254,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
 
             match action {
                 ConsensusAction::Update(context, alarm) => match context {
-                    ScabbardContext::Scabbard2pcContext(context) => {
+                    ConsensusContext::TwoPhaseCommit(context) => {
                         let action_alarm = get_timestamp(alarm)?;
 
                         let update_context_action = Consensus2pcUpdateContextActionModel::try_from(

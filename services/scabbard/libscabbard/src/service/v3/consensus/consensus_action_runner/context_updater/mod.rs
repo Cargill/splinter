@@ -25,7 +25,7 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
-use crate::store::context::ScabbardContext;
+use crate::store::context::ConsensusContext;
 
 pub use store::ScabbardStoreContextUpdater;
 
@@ -40,7 +40,7 @@ pub trait ContextUpdater<C> {
     /// * `alarm` - The alarm to update
     fn update(
         &self,
-        context: ScabbardContext,
+        context: ConsensusContext,
         service_id: &FullyQualifiedServiceId,
         alarm: Option<SystemTime>,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError>;

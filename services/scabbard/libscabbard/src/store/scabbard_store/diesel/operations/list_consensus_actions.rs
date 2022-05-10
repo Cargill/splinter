@@ -41,7 +41,7 @@ use crate::store::scabbard_store::{
         message::Scabbard2pcMessage,
         state::Scabbard2pcState,
     },
-    IdentifiedScabbardConsensusAction, ScabbardContext,
+    ConsensusContext, IdentifiedScabbardConsensusAction,
 };
 
 use super::ScabbardStoreOperations;
@@ -258,7 +258,7 @@ where
                 let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
                     update_context.action_id,
                     ConsensusAction::Update(
-                        ScabbardContext::Scabbard2pcContext(context),
+                        ConsensusContext::TwoPhaseCommit(context),
                         action_alarm,
                     ),
                 );

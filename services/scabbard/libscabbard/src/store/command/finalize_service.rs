@@ -19,7 +19,7 @@ use splinter::{
     error::InternalError, service::FullyQualifiedServiceId, store::command::StoreCommand,
 };
 
-use crate::store::{context::ScabbardContext, service::ServiceStatus, ScabbardStoreFactory};
+use crate::store::{context::ConsensusContext, service::ServiceStatus, ScabbardStoreFactory};
 
 pub struct ScabbardFinalizeServiceCommand<C> {
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,
@@ -66,7 +66,7 @@ impl<C> StoreCommand for ScabbardFinalizeServiceCommand<C> {
             })?;
 
         context = match context {
-            ScabbardContext::Scabbard2pcContext(context) => ScabbardContext::Scabbard2pcContext(
+            ConsensusContext::TwoPhaseCommit(context) => ConsensusContext::TwoPhaseCommit(
                 context
                     .into_builder()
                     .with_alarm(alarm)

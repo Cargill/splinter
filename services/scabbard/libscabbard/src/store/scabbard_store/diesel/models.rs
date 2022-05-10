@@ -20,7 +20,7 @@ use splinter::service::{FullyQualifiedServiceId, ServiceId};
 
 use crate::store::scabbard_store::{
     commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision},
-    context::ScabbardContext,
+    context::ConsensusContext,
     service::{ConsensusType, ScabbardService, ServiceStatus},
     two_phase::{
         action::ConsensusActionNotification,
@@ -226,7 +226,7 @@ impl
     TryFrom<(
         &Consensus2pcContextModel,
         Vec<Consensus2pcContextParticipantModel>,
-    )> for ScabbardContext
+    )> for ConsensusContext
 {
     type Error = InternalError;
 
@@ -275,7 +275,7 @@ impl
                         })?
                 } else {
                     return Err(InternalError::with_message(
-                        "Failed to convert to ScabbardContext, context has state 'voting' but \
+                        "Failed to convert to ConsensusContext, context has state 'voting' but \
                         no vote timeout start time set"
                             .to_string(),
                     ));
@@ -297,14 +297,14 @@ impl
                     })
                     .ok_or_else(|| {
                         InternalError::with_message(
-                        "Failed to convert to ScabbardContext, context has state 'voted' but vote \
+                        "Failed to convert to ConsensusContext, context has state 'voted' but vote \
                         is unset"
                         .to_string(),
                     )
                     })?
                     .ok_or_else(|| {
                         InternalError::with_message(
-                            "Failed to convert to ScabbardContext, context has state 'voted' but \
+                            "Failed to convert to ConsensusContext, context has state 'voted' but \
                         an invalid vote response was found"
                                 .to_string(),
                         )
@@ -320,7 +320,7 @@ impl
                         })?
                 } else {
                     return Err(InternalError::with_message(
-                        "Failed to convert to ScabbardContext, context has state 'voted' but \
+                        "Failed to convert to ConsensusContext, context has state 'voted' but \
                         'decision_timeout_start' is unset"
                             .to_string(),
                     ));
@@ -332,7 +332,7 @@ impl
             }
             _ => {
                 return Err(InternalError::with_message(
-                    "Failed to convert to ScabbardContext, invalid state value found".to_string(),
+                    "Failed to convert to ConsensusContext, invalid state value found".to_string(),
                 ))
             }
         };
@@ -357,7 +357,7 @@ impl
         let context = builder
             .build()
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
-        Ok(ScabbardContext::Scabbard2pcContext(context))
+        Ok(ConsensusContext::TwoPhaseCommit(context))
     }
 }
 

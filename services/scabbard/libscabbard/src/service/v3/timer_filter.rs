@@ -67,7 +67,7 @@ mod tests {
     use crate::store::ScabbardStore;
     use crate::store::{
         action::ScabbardConsensusAction,
-        context::ScabbardContext,
+        context::ConsensusContext,
         two_phase::{
             action::{ConsensusAction, ConsensusActionNotification},
             context::{ContextBuilder, Participant},
@@ -141,7 +141,7 @@ mod tests {
             .build()
             .expect("failed to build context");
 
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         // add a coordinator context for the first service
         store
@@ -182,7 +182,7 @@ mod tests {
             .with_this_process(fqsi2.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context2 = ScabbardContext::Scabbard2pcContext(participant_context);
+        let context2 = ConsensusContext::TwoPhaseCommit(participant_context);
 
         // add a context for the second service
         store
@@ -233,7 +233,7 @@ mod tests {
 
         // reset the alarms for both services to far in the future
         store
-            .update_consensus_context(&fqsi2, ScabbardContext::Scabbard2pcContext(update_context2))
+            .update_consensus_context(&fqsi2, ConsensusContext::TwoPhaseCommit(update_context2))
             .expect("failed to update context");
 
         let updated_alarm = SystemTime::now()
@@ -254,7 +254,7 @@ mod tests {
             .expect("failed to build context");
 
         store
-            .update_consensus_context(&fqsi, ScabbardContext::Scabbard2pcContext(update_context1))
+            .update_consensus_context(&fqsi, ConsensusContext::TwoPhaseCommit(update_context1))
             .expect("failed to update context");
 
         // update the second service's action's executed_at time so that it appears to have

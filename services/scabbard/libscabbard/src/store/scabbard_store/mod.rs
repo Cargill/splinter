@@ -30,7 +30,7 @@ pub(crate) use error::ScabbardStoreError;
 
 use action::{IdentifiedScabbardConsensusAction, ScabbardConsensusAction};
 use commit::CommitEntry;
-use context::ScabbardContext;
+use context::ConsensusContext;
 use event::{ConsensusEvent, IdentifiedConsensusEvent};
 use service::ScabbardService;
 use splinter::service::FullyQualifiedServiceId;
@@ -48,11 +48,11 @@ pub trait ScabbardStore {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the context
     ///    belongs to
-    /// * `context` - The `ScabbardContext` to be added to the database
+    /// * `context` - The `ConsensusContext` to be added to the database
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError>;
 
     /// Update an existing context
@@ -62,11 +62,11 @@ pub trait ScabbardStore {
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the context
     ///    belongs to
     ///    context
-    /// * `context` - The `ScabbardContext` to be updated in the database
+    /// * `context` - The `ConsensusContext` to be updated in the database
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError>;
 
     /// Add a 2 phase commit coordinator action
@@ -220,7 +220,7 @@ pub trait ScabbardStore {
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-    ) -> Result<Option<ScabbardContext>, ScabbardStoreError>;
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError>;
 
     /// Removes a scabbard service and all of its associated state
     ///

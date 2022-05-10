@@ -191,7 +191,7 @@ mod tests {
     use crate::store::pool::ConnectionPool;
     use crate::store::{
         action::ScabbardConsensusAction,
-        context::ScabbardContext,
+        context::ConsensusContext,
         service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus},
         two_phase::action::ConsensusActionNotification,
         two_phase::context::{Context, ContextBuilder, Participant},
@@ -419,7 +419,7 @@ mod tests {
         scabbard_store
             .add_consensus_context(
                 &service_fqsi,
-                ScabbardContext::Scabbard2pcContext(context.clone()),
+                ConsensusContext::TwoPhaseCommit(context.clone()),
             )
             .expect("unable to add context to scabbard store");
 
@@ -433,7 +433,7 @@ mod tests {
         scabbard_store
             .add_consensus_action(
                 ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Update(
-                    ScabbardContext::Scabbard2pcContext(context),
+                    ConsensusContext::TwoPhaseCommit(context),
                     Some(SystemTime::now()),
                 )),
                 &service_fqsi,
@@ -482,7 +482,7 @@ mod tests {
             .expect("unable to get commit entry")
             .expect("No commit entry returned")
         {
-            ScabbardContext::Scabbard2pcContext(context) => context,
+            ConsensusContext::TwoPhaseCommit(context) => context,
         };
 
         assert!(updated_context.alarm().is_some());

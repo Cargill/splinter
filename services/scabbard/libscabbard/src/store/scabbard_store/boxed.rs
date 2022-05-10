@@ -22,7 +22,7 @@ use crate::store::scabbard_store::{
     commit::CommitEntry,
     event::{ConsensusEvent, IdentifiedConsensusEvent},
     service::ScabbardService,
-    ScabbardConsensusAction, ScabbardContext,
+    ConsensusContext, ScabbardConsensusAction,
 };
 
 use super::ScabbardStore;
@@ -34,11 +34,11 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the context
     ///    belongs to
-    /// * `context` - The `ScabbardContext` to be added to the database
+    /// * `context` - The `ConsensusContext` to be added to the database
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         (&**self).add_consensus_context(service_id, context)
     }
@@ -50,11 +50,11 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the context
     ///    belongs to
     ///    context
-    /// * `context` - The `ScabbardContext` to be updated in the database
+    /// * `context` - The `ConsensusContext` to be updated in the database
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         (&**self).update_consensus_context(service_id, context)
     }
@@ -236,7 +236,7 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError> {
         (&**self).get_current_consensus_context(service_id)
     }
 
