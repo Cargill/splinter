@@ -704,7 +704,7 @@ pub mod tests {
             context::{ContextBuilder, Participant},
             event::Event,
             message::Scabbard2pcMessage,
-            state::Scabbard2pcState,
+            state::State,
         },
     };
 
@@ -741,7 +741,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -759,7 +759,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -798,7 +798,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -851,7 +851,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -883,7 +883,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::Voting { vote_timeout_start })
+            .with_state(State::Voting { vote_timeout_start })
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build update context");
@@ -912,7 +912,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::Voting { vote_timeout_start })
+            .with_state(State::Voting { vote_timeout_start })
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build update context");
@@ -966,7 +966,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -995,7 +995,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::Voting { vote_timeout_start })
+            .with_state(State::Voting { vote_timeout_start })
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build update context");
@@ -1015,7 +1015,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::Voting { vote_timeout_start })
+            .with_state(State::Voting { vote_timeout_start })
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build update context");
@@ -1057,7 +1057,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1086,7 +1086,7 @@ pub mod tests {
                 process: participant_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::Voting { vote_timeout_start })
+            .with_state(State::Voting { vote_timeout_start })
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build update context");
@@ -1183,7 +1183,7 @@ pub mod tests {
                 process: peer_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1216,7 +1216,7 @@ pub mod tests {
                 process: peer_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1464,7 +1464,7 @@ pub mod tests {
                 process: peer_service_id.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1533,7 +1533,7 @@ pub mod tests {
                     vote: None,
                 },
             ])
-            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_state(State::WaitingForVoteRequest)
             .with_this_process(participant_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1592,7 +1592,7 @@ pub mod tests {
                     vote: None,
                 },
             ])
-            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_state(State::WaitingForVoteRequest)
             .with_this_process(participant_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1654,7 +1654,7 @@ pub mod tests {
                     vote: None,
                 },
             ])
-            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_state(State::WaitingForVoteRequest)
             .with_this_process(participant_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1795,7 +1795,7 @@ pub mod tests {
                 process: participant_service_id.service_id().clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1813,7 +1813,7 @@ pub mod tests {
                 process: participant_service_id.service_id().clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_state(State::WaitingForVoteRequest)
             .with_this_process(participant_service_id.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1843,7 +1843,7 @@ pub mod tests {
                 process: participant_service_id.service_id().clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1867,7 +1867,7 @@ pub mod tests {
                 process: coordinator_fqsi.service_id().clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_state(State::WaitingForVoteRequest)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -1933,7 +1933,7 @@ pub mod tests {
                 process: participant_service_id.service_id().clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build context");

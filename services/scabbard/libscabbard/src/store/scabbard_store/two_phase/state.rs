@@ -15,7 +15,7 @@
 use std::time::SystemTime;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Scabbard2pcState {
+pub enum State {
     Abort,
     Commit,
     Voted {

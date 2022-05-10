@@ -21,7 +21,7 @@ use crate::store::{
     service::ScabbardService,
     two_phase::{
         context::{Context, ContextBuilder, Participant},
-        state::Scabbard2pcState,
+        state::State,
     },
     ScabbardStoreFactory,
 };
@@ -78,9 +78,9 @@ fn create_context(service: &ScabbardService) -> Result<Context, InternalError> {
     })?;
 
     let state = if service.service_id().service_id() == &coordinator {
-        Scabbard2pcState::WaitingForStart
+        State::WaitingForStart
     } else {
-        Scabbard2pcState::WaitingForVoteRequest
+        State::WaitingForVoteRequest
     };
     ContextBuilder::default()
         .with_coordinator(&coordinator)

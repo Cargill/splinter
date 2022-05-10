@@ -39,7 +39,7 @@ use crate::store::scabbard_store::{
         action::{Action, ConsensusActionNotification},
         context::{ContextBuilder, Participant},
         message::Scabbard2pcMessage,
-        state::Scabbard2pcState,
+        state::State,
     },
     ConsensusContext, IdentifiedConsensusAction,
 };
@@ -158,7 +158,7 @@ where
                 }
 
                 let state = match update_context.state.as_str() {
-                    "WAITINGFORSTART" => Scabbard2pcState::WaitingForStart,
+                    "WAITINGFORSTART" => State::WaitingForStart,
                     "VOTING" => {
                         let vote_timeout_start = get_system_time(
                             update_context.vote_timeout_start,
@@ -170,11 +170,11 @@ where
                                     .to_string(),
                             ))
                         })?;
-                        Scabbard2pcState::Voting { vote_timeout_start }
+                        State::Voting { vote_timeout_start }
                     }
-                    "WAITINGFORVOTE" => Scabbard2pcState::WaitingForVote,
-                    "ABORT" => Scabbard2pcState::Abort,
-                    "COMMIT" => Scabbard2pcState::Commit,
+                    "WAITINGFORVOTE" => State::WaitingForVote,
+                    "ABORT" => State::Abort,
+                    "COMMIT" => State::Commit,
                     "VOTED" => {
                         let decision_timeout_start = get_system_time(
                             update_context.decision_timeout_start,
@@ -207,12 +207,12 @@ where
                                         .to_string(),
                                 ))
                             })?;
-                        Scabbard2pcState::Voted {
+                        State::Voted {
                             vote,
                             decision_timeout_start,
                         }
                     }
-                    "WAITINGFORVOTEREQUEST" => Scabbard2pcState::WaitingForVoteRequest,
+                    "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
                     _ => {
                         return Err(ScabbardStoreError::Internal(InternalError::with_message(
                             "Failed to list actions, invalid state value found".to_string(),

@@ -71,7 +71,7 @@ mod tests {
         two_phase::{
             action::{Action, ConsensusActionNotification},
             context::{ContextBuilder, Participant},
-            state::Scabbard2pcState,
+            state::State,
         },
     };
 
@@ -136,7 +136,7 @@ mod tests {
                 process: peer_service1.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -176,7 +176,7 @@ mod tests {
                 process: peer_service1.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_state(State::WaitingForVoteRequest)
             .with_this_process(fqsi2.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -222,7 +222,7 @@ mod tests {
                 process: peer_service1.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_state(State::WaitingForVoteRequest)
             .with_this_process(fqsi2.clone().service_id())
             .build()
             .expect("failed to build context");
@@ -244,7 +244,7 @@ mod tests {
                 process: peer_service1.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(fqsi.clone().service_id())
             .build()
             .expect("failed to build context");

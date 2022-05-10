@@ -196,7 +196,7 @@ mod tests {
         two_phase::action::ConsensusActionNotification,
         two_phase::context::{Context, ContextBuilder, Participant},
         two_phase::message::Scabbard2pcMessage,
-        two_phase::state::Scabbard2pcState,
+        two_phase::state::State,
         DieselScabbardStore, ScabbardStore, SqliteScabbardStoreFactory,
     };
 
@@ -310,7 +310,7 @@ mod tests {
                         })
                         .collect(),
                 )
-                .with_state(Scabbard2pcState::WaitingForStart)
+                .with_state(State::WaitingForStart)
                 .with_this_process(service.service_id().clone().service_id())
                 .build()
                 .map_err(|err| InternalError::from_source(Box::new(err)))
@@ -328,7 +328,7 @@ mod tests {
                         })
                         .collect(),
                 )
-                .with_state(Scabbard2pcState::WaitingForVoteRequest)
+                .with_state(State::WaitingForVoteRequest)
                 .with_this_process(service.service_id().clone().service_id())
                 .build()
                 .map_err(|err| InternalError::from_source(Box::new(err)))

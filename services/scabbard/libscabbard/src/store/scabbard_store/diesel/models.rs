@@ -27,7 +27,7 @@ use crate::store::scabbard_store::{
         context::{Context, ContextBuilder, Participant},
         event::Event,
         message::Scabbard2pcMessage,
-        state::Scabbard2pcState,
+        state::State,
     },
 };
 
@@ -262,7 +262,7 @@ impl
         let participants = ParticipantList::try_from(participants)?.inner;
 
         let state = match context.state.as_str() {
-            "WAITINGFORSTART" => Scabbard2pcState::WaitingForStart,
+            "WAITINGFORSTART" => State::WaitingForStart,
             "VOTING" => {
                 let vote_timeout_start = if let Some(t) = context.vote_timeout_start {
                     SystemTime::UNIX_EPOCH
@@ -280,12 +280,12 @@ impl
                             .to_string(),
                     ));
                 };
-                Scabbard2pcState::Voting { vote_timeout_start }
+                State::Voting { vote_timeout_start }
             }
-            "WAITINGFORVOTE" => Scabbard2pcState::WaitingForVote,
-            "ABORT" => Scabbard2pcState::Abort,
-            "COMMIT" => Scabbard2pcState::Commit,
-            "WAITINGFORVOTEREQUEST" => Scabbard2pcState::WaitingForVoteRequest,
+            "WAITINGFORVOTE" => State::WaitingForVote,
+            "ABORT" => State::Abort,
+            "COMMIT" => State::Commit,
+            "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
             "VOTED" => {
                 let vote = context
                     .vote
@@ -325,7 +325,7 @@ impl
                             .to_string(),
                     ));
                 };
-                Scabbard2pcState::Voted {
+                State::Voted {
                     vote,
                     decision_timeout_start,
                 }
@@ -375,7 +375,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
             .transpose()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
         let (vote_timeout_start, vote, decision_timeout_start) = match context.state() {
-            Scabbard2pcState::Voting { vote_timeout_start } => {
+            State::Voting { vote_timeout_start } => {
                 let time = i64::try_from(
                     vote_timeout_start
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -385,7 +385,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;
                 (Some(time), None, None)
             }
-            Scabbard2pcState::Voted {
+            State::Voted {
                 vote,
                 decision_timeout_start,
             } => {
@@ -550,7 +550,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
             .transpose()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
         let (vote_timeout_start, vote, decision_timeout_start) = match context.state() {
-            Scabbard2pcState::Voting { vote_timeout_start } => {
+            State::Voting { vote_timeout_start } => {
                 let time = i64::try_from(
                     vote_timeout_start
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -560,7 +560,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;
                 (Some(time), None, None)
             }
-            Scabbard2pcState::Voted {
+            State::Voted {
                 vote,
                 decision_timeout_start,
             } => {
@@ -679,16 +679,16 @@ pub struct Consensus2pcNotificationModel {
     pub request_for_vote_value: Option<Vec<u8>>,
 }
 
-impl From<&Scabbard2pcState> for String {
-    fn from(state: &Scabbard2pcState) -> Self {
+impl From<&State> for String {
+    fn from(state: &State) -> Self {
         match *state {
-            Scabbard2pcState::WaitingForStart => String::from("WAITINGFORSTART"),
-            Scabbard2pcState::Voting { .. } => String::from("VOTING"),
-            Scabbard2pcState::WaitingForVote => String::from("WAITINGFORVOTE"),
-            Scabbard2pcState::Abort => String::from("ABORT"),
-            Scabbard2pcState::Commit => String::from("COMMIT"),
-            Scabbard2pcState::WaitingForVoteRequest => String::from("WAITINGFORVOTEREQUEST"),
-            Scabbard2pcState::Voted { .. } => String::from("VOTED"),
+            State::WaitingForStart => String::from("WAITINGFORSTART"),
+            State::Voting { .. } => String::from("VOTING"),
+            State::WaitingForVote => String::from("WAITINGFORVOTE"),
+            State::Abort => String::from("ABORT"),
+            State::Commit => String::from("COMMIT"),
+            State::WaitingForVoteRequest => String::from("WAITINGFORVOTEREQUEST"),
+            State::Voted { .. } => String::from("VOTED"),
         }
     }
 }
