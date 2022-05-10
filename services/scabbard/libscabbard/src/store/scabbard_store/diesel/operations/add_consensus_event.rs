@@ -34,7 +34,7 @@ use crate::store::scabbard_store::diesel::{
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    event::ScabbardConsensusEvent,
+    event::ConsensusEvent,
     two_phase::{event::Scabbard2pcEvent, message::Scabbard2pcMessage},
 };
 
@@ -45,7 +45,7 @@ pub(in crate::store::scabbard_store::diesel) trait AddEventOperation {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError>;
 }
 
@@ -55,10 +55,10 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let ScabbardConsensusEvent::Scabbard2pcConsensusEvent(event) = event;
+            let ConsensusEvent::Scabbard2pcConsensusEvent(event) = event;
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
@@ -180,10 +180,10 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let ScabbardConsensusEvent::Scabbard2pcConsensusEvent(event) = event;
+            let ConsensusEvent::Scabbard2pcConsensusEvent(event) = event;
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;

@@ -15,21 +15,21 @@
 use crate::store::scabbard_store::two_phase::event::Scabbard2pcEvent;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ScabbardConsensusEvent {
+pub enum ConsensusEvent {
     Scabbard2pcConsensusEvent(Scabbard2pcEvent),
 }
 
 // A scabbard consensus event that includes the event ID associated with the event
 #[derive(Debug, PartialEq, Clone)]
-pub enum ReturnedScabbardConsensusEvent {
+pub enum IdentifiedConsensusEvent {
     Scabbard2pcConsensusEvent(i64, Scabbard2pcEvent),
 }
 
-impl ReturnedScabbardConsensusEvent {
-    pub fn deconstruct(self) -> (i64, ScabbardConsensusEvent) {
+impl IdentifiedConsensusEvent {
+    pub fn deconstruct(self) -> (i64, ConsensusEvent) {
         match self {
             Self::Scabbard2pcConsensusEvent(id, event) => {
-                (id, ScabbardConsensusEvent::Scabbard2pcConsensusEvent(event))
+                (id, ConsensusEvent::Scabbard2pcConsensusEvent(event))
             }
         }
     }

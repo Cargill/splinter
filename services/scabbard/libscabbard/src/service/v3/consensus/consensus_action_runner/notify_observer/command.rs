@@ -27,7 +27,7 @@ use crate::service::v3::consensus::consensus_action_runner::commands::notificati
 use crate::store::two_phase::action::ConsensusActionNotification;
 use crate::store::{
     commit::{CommitEntryBuilder, ConsensusDecision},
-    event::ScabbardConsensusEvent,
+    event::ConsensusEvent,
     two_phase::event::Scabbard2pcEvent,
 };
 use crate::store::{ScabbardStore, ScabbardStoreFactory};
@@ -95,7 +95,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                     self.store_factory.clone(),
                     service_id.clone(),
                     epoch,
-                    ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Start(
+                    ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Start(
                         s.into_bytes(),
                     )),
                 )));
@@ -110,7 +110,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                     self.store_factory.clone(),
                     service_id.clone(),
                     epoch,
-                    ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Vote(true)),
+                    ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Vote(true)),
                 )));
             }
             // vote on a the provided value
@@ -130,7 +130,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                     self.store_factory.clone(),
                     service_id.clone(),
                     epoch,
-                    ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Vote(true)),
+                    ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Vote(true)),
                 )));
                 commands.push(Box::new(AddCommitEntryCommand::new(
                     self.store_factory.clone(),

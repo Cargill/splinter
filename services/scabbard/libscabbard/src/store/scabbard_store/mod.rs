@@ -31,7 +31,7 @@ pub(crate) use error::ScabbardStoreError;
 use action::{IdentifiedScabbardConsensusAction, ScabbardConsensusAction};
 use commit::CommitEntry;
 use context::ScabbardContext;
-use event::{ReturnedScabbardConsensusEvent, ScabbardConsensusEvent};
+use event::{ConsensusEvent, IdentifiedConsensusEvent};
 use service::ScabbardService;
 use splinter::service::FullyQualifiedServiceId;
 
@@ -173,12 +173,12 @@ pub trait ScabbardStore {
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the event
     ///    belongs to
     /// * `epoch` - The epoch that the event belongs to
-    /// * `event` - The `ScabbardConsensusEvent` to be added
+    /// * `event` - The `ConsensusEvent` to be added
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError>;
 
     /// Update an existing consensus event
@@ -209,7 +209,7 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError>;
+    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError>;
 
     /// Get the current context for a given service
     ///

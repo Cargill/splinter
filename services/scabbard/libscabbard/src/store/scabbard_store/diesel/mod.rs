@@ -34,7 +34,7 @@ use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     action::IdentifiedScabbardConsensusAction,
     commit::CommitEntry,
-    event::{ReturnedScabbardConsensusEvent, ScabbardConsensusEvent},
+    event::{ConsensusEvent, IdentifiedConsensusEvent},
     service::ScabbardService,
     ScabbardConsensusAction, ScabbardContext,
 };
@@ -190,7 +190,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).add_consensus_event(service_id, epoch, event)
@@ -218,7 +218,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
         })
@@ -351,7 +351,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).add_consensus_event(service_id, epoch, event)
@@ -379,7 +379,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
         })
@@ -512,7 +512,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, epoch, event)
     }
@@ -536,7 +536,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
     }
     /// Get the current context for a given service
@@ -644,7 +644,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, epoch, event)
     }
@@ -668,7 +668,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
     }
     /// Get the current context for a given service
@@ -1549,7 +1549,7 @@ pub mod tests {
             .add_consensus_context(&participant_fqsi, context)
             .expect("failed to add context");
 
-        let event = ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
+        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
             participant2_fqsi.service_id().clone(),
             Scabbard2pcMessage::DecisionRequest(1),
         ));
@@ -1608,7 +1608,7 @@ pub mod tests {
             .add_consensus_context(&participant_fqsi, context)
             .expect("failed to add context");
 
-        let event = ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
+        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
             participant2_fqsi.service_id().clone(),
             Scabbard2pcMessage::DecisionRequest(1),
         ));
@@ -1670,7 +1670,7 @@ pub mod tests {
             .add_consensus_context(&participant_fqsi, context)
             .expect("failed to add context");
 
-        let event = ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
+        let event = ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Deliver(
             participant2_fqsi.service_id().clone(),
             Scabbard2pcMessage::DecisionRequest(1),
         ));
@@ -1686,7 +1686,7 @@ pub mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0],
-            ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                 event_id,
                 Scabbard2pcEvent::Deliver(
                     participant2_fqsi.service_id().clone(),
@@ -1695,7 +1695,7 @@ pub mod tests {
             )
         );
 
-        let event2 = ScabbardConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Alarm());
+        let event2 = ConsensusEvent::Scabbard2pcConsensusEvent(Scabbard2pcEvent::Alarm());
 
         let event_id2 = store
             .add_consensus_event(&participant_fqsi, 1, event2)
@@ -1708,7 +1708,7 @@ pub mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(
             events[0],
-            ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                 event_id,
                 Scabbard2pcEvent::Deliver(
                     participant2_fqsi.service_id().clone(),
@@ -1718,7 +1718,7 @@ pub mod tests {
         );
         assert_eq!(
             events[1],
-            ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                 event_id2,
                 Scabbard2pcEvent::Alarm()
             ),
@@ -1735,7 +1735,7 @@ pub mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0],
-            ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+            IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                 event_id2,
                 Scabbard2pcEvent::Alarm()
             ),

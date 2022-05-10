@@ -32,7 +32,7 @@ use crate::store::scabbard_store::diesel::{
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    event::ReturnedScabbardConsensusEvent,
+    event::IdentifiedConsensusEvent,
     two_phase::{event::Scabbard2pcEvent, message::Scabbard2pcMessage},
 };
 
@@ -43,7 +43,7 @@ pub(in crate::store::scabbard_store::diesel) trait ListEventsOperation {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError>;
+    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError>;
 }
 
 impl<'a, C> ListEventsOperation for ScabbardStoreOperations<'a, C>
@@ -58,7 +58,7 @@ where
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
@@ -113,14 +113,14 @@ where
                 .filter_map(|(id, position, event_type)| match event_type.as_str() {
                     "ALARM" => Some((
                         position,
-                        ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                        IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                             id,
                             Scabbard2pcEvent::Alarm(),
                         ),
                     )),
                     _ => None,
                 })
-                .collect::<Vec<(i32, ReturnedScabbardConsensusEvent)>>();
+                .collect::<Vec<(i32, IdentifiedConsensusEvent)>>();
 
             all_events.append(&mut alarm_events);
 
@@ -194,7 +194,7 @@ where
                         ))
                     }
                 };
-                let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                let event = IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                     deliver.event_id,
                     Scabbard2pcEvent::Deliver(process, message),
                 );
@@ -207,7 +207,7 @@ where
                         "Failed to list consensus events, invalid event ID".to_string(),
                     ))
                 })?;
-                let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                let event = IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                     start.event_id,
                     Scabbard2pcEvent::Start(start.value),
                 );
@@ -231,7 +231,7 @@ where
                         ))
                     }
                 };
-                let event = ReturnedScabbardConsensusEvent::Scabbard2pcConsensusEvent(
+                let event = IdentifiedConsensusEvent::Scabbard2pcConsensusEvent(
                     vote.event_id,
                     Scabbard2pcEvent::Vote(vote_decision),
                 );

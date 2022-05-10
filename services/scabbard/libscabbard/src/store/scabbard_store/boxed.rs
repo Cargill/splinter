@@ -20,7 +20,7 @@ use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     action::IdentifiedScabbardConsensusAction,
     commit::CommitEntry,
-    event::{ReturnedScabbardConsensusEvent, ScabbardConsensusEvent},
+    event::{ConsensusEvent, IdentifiedConsensusEvent},
     service::ScabbardService,
     ScabbardConsensusAction, ScabbardContext,
 };
@@ -183,12 +183,12 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the event
     ///    belongs to
     /// * `epoch` - The epoch that the event belongs to
-    /// * `event` - The `ScabbardConsensusEvent` to be added
+    /// * `event` - The `ConsensusEvent` to be added
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         (&**self).add_consensus_event(service_id, epoch, event)
     }
@@ -223,7 +223,7 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
         (&**self).list_consensus_events(service_id, epoch)
     }
 
