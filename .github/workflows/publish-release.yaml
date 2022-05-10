@@ -97,7 +97,6 @@ jobs:
           git fetch --tags --force
           ./ci/publish-docker
         env:
-          NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
           VERSION: AUTO_STRICT
           CARGO_TERM_COLOR: always
 

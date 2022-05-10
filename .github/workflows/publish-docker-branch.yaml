@@ -79,7 +79,6 @@ jobs:
       - name: Publish branch to dockerhub
         run: docker buildx ls && ./ci/publish-docker main
         env:
-          NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
           VERSION: AUTO_STRICT
           CARGO_TERM_COLOR: always
 
@@ -188,7 +187,6 @@ jobs:
       - name: Publish branch to dockerhub
         run: docker buildx ls && ./ci/publish-docker experimental
         env:
-          NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
           VERSION: AUTO_STRICT
           CARGO_TERM_COLOR: always
 

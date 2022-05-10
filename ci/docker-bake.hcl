@@ -39,14 +39,6 @@ variable "ISOLATION_ID" {
     default = "latest"
 }
 
-variable "NAMESPACE" {
-    default = ""
-}
-
-variable "REGISTRY" {
-    default = ""
-}
-
 variable "REPO_VERSION" {
     default = "0.7.1-dev"
 }
@@ -64,19 +56,19 @@ target "all" {
 target "scabbard-cli" {
     inherits = ["all"]
     dockerfile = "services/scabbard/cli/Dockerfile-installed-${DISTRO}"
-    tags = ["${REGISTRY}${NAMESPACE}scabbard-cli:${ISOLATION_ID}"]
+    tags = ["docker.io/splintercommunity/scabbard-cli:${ISOLATION_ID}"]
 }
 
 target "splinter-cli" {
     inherits = ["all"]
     dockerfile = "cli/Dockerfile-installed-${DISTRO}"
-    tags = ["${REGISTRY}${NAMESPACE}splinter-cli:${ISOLATION_ID}"]
+    tags = ["docker.io/splintercommunity/splinter-cli:${ISOLATION_ID}"]
 }
 
 target "splinterd" {
     inherits = ["all"]
     dockerfile = "splinterd/Dockerfile-installed-${DISTRO}"
-    tags = ["${REGISTRY}${NAMESPACE}splinterd:${ISOLATION_ID}"]
+    tags = ["docker.io/splintercommunity/splinterd:${ISOLATION_ID}"]
 }
 
 # --== gameroom ==--
@@ -84,32 +76,32 @@ target "splinterd" {
 target "gameroomd" {
     inherits = ["all"]
     dockerfile = "examples/gameroom/daemon/Dockerfile-installed-${DISTRO}"
-    tags = ["${REGISTRY}${NAMESPACE}gameroomd:${ISOLATION_ID}"]
+    tags = ["docker.io/splintercommunity/gameroomd:${ISOLATION_ID}"]
 }
 
 target "gameroom-app-acme" {
     inherits = ["all"]
     args = {VUE_APP_BRAND = "acme"}
     dockerfile = "examples/gameroom/gameroom-app/Dockerfile-installed"
-    tags = ["${REGISTRY}${NAMESPACE}gameroom-app-acme:${ISOLATION_ID}"]
+    tags = ["docker.io/splintercommunity/gameroom-app-acme:${ISOLATION_ID}"]
 }
 
 target "gameroom-app-bubba" {
     inherits = ["all"]
     args = {VUE_APP_BRAND = "bubba"}
     dockerfile = "examples/gameroom/gameroom-app/Dockerfile-installed"
-    tags = ["${REGISTRY}${NAMESPACE}gameroom-app-bubba:${ISOLATION_ID}"]
+    tags = ["docker.io/splintercommunity/gameroom-app-bubba:${ISOLATION_ID}"]
 }
 
 target "gameroom-app" {
     inherits = ["all"]
     args = {VUE_APP_BRAND = "generic"}
     dockerfile = "examples/gameroom/gameroom-app/Dockerfile-installed"
-    tags = ["${REGISTRY}${NAMESPACE}gameroom-app:${ISOLATION_ID}"]
+    tags = ["docker.io/splintercommunity/gameroom-app:${ISOLATION_ID}"]
 }
 
 target "gameroom-database" {
     inherits = ["all"]
     dockerfile = "examples/gameroom/database/Dockerfile-installed"
-    tags = ["${REGISTRY}${NAMESPACE}gameroom-database:${ISOLATION_ID}"]
+    tags = ["docker.io/splintercommunity/gameroom-database:${ISOLATION_ID}"]
 }

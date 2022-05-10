@@ -66,8 +66,6 @@ jobs:
           fetch-depth: 0
 
       - name: Docker build
-        env:
-          NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
         run: ./ci/splinter-dev-buildx
 
       - name: Notify Slack of Failure
