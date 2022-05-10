@@ -14,12 +14,12 @@
 
 use splinter::service::ServiceId;
 
-use super::message::Scabbard2pcMessage;
+use super::message::Message;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Alarm(),
-    Deliver(ServiceId, Scabbard2pcMessage),
+    Deliver(ServiceId, Message),
     Start(Vec<u8>),
     Vote(bool),
 }

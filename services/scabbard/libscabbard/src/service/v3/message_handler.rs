@@ -28,7 +28,7 @@ use crate::protos::FromBytes as _;
 use crate::store::{
     event::ConsensusEvent,
     service::ConsensusType,
-    two_phase::{event::Event, message::Scabbard2pcMessage},
+    two_phase::{event::Event, message::Message},
     ScabbardStore,
 };
 
@@ -92,18 +92,18 @@ impl MessageHandler for ScabbardMessageHandler {
     }
 }
 
-fn into_store_msg(msg: TwoPhaseCommitMessage) -> Scabbard2pcMessage {
+fn into_store_msg(msg: TwoPhaseCommitMessage) -> Message {
     match msg {
         TwoPhaseCommitMessage::VoteRequest(VoteRequest { epoch, value }) => {
-            Scabbard2pcMessage::VoteRequest(epoch, value)
+            Message::VoteRequest(epoch, value)
         }
         TwoPhaseCommitMessage::VoteResponse(VoteResponse { epoch, response }) => {
-            Scabbard2pcMessage::VoteResponse(epoch, response)
+            Message::VoteResponse(epoch, response)
         }
-        TwoPhaseCommitMessage::Commit(Commit { epoch }) => Scabbard2pcMessage::Commit(epoch),
-        TwoPhaseCommitMessage::Abort(Abort { epoch }) => Scabbard2pcMessage::Abort(epoch),
+        TwoPhaseCommitMessage::Commit(Commit { epoch }) => Message::Commit(epoch),
+        TwoPhaseCommitMessage::Abort(Abort { epoch }) => Message::Abort(epoch),
         TwoPhaseCommitMessage::DecisionRequest(DecisionRequest { epoch }) => {
-            Scabbard2pcMessage::DecisionRequest(epoch)
+            Message::DecisionRequest(epoch)
         }
     }
 }

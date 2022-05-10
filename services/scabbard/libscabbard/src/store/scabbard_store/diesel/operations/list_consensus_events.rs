@@ -33,7 +33,7 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     event::IdentifiedConsensusEvent,
-    two_phase::{event::Event, message::Scabbard2pcMessage},
+    two_phase::{event::Event, message::Message},
 };
 
 use super::ScabbardStoreOperations;
@@ -143,54 +143,53 @@ where
                     ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                 })?;
 
-                let message = match deliver.message_type.as_str() {
-                    "VOTERESPONSE" => {
-                        let vote_response = deliver
-                            .vote_response
-                            .map(|v| match v.as_str() {
-                                "TRUE" => Some(true),
-                                "FALSE" => Some(false),
-                                _ => None,
-                            })
-                            .ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get vote response for message in 'deliver' \
+                let message =
+                    match deliver.message_type.as_str() {
+                        "VOTERESPONSE" => {
+                            let vote_response = deliver
+                                .vote_response
+                                .map(|v| match v.as_str() {
+                                    "TRUE" => Some(true),
+                                    "FALSE" => Some(false),
+                                    _ => None,
+                                })
+                                .ok_or_else(|| {
+                                    ScabbardStoreError::Internal(InternalError::with_message(
+                                        "Failed to get vote response for message in 'deliver' \
                                     event, no associated vote response found"
-                                        .to_string(),
-                                ))
-                            })?
-                            .ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
+                                            .to_string(),
+                                    ))
+                                })?
+                                .ok_or_else(|| {
+                                    ScabbardStoreError::Internal(InternalError::with_message(
                                     "Failed to get 'vote response' for message in 'deliver' event, \
                                     invalid vote response found"
                                     .to_string(),
                                 ))
-                            })?;
-                        Scabbard2pcMessage::VoteResponse(deliver.epoch as u64, vote_response)
-                    }
-                    "DECISIONREQUEST" => Scabbard2pcMessage::DecisionRequest(deliver.epoch as u64),
-                    "VOTEREQUEST" => Scabbard2pcMessage::VoteRequest(
-                        deliver.epoch as u64,
-                        deliver.vote_request.ok_or_else(|| {
-                            ScabbardStoreError::Internal(InternalError::with_message(
-                                "Failed to list events, deliver event has message type 'vote \
+                                })?;
+                            Message::VoteResponse(deliver.epoch as u64, vote_response)
+                        }
+                        "DECISIONREQUEST" => Message::DecisionRequest(deliver.epoch as u64),
+                        "VOTEREQUEST" => Message::VoteRequest(
+                            deliver.epoch as u64,
+                            deliver.vote_request.ok_or_else(|| {
+                                ScabbardStoreError::Internal(InternalError::with_message(
+                                    "Failed to list events, deliver event has message type 'vote \
                                 request' but no associated value"
-                                    .to_string(),
-                            ))
-                        })?,
-                    ),
-                    "COMMIT" => Scabbard2pcMessage::Commit(deliver.epoch as u64),
-                    "ABORT" => Scabbard2pcMessage::Abort(deliver.epoch as u64),
-                    _ => {
-                        return Err(ScabbardStoreError::InvalidState(
+                                        .to_string(),
+                                ))
+                            })?,
+                        ),
+                        "COMMIT" => Message::Commit(deliver.epoch as u64),
+                        "ABORT" => Message::Abort(deliver.epoch as u64),
+                        _ => return Err(ScabbardStoreError::InvalidState(
                             InvalidStateError::with_message(
                                 "Failed to list events, invalid message type found for deliver \
                                 event"
                                     .to_string(),
                             ),
-                        ))
-                    }
-                };
+                        )),
+                    };
                 let event = IdentifiedConsensusEvent::TwoPhaseCommit(
                     deliver.event_id,
                     Event::Deliver(process, message),

@@ -703,7 +703,7 @@ pub mod tests {
             action::{Action, ConsensusActionNotification},
             context::{ContextBuilder, Participant},
             event::Event,
-            message::Scabbard2pcMessage,
+            message::Message,
             state::State,
         },
     };
@@ -1545,7 +1545,7 @@ pub mod tests {
 
         let event = ConsensusEvent::TwoPhaseCommit(Event::Deliver(
             participant2_fqsi.service_id().clone(),
-            Scabbard2pcMessage::DecisionRequest(1),
+            Message::DecisionRequest(1),
         ));
 
         assert!(store
@@ -1604,7 +1604,7 @@ pub mod tests {
 
         let event = ConsensusEvent::TwoPhaseCommit(Event::Deliver(
             participant2_fqsi.service_id().clone(),
-            Scabbard2pcMessage::DecisionRequest(1),
+            Message::DecisionRequest(1),
         ));
 
         let event_id = store
@@ -1666,7 +1666,7 @@ pub mod tests {
 
         let event = ConsensusEvent::TwoPhaseCommit(Event::Deliver(
             participant2_fqsi.service_id().clone(),
-            Scabbard2pcMessage::DecisionRequest(1),
+            Message::DecisionRequest(1),
         ));
 
         let event_id = store
@@ -1684,7 +1684,7 @@ pub mod tests {
                 event_id,
                 Event::Deliver(
                     participant2_fqsi.service_id().clone(),
-                    Scabbard2pcMessage::DecisionRequest(1)
+                    Message::DecisionRequest(1)
                 )
             )
         );
@@ -1706,7 +1706,7 @@ pub mod tests {
                 event_id,
                 Event::Deliver(
                     participant2_fqsi.service_id().clone(),
-                    Scabbard2pcMessage::DecisionRequest(1)
+                    Message::DecisionRequest(1)
                 )
             ),
         );

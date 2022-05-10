@@ -35,7 +35,7 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     event::ConsensusEvent,
-    two_phase::{event::Event, message::Scabbard2pcMessage},
+    two_phase::{event::Event, message::Message},
 };
 
 use super::ScabbardStoreOperations;
@@ -111,18 +111,16 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 Event::Alarm() => Ok(event_id),
                 Event::Deliver(receiving_process, message) => {
                     let (message_type, vote_response, vote_request) = match message {
-                        Scabbard2pcMessage::DecisionRequest(_) => {
-                            (String::from(&message), None, None)
-                        }
-                        Scabbard2pcMessage::VoteResponse(_, true) => {
+                        Message::DecisionRequest(_) => (String::from(&message), None, None),
+                        Message::VoteResponse(_, true) => {
                             (String::from(&message), Some("TRUE".to_string()), None)
                         }
-                        Scabbard2pcMessage::VoteResponse(_, false) => {
+                        Message::VoteResponse(_, false) => {
                             (String::from(&message), Some("FALSE".to_string()), None)
                         }
-                        Scabbard2pcMessage::Commit(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::Abort(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::VoteRequest(_, ref value) => {
+                        Message::Commit(_) => (String::from(&message), None, None),
+                        Message::Abort(_) => (String::from(&message), None, None),
+                        Message::VoteRequest(_, ref value) => {
                             (String::from(&message), None, Some(value.clone()))
                         }
                     };
@@ -233,18 +231,16 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                 Event::Alarm() => Ok(event_id),
                 Event::Deliver(receiving_process, message) => {
                     let (message_type, vote_response, vote_request) = match message {
-                        Scabbard2pcMessage::DecisionRequest(_) => {
-                            (String::from(&message), None, None)
-                        }
-                        Scabbard2pcMessage::VoteResponse(_, true) => {
+                        Message::DecisionRequest(_) => (String::from(&message), None, None),
+                        Message::VoteResponse(_, true) => {
                             (String::from(&message), Some("TRUE".to_string()), None)
                         }
-                        Scabbard2pcMessage::VoteResponse(_, false) => {
+                        Message::VoteResponse(_, false) => {
                             (String::from(&message), Some("FALSE".to_string()), None)
                         }
-                        Scabbard2pcMessage::Commit(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::Abort(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::VoteRequest(_, ref value) => {
+                        Message::Commit(_) => (String::from(&message), None, None),
+                        Message::Abort(_) => (String::from(&message), None, None),
+                        Message::VoteRequest(_, ref value) => {
                             (String::from(&message), None, Some(value.clone()))
                         }
                     };

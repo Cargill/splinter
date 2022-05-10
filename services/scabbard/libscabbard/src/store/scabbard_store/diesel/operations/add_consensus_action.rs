@@ -39,7 +39,7 @@ use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     two_phase::{
         action::{Action, ConsensusActionNotification},
-        message::Scabbard2pcMessage,
+        message::Message,
     },
     ConsensusAction, ConsensusContext,
 };
@@ -138,18 +138,16 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 },
                 Action::SendMessage(receiving_process, message) => {
                     let (message_type, vote_response, vote_request) = match message {
-                        Scabbard2pcMessage::DecisionRequest(_) => {
-                            (String::from(&message), None, None)
-                        }
-                        Scabbard2pcMessage::VoteResponse(_, true) => {
+                        Message::DecisionRequest(_) => (String::from(&message), None, None),
+                        Message::VoteResponse(_, true) => {
                             (String::from(&message), Some("TRUE".to_string()), None)
                         }
-                        Scabbard2pcMessage::VoteResponse(_, false) => {
+                        Message::VoteResponse(_, false) => {
                             (String::from(&message), Some("FALSE".to_string()), None)
                         }
-                        Scabbard2pcMessage::Commit(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::Abort(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::VoteRequest(_, ref value) => {
+                        Message::Commit(_) => (String::from(&message), None, None),
+                        Message::Abort(_) => (String::from(&message), None, None),
+                        Message::VoteRequest(_, ref value) => {
                             (String::from(&message), None, Some(value.clone()))
                         }
                     };
@@ -278,18 +276,16 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 },
                 Action::SendMessage(receiving_process, message) => {
                     let (message_type, vote_response, vote_request) = match message {
-                        Scabbard2pcMessage::DecisionRequest(_) => {
-                            (String::from(&message), None, None)
-                        }
-                        Scabbard2pcMessage::VoteResponse(_, true) => {
+                        Message::DecisionRequest(_) => (String::from(&message), None, None),
+                        Message::VoteResponse(_, true) => {
                             (String::from(&message), Some("TRUE".to_string()), None)
                         }
-                        Scabbard2pcMessage::VoteResponse(_, false) => {
+                        Message::VoteResponse(_, false) => {
                             (String::from(&message), Some("FALSE".to_string()), None)
                         }
-                        Scabbard2pcMessage::Commit(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::Abort(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::VoteRequest(_, ref value) => {
+                        Message::Commit(_) => (String::from(&message), None, None),
+                        Message::Abort(_) => (String::from(&message), None, None),
+                        Message::VoteRequest(_, ref value) => {
                             (String::from(&message), None, Some(value.clone()))
                         }
                     };

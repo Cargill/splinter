@@ -38,7 +38,7 @@ use crate::store::scabbard_store::{
     two_phase::{
         action::{Action, ConsensusActionNotification},
         context::{ContextBuilder, Participant},
-        message::Scabbard2pcMessage,
+        message::Message,
         state::State,
     },
     ConsensusContext, IdentifiedConsensusAction,
@@ -295,12 +295,10 @@ where
                                         .to_string(),
                                 ))
                             })?;
-                        Scabbard2pcMessage::VoteResponse(send_message.epoch as u64, vote_response)
+                        Message::VoteResponse(send_message.epoch as u64, vote_response)
                     }
-                    "DECISIONREQUEST" => {
-                        Scabbard2pcMessage::DecisionRequest(send_message.epoch as u64)
-                    }
-                    "VOTEREQUEST" => Scabbard2pcMessage::VoteRequest(
+                    "DECISIONREQUEST" => Message::DecisionRequest(send_message.epoch as u64),
+                    "VOTEREQUEST" => Message::VoteRequest(
                         send_message.epoch as u64,
                         send_message.vote_request.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
@@ -310,8 +308,8 @@ where
                             ))
                         })?,
                     ),
-                    "COMMIT" => Scabbard2pcMessage::Commit(send_message.epoch as u64),
-                    "ABORT" => Scabbard2pcMessage::Abort(send_message.epoch as u64),
+                    "COMMIT" => Message::Commit(send_message.epoch as u64),
+                    "ABORT" => Message::Abort(send_message.epoch as u64),
                     _ => {
                         return Err(ScabbardStoreError::InvalidState(
                             InvalidStateError::with_message(

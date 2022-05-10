@@ -16,13 +16,13 @@ use std::time::SystemTime;
 
 use splinter::service::ServiceId;
 
-use super::message::Scabbard2pcMessage;
+use super::message::Message;
 use crate::store::scabbard_store::context::ConsensusContext;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Action {
     Update(ConsensusContext, Option<SystemTime>),
-    SendMessage(ServiceId, Scabbard2pcMessage),
+    SendMessage(ServiceId, Message),
     Notify(ConsensusActionNotification),
 }
 

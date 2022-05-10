@@ -195,7 +195,7 @@ mod tests {
         service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus},
         two_phase::action::ConsensusActionNotification,
         two_phase::context::{Context, ContextBuilder, Participant},
-        two_phase::message::Scabbard2pcMessage,
+        two_phase::message::Message,
         two_phase::state::State,
         DieselScabbardStore, ScabbardStore, SqliteScabbardStoreFactory,
     };
@@ -445,7 +445,7 @@ mod tests {
             .add_consensus_action(
                 ConsensusAction::TwoPhaseCommit(Action::SendMessage(
                     peer_service_id.clone(),
-                    Scabbard2pcMessage::DecisionRequest(1),
+                    Message::DecisionRequest(1),
                 )),
                 &service_fqsi,
                 1,

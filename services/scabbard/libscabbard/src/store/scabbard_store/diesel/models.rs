@@ -26,7 +26,7 @@ use crate::store::scabbard_store::{
         action::ConsensusActionNotification,
         context::{Context, ContextBuilder, Participant},
         event::Event,
-        message::Scabbard2pcMessage,
+        message::Message,
         state::State,
     },
 };
@@ -732,14 +732,14 @@ impl From<&ConsensusActionNotification> for String {
     }
 }
 
-impl From<&Scabbard2pcMessage> for String {
-    fn from(message: &Scabbard2pcMessage) -> Self {
+impl From<&Message> for String {
+    fn from(message: &Message) -> Self {
         match *message {
-            Scabbard2pcMessage::VoteRequest(..) => String::from("VOTEREQUEST"),
-            Scabbard2pcMessage::DecisionRequest(_) => String::from("DECISIONREQUEST"),
-            Scabbard2pcMessage::VoteResponse(..) => String::from("VOTERESPONSE"),
-            Scabbard2pcMessage::Commit(_) => String::from("COMMIT"),
-            Scabbard2pcMessage::Abort(_) => String::from("ABORT"),
+            Message::VoteRequest(..) => String::from("VOTEREQUEST"),
+            Message::DecisionRequest(_) => String::from("DECISIONREQUEST"),
+            Message::VoteResponse(..) => String::from("VOTERESPONSE"),
+            Message::Commit(_) => String::from("COMMIT"),
+            Message::Abort(_) => String::from("ABORT"),
         }
     }
 }
