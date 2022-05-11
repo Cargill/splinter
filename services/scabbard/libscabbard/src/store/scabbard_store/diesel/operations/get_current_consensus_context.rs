@@ -21,7 +21,7 @@ use crate::store::scabbard_store::diesel::{
     models::{Consensus2pcContextModel, Consensus2pcContextParticipantModel},
     schema::{consensus_2pc_context, consensus_2pc_context_participant},
 };
-use crate::store::scabbard_store::{context::ScabbardContext, ScabbardStoreError};
+use crate::store::scabbard_store::{context::ConsensusContext, ScabbardStoreError};
 
 use super::ScabbardStoreOperations;
 
@@ -29,7 +29,7 @@ pub(in crate::store::scabbard_store::diesel) trait GetCurrentContextAction {
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-    ) -> Result<Option<ScabbardContext>, ScabbardStoreError>;
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError>;
 }
 
 impl<'a, C> GetCurrentContextAction for ScabbardStoreOperations<'a, C>
@@ -41,7 +41,7 @@ where
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let context = consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
@@ -59,7 +59,7 @@ where
                         )
                         .load::<Consensus2pcContextParticipantModel>(self.conn)?;
 
-                Ok(Some(ScabbardContext::try_from((&context, participants))?))
+                Ok(Some(ConsensusContext::try_from((&context, participants))?))
             } else {
                 Ok(None)
             }

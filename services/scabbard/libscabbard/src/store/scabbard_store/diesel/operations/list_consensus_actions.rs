@@ -35,13 +35,8 @@ use crate::store::scabbard_store::diesel::{
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    two_phase::{
-        action::{ConsensusAction, ConsensusActionNotification},
-        context::{ContextBuilder, Participant},
-        message::Scabbard2pcMessage,
-        state::Scabbard2pcState,
-    },
-    IdentifiedScabbardConsensusAction, ScabbardContext,
+    two_phase_commit::{Action, ContextBuilder, Message, Notification, Participant, State},
+    ConsensusContext, IdentifiedConsensusAction,
 };
 
 use super::ScabbardStoreOperations;
@@ -51,7 +46,7 @@ pub(in crate::store::scabbard_store::diesel) trait ListActionsOperation {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError>;
+    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError>;
 }
 
 impl<'a, C> ListActionsOperation for ScabbardStoreOperations<'a, C>
@@ -66,7 +61,7 @@ where
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
@@ -158,7 +153,7 @@ where
                 }
 
                 let state = match update_context.state.as_str() {
-                    "WAITINGFORSTART" => Scabbard2pcState::WaitingForStart,
+                    "WAITINGFORSTART" => State::WaitingForStart,
                     "VOTING" => {
                         let vote_timeout_start = get_system_time(
                             update_context.vote_timeout_start,
@@ -170,11 +165,11 @@ where
                                     .to_string(),
                             ))
                         })?;
-                        Scabbard2pcState::Voting { vote_timeout_start }
+                        State::Voting { vote_timeout_start }
                     }
-                    "WAITINGFORVOTE" => Scabbard2pcState::WaitingForVote,
-                    "ABORT" => Scabbard2pcState::Abort,
-                    "COMMIT" => Scabbard2pcState::Commit,
+                    "WAITINGFORVOTE" => State::WaitingForVote,
+                    "ABORT" => State::Abort,
+                    "COMMIT" => State::Commit,
                     "VOTED" => {
                         let decision_timeout_start = get_system_time(
                             update_context.decision_timeout_start,
@@ -207,12 +202,12 @@ where
                                         .to_string(),
                                 ))
                             })?;
-                        Scabbard2pcState::Voted {
+                        State::Voted {
                             vote,
                             decision_timeout_start,
                         }
                     }
-                    "WAITINGFORVOTEREQUEST" => Scabbard2pcState::WaitingForVoteRequest,
+                    "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
                     _ => {
                         return Err(ScabbardStoreError::Internal(InternalError::with_message(
                             "Failed to list actions, invalid state value found".to_string(),
@@ -255,12 +250,9 @@ where
                 })?;
 
                 let action_alarm = get_system_time(update_context.action_alarm)?;
-                let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                let action = IdentifiedConsensusAction::TwoPhaseCommit(
                     update_context.action_id,
-                    ConsensusAction::Update(
-                        ScabbardContext::Scabbard2pcContext(context),
-                        action_alarm,
-                    ),
+                    Action::Update(ConsensusContext::TwoPhaseCommit(context), action_alarm),
                 );
                 all_actions.push((position, action));
             }
@@ -298,12 +290,10 @@ where
                                         .to_string(),
                                 ))
                             })?;
-                        Scabbard2pcMessage::VoteResponse(send_message.epoch as u64, vote_response)
+                        Message::VoteResponse(send_message.epoch as u64, vote_response)
                     }
-                    "DECISIONREQUEST" => {
-                        Scabbard2pcMessage::DecisionRequest(send_message.epoch as u64)
-                    }
-                    "VOTEREQUEST" => Scabbard2pcMessage::VoteRequest(
+                    "DECISIONREQUEST" => Message::DecisionRequest(send_message.epoch as u64),
+                    "VOTEREQUEST" => Message::VoteRequest(
                         send_message.epoch as u64,
                         send_message.vote_request.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
@@ -313,8 +303,8 @@ where
                             ))
                         })?,
                     ),
-                    "COMMIT" => Scabbard2pcMessage::Commit(send_message.epoch as u64),
-                    "ABORT" => Scabbard2pcMessage::Abort(send_message.epoch as u64),
+                    "COMMIT" => Message::Commit(send_message.epoch as u64),
+                    "ABORT" => Message::Abort(send_message.epoch as u64),
                     _ => {
                         return Err(ScabbardStoreError::InvalidState(
                             InvalidStateError::with_message(
@@ -323,9 +313,9 @@ where
                         ))
                     }
                 };
-                let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                let action = IdentifiedConsensusAction::TwoPhaseCommit(
                     send_message.action_id,
-                    ConsensusAction::SendMessage(service_id, message),
+                    Action::SendMessage(service_id, message),
                 );
                 all_actions.push((position, action));
             }
@@ -337,24 +327,20 @@ where
                     ))
                 })?;
                 let notification_action = match notification.notification_type.as_str() {
-                    "REQUESTFORSTART" => ConsensusActionNotification::RequestForStart(),
-                    "COORDINATORREQUESTFORVOTE" => {
-                        ConsensusActionNotification::CoordinatorRequestForVote()
-                    }
-                    "PARTICIPANTREQUESTFORVOTE" => {
-                        ConsensusActionNotification::ParticipantRequestForVote(
-                            notification.request_for_vote_value.ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get 'request for vote' notification action, no \
+                    "REQUESTFORSTART" => Notification::RequestForStart(),
+                    "COORDINATORREQUESTFORVOTE" => Notification::CoordinatorRequestForVote(),
+                    "PARTICIPANTREQUESTFORVOTE" => Notification::ParticipantRequestForVote(
+                        notification.request_for_vote_value.ok_or_else(|| {
+                            ScabbardStoreError::Internal(InternalError::with_message(
+                                "Failed to get 'request for vote' notification action, no \
                                     associated value"
-                                        .to_string(),
-                                ))
-                            })?,
-                        )
-                    }
-                    "COMMIT" => ConsensusActionNotification::Commit(),
-                    "ABORT" => ConsensusActionNotification::Abort(),
-                    "MESSAGEDROPPED" => ConsensusActionNotification::MessageDropped(
+                                    .to_string(),
+                            ))
+                        })?,
+                    ),
+                    "COMMIT" => Notification::Commit(),
+                    "ABORT" => Notification::Abort(),
+                    "MESSAGEDROPPED" => Notification::MessageDropped(
                         notification.dropped_message.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
                                 "Failed to get 'message dropped' notification action, no \
@@ -369,9 +355,9 @@ where
                         )))
                     }
                 };
-                let action = IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                let action = IdentifiedConsensusAction::TwoPhaseCommit(
                     notification.action_id,
-                    ConsensusAction::Notify(notification_action),
+                    Action::Notify(notification_action),
                 );
                 all_actions.push((position, action));
             }

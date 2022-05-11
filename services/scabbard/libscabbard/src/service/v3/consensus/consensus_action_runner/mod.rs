@@ -27,8 +27,8 @@ use splinter::service::FullyQualifiedServiceId;
 use splinter::service::MessageSenderFactory;
 use splinter::store::command::StoreCommandExecutor;
 
-use crate::store::action::IdentifiedScabbardConsensusAction;
-use crate::store::two_phase::action::ConsensusAction;
+use crate::store::action::IdentifiedConsensusAction;
+use crate::store::two_phase_commit::Action;
 use crate::store::ScabbardStoreFactory;
 
 pub use self::commands::actions::ExecuteActionCommand;
@@ -96,16 +96,16 @@ where
     /// * `epoch` - The current epoch of the consensus algorithm
     pub fn run_actions(
         &self,
-        actions: Vec<IdentifiedScabbardConsensusAction>,
+        actions: Vec<IdentifiedConsensusAction>,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<(), InternalError> {
         for action in actions {
             let mut commands = Vec::new();
             match &action {
-                IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                IdentifiedConsensusAction::TwoPhaseCommit(
                     action_id,
-                    ConsensusAction::Update(context, alarm),
+                    Action::Update(context, alarm),
                 ) => {
                     commands.extend(self.context_updater.update(
                         context.clone(),
@@ -121,9 +121,9 @@ where
                         self.store_factory.clone(),
                     )));
                 }
-                IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                IdentifiedConsensusAction::TwoPhaseCommit(
                     action_id,
-                    ConsensusAction::SendMessage(to_service, msg),
+                    Action::SendMessage(to_service, msg),
                 ) => {
                     // close out notfication regardless of if this was succesful
                     let msg_bytes: Vec<u8> = Vec::<u8>::try_from(msg.clone())
@@ -145,9 +145,9 @@ where
                         self.store_factory.clone(),
                     )));
                 }
-                IdentifiedScabbardConsensusAction::Scabbard2pcConsensusAction(
+                IdentifiedConsensusAction::TwoPhaseCommit(
                     action_id,
-                    ConsensusAction::Notify(notification),
+                    Action::Notify(notification),
                 ) => {
                     commands.extend(self.notify_observer.notify(
                         notification.clone(),
@@ -190,13 +190,13 @@ mod tests {
     use crate::migrations::run_sqlite_migrations;
     use crate::store::pool::ConnectionPool;
     use crate::store::{
-        action::ScabbardConsensusAction,
-        context::ScabbardContext,
+        action::ConsensusAction,
+        context::ConsensusContext,
         service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus},
-        two_phase::action::ConsensusActionNotification,
-        two_phase::context::{Context, ContextBuilder, Participant},
-        two_phase::message::Scabbard2pcMessage,
-        two_phase::state::Scabbard2pcState,
+        two_phase_commit::Message,
+        two_phase_commit::Notification,
+        two_phase_commit::State,
+        two_phase_commit::{Context, ContextBuilder, Participant},
         DieselScabbardStore, ScabbardStore, SqliteScabbardStoreFactory,
     };
 
@@ -310,7 +310,7 @@ mod tests {
                         })
                         .collect(),
                 )
-                .with_state(Scabbard2pcState::WaitingForStart)
+                .with_state(State::WaitingForStart)
                 .with_this_process(service.service_id().clone().service_id())
                 .build()
                 .map_err(|err| InternalError::from_source(Box::new(err)))
@@ -328,7 +328,7 @@ mod tests {
                         })
                         .collect(),
                 )
-                .with_state(Scabbard2pcState::WaitingForVoteRequest)
+                .with_state(State::WaitingForVoteRequest)
                 .with_this_process(service.service_id().clone().service_id())
                 .build()
                 .map_err(|err| InternalError::from_source(Box::new(err)))
@@ -419,7 +419,7 @@ mod tests {
         scabbard_store
             .add_consensus_context(
                 &service_fqsi,
-                ScabbardContext::Scabbard2pcContext(context.clone()),
+                ConsensusContext::TwoPhaseCommit(context.clone()),
             )
             .expect("unable to add context to scabbard store");
 
@@ -432,8 +432,8 @@ mod tests {
         // add actions
         scabbard_store
             .add_consensus_action(
-                ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Update(
-                    ScabbardContext::Scabbard2pcContext(context),
+                ConsensusAction::TwoPhaseCommit(Action::Update(
+                    ConsensusContext::TwoPhaseCommit(context),
                     Some(SystemTime::now()),
                 )),
                 &service_fqsi,
@@ -443,9 +443,9 @@ mod tests {
 
         scabbard_store
             .add_consensus_action(
-                ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::SendMessage(
+                ConsensusAction::TwoPhaseCommit(Action::SendMessage(
                     peer_service_id.clone(),
-                    Scabbard2pcMessage::DecisionRequest(1),
+                    Message::DecisionRequest(1),
                 )),
                 &service_fqsi,
                 1,
@@ -454,9 +454,7 @@ mod tests {
 
         scabbard_store
             .add_consensus_action(
-                ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Notify(
-                    ConsensusActionNotification::RequestForStart(),
-                )),
+                ConsensusAction::TwoPhaseCommit(Action::Notify(Notification::RequestForStart())),
                 &service_fqsi,
                 1,
             )
@@ -482,7 +480,7 @@ mod tests {
             .expect("unable to get commit entry")
             .expect("No commit entry returned")
         {
-            ScabbardContext::Scabbard2pcContext(context) => context,
+            ConsensusContext::TwoPhaseCommit(context) => context,
         };
 
         assert!(updated_context.alarm().is_some());

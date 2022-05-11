@@ -22,16 +22,16 @@ mod error;
 pub mod event;
 mod factory;
 pub mod service;
-pub mod two_phase;
+pub mod two_phase_commit;
 
 use std::time::SystemTime;
 
 pub(crate) use error::ScabbardStoreError;
 
-use action::{IdentifiedScabbardConsensusAction, ScabbardConsensusAction};
+use action::{ConsensusAction, IdentifiedConsensusAction};
 use commit::CommitEntry;
-use context::ScabbardContext;
-use event::{ReturnedScabbardConsensusEvent, ScabbardConsensusEvent};
+use context::ConsensusContext;
+use event::{ConsensusEvent, IdentifiedConsensusEvent};
 use service::ScabbardService;
 use splinter::service::FullyQualifiedServiceId;
 
@@ -48,11 +48,11 @@ pub trait ScabbardStore {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the context
     ///    belongs to
-    /// * `context` - The `ScabbardContext` to be added to the database
+    /// * `context` - The `ConsensusContext` to be added to the database
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError>;
 
     /// Update an existing context
@@ -62,24 +62,24 @@ pub trait ScabbardStore {
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the context
     ///    belongs to
     ///    context
-    /// * `context` - The `ScabbardContext` to be updated in the database
+    /// * `context` - The `ConsensusContext` to be updated in the database
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError>;
 
     /// Add a 2 phase commit coordinator action
     ///
     /// # Arguments
     ///
-    /// * `action` - The `ScabbardConsensusAction` to be added to the database
+    /// * `action` - The `ConsensusAction` to be added to the database
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the action
     ///    belongs to
     /// * `epoch` - The epoch that the given action belongs to
     fn add_consensus_action(
         &self,
-        action: ScabbardConsensusAction,
+        action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<i64, ScabbardStoreError>;
@@ -112,7 +112,7 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError>;
+    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError>;
 
     /// List ready services
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError>;
@@ -173,12 +173,12 @@ pub trait ScabbardStore {
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the event
     ///    belongs to
     /// * `epoch` - The epoch that the event belongs to
-    /// * `event` - The `ScabbardConsensusEvent` to be added
+    /// * `event` - The `ConsensusEvent` to be added
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError>;
 
     /// Update an existing consensus event
@@ -209,7 +209,7 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError>;
+    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError>;
 
     /// Get the current context for a given service
     ///
@@ -220,7 +220,7 @@ pub trait ScabbardStore {
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-    ) -> Result<Option<ScabbardContext>, ScabbardStoreError>;
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError>;
 
     /// Removes a scabbard service and all of its associated state
     ///

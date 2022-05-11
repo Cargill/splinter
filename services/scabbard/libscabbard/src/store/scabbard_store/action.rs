@@ -12,26 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::store::scabbard_store::two_phase::action::ConsensusAction;
+use crate::store::scabbard_store::two_phase_commit::Action;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ScabbardConsensusAction {
-    Scabbard2pcConsensusAction(ConsensusAction),
+pub enum ConsensusAction {
+    TwoPhaseCommit(Action),
 }
 
 // A scabbard consensus action that includes the action ID associated with the action
 #[derive(Debug, PartialEq, Clone)]
-pub enum IdentifiedScabbardConsensusAction {
-    Scabbard2pcConsensusAction(i64, ConsensusAction),
+pub enum IdentifiedConsensusAction {
+    TwoPhaseCommit(i64, Action),
 }
 
-impl IdentifiedScabbardConsensusAction {
-    pub fn deconstruct(self) -> (i64, ScabbardConsensusAction) {
+impl IdentifiedConsensusAction {
+    pub fn deconstruct(self) -> (i64, ConsensusAction) {
         match self {
-            Self::Scabbard2pcConsensusAction(id, action) => (
-                id,
-                ScabbardConsensusAction::Scabbard2pcConsensusAction(action),
-            ),
+            Self::TwoPhaseCommit(id, action) => (id, ConsensusAction::TwoPhaseCommit(action)),
         }
     }
 }

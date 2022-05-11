@@ -39,7 +39,7 @@ pub use scabbard_store::diesel::DieselScabbardStore;
 pub use scabbard_store::PooledScabbardStoreFactory;
 #[cfg(feature = "scabbardv3-store")]
 pub use scabbard_store::{
-    action, commit, context, event, service, two_phase, ScabbardStore, ScabbardStoreFactory,
+    action, commit, context, event, service, two_phase_commit, ScabbardStore, ScabbardStoreFactory,
 };
 #[cfg(all(feature = "scabbardv3-store", feature = "postgres"))]
 pub use scabbard_store::{PgScabbardStoreFactory, PooledPgScabbardStoreFactory};

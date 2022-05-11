@@ -25,7 +25,7 @@ use crate::store::scabbard_store::diesel::{
     models::{Consensus2pcContextModel, ContextParticipantList},
     schema::{consensus_2pc_context, consensus_2pc_context_participant},
 };
-use crate::store::scabbard_store::ScabbardContext;
+use crate::store::scabbard_store::ConsensusContext;
 use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
@@ -34,7 +34,7 @@ pub(in crate::store::scabbard_store::diesel) trait AddContextOperation {
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError>;
 }
 
@@ -43,11 +43,11 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, SqliteConnection> {
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
-                ScabbardContext::Scabbard2pcContext(context) => {
+                ConsensusContext::TwoPhaseCommit(context) => {
                     let new_context = Consensus2pcContextModel::try_from((&context, service_id))?;
                     let participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
@@ -71,11 +71,11 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, PgConnection> {
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
-                ScabbardContext::Scabbard2pcContext(context) => {
+                ConsensusContext::TwoPhaseCommit(context) => {
                     let new_context = Consensus2pcContextModel::try_from((&context, service_id))?;
                     let participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;

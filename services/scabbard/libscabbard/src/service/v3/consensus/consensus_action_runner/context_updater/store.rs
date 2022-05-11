@@ -23,7 +23,7 @@ use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
 use crate::service::v3::consensus::consensus_action_runner::UpdateContextCommand;
-use crate::store::context::ScabbardContext;
+use crate::store::context::ConsensusContext;
 use crate::store::ScabbardStoreFactory;
 
 use super::ContextUpdater;
@@ -54,7 +54,7 @@ impl<C: 'static> ContextUpdater<C> for ScabbardStoreContextUpdater<C> {
     /// * `alarm` - The alarm to update
     fn update(
         &self,
-        context: ScabbardContext,
+        context: ConsensusContext,
         service_id: &FullyQualifiedServiceId,
         _alarm: Option<SystemTime>,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError> {

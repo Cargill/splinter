@@ -12,10 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Structs and enums specific to the two phase commit consensus algorithm
+use std::time::SystemTime;
 
-pub mod action;
-pub mod context;
-pub mod event;
-pub mod message;
-pub mod state;
+#[derive(Clone, Debug, PartialEq)]
+pub enum State {
+    Abort,
+    Commit,
+    Voted {
+        vote: bool,
+        decision_timeout_start: SystemTime,
+    },
+    Voting {
+        vote_timeout_start: SystemTime,
+    },
+    WaitingForStart,
+    WaitingForVoteRequest,
+    WaitingForVote,
+}

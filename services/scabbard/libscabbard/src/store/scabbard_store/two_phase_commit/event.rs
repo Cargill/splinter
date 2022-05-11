@@ -12,20 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::time::SystemTime;
+use splinter::service::ServiceId;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Scabbard2pcState {
-    Abort,
-    Commit,
-    Voted {
-        vote: bool,
-        decision_timeout_start: SystemTime,
-    },
-    Voting {
-        vote_timeout_start: SystemTime,
-    },
-    WaitingForStart,
-    WaitingForVoteRequest,
-    WaitingForVote,
+use super::message::Message;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Event {
+    Alarm(),
+    Deliver(ServiceId, Message),
+    Start(Vec<u8>),
+    Vote(bool),
 }

@@ -26,7 +26,7 @@ use crate::store::scabbard_store::diesel::{
     models::{Consensus2pcContextModel, ContextParticipantList},
     schema::{consensus_2pc_context, consensus_2pc_context_participant},
 };
-use crate::store::scabbard_store::ScabbardContext;
+use crate::store::scabbard_store::ConsensusContext;
 use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
@@ -35,7 +35,7 @@ pub(in crate::store::scabbard_store::diesel) trait UpdateContextAction {
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError>;
 }
 
@@ -44,11 +44,11 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
-                ScabbardContext::Scabbard2pcContext(context) => {
+                ConsensusContext::TwoPhaseCommit(context) => {
                     let epoch = i64::try_from(*context.epoch()).map_err(|err| {
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                     })?;
@@ -114,11 +114,11 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
-                ScabbardContext::Scabbard2pcContext(context) => {
+                ConsensusContext::TwoPhaseCommit(context) => {
                     let epoch = i64::try_from(*context.epoch()).map_err(|err| {
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                     })?;

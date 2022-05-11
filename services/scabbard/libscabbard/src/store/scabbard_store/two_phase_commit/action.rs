@@ -12,14 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::time::SystemTime;
+
 use splinter::service::ServiceId;
 
-use super::message::Scabbard2pcMessage;
+use super::message::Message;
+use crate::store::scabbard_store::context::ConsensusContext;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Scabbard2pcEvent {
-    Alarm(),
-    Deliver(ServiceId, Scabbard2pcMessage),
-    Start(Vec<u8>),
-    Vote(bool),
+#[derive(Debug, PartialEq, Clone)]
+pub enum Action {
+    Update(ConsensusContext, Option<SystemTime>),
+    SendMessage(ServiceId, Message),
+    Notify(Notification),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Notification {
+    Abort(),
+    Commit(),
+    MessageDropped(String),
+    RequestForStart(),
+    CoordinatorRequestForVote(),
+    ParticipantRequestForVote(Vec<u8>),
 }

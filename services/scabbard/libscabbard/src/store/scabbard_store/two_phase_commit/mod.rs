@@ -12,26 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::time::SystemTime;
+//! Structs and enums specific to the two phase commit consensus algorithm
 
-use splinter::service::ServiceId;
+mod action;
+mod context;
+mod event;
+mod message;
+mod state;
 
-use super::message::Scabbard2pcMessage;
-use crate::store::scabbard_store::context::ScabbardContext;
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum ConsensusAction {
-    Update(ScabbardContext, Option<SystemTime>),
-    SendMessage(ServiceId, Scabbard2pcMessage),
-    Notify(ConsensusActionNotification),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ConsensusActionNotification {
-    Abort(),
-    Commit(),
-    MessageDropped(String),
-    RequestForStart(),
-    CoordinatorRequestForVote(),
-    ParticipantRequestForVote(Vec<u8>),
-}
+pub use action::{Action, Notification};
+pub use context::{Context, ContextBuilder, Participant};
+pub use event::Event;
+pub use message::Message;
+pub use state::State;

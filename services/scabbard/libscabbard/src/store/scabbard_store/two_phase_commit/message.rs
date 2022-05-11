@@ -30,7 +30,7 @@ use crate::protos::{scabbard_v3, IntoBytes, ProtoConversionError};
 use crate::service::v3::ScabbardValue;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Scabbard2pcMessage {
+pub enum Message {
     VoteRequest(u64, Vec<u8>),
     Commit(u64),
     Abort(u64),
@@ -38,20 +38,20 @@ pub enum Scabbard2pcMessage {
     VoteResponse(u64, bool),
 }
 
-impl TryFrom<Scabbard2pcMessage> for ScabbardMessage {
+impl TryFrom<Message> for ScabbardMessage {
     type Error = ProtoConversionError;
 
-    fn try_from(store_msg: Scabbard2pcMessage) -> Result<Self, Self::Error> {
+    fn try_from(store_msg: Message) -> Result<Self, Self::Error> {
         let msg_2pc = match store_msg {
-            Scabbard2pcMessage::VoteRequest(epoch, value) => {
+            Message::VoteRequest(epoch, value) => {
                 TwoPhaseCommitMessage::VoteRequest(VoteRequest { epoch, value })
             }
-            Scabbard2pcMessage::Commit(epoch) => TwoPhaseCommitMessage::Commit(Commit { epoch }),
-            Scabbard2pcMessage::Abort(epoch) => TwoPhaseCommitMessage::Abort(Abort { epoch }),
-            Scabbard2pcMessage::DecisionRequest(epoch) => {
+            Message::Commit(epoch) => TwoPhaseCommitMessage::Commit(Commit { epoch }),
+            Message::Abort(epoch) => TwoPhaseCommitMessage::Abort(Abort { epoch }),
+            Message::DecisionRequest(epoch) => {
                 TwoPhaseCommitMessage::DecisionRequest(DecisionRequest { epoch })
             }
-            Scabbard2pcMessage::VoteResponse(epoch, response) => {
+            Message::VoteResponse(epoch, response) => {
                 TwoPhaseCommitMessage::VoteResponse(VoteResponse { epoch, response })
             }
         };
@@ -64,10 +64,10 @@ impl TryFrom<Scabbard2pcMessage> for ScabbardMessage {
     }
 }
 
-impl TryFrom<Scabbard2pcMessage> for Vec<u8> {
+impl TryFrom<Message> for Vec<u8> {
     type Error = ProtoConversionError;
 
-    fn try_from(store_msg: Scabbard2pcMessage) -> Result<Self, Self::Error> {
+    fn try_from(store_msg: Message) -> Result<Self, Self::Error> {
         IntoBytes::<scabbard_v3::ScabbardMessageV3>::into_bytes(ScabbardMessage::try_from(
             store_msg,
         )?)
@@ -75,7 +75,7 @@ impl TryFrom<Scabbard2pcMessage> for Vec<u8> {
 }
 
 #[cfg(feature = "scabbardv3-consensus")]
-impl TryFrom<AugrimTwoPhaseCommitMessage<ScabbardValue>> for Scabbard2pcMessage {
+impl TryFrom<AugrimTwoPhaseCommitMessage<ScabbardValue>> for Message {
     type Error = InternalError;
 
     fn try_from(msg: AugrimTwoPhaseCommitMessage<ScabbardValue>) -> Result<Self, Self::Error> {

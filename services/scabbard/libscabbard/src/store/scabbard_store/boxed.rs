@@ -18,11 +18,11 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    action::IdentifiedScabbardConsensusAction,
+    action::IdentifiedConsensusAction,
     commit::CommitEntry,
-    event::{ReturnedScabbardConsensusEvent, ScabbardConsensusEvent},
+    event::{ConsensusEvent, IdentifiedConsensusEvent},
     service::ScabbardService,
-    ScabbardConsensusAction, ScabbardContext,
+    ConsensusAction, ConsensusContext,
 };
 
 use super::ScabbardStore;
@@ -34,11 +34,11 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the context
     ///    belongs to
-    /// * `context` - The `ScabbardContext` to be added to the database
+    /// * `context` - The `ConsensusContext` to be added to the database
     fn add_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         (&**self).add_consensus_context(service_id, context)
     }
@@ -50,11 +50,11 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the context
     ///    belongs to
     ///    context
-    /// * `context` - The `ScabbardContext` to be updated in the database
+    /// * `context` - The `ConsensusContext` to be updated in the database
     fn update_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-        context: ScabbardContext,
+        context: ConsensusContext,
     ) -> Result<(), ScabbardStoreError> {
         (&**self).update_consensus_context(service_id, context)
     }
@@ -63,13 +63,13 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     ///
     /// # Arguments
     ///
-    /// * `action` - The `ScabbardConsensusAction` to be added to the database
+    /// * `action` - The `ConsensusAction` to be added to the database
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the action
     ///    belongs to
     /// * `epoch` - The epoch that the given action belongs to
     fn add_consensus_action(
         &self,
-        action: ScabbardConsensusAction,
+        action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<i64, ScabbardStoreError> {
@@ -106,7 +106,7 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedScabbardConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError> {
         (&**self).list_consensus_actions(service_id, epoch)
     }
 
@@ -183,12 +183,12 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the event
     ///    belongs to
     /// * `epoch` - The epoch that the event belongs to
-    /// * `event` - The `ScabbardConsensusEvent` to be added
+    /// * `event` - The `ConsensusEvent` to be added
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         (&**self).add_consensus_event(service_id, epoch, event)
     }
@@ -223,7 +223,7 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<ReturnedScabbardConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
         (&**self).list_consensus_events(service_id, epoch)
     }
 
@@ -236,7 +236,7 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
-    ) -> Result<Option<ScabbardContext>, ScabbardStoreError> {
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError> {
         (&**self).get_current_consensus_context(service_id)
     }
 

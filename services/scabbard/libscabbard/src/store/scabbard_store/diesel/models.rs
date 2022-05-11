@@ -20,15 +20,9 @@ use splinter::service::{FullyQualifiedServiceId, ServiceId};
 
 use crate::store::scabbard_store::{
     commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision},
-    context::ScabbardContext,
+    context::ConsensusContext,
     service::{ConsensusType, ScabbardService, ServiceStatus},
-    two_phase::{
-        action::ConsensusActionNotification,
-        context::{Context, ContextBuilder, Participant},
-        event::Scabbard2pcEvent,
-        message::Scabbard2pcMessage,
-        state::Scabbard2pcState,
-    },
+    two_phase_commit::{Context, ContextBuilder, Event, Message, Notification, Participant, State},
 };
 
 use super::schema::{
@@ -226,7 +220,7 @@ impl
     TryFrom<(
         &Consensus2pcContextModel,
         Vec<Consensus2pcContextParticipantModel>,
-    )> for ScabbardContext
+    )> for ConsensusContext
 {
     type Error = InternalError;
 
@@ -262,7 +256,7 @@ impl
         let participants = ParticipantList::try_from(participants)?.inner;
 
         let state = match context.state.as_str() {
-            "WAITINGFORSTART" => Scabbard2pcState::WaitingForStart,
+            "WAITINGFORSTART" => State::WaitingForStart,
             "VOTING" => {
                 let vote_timeout_start = if let Some(t) = context.vote_timeout_start {
                     SystemTime::UNIX_EPOCH
@@ -275,17 +269,17 @@ impl
                         })?
                 } else {
                     return Err(InternalError::with_message(
-                        "Failed to convert to ScabbardContext, context has state 'voting' but \
+                        "Failed to convert to ConsensusContext, context has state 'voting' but \
                         no vote timeout start time set"
                             .to_string(),
                     ));
                 };
-                Scabbard2pcState::Voting { vote_timeout_start }
+                State::Voting { vote_timeout_start }
             }
-            "WAITINGFORVOTE" => Scabbard2pcState::WaitingForVote,
-            "ABORT" => Scabbard2pcState::Abort,
-            "COMMIT" => Scabbard2pcState::Commit,
-            "WAITINGFORVOTEREQUEST" => Scabbard2pcState::WaitingForVoteRequest,
+            "WAITINGFORVOTE" => State::WaitingForVote,
+            "ABORT" => State::Abort,
+            "COMMIT" => State::Commit,
+            "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
             "VOTED" => {
                 let vote = context
                     .vote
@@ -297,14 +291,14 @@ impl
                     })
                     .ok_or_else(|| {
                         InternalError::with_message(
-                        "Failed to convert to ScabbardContext, context has state 'voted' but vote \
+                        "Failed to convert to ConsensusContext, context has state 'voted' but vote \
                         is unset"
                         .to_string(),
                     )
                     })?
                     .ok_or_else(|| {
                         InternalError::with_message(
-                            "Failed to convert to ScabbardContext, context has state 'voted' but \
+                            "Failed to convert to ConsensusContext, context has state 'voted' but \
                         an invalid vote response was found"
                                 .to_string(),
                         )
@@ -320,19 +314,19 @@ impl
                         })?
                 } else {
                     return Err(InternalError::with_message(
-                        "Failed to convert to ScabbardContext, context has state 'voted' but \
+                        "Failed to convert to ConsensusContext, context has state 'voted' but \
                         'decision_timeout_start' is unset"
                             .to_string(),
                     ));
                 };
-                Scabbard2pcState::Voted {
+                State::Voted {
                     vote,
                     decision_timeout_start,
                 }
             }
             _ => {
                 return Err(InternalError::with_message(
-                    "Failed to convert to ScabbardContext, invalid state value found".to_string(),
+                    "Failed to convert to ConsensusContext, invalid state value found".to_string(),
                 ))
             }
         };
@@ -357,7 +351,7 @@ impl
         let context = builder
             .build()
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
-        Ok(ScabbardContext::Scabbard2pcContext(context))
+        Ok(ConsensusContext::TwoPhaseCommit(context))
     }
 }
 
@@ -375,7 +369,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
             .transpose()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
         let (vote_timeout_start, vote, decision_timeout_start) = match context.state() {
-            Scabbard2pcState::Voting { vote_timeout_start } => {
+            State::Voting { vote_timeout_start } => {
                 let time = i64::try_from(
                     vote_timeout_start
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -385,7 +379,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;
                 (Some(time), None, None)
             }
-            Scabbard2pcState::Voted {
+            State::Voted {
                 vote,
                 decision_timeout_start,
             } => {
@@ -550,7 +544,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
             .transpose()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
         let (vote_timeout_start, vote, decision_timeout_start) = match context.state() {
-            Scabbard2pcState::Voting { vote_timeout_start } => {
+            State::Voting { vote_timeout_start } => {
                 let time = i64::try_from(
                     vote_timeout_start
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -560,7 +554,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;
                 (Some(time), None, None)
             }
-            Scabbard2pcState::Voted {
+            State::Voted {
                 vote,
                 decision_timeout_start,
             } => {
@@ -679,16 +673,16 @@ pub struct Consensus2pcNotificationModel {
     pub request_for_vote_value: Option<Vec<u8>>,
 }
 
-impl From<&Scabbard2pcState> for String {
-    fn from(state: &Scabbard2pcState) -> Self {
+impl From<&State> for String {
+    fn from(state: &State) -> Self {
         match *state {
-            Scabbard2pcState::WaitingForStart => String::from("WAITINGFORSTART"),
-            Scabbard2pcState::Voting { .. } => String::from("VOTING"),
-            Scabbard2pcState::WaitingForVote => String::from("WAITINGFORVOTE"),
-            Scabbard2pcState::Abort => String::from("ABORT"),
-            Scabbard2pcState::Commit => String::from("COMMIT"),
-            Scabbard2pcState::WaitingForVoteRequest => String::from("WAITINGFORVOTEREQUEST"),
-            Scabbard2pcState::Voted { .. } => String::from("VOTED"),
+            State::WaitingForStart => String::from("WAITINGFORSTART"),
+            State::Voting { .. } => String::from("VOTING"),
+            State::WaitingForVote => String::from("WAITINGFORVOTE"),
+            State::Abort => String::from("ABORT"),
+            State::Commit => String::from("COMMIT"),
+            State::WaitingForVoteRequest => String::from("WAITINGFORVOTEREQUEST"),
+            State::Voted { .. } => String::from("VOTED"),
         }
     }
 }
@@ -715,31 +709,27 @@ pub struct InsertableConsensus2pcActionModel {
     pub position: i32,
 }
 
-impl From<&ConsensusActionNotification> for String {
-    fn from(notification: &ConsensusActionNotification) -> Self {
+impl From<&Notification> for String {
+    fn from(notification: &Notification) -> Self {
         match *notification {
-            ConsensusActionNotification::RequestForStart() => String::from("REQUESTFORSTART"),
-            ConsensusActionNotification::CoordinatorRequestForVote() => {
-                String::from("COORDINATORREQUESTFORVOTE")
-            }
-            ConsensusActionNotification::ParticipantRequestForVote(_) => {
-                String::from("PARTICIPANTREQUESTFORVOTE")
-            }
-            ConsensusActionNotification::Commit() => String::from("COMMIT"),
-            ConsensusActionNotification::Abort() => String::from("ABORT"),
-            ConsensusActionNotification::MessageDropped(_) => String::from("MESSAGEDROPPED"),
+            Notification::RequestForStart() => String::from("REQUESTFORSTART"),
+            Notification::CoordinatorRequestForVote() => String::from("COORDINATORREQUESTFORVOTE"),
+            Notification::ParticipantRequestForVote(_) => String::from("PARTICIPANTREQUESTFORVOTE"),
+            Notification::Commit() => String::from("COMMIT"),
+            Notification::Abort() => String::from("ABORT"),
+            Notification::MessageDropped(_) => String::from("MESSAGEDROPPED"),
         }
     }
 }
 
-impl From<&Scabbard2pcMessage> for String {
-    fn from(message: &Scabbard2pcMessage) -> Self {
+impl From<&Message> for String {
+    fn from(message: &Message) -> Self {
         match *message {
-            Scabbard2pcMessage::VoteRequest(..) => String::from("VOTEREQUEST"),
-            Scabbard2pcMessage::DecisionRequest(_) => String::from("DECISIONREQUEST"),
-            Scabbard2pcMessage::VoteResponse(..) => String::from("VOTERESPONSE"),
-            Scabbard2pcMessage::Commit(_) => String::from("COMMIT"),
-            Scabbard2pcMessage::Abort(_) => String::from("ABORT"),
+            Message::VoteRequest(..) => String::from("VOTEREQUEST"),
+            Message::DecisionRequest(_) => String::from("DECISIONREQUEST"),
+            Message::VoteResponse(..) => String::from("VOTERESPONSE"),
+            Message::Commit(_) => String::from("COMMIT"),
+            Message::Abort(_) => String::from("ABORT"),
         }
     }
 }
@@ -767,13 +757,13 @@ pub struct InsertableConsensus2pcEventModel {
     pub event_type: String,
 }
 
-impl From<&Scabbard2pcEvent> for String {
-    fn from(event: &Scabbard2pcEvent) -> Self {
+impl From<&Event> for String {
+    fn from(event: &Event) -> Self {
         match *event {
-            Scabbard2pcEvent::Alarm() => "ALARM".into(),
-            Scabbard2pcEvent::Deliver(..) => "DELIVER".into(),
-            Scabbard2pcEvent::Start(..) => "START".into(),
-            Scabbard2pcEvent::Vote(..) => "VOTE".into(),
+            Event::Alarm() => "ALARM".into(),
+            Event::Deliver(..) => "DELIVER".into(),
+            Event::Start(..) => "START".into(),
+            Event::Vote(..) => "VOTE".into(),
         }
     }
 }

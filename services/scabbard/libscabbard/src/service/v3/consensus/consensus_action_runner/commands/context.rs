@@ -20,18 +20,18 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
-use crate::store::context::ScabbardContext;
+use crate::store::context::ConsensusContext;
 use crate::store::ScabbardStoreFactory;
 
 pub struct UpdateContextCommand<C> {
-    context: ScabbardContext,
+    context: ConsensusContext,
     service_id: FullyQualifiedServiceId,
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,
 }
 
 impl<C> UpdateContextCommand<C> {
     pub fn new(
-        context: ScabbardContext,
+        context: ConsensusContext,
         service_id: FullyQualifiedServiceId,
         store_factory: Arc<dyn ScabbardStoreFactory<C>>,
     ) -> Self {

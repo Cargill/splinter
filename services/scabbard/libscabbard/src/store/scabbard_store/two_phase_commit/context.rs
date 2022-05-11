@@ -17,7 +17,7 @@ use std::time::SystemTime;
 use splinter::error::InvalidStateError;
 use splinter::service::ServiceId;
 
-use crate::store::scabbard_store::two_phase::state::Scabbard2pcState;
+use crate::store::scabbard_store::two_phase_commit::State;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Context {
@@ -27,7 +27,7 @@ pub struct Context {
     last_commit_epoch: Option<u64>,
     this_process: ServiceId,
     participants: Vec<Participant>,
-    state: Scabbard2pcState,
+    state: State,
 }
 
 impl Context {
@@ -55,7 +55,7 @@ impl Context {
         &self.participants
     }
 
-    pub fn state(&self) -> &Scabbard2pcState {
+    pub fn state(&self) -> &State {
         &self.state
     }
 
@@ -86,7 +86,7 @@ pub struct ContextBuilder {
     epoch: Option<u64>,
     last_commit_epoch: Option<u64>,
     participants: Option<Vec<Participant>>,
-    state: Option<Scabbard2pcState>,
+    state: Option<State>,
     this_process: Option<ServiceId>,
 }
 
@@ -116,7 +116,7 @@ impl ContextBuilder {
         self
     }
 
-    pub fn with_state(mut self, state: Scabbard2pcState) -> ContextBuilder {
+    pub fn with_state(mut self, state: State) -> ContextBuilder {
         self.state = Some(state);
         self
     }

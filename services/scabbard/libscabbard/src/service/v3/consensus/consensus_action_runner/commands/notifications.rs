@@ -21,14 +21,14 @@ use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
 use crate::store::commit::CommitEntry;
-use crate::store::event::ScabbardConsensusEvent;
+use crate::store::event::ConsensusEvent;
 use crate::store::ScabbardStoreFactory;
 
 pub struct AddEventCommand<C> {
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,
     service_id: FullyQualifiedServiceId,
     epoch: u64,
-    event: ScabbardConsensusEvent,
+    event: ConsensusEvent,
 }
 
 impl<C> AddEventCommand<C> {
@@ -36,7 +36,7 @@ impl<C> AddEventCommand<C> {
         store_factory: Arc<dyn ScabbardStoreFactory<C>>,
         service_id: FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Self {
         Self {
             store_factory,

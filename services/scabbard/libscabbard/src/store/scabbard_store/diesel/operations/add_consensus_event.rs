@@ -34,8 +34,8 @@ use crate::store::scabbard_store::diesel::{
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    event::ScabbardConsensusEvent,
-    two_phase::{event::Scabbard2pcEvent, message::Scabbard2pcMessage},
+    event::ConsensusEvent,
+    two_phase_commit::{Event, Message},
 };
 
 use super::ScabbardStoreOperations;
@@ -45,7 +45,7 @@ pub(in crate::store::scabbard_store::diesel) trait AddEventOperation {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError>;
 }
 
@@ -55,10 +55,10 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let ScabbardConsensusEvent::Scabbard2pcConsensusEvent(event) = event;
+            let ConsensusEvent::TwoPhaseCommit(event) = event;
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
@@ -108,21 +108,19 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 .first::<i64>(self.conn)?;
 
             match event {
-                Scabbard2pcEvent::Alarm() => Ok(event_id),
-                Scabbard2pcEvent::Deliver(receiving_process, message) => {
+                Event::Alarm() => Ok(event_id),
+                Event::Deliver(receiving_process, message) => {
                     let (message_type, vote_response, vote_request) = match message {
-                        Scabbard2pcMessage::DecisionRequest(_) => {
-                            (String::from(&message), None, None)
-                        }
-                        Scabbard2pcMessage::VoteResponse(_, true) => {
+                        Message::DecisionRequest(_) => (String::from(&message), None, None),
+                        Message::VoteResponse(_, true) => {
                             (String::from(&message), Some("TRUE".to_string()), None)
                         }
-                        Scabbard2pcMessage::VoteResponse(_, false) => {
+                        Message::VoteResponse(_, false) => {
                             (String::from(&message), Some("FALSE".to_string()), None)
                         }
-                        Scabbard2pcMessage::Commit(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::Abort(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::VoteRequest(_, ref value) => {
+                        Message::Commit(_) => (String::from(&message), None, None),
+                        Message::Abort(_) => (String::from(&message), None, None),
+                        Message::VoteRequest(_, ref value) => {
                             (String::from(&message), None, Some(value.clone()))
                         }
                     };
@@ -141,7 +139,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         .execute(self.conn)?;
                     Ok(event_id)
                 }
-                Scabbard2pcEvent::Start(value) => {
+                Event::Start(value) => {
                     let start_event = Consensus2pcStartEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
@@ -153,7 +151,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         .execute(self.conn)?;
                     Ok(event_id)
                 }
-                Scabbard2pcEvent::Vote(vote) => {
+                Event::Vote(vote) => {
                     let vote = match vote {
                         true => String::from("TRUE"),
                         false => String::from("FALSE"),
@@ -180,10 +178,10 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-        event: ScabbardConsensusEvent,
+        event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let ScabbardConsensusEvent::Scabbard2pcConsensusEvent(event) = event;
+            let ConsensusEvent::TwoPhaseCommit(event) = event;
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
             })?;
@@ -230,21 +228,19 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                 .get_result(self.conn)?;
 
             match event {
-                Scabbard2pcEvent::Alarm() => Ok(event_id),
-                Scabbard2pcEvent::Deliver(receiving_process, message) => {
+                Event::Alarm() => Ok(event_id),
+                Event::Deliver(receiving_process, message) => {
                     let (message_type, vote_response, vote_request) = match message {
-                        Scabbard2pcMessage::DecisionRequest(_) => {
-                            (String::from(&message), None, None)
-                        }
-                        Scabbard2pcMessage::VoteResponse(_, true) => {
+                        Message::DecisionRequest(_) => (String::from(&message), None, None),
+                        Message::VoteResponse(_, true) => {
                             (String::from(&message), Some("TRUE".to_string()), None)
                         }
-                        Scabbard2pcMessage::VoteResponse(_, false) => {
+                        Message::VoteResponse(_, false) => {
                             (String::from(&message), Some("FALSE".to_string()), None)
                         }
-                        Scabbard2pcMessage::Commit(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::Abort(_) => (String::from(&message), None, None),
-                        Scabbard2pcMessage::VoteRequest(_, ref value) => {
+                        Message::Commit(_) => (String::from(&message), None, None),
+                        Message::Abort(_) => (String::from(&message), None, None),
+                        Message::VoteRequest(_, ref value) => {
                             (String::from(&message), None, Some(value.clone()))
                         }
                     };
@@ -263,7 +259,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                         .execute(self.conn)?;
                     Ok(event_id)
                 }
-                Scabbard2pcEvent::Start(value) => {
+                Event::Start(value) => {
                     let start_event = Consensus2pcStartEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
@@ -275,7 +271,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                         .execute(self.conn)?;
                     Ok(event_id)
                 }
-                Scabbard2pcEvent::Vote(vote) => {
+                Event::Vote(vote) => {
                     let vote = match vote {
                         true => String::from("TRUE"),
                         false => String::from("FALSE"),

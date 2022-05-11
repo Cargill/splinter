@@ -66,13 +66,9 @@ mod tests {
     use crate::store::PooledSqliteScabbardStoreFactory;
     use crate::store::ScabbardStore;
     use crate::store::{
-        action::ScabbardConsensusAction,
-        context::ScabbardContext,
-        two_phase::{
-            action::{ConsensusAction, ConsensusActionNotification},
-            context::{ContextBuilder, Participant},
-            state::Scabbard2pcState,
-        },
+        action::ConsensusAction,
+        context::ConsensusContext,
+        two_phase_commit::{Action, ContextBuilder, Notification, Participant, State},
     };
 
     /// Test that the `ScabbardTimerFilter`'s `filter` function works
@@ -136,22 +132,20 @@ mod tests {
                 process: peer_service1.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
 
-        let context = ScabbardContext::Scabbard2pcContext(coordinator_context);
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         // add a coordinator context for the first service
         store
             .add_consensus_context(&fqsi, context)
             .expect("failed to add context to store");
 
-        let notification = ConsensusActionNotification::RequestForStart();
-        let action = ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Notify(
-            notification,
-        ));
+        let notification = Notification::RequestForStart();
+        let action = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
 
         // add an unexecuted action for the first service
         let action_id = store
@@ -178,11 +172,11 @@ mod tests {
                 process: peer_service1.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_state(State::WaitingForVoteRequest)
             .with_this_process(fqsi2.clone().service_id())
             .build()
             .expect("failed to build context");
-        let context2 = ScabbardContext::Scabbard2pcContext(participant_context);
+        let context2 = ConsensusContext::TwoPhaseCommit(participant_context);
 
         // add a context for the second service
         store
@@ -196,11 +190,8 @@ mod tests {
         assert!(ids.contains(&fqsi));
         assert!(ids.contains(&fqsi2));
 
-        let notification2 =
-            ConsensusActionNotification::MessageDropped("test dropped message".to_string());
-        let action2 = ScabbardConsensusAction::Scabbard2pcConsensusAction(ConsensusAction::Notify(
-            notification2,
-        ));
+        let notification2 = Notification::MessageDropped("test dropped message".to_string());
+        let action2 = ConsensusAction::TwoPhaseCommit(Action::Notify(notification2));
 
         // add an unexecuted action for the second service
         let action_id2 = store
@@ -226,14 +217,14 @@ mod tests {
                 process: peer_service1.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForVoteRequest)
+            .with_state(State::WaitingForVoteRequest)
             .with_this_process(fqsi2.clone().service_id())
             .build()
             .expect("failed to build context");
 
         // reset the alarms for both services to far in the future
         store
-            .update_consensus_context(&fqsi2, ScabbardContext::Scabbard2pcContext(update_context2))
+            .update_consensus_context(&fqsi2, ConsensusContext::TwoPhaseCommit(update_context2))
             .expect("failed to update context");
 
         let updated_alarm = SystemTime::now()
@@ -248,13 +239,13 @@ mod tests {
                 process: peer_service1.clone(),
                 vote: None,
             }])
-            .with_state(Scabbard2pcState::WaitingForStart)
+            .with_state(State::WaitingForStart)
             .with_this_process(fqsi.clone().service_id())
             .build()
             .expect("failed to build context");
 
         store
-            .update_consensus_context(&fqsi, ScabbardContext::Scabbard2pcContext(update_context1))
+            .update_consensus_context(&fqsi, ConsensusContext::TwoPhaseCommit(update_context1))
             .expect("failed to update context");
 
         // update the second service's action's executed_at time so that it appears to have

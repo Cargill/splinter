@@ -17,12 +17,9 @@ use std::sync::Arc;
 use splinter::{error::InternalError, service::ServiceId, store::command::StoreCommand};
 
 use crate::store::{
-    context::ScabbardContext,
+    context::ConsensusContext,
     service::ScabbardService,
-    two_phase::{
-        context::{Context, ContextBuilder, Participant},
-        state::Scabbard2pcState,
-    },
+    two_phase_commit::{Context, ContextBuilder, Participant, State},
     ScabbardStoreFactory,
 };
 
@@ -58,7 +55,7 @@ impl<C> StoreCommand for ScabbardPrepareServiceCommand<C> {
         store
             .add_consensus_context(
                 self.scabbard_service.service_id(),
-                ScabbardContext::Scabbard2pcContext(context),
+                ConsensusContext::TwoPhaseCommit(context),
             )
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
         Ok(())
@@ -78,9 +75,9 @@ fn create_context(service: &ScabbardService) -> Result<Context, InternalError> {
     })?;
 
     let state = if service.service_id().service_id() == &coordinator {
-        Scabbard2pcState::WaitingForStart
+        State::WaitingForStart
     } else {
-        Scabbard2pcState::WaitingForVoteRequest
+        State::WaitingForVoteRequest
     };
     ContextBuilder::default()
         .with_coordinator(&coordinator)

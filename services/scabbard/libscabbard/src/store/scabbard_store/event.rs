@@ -12,25 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::store::scabbard_store::two_phase::event::Scabbard2pcEvent;
+use crate::store::scabbard_store::two_phase_commit::Event;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ScabbardConsensusEvent {
-    Scabbard2pcConsensusEvent(Scabbard2pcEvent),
+pub enum ConsensusEvent {
+    TwoPhaseCommit(Event),
 }
 
 // A scabbard consensus event that includes the event ID associated with the event
 #[derive(Debug, PartialEq, Clone)]
-pub enum ReturnedScabbardConsensusEvent {
-    Scabbard2pcConsensusEvent(i64, Scabbard2pcEvent),
+pub enum IdentifiedConsensusEvent {
+    TwoPhaseCommit(i64, Event),
 }
 
-impl ReturnedScabbardConsensusEvent {
-    pub fn deconstruct(self) -> (i64, ScabbardConsensusEvent) {
+impl IdentifiedConsensusEvent {
+    pub fn deconstruct(self) -> (i64, ConsensusEvent) {
         match self {
-            Self::Scabbard2pcConsensusEvent(id, event) => {
-                (id, ScabbardConsensusEvent::Scabbard2pcConsensusEvent(event))
-            }
+            Self::TwoPhaseCommit(id, event) => (id, ConsensusEvent::TwoPhaseCommit(event)),
         }
     }
 }
