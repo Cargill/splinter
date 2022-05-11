@@ -25,7 +25,7 @@ use std::sync::Arc;
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::service::MessageSenderFactory;
-use splinter::store::command::StoreCommandExecutor;
+use splinter::store::command::StoreCommand;
 
 use crate::store::action::IdentifiedConsensusAction;
 use crate::store::two_phase_commit::Action;
@@ -40,21 +40,14 @@ pub use self::context_updater::{ContextUpdater, ScabbardStoreContextUpdater};
 pub use self::notify_observer::{CommandNotifyObserver, NotifyObserver};
 
 /// Runs the actions provided from the consensus algorithm, in order of receipt.
-pub struct ConsensusActionRunner<E: 'static>
-where
-    E: StoreCommandExecutor,
-{
+pub struct ConsensusActionRunner<C> {
     message_sender_factory: Box<dyn MessageSenderFactory<Vec<u8>>>,
-    context_updater: Box<dyn ContextUpdater<E::Context>>,
-    notify_observer: Box<dyn NotifyObserver<E::Context>>,
-    store_factory: Arc<dyn ScabbardStoreFactory<E::Context>>,
-    store_command_executor: E,
+    context_updater: Box<dyn ContextUpdater<C>>,
+    notify_observer: Box<dyn NotifyObserver<C>>,
+    store_factory: Arc<dyn ScabbardStoreFactory<C>>,
 }
 
-impl<E: 'static> ConsensusActionRunner<E>
-where
-    E: StoreCommandExecutor,
-{
+impl<C: 'static> ConsensusActionRunner<C> {
     /// Create a new ConsensusActionRunner
     ///
     /// # Arguments
@@ -69,16 +62,14 @@ where
     ///     components
     pub fn new(
         message_sender_factory: Box<dyn MessageSenderFactory<Vec<u8>>>,
-        context_updater: Box<dyn ContextUpdater<E::Context>>,
-        notify_observer: Box<dyn NotifyObserver<E::Context>>,
-        store_factory: Arc<dyn ScabbardStoreFactory<E::Context>>,
-        store_command_executor: E,
+        context_updater: Box<dyn ContextUpdater<C>>,
+        notify_observer: Box<dyn NotifyObserver<C>>,
+        store_factory: Arc<dyn ScabbardStoreFactory<C>>,
     ) -> Self {
         ConsensusActionRunner {
             message_sender_factory,
             context_updater,
             notify_observer,
-            store_command_executor,
             store_factory,
         }
     }
@@ -99,9 +90,9 @@ where
         actions: Vec<IdentifiedConsensusAction>,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<(), InternalError> {
+    ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError> {
+        let mut commands = Vec::new();
         for action in actions {
-            let mut commands = Vec::new();
             match &action {
                 IdentifiedConsensusAction::TwoPhaseCommit(
                     action_id,
@@ -164,10 +155,8 @@ where
                     )));
                 }
             }
-
-            self.store_command_executor.execute(commands)?
         }
-        Ok(())
+        Ok(commands)
     }
 }
 
@@ -185,7 +174,7 @@ mod tests {
     };
 
     use splinter::service::{MessageSender, ServiceId};
-    use splinter::store::command::StoreCommand;
+    use splinter::store::command::StoreCommandExecutor;
 
     use crate::migrations::run_sqlite_migrations;
     use crate::store::pool::ConnectionPool;
@@ -250,7 +239,8 @@ mod tests {
     }
 
     fn create_action_runner() -> (
-        ConsensusActionRunner<SqliteCommandExecutor>,
+        ConsensusActionRunner<SqliteConnection>,
+        SqliteCommandExecutor,
         TestMessageSenderFactory,
         Box<dyn ScabbardStore>,
     ) {
@@ -275,12 +265,16 @@ mod tests {
             context_updater,
             notify_observer,
             store_factory,
-            store_command_executor,
         );
 
         let scabbard_store = Box::new(DieselScabbardStore::new(pool.clone()));
 
-        (action_runner, test_messsage_factory, scabbard_store)
+        (
+            action_runner,
+            store_command_executor,
+            test_messsage_factory,
+            scabbard_store,
+        )
     }
 
     fn create_context(service: &ScabbardService) -> Result<Context, InternalError> {
@@ -398,7 +392,8 @@ mod tests {
     /// 8. Verify a commit entry was added after RequestForStart
     #[test]
     fn test_consensus_action_runner() {
-        let (action_runner, message_sender_factory, scabbard_store) = create_action_runner();
+        let (action_runner, executor, message_sender_factory, scabbard_store) =
+            create_action_runner();
 
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
@@ -459,9 +454,11 @@ mod tests {
             .list_consensus_actions(&service_fqsi, 1)
             .expect("unable to get actions");
 
-        action_runner
+        let commands = action_runner
             .run_actions(actions, &service_fqsi, 1)
             .unwrap();
+
+        executor.execute(commands).unwrap();
 
         // verify that all actions were handled
         assert!(scabbard_store
