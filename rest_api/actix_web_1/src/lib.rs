@@ -24,5 +24,7 @@ extern crate serde_json;
 
 #[cfg(feature = "admin-service")]
 pub mod admin;
+#[cfg(feature = "biome")]
+pub mod biome;
 
 mod hex;

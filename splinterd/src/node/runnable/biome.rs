@@ -18,7 +18,6 @@ use std::sync::Arc;
 
 use splinter::biome::{
     credentials::rest_api::BiomeCredentialsRestResourceProviderBuilder,
-    key_management::rest_api::BiomeKeyManagementRestResourceProvider,
     profile::rest_api::BiomeProfileRestResourceProvider, UserProfileStore,
 };
 use splinter::error::InternalError;
@@ -26,6 +25,7 @@ use splinter::rest_api::{
     actix_web_1::Resource as Actix1Resource, AuthConfig, RestResourceProvider,
 };
 use splinter::store::StoreFactory;
+use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
 
 use crate::node::running::biome::BiomeSubsystem;
 

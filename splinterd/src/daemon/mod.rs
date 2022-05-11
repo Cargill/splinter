@@ -43,8 +43,6 @@ use splinter::admin::lifecycle::LifecycleDispatch;
 use splinter::admin::service::{admin_service_id, AdminService, AdminServiceBuilder};
 #[cfg(feature = "biome-credentials")]
 use splinter::biome::credentials::rest_api::BiomeCredentialsRestResourceProviderBuilder;
-#[cfg(feature = "biome-key-management")]
-use splinter::biome::key_management::rest_api::BiomeKeyManagementRestResourceProvider;
 #[cfg(feature = "biome-profile")]
 use splinter::biome::profile::rest_api::BiomeProfileRestResourceProvider;
 use splinter::circuit::handlers::{
@@ -112,6 +110,8 @@ use splinter::transport::{
     Transport,
 };
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
+#[cfg(feature = "biome-key-management")]
+use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
 
 use crate::node_id::get_node_id;
 use crate::routes;

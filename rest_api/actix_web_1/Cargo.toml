@@ -45,6 +45,8 @@ stable = [
     # The following features are stable:
     "admin-service",
     "authorization",
+    "biome",
+    "biome-key-management",
     "rest-api",
 ]
 
@@ -66,3 +68,5 @@ admin-service = [
 ]
 authorization = ["splinter/authorization"]
 rest-api = ["splinter/rest-api"]
+biome = ["splinter/biome"]
+biome-key-management = ["biome", "splinter/biome-key-management"]

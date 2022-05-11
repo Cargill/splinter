@@ -14,20 +14,20 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::HttpResponse;
-use crate::biome::key_management::{
-    rest_api::resources::{NewKey, ResponseKey, UpdatedKey},
-    store::{KeyStore, KeyStoreError},
-    Key,
-};
-use crate::futures::{Future, IntoFuture};
+use crate::biome::key_management::resources::{NewKey, ResponseKey, UpdatedKey};
+use futures::{Future, IntoFuture};
+
+use splinter::actix_web::HttpResponse;
+use splinter::biome::key_management::store::{KeyStore, KeyStoreError};
+use splinter::biome::key_management::Key;
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::authorization::Permission;
-use crate::rest_api::{
+use splinter::rest_api::auth::authorization::Permission;
+use splinter::rest_api::{
     actix_web_1::{into_bytes, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
     auth::identity::Identity,
-    ErrorResponse, SPLINTER_PROTOCOL_VERSION,
+    ErrorResponse,
 };
+use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
 
 const BIOME_KEYS_PROTOCOL_MIN: u32 = 1;
 const BIOME_REPLACE_KEYS_PROTOCOL_MIN: u32 = 2;
