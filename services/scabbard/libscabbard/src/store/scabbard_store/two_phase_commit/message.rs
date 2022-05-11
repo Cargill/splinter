@@ -92,3 +92,18 @@ impl TryFrom<AugrimTwoPhaseCommitMessage<ScabbardValue>> for Message {
         })
     }
 }
+
+#[cfg(feature = "scabbardv3-consensus")]
+impl TryFrom<Message> for AugrimTwoPhaseCommitMessage<ScabbardValue> {
+    type Error = InternalError;
+
+    fn try_from(msg: Message) -> Result<Self, Self::Error> {
+        Ok(match msg {
+            Message::VoteRequest(epoch, val) => Self::VoteRequest(epoch, val.into()),
+            Message::Commit(epoch) => Self::Commit(epoch),
+            Message::Abort(epoch) => Self::Abort(epoch),
+            Message::DecisionRequest(epoch) => Self::DecisionRequest(epoch),
+            Message::VoteResponse(epoch, vote) => Self::VoteResponse(epoch, vote),
+        })
+    }
+}
