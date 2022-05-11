@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "scabbardv3-consensus")]
+use std::convert::TryFrom;
 use std::time::SystemTime;
+
+#[cfg(feature = "scabbardv3-consensus")]
+use augrim::{error::InternalError, two_phase_commit::TwoPhaseCommitState};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum State {
@@ -28,4 +33,52 @@ pub enum State {
     WaitingForStart,
     WaitingForVoteRequest,
     WaitingForVote,
+}
+
+#[cfg(feature = "scabbardv3-consensus")]
+impl TryFrom<State> for TwoPhaseCommitState<SystemTime> {
+    type Error = InternalError;
+
+    fn try_from(state: State) -> Result<Self, Self::Error> {
+        Ok(match state {
+            State::Abort => Self::Abort,
+            State::Commit => Self::Commit,
+            State::Voted {
+                vote,
+                decision_timeout_start,
+            } => Self::Voted {
+                vote,
+                decision_timeout_start,
+            },
+            State::Voting { vote_timeout_start } => Self::Voting { vote_timeout_start },
+            State::WaitingForStart => Self::WaitingForStart,
+            State::WaitingForVoteRequest => Self::WaitingForVoteRequest,
+            State::WaitingForVote => Self::WaitingForVote,
+        })
+    }
+}
+
+#[cfg(feature = "scabbardv3-consensus")]
+impl TryFrom<TwoPhaseCommitState<SystemTime>> for State {
+    type Error = InternalError;
+
+    fn try_from(state: TwoPhaseCommitState<SystemTime>) -> Result<Self, Self::Error> {
+        Ok(match state {
+            TwoPhaseCommitState::Abort => Self::Abort,
+            TwoPhaseCommitState::Commit => Self::Commit,
+            TwoPhaseCommitState::Voted {
+                vote,
+                decision_timeout_start,
+            } => Self::Voted {
+                vote,
+                decision_timeout_start,
+            },
+            TwoPhaseCommitState::Voting { vote_timeout_start } => {
+                Self::Voting { vote_timeout_start }
+            }
+            TwoPhaseCommitState::WaitingForStart => Self::WaitingForStart,
+            TwoPhaseCommitState::WaitingForVoteRequest => Self::WaitingForVoteRequest,
+            TwoPhaseCommitState::WaitingForVote => Self::WaitingForVote,
+        })
+    }
 }

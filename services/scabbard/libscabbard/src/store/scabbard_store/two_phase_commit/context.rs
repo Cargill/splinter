@@ -12,12 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "scabbardv3-consensus")]
+use std::convert::{TryFrom, TryInto as _};
 use std::time::SystemTime;
+
+#[cfg(feature = "scabbardv3-consensus")]
+use augrim::{
+    error::InternalError,
+    two_phase_commit::{
+        Participant as AugrimParticipant, TwoPhaseCommitContext, TwoPhaseCommitContextBuilder,
+    },
+};
 
 use splinter::error::InvalidStateError;
 use splinter::service::ServiceId;
 
 use crate::store::scabbard_store::two_phase_commit::State;
+
+#[cfg(feature = "scabbardv3-consensus")]
+use crate::service::v3::ScabbardProcess;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Context {
@@ -169,4 +182,102 @@ impl ContextBuilder {
 pub struct Participant {
     pub process: ServiceId,
     pub vote: Option<bool>,
+}
+
+#[cfg(feature = "scabbardv3-consensus")]
+impl TryFrom<TwoPhaseCommitContext<ScabbardProcess, SystemTime>> for Context {
+    type Error = InternalError;
+
+    fn try_from(
+        ctx: TwoPhaseCommitContext<ScabbardProcess, SystemTime>,
+    ) -> Result<Self, Self::Error> {
+        let mut builder = ContextBuilder::default()
+            .with_epoch(*ctx.epoch())
+            .with_coordinator(&ctx.coordinator().clone().into())
+            .with_this_process(&ctx.this_process().clone().into())
+            .with_state(ctx.state().try_into()?);
+
+        if let Some(last_commit_epoch) = ctx.last_commit_epoch() {
+            builder = builder.with_last_commit_epoch(*last_commit_epoch);
+        }
+
+        if let Some(participants) = ctx.participants() {
+            builder = builder.with_participants(
+                participants
+                    .iter()
+                    .cloned()
+                    .map(|p| Participant {
+                        process: p.process.into(),
+                        vote: p.vote,
+                    })
+                    .collect(),
+            );
+        }
+
+        if let Some(participant_processes) = ctx.participant_processes() {
+            builder = builder.with_participants(
+                participant_processes
+                    .iter()
+                    .cloned()
+                    .map(|p| Participant {
+                        process: p.into(),
+                        vote: None,
+                    })
+                    .collect(),
+            );
+        }
+
+        builder
+            .build()
+            .map_err(|e| InternalError::from_source(Box::new(e)))
+    }
+}
+
+#[cfg(feature = "scabbardv3-consensus")]
+impl TryFrom<Context> for TwoPhaseCommitContext<ScabbardProcess, SystemTime> {
+    type Error = InternalError;
+
+    fn try_from(ctx: Context) -> Result<Self, Self::Error> {
+        let Context {
+            coordinator,
+            epoch,
+            last_commit_epoch,
+            this_process,
+            participants,
+            state,
+            ..
+        } = ctx;
+
+        let mut builder = TwoPhaseCommitContextBuilder::new();
+
+        if coordinator == this_process {
+            builder = builder.with_participants(
+                participants
+                    .into_iter()
+                    .map(|p| AugrimParticipant {
+                        process: p.process.into(),
+                        vote: p.vote,
+                    })
+                    .collect(),
+            );
+        } else {
+            builder = builder.with_participant_processes(
+                participants.into_iter().map(|p| p.process.into()).collect(),
+            );
+        }
+
+        builder = builder
+            .with_this_process(this_process.into())
+            .with_coordinator(coordinator.into())
+            .with_epoch(epoch)
+            .with_state(state.try_into()?);
+
+        if let Some(last_commit_epoch) = last_commit_epoch {
+            builder = builder.with_last_commit_epoch(last_commit_epoch);
+        }
+
+        builder
+            .build()
+            .map_err(|e| InternalError::from_source(Box::new(e)))
+    }
 }
