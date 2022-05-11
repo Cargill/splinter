@@ -282,8 +282,13 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
+    use crate::error::InternalError;
     use crate::error::InvalidStateError;
     use crate::registry::{error::RegistryError, NodeIter};
+    use crate::rest_api::actix_web_1::AuthConfig;
+    use crate::rest_api::auth::authorization::{AuthorizationHandler, AuthorizationHandlerResult};
+    use crate::rest_api::auth::identity::{Identity, IdentityProvider};
+    use crate::rest_api::auth::AuthorizationHeader;
     use crate::rest_api::{
         actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
         paging::Paging,
@@ -301,6 +306,7 @@ mod tests {
         let resp = Client::new()
             .get(url)
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
+            .header("Authorization", "custom")
             .send()
             .expect("Failed to perform request");
 
@@ -359,6 +365,7 @@ mod tests {
         let resp = Client::new()
             .get(url)
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
+            .header("Authorization", "custom")
             .send()
             .expect("Failed to perform request");
 
@@ -406,6 +413,7 @@ mod tests {
         let resp = Client::new()
             .get(url)
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
+            .header("Authorization", "custom")
             .send()
             .expect("Failed to perform request");
 
@@ -429,6 +437,7 @@ mod tests {
         let resp = Client::new()
             .post(url)
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
+            .header("Authorization", "custom")
             .send()
             .expect("Failed to perform request");
 
@@ -440,6 +449,7 @@ mod tests {
         let resp = Client::new()
             .post(url)
             .header("SplinterProtocolVersion", SPLINTER_PROTOCOL_VERSION)
+            .header("Authorization", "custom")
             .json(&get_new_node_1())
             .send()
             .expect("Failed to perform request");
@@ -459,13 +469,21 @@ mod tests {
         let bind = "127.0.0.1:0";
         #[cfg(feature = "https-bind")]
         let bind = crate::rest_api::BindConfig::Http("127.0.0.1:0".into());
+        let identity_provider = MockIdentityProvider::default().clone_box();
+        let auth_config = AuthConfig::Custom {
+            resources: Vec::new(),
+            identity_provider,
+        };
+        let authorization_handlers = vec![MockAuthorizationHandler::default().clone_box()];
 
         let result = RestApiBuilder::new()
             .with_bind(bind)
             .add_resources(resources.clone())
-            .build_insecure()
+            .push_auth_config(auth_config)
+            .with_authorization_handlers(authorization_handlers)
+            .build()
             .expect("Failed to build REST API")
-            .run_insecure();
+            .run();
         match result {
             Ok((shutdown_handle, join_handle)) => {
                 let port = shutdown_handle.port_numbers()[0];
@@ -612,6 +630,37 @@ mod tests {
                 .lock()
                 .expect("mem registry lock was poisoned")
                 .remove(identity))
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct MockIdentityProvider {}
+
+    impl IdentityProvider for MockIdentityProvider {
+        fn get_identity(
+            &self,
+            _authorization: &AuthorizationHeader,
+        ) -> Result<Option<Identity>, InternalError> {
+            Ok(Some(Identity::Custom("custom".to_string())))
+        }
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct MockAuthorizationHandler {}
+
+    impl AuthorizationHandler for MockAuthorizationHandler {
+        fn has_permission(
+            &self,
+            _identity: &Identity,
+            _permission_id: &str,
+        ) -> Result<AuthorizationHandlerResult, InternalError> {
+            Ok(AuthorizationHandlerResult::Allow)
+        }
+        fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
+            Box::new(self.clone())
         }
     }
 
