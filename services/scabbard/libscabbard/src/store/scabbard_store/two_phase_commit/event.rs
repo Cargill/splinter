@@ -12,7 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "scabbardv3-consensus")]
+use std::convert::{TryFrom, TryInto as _};
+
+#[cfg(feature = "scabbardv3-consensus")]
+use augrim::{error::InternalError, two_phase_commit::TwoPhaseCommitEvent};
 use splinter::service::ServiceId;
+
+#[cfg(feature = "scabbardv3-consensus")]
+use crate::service::v3::{ScabbardProcess, ScabbardValue};
 
 use super::message::Message;
 
@@ -22,4 +30,20 @@ pub enum Event {
     Deliver(ServiceId, Message),
     Start(Vec<u8>),
     Vote(bool),
+}
+
+#[cfg(feature = "scabbardv3-consensus")]
+impl TryFrom<Event> for TwoPhaseCommitEvent<ScabbardProcess, ScabbardValue> {
+    type Error = InternalError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        Ok(match event {
+            Event::Alarm() => Self::Alarm(),
+            Event::Deliver(service_id, message) => {
+                Self::Deliver(service_id.into(), message.try_into()?)
+            }
+            Event::Start(val) => Self::Start(val.into()),
+            Event::Vote(vote) => Self::Vote(vote),
+        })
+    }
 }

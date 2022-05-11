@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "scabbardv3-consensus")]
+use std::convert::{TryFrom, TryInto as _};
+
+#[cfg(feature = "scabbardv3-consensus")]
+use augrim::{error::InternalError, two_phase_commit::TwoPhaseCommitEvent};
+
+#[cfg(feature = "scabbardv3-consensus")]
+use crate::service::v3::{ScabbardProcess, ScabbardValue};
 use crate::store::scabbard_store::two_phase_commit::Event;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -29,6 +37,17 @@ impl IdentifiedConsensusEvent {
     pub fn deconstruct(self) -> (i64, ConsensusEvent) {
         match self {
             Self::TwoPhaseCommit(id, event) => (id, ConsensusEvent::TwoPhaseCommit(event)),
+        }
+    }
+}
+
+#[cfg(feature = "scabbardv3-consensus")]
+impl TryFrom<ConsensusEvent> for TwoPhaseCommitEvent<ScabbardProcess, ScabbardValue> {
+    type Error = InternalError;
+
+    fn try_from(event: ConsensusEvent) -> Result<Self, Self::Error> {
+        match event {
+            ConsensusEvent::TwoPhaseCommit(event) => event.try_into(),
         }
     }
 }
