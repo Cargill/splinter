@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod action;
+pub mod alarm;
 mod boxed;
 pub mod commit;
 pub mod context;
@@ -29,6 +30,7 @@ use std::time::SystemTime;
 pub(crate) use error::ScabbardStoreError;
 
 use action::{ConsensusAction, IdentifiedConsensusAction};
+use alarm::AlarmType;
 use commit::CommitEntry;
 use context::ConsensusContext;
 use event::{ConsensusEvent, IdentifiedConsensusEvent};
@@ -231,4 +233,45 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
     ) -> Result<(), ScabbardStoreError>;
+
+    /// Set a scabbard alarm for a given service
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The fully qualified service id for the `ScabbardService` that the alarm
+    ///   will be set for
+    /// * `alarm` - The time that the alarm will go off
+    /// * `alarm_type` - The type of alarm being set
+    fn set_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+        alarm: SystemTime,
+    ) -> Result<(), ScabbardStoreError>;
+
+    /// Unset a scabbard alarm of a specified type for a given service
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The fully qualified service id for the `ScabbardService` that the alarm
+    ///   will be unset for
+    /// * `alarm_type` - The type of alarm being unset
+    fn unset_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<(), ScabbardStoreError>;
+
+    /// Get the scabbard alarm of a specified type for the given service
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The fully qualified service id for the `ScabbardService` to retrieve the
+    ///    alarm for
+    /// * `alarm_type` - The type of alarm to retrieve
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError>;
 }

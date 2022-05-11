@@ -33,6 +33,7 @@ use crate::store::pool::ConnectionPool;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     action::IdentifiedConsensusAction,
+    alarm::AlarmType,
     commit::CommitEntry,
     event::{ConsensusEvent, IdentifiedConsensusEvent},
     service::ScabbardService,
@@ -46,6 +47,7 @@ use operations::add_consensus_action::AddActionOperation as _;
 use operations::add_consensus_context::AddContextOperation as _;
 use operations::add_consensus_event::AddEventOperation as _;
 use operations::add_service::AddServiceOperation as _;
+use operations::get_alarm::GetAlarmOperation as _;
 use operations::get_current_consensus_context::GetCurrentContextAction as _;
 use operations::get_last_commit_entry::GetLastCommitEntryOperation as _;
 use operations::get_service::GetServiceOperation as _;
@@ -53,6 +55,8 @@ use operations::list_consensus_actions::ListActionsOperation as _;
 use operations::list_consensus_events::ListEventsOperation as _;
 use operations::list_ready_services::ListReadyServicesOperation as _;
 use operations::remove_service::RemoveServiceOperation as _;
+use operations::set_alarm::SetAlarmOperation as _;
+use operations::unset_alarm::UnsetAlarmOperation as _;
 use operations::update_commit_entry::UpdateCommitEntryOperation as _;
 use operations::update_consensus_action::UpdateActionOperation as _;
 use operations::update_consensus_context::UpdateContextAction as _;
@@ -241,6 +245,40 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).remove_service(service_id))
     }
+
+    /// Set a scabbard alarm
+    fn set_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+        alarm: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).set_alarm(service_id, alarm_type, alarm)
+        })
+    }
+
+    /// Unset a scabbard alarm
+    fn unset_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).unset_alarm(service_id, alarm_type)
+        })
+    }
+
+    /// Get the scabbard alarm of a specified type for the given service
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).get_alarm(service_id, alarm_type)
+        })
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -402,6 +440,40 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).remove_service(service_id))
     }
+
+    /// Set a scabbard alarm
+    fn set_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+        alarm: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).set_alarm(service_id, alarm_type, alarm)
+        })
+    }
+
+    /// Unset a scabbard alarm
+    fn unset_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).unset_alarm(service_id, alarm_type)
+        })
+    }
+
+    /// Get the scabbard alarm of a specified type for the given service
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).get_alarm(service_id, alarm_type)
+        })
+    }
 }
 
 pub struct DieselConnectionScabbardStore<'a, C>
@@ -553,6 +625,34 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).remove_service(service_id)
     }
+
+    /// Set a scabbard alarm
+    fn set_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+        alarm: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).set_alarm(service_id, alarm_type, alarm)
+    }
+
+    /// Unset a scabbard alarm
+    fn unset_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).unset_alarm(service_id, alarm_type)
+    }
+
+    /// Get the scabbard alarm of a specified type for the given service
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).get_alarm(service_id, alarm_type)
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -685,6 +785,34 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).remove_service(service_id)
     }
+
+    /// Set a scabbard alarm
+    fn set_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+        alarm: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).set_alarm(service_id, alarm_type, alarm)
+    }
+
+    /// Unset a scabbard alarm
+    fn unset_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).unset_alarm(service_id, alarm_type)
+    }
+
+    /// Get the scabbard alarm of a specified type for the given service
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).get_alarm(service_id, alarm_type)
+    }
 }
 
 #[cfg(all(test, feature = "sqlite"))]
@@ -725,12 +853,7 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -748,7 +871,6 @@ pub mod tests {
             .is_ok());
 
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -782,12 +904,7 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -828,19 +945,7 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
-        let alarm = SystemTime::UNIX_EPOCH
-            .checked_add(Duration::from_secs(
-                SystemTime::now()
-                    .checked_add(Duration::from_secs(60))
-                    .expect("failed to get alarm time")
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .expect("failed to get duration since UNIX EPOCH")
-                    .as_secs(),
-            ))
-            .unwrap();
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -872,7 +977,6 @@ pub mod tests {
             .unwrap();
 
         let update_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -901,7 +1005,6 @@ pub mod tests {
             .expect("failed to list all actions");
 
         let expected_update_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -950,12 +1053,7 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -984,7 +1082,6 @@ pub mod tests {
             .unwrap();
 
         let update_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1004,7 +1101,6 @@ pub mod tests {
             .is_ok());
 
         let bad_update_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(0)
             .with_participants(vec![Participant {
@@ -1041,12 +1137,7 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1075,7 +1166,6 @@ pub mod tests {
             .unwrap();
 
         let update_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1172,7 +1262,6 @@ pub mod tests {
         assert!(store.add_service(service).is_ok());
 
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(SystemTime::now())
             .with_coordinator(service_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1190,6 +1279,10 @@ pub mod tests {
             .add_consensus_context(&service_fqsi, context)
             .expect("failed to add context to store");
 
+        store
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, SystemTime::now())
+            .expect("failed to add alarm to store");
+
         let ready_services = store
             .list_ready_services()
             .expect("failed to list ready services");
@@ -1204,26 +1297,10 @@ pub mod tests {
             .checked_add(Duration::from_secs(604800))
             .expect("failed to get alarm time");
 
-        let update_context = ContextBuilder::default()
-            .with_alarm(updated_alarm)
-            .with_coordinator(service_fqsi.clone().service_id())
-            .with_epoch(1)
-            .with_participants(vec![Participant {
-                process: peer_service_id.clone(),
-                vote: None,
-            }])
-            .with_state(State::WaitingForStart)
-            .with_this_process(service_fqsi.clone().service_id())
-            .build()
-            .expect("failed to build context");
-
         // update the context to have an alarm far in the future
         store
-            .update_consensus_context(
-                &service_fqsi,
-                ConsensusContext::TwoPhaseCommit(update_context),
-            )
-            .expect("failed to update context");
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, updated_alarm)
+            .expect("failed to add alarm to store");
 
         // add an action for the service
         let action_id = store
@@ -1453,7 +1530,6 @@ pub mod tests {
         assert!(store.add_service(service.clone()).is_ok());
 
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(SystemTime::now())
             .with_coordinator(service_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1470,6 +1546,10 @@ pub mod tests {
         store
             .add_consensus_context(&service_fqsi, context)
             .expect("failed to add context to store");
+
+        store
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, SystemTime::now())
+            .expect("failed to add alarm to store");
 
         let ready_services = store
             .list_ready_services()
@@ -1511,12 +1591,7 @@ pub mod tests {
         let participant_fqsi = FullyQualifiedServiceId::new_random();
         let participant2_fqsi = FullyQualifiedServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let participant_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![
@@ -1570,12 +1645,7 @@ pub mod tests {
         let participant_fqsi = FullyQualifiedServiceId::new_random();
         let participant2_fqsi = FullyQualifiedServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let participant_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![
@@ -1632,12 +1702,7 @@ pub mod tests {
         let participant_fqsi = FullyQualifiedServiceId::new_random();
         let participant2_fqsi = FullyQualifiedServiceId::new_random();
 
-        let alarm = SystemTime::now()
-            .checked_add(Duration::from_secs(60))
-            .expect("failed to get alarm time");
-
         let participant_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![
@@ -1772,19 +1837,7 @@ pub mod tests {
 
         store.add_service(service).expect("faield to add service");
 
-        let alarm = SystemTime::UNIX_EPOCH
-            .checked_add(Duration::from_secs(
-                SystemTime::now()
-                    .checked_add(Duration::from_secs(60))
-                    .expect("failed to get alarm time")
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .expect("failed to get duration since UNIX EPOCH")
-                    .as_secs(),
-            ))
-            .unwrap();
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1802,7 +1855,6 @@ pub mod tests {
             .expect("failed to add context");
 
         let participant_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1832,7 +1884,6 @@ pub mod tests {
         assert_eq!(current_context, Some(context2));
 
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(2)
             .with_participants(vec![Participant {
@@ -1856,7 +1907,6 @@ pub mod tests {
         assert_eq!(current_context, Some(context3));
 
         let participant_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(participant_service_id.clone().service_id())
             .with_epoch(3)
             .with_participants(vec![Participant {
@@ -1910,19 +1960,7 @@ pub mod tests {
             .add_service(service.clone())
             .expect("failed to add service");
 
-        let alarm = SystemTime::UNIX_EPOCH
-            .checked_add(Duration::from_secs(
-                SystemTime::now()
-                    .checked_add(Duration::from_secs(60))
-                    .expect("failed to get alarm time")
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .expect("failed to get duration since UNIX EPOCH")
-                    .as_secs(),
-            ))
-            .unwrap();
-
         let coordinator_context = ContextBuilder::default()
-            .with_alarm(alarm)
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
             .with_participants(vec![Participant {
@@ -1938,6 +1976,14 @@ pub mod tests {
         store
             .add_consensus_context(&coordinator_fqsi, context.clone())
             .expect("failed to add context");
+
+        store
+            .set_alarm(
+                &coordinator_fqsi,
+                &AlarmType::TwoPhaseCommit,
+                SystemTime::now(),
+            )
+            .expect("failed to add alarm to store");
 
         let fetched_service = store
             .get_service(&coordinator_fqsi)
@@ -1964,6 +2010,240 @@ pub mod tests {
             .get_current_consensus_context(&coordinator_fqsi)
             .expect("failed to get current context")
             .is_none());
+    }
+
+    /// Test that the scabbard store `set_alarm` operation is successful.
+    ///
+    /// 1. Add a service to the database
+    /// 2. Add a context to the database for the service
+    /// 3. Call `list_ready_services` and check that the service is not returned
+    /// 4. Set an alarm for the service and check that the operation was successful
+    /// 5. Call `list_ready_services` and check that the service is returned because it
+    ///    has an alarm that has passed
+    #[test]
+    fn scabbard_store_set_alarm() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
+            .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
+
+        let peer_service_id = ServiceId::new_random();
+
+        // service with finalized status
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&service_fqsi)
+            .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        assert!(store.add_service(service.clone()).is_ok());
+
+        let coordinator_context = ContextBuilder::default()
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+            }])
+            .with_state(State::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
+
+        store
+            .add_consensus_context(&service_fqsi, context)
+            .expect("failed to add context to store");
+
+        let ready_services = store
+            .list_ready_services()
+            .expect("failed to list ready services");
+
+        // Check that the service is not returned yet because it does not have an alarm that has
+        // passed or outstanding actions
+        assert!(ready_services.is_empty());
+
+        assert!(store
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, SystemTime::now())
+            .is_ok());
+
+        let ready_services = store
+            .list_ready_services()
+            .expect("failed to list ready services");
+
+        // check that the service is returned because it has an alarm that has passed
+        assert_eq!(&ready_services[0], &service_fqsi);
+    }
+
+    /// Test that the scabbard store `unset_alarm` operation is successful.
+    ///
+    /// 1. Add a service to the database
+    /// 2. Add a context to the database for the service
+    /// 3. Call `list_ready_services` and check that the service is not returned
+    /// 4. Set an alarm for the service and check that the operation was successful
+    /// 5. Call `list_ready_services` and check that the service is returned because it
+    ///    has an alarm that has passed
+    /// 6. Unset the alarm for the service
+    /// 7. Call `list_ready_services` and check that the service is no longer returned
+    #[test]
+    fn scabbard_store_unset_alarm() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
+            .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
+
+        let peer_service_id = ServiceId::new_random();
+
+        // service with finalized status
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&service_fqsi)
+            .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        assert!(store.add_service(service.clone()).is_ok());
+
+        let coordinator_context = ContextBuilder::default()
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+            }])
+            .with_state(State::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
+
+        store
+            .add_consensus_context(&service_fqsi, context)
+            .expect("failed to add context to store");
+
+        let ready_services = store
+            .list_ready_services()
+            .expect("failed to list ready services");
+
+        // Check that the service is not returned yet because it does not have a passed
+        // alarm or outstanding actions
+        assert!(ready_services.is_empty());
+
+        store
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, SystemTime::now())
+            .expect("failed to set alarm");
+
+        let ready_services = store
+            .list_ready_services()
+            .expect("failed to list ready services");
+
+        // check that the service is returned because it has an alarm that has passed
+        assert_eq!(&ready_services[0], &service_fqsi);
+
+        // unset the alarm that was just set
+        assert!(store
+            .unset_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit)
+            .is_ok());
+
+        let ready_services = store
+            .list_ready_services()
+            .expect("failed to list ready services");
+
+        // Check that the service is not returned because it does not have an alarm that has passed
+        // or outstanding actions
+        assert!(ready_services.is_empty());
+    }
+
+    /// Test that the scabbard store `get_alarm` operation is successful.
+    ///
+    /// 1. Add a service to the database
+    /// 2. Add a context to the database for the service
+    /// 3. Set an alarm for the service
+    /// 4. Call `get_alarm` and check that the alarm is returned
+    /// 5. Unset the alarm
+    /// 6. Call `get_alarm` and check that the alarm is no longer returned
+    #[test]
+    fn scabbard_store_get_alarm() {
+        let pool = create_connection_pool_and_migrate();
+
+        let store = DieselScabbardStore::new(pool);
+
+        let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
+            .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
+
+        let peer_service_id = ServiceId::new_random();
+
+        // service with finalized status
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&service_fqsi)
+            .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        assert!(store.add_service(service.clone()).is_ok());
+
+        let coordinator_context = ContextBuilder::default()
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+            }])
+            .with_state(State::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
+
+        store
+            .add_consensus_context(&service_fqsi, context)
+            .expect("failed to add context to store");
+
+        let alarm = SystemTime::UNIX_EPOCH
+            .checked_add(Duration::from_secs(
+                SystemTime::now()
+                    .checked_add(Duration::from_secs(60))
+                    .expect("failed to get alarm time")
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .expect("failed to get duration since UNIX EPOCH")
+                    .as_secs(),
+            ))
+            .unwrap();
+
+        store
+            .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, alarm)
+            .expect("failed to set alarm");
+
+        let retrieved_alarm = store
+            .get_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit)
+            .expect("failed to list ready services");
+
+        // check that the alarm is returned
+        assert_eq!(retrieved_alarm, Some(alarm));
+
+        // unset the alarm
+        store
+            .unset_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit)
+            .expect("failed to unset alarm");
+
+        let retrieved_alarm = store
+            .get_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit)
+            .expect("failed to list ready services");
+
+        // Check that the alarm is not returned because it was unset
+        assert_eq!(retrieved_alarm, None);
     }
 
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {

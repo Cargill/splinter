@@ -19,6 +19,7 @@ use splinter::service::FullyQualifiedServiceId;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     action::IdentifiedConsensusAction,
+    alarm::AlarmType,
     commit::CommitEntry,
     event::{ConsensusEvent, IdentifiedConsensusEvent},
     service::ScabbardService,
@@ -250,5 +251,52 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         service_id: &FullyQualifiedServiceId,
     ) -> Result<(), ScabbardStoreError> {
         (&**self).remove_service(service_id)
+    }
+
+    /// Set a scabbard alarm for a given service
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The fully qualified service id for the `ScabbardService` that the alarm
+    ///   will be set for
+    /// * `alarm` - The time that the alarm will go off
+    /// * `alarm_type` - The type of alarm being set
+    fn set_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+        alarm: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        (&**self).set_alarm(service_id, alarm_type, alarm)
+    }
+
+    /// Unset a scabbard alarm of a specified type for a given service
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The fully qualified service id for the `ScabbardService` that the alarm
+    ///   will be unset for
+    /// * `alarm_type` - The type of alarm being unset
+    fn unset_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<(), ScabbardStoreError> {
+        (&**self).unset_alarm(service_id, alarm_type)
+    }
+
+    /// Get the scabbard alarm of a specified type for the given service
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - The fully qualified service id for the `ScabbardService` to retrieve the
+    ///    alarm for
+    /// * `alarm_type` - The type of alarm to retrieve
+    fn get_alarm(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        alarm_type: &AlarmType,
+    ) -> Result<Option<SystemTime>, ScabbardStoreError> {
+        (&**self).get_alarm(service_id, alarm_type)
     }
 }

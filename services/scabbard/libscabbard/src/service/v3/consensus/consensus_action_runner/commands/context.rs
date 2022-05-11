@@ -15,17 +15,20 @@
 //! Contains commands for updating contexts and alarms
 
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
+use crate::store::alarm::AlarmType;
 use crate::store::context::ConsensusContext;
 use crate::store::ScabbardStoreFactory;
 
 pub struct UpdateContextCommand<C> {
     context: ConsensusContext,
     service_id: FullyQualifiedServiceId,
+    alarm: Option<SystemTime>,
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,
 }
 
@@ -33,11 +36,13 @@ impl<C> UpdateContextCommand<C> {
     pub fn new(
         context: ConsensusContext,
         service_id: FullyQualifiedServiceId,
+        alarm: Option<SystemTime>,
         store_factory: Arc<dyn ScabbardStoreFactory<C>>,
     ) -> Self {
         Self {
             context,
             service_id,
+            alarm,
             store_factory,
         }
     }
@@ -47,8 +52,19 @@ impl<C> StoreCommand for UpdateContextCommand<C> {
     type Context = C;
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
-        self.store_factory
-            .new_store(&*conn)
+        let store = self.store_factory.new_store(&*conn);
+
+        if let Some(alarm) = self.alarm {
+            store
+                .set_alarm(&self.service_id, &AlarmType::TwoPhaseCommit, alarm)
+                .map_err(|e| InternalError::from_source(Box::new(e)))?;
+        } else {
+            store
+                .unset_alarm(&self.service_id, &AlarmType::TwoPhaseCommit)
+                .map_err(|e| InternalError::from_source(Box::new(e)))?;
+        }
+
+        store
             .update_consensus_context(&self.service_id, self.context.clone())
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }

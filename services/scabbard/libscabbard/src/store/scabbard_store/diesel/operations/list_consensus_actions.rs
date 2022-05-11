@@ -216,13 +216,6 @@ where
                 };
 
                 let mut context = ContextBuilder::default()
-                    .with_alarm(get_system_time(update_context.alarm)?.ok_or_else(|| {
-                        ScabbardStoreError::Internal(InternalError::with_message(
-                            "failed to get update context action with status 'voting', no vote \
-                            timeout start time set"
-                                .to_string(),
-                        ))
-                    })?)
                     .with_coordinator(&ServiceId::new(&update_context.coordinator).map_err(
                         |err| {
                             ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))

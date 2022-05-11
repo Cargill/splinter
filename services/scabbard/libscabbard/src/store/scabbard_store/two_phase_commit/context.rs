@@ -14,6 +14,7 @@
 
 #[cfg(feature = "scabbardv3-consensus")]
 use std::convert::{TryFrom, TryInto as _};
+#[cfg(feature = "scabbardv3-consensus")]
 use std::time::SystemTime;
 
 #[cfg(feature = "scabbardv3-consensus")]
@@ -34,7 +35,6 @@ use crate::service::v3::ScabbardProcess;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Context {
-    alarm: Option<SystemTime>,
     coordinator: ServiceId,
     epoch: u64,
     last_commit_epoch: Option<u64>,
@@ -44,10 +44,6 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn alarm(&self) -> Option<SystemTime> {
-        self.alarm
-    }
-
     pub fn coordinator(&self) -> &ServiceId {
         &self.coordinator
     }
@@ -80,10 +76,6 @@ impl Context {
             .with_state(self.state)
             .with_participants(self.participants);
 
-        if let Some(alarm) = self.alarm {
-            builder = builder.with_alarm(alarm);
-        }
-
         if let Some(last_commit_epoch) = self.last_commit_epoch {
             builder = builder.with_last_commit_epoch(last_commit_epoch);
         }
@@ -94,7 +86,6 @@ impl Context {
 
 #[derive(Default, Clone)]
 pub struct ContextBuilder {
-    alarm: Option<SystemTime>,
     coordinator: Option<ServiceId>,
     epoch: Option<u64>,
     last_commit_epoch: Option<u64>,
@@ -104,11 +95,6 @@ pub struct ContextBuilder {
 }
 
 impl ContextBuilder {
-    pub fn with_alarm(mut self, alarm: SystemTime) -> ContextBuilder {
-        self.alarm = Some(alarm);
-        self
-    }
-
     pub fn with_coordinator(mut self, coordinator: &ServiceId) -> ContextBuilder {
         self.coordinator = Some(coordinator.clone());
         self
@@ -167,7 +153,6 @@ impl ContextBuilder {
         })?;
 
         Ok(Context {
-            alarm: self.alarm,
             coordinator,
             epoch,
             last_commit_epoch: self.last_commit_epoch,

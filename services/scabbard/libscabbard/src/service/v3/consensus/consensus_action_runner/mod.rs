@@ -191,6 +191,7 @@ mod tests {
     use crate::store::pool::ConnectionPool;
     use crate::store::{
         action::ConsensusAction,
+        alarm::AlarmType,
         context::ConsensusContext,
         service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus},
         two_phase_commit::Message,
@@ -392,7 +393,7 @@ mod tests {
     /// 3. Fetch pending actions from the scabbard store
     /// 4. Call run_actions on the ConsensusActionRunner, executing the Actions
     /// 5. Verify that no actions are returned after execution, meaning they have all ben udpated
-    /// 6. Verify the context was updated with an alarm
+    /// 6. Verify the service now has a consensus 2pc alarm set
     /// 7. Verify that a message was send to the peer
     /// 8. Verify a commit entry was added after RequestForStart
     #[test]
@@ -414,7 +415,7 @@ mod tests {
 
         scabbard_store.add_service(service.clone()).unwrap();
 
-        let mut context = create_context(&service).unwrap();
+        let context = create_context(&service).unwrap();
 
         scabbard_store
             .add_consensus_context(
@@ -422,12 +423,6 @@ mod tests {
                 ConsensusContext::TwoPhaseCommit(context.clone()),
             )
             .expect("unable to add context to scabbard store");
-
-        context = context
-            .into_builder()
-            .with_alarm(SystemTime::now())
-            .build()
-            .unwrap();
 
         // add actions
         scabbard_store
@@ -474,16 +469,11 @@ mod tests {
             .expect("unable to get actions")
             .is_empty());
 
-        // verify the context was updated with an alarm
-        let updated_context = match scabbard_store
-            .get_current_consensus_context(&service_fqsi)
-            .expect("unable to get commit entry")
-            .expect("No commit entry returned")
-        {
-            ConsensusContext::TwoPhaseCommit(context) => context,
-        };
+        let update_alarm = scabbard_store
+            .get_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit)
+            .expect("failed to get alarm");
 
-        assert!(updated_context.alarm().is_some());
+        assert!(update_alarm.is_some());
 
         // Verify that a message was send to the peer
         let sent_messages = message_sender_factory.sent_messages.lock().unwrap();

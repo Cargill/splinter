@@ -37,9 +37,16 @@ table! {
 }
 
 table! {
+    scabbard_alarm (service_id, alarm_type) {
+        service_id -> Text,
+        alarm_type -> Text,
+        alarm -> BigInt,
+    }
+}
+
+table! {
     consensus_2pc_context (service_id, epoch) {
         service_id -> Text,
-        alarm -> Nullable<BigInt>,
         coordinator -> Text,
         epoch -> BigInt,
         last_commit_epoch -> Nullable<BigInt>,
@@ -86,7 +93,6 @@ table! {
     consensus_2pc_update_context_action (action_id) {
         action_id -> Int8,
         service_id -> Text,
-        alarm -> Nullable<BigInt>,
         coordinator -> Text,
         epoch -> BigInt,
         last_commit_epoch -> Nullable<BigInt>,
@@ -185,4 +191,9 @@ allow_tables_to_appear_in_same_query!(
     consensus_2pc_vote_event,
 );
 
-allow_tables_to_appear_in_same_query!(scabbard_peer, scabbard_service, scabbard_v3_commit_history,);
+allow_tables_to_appear_in_same_query!(
+    scabbard_peer,
+    scabbard_service,
+    scabbard_v3_commit_history,
+    scabbard_alarm
+);

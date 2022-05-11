@@ -19,6 +19,7 @@ use splinter::error::InternalError;
 use splinter::service::{FullyQualifiedServiceId, ServiceId};
 
 use crate::store::scabbard_store::{
+    alarm::AlarmType,
     commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision},
     context::ConsensusContext,
     service::{ConsensusType, ScabbardService, ServiceStatus},
@@ -30,7 +31,8 @@ use super::schema::{
     consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_notification_action,
     consensus_2pc_send_message_action, consensus_2pc_start_event,
     consensus_2pc_update_context_action, consensus_2pc_update_context_action_participant,
-    consensus_2pc_vote_event, scabbard_peer, scabbard_service, scabbard_v3_commit_history,
+    consensus_2pc_vote_event, scabbard_alarm, scabbard_peer, scabbard_service,
+    scabbard_v3_commit_history,
 };
 
 /// Database model representation of `ScabbardService`
@@ -202,11 +204,19 @@ impl From<&ConsensusDecision> for String {
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "scabbard_alarm"]
+#[primary_key(service_id, alarm_type)]
+pub struct ScabbardAlarmModel {
+    pub service_id: String,
+    pub alarm_type: String,
+    pub alarm: i64, // timestamp, when to wake up
+}
+
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_context"]
 #[primary_key(service_id, epoch)]
 pub struct Consensus2pcContextModel {
     pub service_id: String,
-    pub alarm: Option<i64>, // timestamp, when to wake up
     pub coordinator: String,
     pub epoch: i64,
     pub last_commit_epoch: Option<i64>,
@@ -232,20 +242,6 @@ impl
     ) -> Result<Self, Self::Error> {
         let epoch = u64::try_from(context.epoch)
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
-        let alarm = if let Some(alarm) = context.alarm {
-            Some(
-                SystemTime::UNIX_EPOCH
-                    .checked_add(Duration::from_secs(alarm as u64))
-                    .ok_or_else(|| {
-                        InternalError::with_message(
-                            "'alarm' timestamp could not be represented as a `SystemTime`"
-                                .to_string(),
-                        )
-                    })?,
-            )
-        } else {
-            None
-        };
         let coordinator = ServiceId::new(&context.coordinator)
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
         let last_commit_epoch = context
@@ -342,9 +338,6 @@ impl
                     .service_id(),
             );
 
-        if let Some(alarm) = alarm {
-            builder = builder.with_alarm(alarm);
-        }
         if let Some(last_commit_epoch) = last_commit_epoch {
             builder = builder.with_last_commit_epoch(last_commit_epoch);
         }
@@ -399,19 +392,8 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
             _ => (None, None, None),
         };
         let state = String::from(context.state());
-        let alarm = context
-            .alarm()
-            .map(|a| {
-                a.duration_since(SystemTime::UNIX_EPOCH)
-                    .map(|r| i64::try_from(r.as_secs()))
-            })
-            .transpose()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?
-            .transpose()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
         Ok(Consensus2pcContextModel {
             service_id: format!("{}", service_id),
-            alarm,
             coordinator: format!("{}", context.coordinator()),
             epoch,
             last_commit_epoch,
@@ -512,7 +494,6 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ContextParticipantList {
 pub struct Consensus2pcUpdateContextActionModel {
     pub action_id: i64,
     pub service_id: String,
-    pub alarm: Option<i64>,
     pub coordinator: String,
     pub epoch: i64,
     pub last_commit_epoch: Option<i64>,
@@ -574,20 +555,9 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
             _ => (None, None, None),
         };
         let state = String::from(context.state());
-        let alarm = context
-            .alarm()
-            .map(|a| {
-                a.duration_since(SystemTime::UNIX_EPOCH)
-                    .map(|r| i64::try_from(r.as_secs()))
-            })
-            .transpose()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?
-            .transpose()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
         Ok(Consensus2pcUpdateContextActionModel {
             action_id: *action_id,
             service_id: format!("{}", service_id),
-            alarm,
             coordinator: format!("{}", context.coordinator()),
             epoch,
             last_commit_epoch,
@@ -802,4 +772,12 @@ pub struct Consensus2pcVoteEventModel {
     pub service_id: String,
     pub epoch: i64,
     pub vote: String, // TRUE or FALSE
+}
+
+impl From<&AlarmType> for String {
+    fn from(status: &AlarmType) -> Self {
+        match *status {
+            AlarmType::TwoPhaseCommit => "TWOPHASECOMMIT".into(),
+        }
+    }
 }
