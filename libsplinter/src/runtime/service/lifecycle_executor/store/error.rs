@@ -17,9 +17,11 @@
 use std::error::Error;
 use std::fmt::Display;
 
+#[cfg(feature = "diesel")]
+use crate::error::ConstraintViolationType;
 use crate::error::{
-    ConstraintViolationError, ConstraintViolationType, InternalError, InvalidArgumentError,
-    InvalidStateError, ResourceTemporarilyUnavailableError,
+    ConstraintViolationError, InternalError, InvalidArgumentError, InvalidStateError,
+    ResourceTemporarilyUnavailableError,
 };
 
 /// Error type for the LifecycleStore trait.
