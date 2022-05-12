@@ -24,6 +24,7 @@ use std::collections::HashMap;
 
 use crate::error::InternalError;
 
+#[cfg(feature = "registry-client-reqwest")]
 pub use self::reqwest::ReqwestRegistryClient;
 
 pub trait RegistryClient {
