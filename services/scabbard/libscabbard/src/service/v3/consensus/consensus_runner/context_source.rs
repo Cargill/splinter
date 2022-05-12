@@ -12,5 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod action_source;
-mod context_source;
+use splinter::error::InternalError;
+use splinter::service::FullyQualifiedServiceId;
+
+use crate::store::context::ConsensusContext;
+
+pub trait ContextSource {
+    fn get_context(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<ConsensusContext>, InternalError>;
+}
