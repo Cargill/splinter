@@ -24,6 +24,7 @@ extern crate serde_derive;
 extern crate serde_json;
 #[macro_use]
 #[cfg(any(
+    feature = "admin-service",
     feature = "authorization-handler-rbac",
     feature = "biome-credentials",
     feature = "biome-key-management",

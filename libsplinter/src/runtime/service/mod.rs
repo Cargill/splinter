@@ -40,9 +40,17 @@ pub use dispatch::{MessageHandlerTaskPool, MessageHandlerTaskPoolBuilder};
     feature = "service-lifecycle-store"
 ))]
 pub use lifecycle_executor::DieselLifecycleStore;
-#[cfg(all(feature = "service-lifecycle-store", feature = "postgres"))]
+#[cfg(all(
+    feature = "service-lifecycle-executor",
+    feature = "service-lifecycle-store",
+    feature = "postgres"
+))]
 pub use lifecycle_executor::PostgresLifecycleStoreFactory;
-#[cfg(all(feature = "service-lifecycle-store", feature = "sqlite"))]
+#[cfg(all(
+    feature = "service-lifecycle-executor",
+    feature = "service-lifecycle-store",
+    feature = "sqlite"
+))]
 pub use lifecycle_executor::SqliteLifecycleStoreFactory;
 #[cfg(feature = "service-lifecycle-executor")]
 pub use lifecycle_executor::{
