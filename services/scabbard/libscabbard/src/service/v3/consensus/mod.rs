@@ -21,5 +21,7 @@ mod consensus_runner;
 mod process;
 mod value;
 
+#[cfg(feature = "scabbardv3-consensus-action-runner")]
+pub use consensus_action_runner::ConsensusActionRunner;
 pub use process::ScabbardProcess;
 pub use value::ScabbardValue;

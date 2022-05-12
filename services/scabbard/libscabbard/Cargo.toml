@@ -53,6 +53,7 @@ features = ["lmdb", "transaction-receipt-store"]
 
 [dev-dependencies]
 transact = { version = "0.5", features = ["family-command", "family-command-transaction-builder", "state-merkle-sql"] }
+splinter = { path = "../../../libsplinter", features = ["diesel"]}
 
 [build-dependencies]
 protoc-rust = "2.14"
