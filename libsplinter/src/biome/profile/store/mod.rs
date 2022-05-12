@@ -14,7 +14,7 @@
 
 //! Defines a basic representation of a profile.
 
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
+#[cfg(feature = "diesel")]
 pub(in crate::biome) mod diesel;
 pub mod error;
 pub(in crate::biome) mod memory;

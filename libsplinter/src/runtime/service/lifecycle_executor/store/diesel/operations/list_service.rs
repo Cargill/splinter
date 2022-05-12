@@ -17,13 +17,16 @@ use std::convert::TryFrom;
 
 use diesel::prelude::*;
 
-use crate::runtime::service::lifecycle_executor::store::{
-    diesel::{
-        models::{ServiceLifecycleArgumentModel, ServiceLifecycleStatusModel},
-        schema::{service_lifecycle_argument, service_lifecycle_status},
+use crate::runtime::service::{
+    lifecycle_executor::store::{
+        diesel::{
+            models::{ServiceLifecycleArgumentModel, ServiceLifecycleStatusModel},
+            schema::{service_lifecycle_argument, service_lifecycle_status},
+        },
+        error::LifecycleStoreError,
+        LifecycleService, LifecycleStatus,
     },
-    error::LifecycleStoreError,
-    LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus,
+    LifecycleCommand, LifecycleServiceBuilder,
 };
 use crate::service::{CircuitId, FullyQualifiedServiceId, ServiceId, ServiceType};
 

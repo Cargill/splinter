@@ -24,7 +24,7 @@ use diesel::{
     Queryable,
 };
 
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
+#[cfg(feature = "diesel")]
 use diesel::{
     deserialize::{self, FromSql},
     row::Row,
