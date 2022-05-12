@@ -12,6 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod action_source;
-mod context_source;
-mod event_source;
+use splinter::error::InternalError;
+use splinter::service::FullyQualifiedServiceId;
+
+use crate::store::event::IdentifiedConsensusEvent;
+
+pub trait UnprocessedEventSource {
+    /// Returns the next event for a given service that requires processing,
+    /// if one exists.
+    fn get_next_event(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+    ) -> Result<Option<IdentifiedConsensusEvent>, InternalError>;
+}
