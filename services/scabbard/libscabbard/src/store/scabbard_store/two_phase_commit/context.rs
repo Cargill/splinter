@@ -95,6 +95,10 @@ pub struct ContextBuilder {
 }
 
 impl ContextBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn with_coordinator(mut self, coordinator: &ServiceId) -> ContextBuilder {
         self.coordinator = Some(coordinator.clone());
         self
