@@ -11,15 +11,3 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-//! Consensus components to work with Augrim
-
-#[cfg(feature = "scabbardv3-consensus-action-runner")]
-pub mod consensus_action_runner;
-#[cfg(feature = "scabbardv3-consensus-runner")]
-mod consensus_runner;
-mod process;
-mod value;
-
-pub use process::ScabbardProcess;
-pub use value::ScabbardValue;
