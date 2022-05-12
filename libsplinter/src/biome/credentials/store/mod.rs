@@ -16,16 +16,16 @@
 
 #[cfg(feature = "diesel")]
 pub(in crate::biome) mod diesel;
-pub(in crate::biome) mod memory;
-use std::str::FromStr;
 mod error;
+pub(in crate::biome) mod memory;
 
-pub use error::CredentialsStoreError;
+use std::str::FromStr;
 
 use bcrypt::{hash, verify, DEFAULT_COST};
 
 #[cfg(feature = "diesel")]
 use self::diesel::models::{CredentialsModel, NewCredentialsModel};
+pub use error::CredentialsStoreError;
 use error::{CredentialsBuilderError, CredentialsError};
 
 const MEDIUM_COST: u32 = 8;
