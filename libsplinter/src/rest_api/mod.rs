@@ -99,6 +99,7 @@ pub use actix_web_1::{
 };
 
 #[cfg(any(
+    feature = "admin-service-event-client-actix-web-client",
     feature = "authorization",
     feature = "biome-credentials",
     feature = "biome-key-management",

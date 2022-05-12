@@ -150,7 +150,8 @@ admin-service-client = ["admin-service"]
 admin-service-event-client = ["admin-service-client"]
 admin-service-event-client-actix-web-client = [
     "admin-service-event-client",
-    "events"
+    "events",
+    "rest-api",
 ]
 admin-service-event-subscriber-glob = ["admin-service"]
 authorization-handler-allow-keys = ["authorization"]
