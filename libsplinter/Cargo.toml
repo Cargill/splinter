@@ -211,7 +211,11 @@ service-timer =[
 ]
 service-timer-filter = ["service-routable"]
 service-timer-handler = ["service-message-converter", "service-message-sender"]
-service-message-handler-dispatch = ["service-message-handler", "service-message-handler-factory"]
+service-message-handler-dispatch = [
+    "service-message-handler",
+    "service-message-handler-factory",
+    "service-message-sender-factory",
+]
 service-timer-handler-factory = ["service-timer-handler"]
 service-type = []
 sqlite = ["diesel/sqlite", "diesel_migrations"]
