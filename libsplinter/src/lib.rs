@@ -26,7 +26,7 @@ extern crate serde_json;
 #[cfg(all(feature = "diesel", feature = "store"))]
 extern crate diesel;
 #[macro_use]
-#[cfg(feature = "diesel")]
+#[cfg(feature = "diesel_migrations")]
 extern crate diesel_migrations;
 #[cfg(feature = "tap")]
 #[macro_use]
