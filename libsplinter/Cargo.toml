@@ -147,7 +147,7 @@ benchmark = []
 
 admin-service = ["store"]
 admin-service-client = ["admin-service"]
-admin-service-event-client = ["admin-service-client" ]
+admin-service-event-client = ["admin-service-client"]
 admin-service-event-client-actix-web-client = [
     "admin-service-event-client",
     "events"
