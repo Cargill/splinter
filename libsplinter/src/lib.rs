@@ -23,16 +23,19 @@ extern crate serde_derive;
 #[cfg(feature = "rest-api-actix-web-1")]
 extern crate serde_json;
 #[macro_use]
-#[cfg(any(
-    feature = "admin-service",
-    feature = "authorization-handler-rbac",
-    feature = "biome-credentials",
-    feature = "biome-key-management",
-    feature = "biome-profile",
-    feature = "node-id-store",
-    feature = "oauth",
-    feature = "registry",
-    feature = "service-lifecycle-executor",
+#[cfg(all(
+    feature = "diesel",
+    any(
+        feature = "admin-service",
+        feature = "authorization-handler-rbac",
+        feature = "biome-credentials",
+        feature = "biome-key-management",
+        feature = "biome-profile",
+        feature = "node-id-store",
+        feature = "oauth",
+        feature = "registry",
+        feature = "service-lifecycle-executor",
+    )
 ))]
 extern crate diesel;
 #[macro_use]
