@@ -22,6 +22,7 @@ pub(in crate::biome) mod memory;
 use std::str::FromStr;
 
 use bcrypt::{hash, verify, DEFAULT_COST};
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "diesel")]
 use self::diesel::models::{CredentialsModel, NewCredentialsModel};
