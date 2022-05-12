@@ -197,7 +197,10 @@ service-message-handler = ["service-message-converter", "service-message-sender"
 service-message-handler-factory = ["service-type", "service-routable", "service-message-handler"]
 service-message-sender = ["service-message-converter"]
 service-message-sender-factory = ["service-message-sender"]
-service-message-sender-factory-peer = ["service-message-sender"]
+service-message-sender-factory-peer = [
+    "service-message-sender",
+    "service-message-sender-factory"
+]
 service-routable = ["service-type"]
 service-timer =[
   "service-message-sender-factory",
