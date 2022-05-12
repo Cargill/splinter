@@ -27,8 +27,8 @@ use splinter::service::FullyQualifiedServiceId;
 use splinter::service::MessageSenderFactory;
 use splinter::store::command::StoreCommand;
 
-use crate::store::action::IdentifiedConsensusAction;
-use crate::store::two_phase_commit::Action;
+use crate::store::Action;
+use crate::store::IdentifiedConsensusAction;
 use crate::store::ScabbardStoreFactory;
 
 pub use self::commands::actions::ExecuteActionCommand;
@@ -179,15 +179,9 @@ mod tests {
     use crate::migrations::run_sqlite_migrations;
     use crate::store::pool::ConnectionPool;
     use crate::store::{
-        action::ConsensusAction,
-        alarm::AlarmType,
-        context::ConsensusContext,
-        service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus},
-        two_phase_commit::Message,
-        two_phase_commit::Notification,
-        two_phase_commit::State,
-        two_phase_commit::{Context, ContextBuilder, Participant},
-        DieselScabbardStore, ScabbardStore, SqliteScabbardStoreFactory,
+        AlarmType, ConsensusAction, ConsensusContext, ConsensusType, Context, ContextBuilder,
+        DieselScabbardStore, Message, Notification, Participant, ScabbardService,
+        ScabbardServiceBuilder, ScabbardStore, ServiceStatus, SqliteScabbardStoreFactory, State,
     };
 
     struct TestMessageSender {

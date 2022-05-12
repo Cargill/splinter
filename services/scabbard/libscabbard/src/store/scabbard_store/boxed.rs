@@ -18,12 +18,8 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    action::IdentifiedConsensusAction,
-    alarm::AlarmType,
-    commit::CommitEntry,
-    event::{ConsensusEvent, IdentifiedConsensusEvent},
-    service::ScabbardService,
-    ConsensusAction, ConsensusContext,
+    AlarmType, CommitEntry, ConsensusAction, ConsensusContext, ConsensusEvent, IdentifiedConsensusEvent,
+    IdentifiedConsensusAction, ScabbardService,
 };
 
 use super::ScabbardStore;

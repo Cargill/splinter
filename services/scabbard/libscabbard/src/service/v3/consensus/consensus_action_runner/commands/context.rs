@@ -21,8 +21,8 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
-use crate::store::alarm::AlarmType;
-use crate::store::context::ConsensusContext;
+use crate::store::AlarmType;
+use crate::store::ConsensusContext;
 use crate::store::ScabbardStoreFactory;
 
 pub struct UpdateContextCommand<C> {

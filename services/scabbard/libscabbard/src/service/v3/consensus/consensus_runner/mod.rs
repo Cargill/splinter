@@ -26,9 +26,9 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommandExecutor;
 
-use crate::store::action::ConsensusAction;
-use crate::store::context::ConsensusContext;
-use crate::store::event::ConsensusEvent;
+use crate::store::ConsensusAction;
+use crate::store::ConsensusContext;
+use crate::store::ConsensusEvent;
 
 use super::{ConsensusActionRunner, ScabbardProcess};
 
@@ -151,13 +151,9 @@ mod tests {
     use crate::service::v3::CommandNotifyObserver;
     use crate::store::pool::ConnectionPool;
     use crate::store::{
-        alarm::AlarmType,
-        context::ConsensusContext,
-        service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
-        two_phase_commit::Event,
-        two_phase_commit::State,
-        two_phase_commit::{ContextBuilder, Participant},
-        DieselScabbardStore, ScabbardStore, SqliteScabbardStoreFactory,
+        AlarmType, ConsensusContext, ConsensusType, ContextBuilder, DieselScabbardStore, Event,
+        Participant, ScabbardServiceBuilder, ScabbardStore, ServiceStatus,
+        SqliteScabbardStoreFactory, State,
     };
 
     use self::store_sources::{

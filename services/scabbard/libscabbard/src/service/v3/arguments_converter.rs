@@ -19,7 +19,7 @@ use splinter::{
     service::{ArgumentsConverter, ServiceId},
 };
 
-use crate::store::service::ConsensusType;
+use crate::store::ConsensusType;
 
 use super::{ScabbardArguments, ScabbardArgumentsBuilder};
 

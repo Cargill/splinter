@@ -20,8 +20,8 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
-use crate::store::commit::CommitEntry;
-use crate::store::event::ConsensusEvent;
+use crate::store::CommitEntry;
+use crate::store::ConsensusEvent;
 use crate::store::ScabbardStoreFactory;
 
 pub struct AddEventCommand<C> {

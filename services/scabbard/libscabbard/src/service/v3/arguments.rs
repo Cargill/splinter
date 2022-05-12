@@ -17,7 +17,7 @@ use std::convert::TryFrom;
 use splinter::error::InvalidArgumentError;
 use splinter::service::ServiceId;
 
-use crate::store::service::ConsensusType;
+use crate::store::ConsensusType;
 
 pub struct ScabbardArguments {
     peers: Vec<ServiceId>,

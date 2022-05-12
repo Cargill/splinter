@@ -21,7 +21,7 @@ use crate::store::scabbard_store::diesel::{
     models::{Consensus2pcContextModel, Consensus2pcContextParticipantModel},
     schema::{consensus_2pc_context, consensus_2pc_context_participant},
 };
-use crate::store::scabbard_store::{context::ConsensusContext, ScabbardStoreError};
+use crate::store::scabbard_store::{ConsensusContext, ScabbardStoreError};
 
 use super::ScabbardStoreOperations;
 

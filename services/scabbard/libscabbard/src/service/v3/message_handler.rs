@@ -25,12 +25,7 @@ use crate::protocol::v3::{
     },
 };
 use crate::protos::FromBytes as _;
-use crate::store::{
-    event::ConsensusEvent,
-    service::ConsensusType,
-    two_phase_commit::{Event, Message},
-    ScabbardStore,
-};
+use crate::store::{ConsensusEvent, ConsensusType, Event, Message, ScabbardStore};
 
 pub struct ScabbardMessageHandler {
     store: Box<dyn ScabbardStore>,

@@ -15,7 +15,7 @@
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
-use crate::store::action::IdentifiedConsensusAction;
+use crate::store::IdentifiedConsensusAction;
 
 pub trait UnprocessedActionSource {
     /// Returns actions for a given service that require processing.

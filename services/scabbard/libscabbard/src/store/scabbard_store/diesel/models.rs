@@ -21,9 +21,9 @@ use splinter::service::{FullyQualifiedServiceId, ServiceId};
 use crate::store::scabbard_store::{
     alarm::AlarmType,
     commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision},
-    context::ConsensusContext,
     service::{ConsensusType, ScabbardService, ServiceStatus},
     two_phase_commit::{Context, ContextBuilder, Event, Message, Notification, Participant, State},
+    ConsensusContext,
 };
 
 use super::schema::{

@@ -12,30 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod action;
-pub mod alarm;
+mod action;
+mod alarm;
 mod boxed;
-pub mod commit;
-pub mod context;
+mod commit;
+mod context;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
-pub mod diesel;
+mod diesel;
 mod error;
-pub mod event;
+mod event;
 mod factory;
-pub mod service;
-pub mod two_phase_commit;
+mod service;
+mod two_phase_commit;
 
+use splinter::service::FullyQualifiedServiceId;
 use std::time::SystemTime;
 
 pub(crate) use error::ScabbardStoreError;
 
-use action::{ConsensusAction, IdentifiedConsensusAction};
-use alarm::AlarmType;
-use commit::CommitEntry;
-use context::ConsensusContext;
-use event::{ConsensusEvent, IdentifiedConsensusEvent};
-use service::ScabbardService;
-use splinter::service::FullyQualifiedServiceId;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+pub use self::diesel::DieselScabbardStore;
+pub use action::{ConsensusAction, IdentifiedConsensusAction};
+pub use alarm::AlarmType;
+pub use commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision};
+pub use context::ConsensusContext;
+pub use event::{ConsensusEvent, IdentifiedConsensusEvent};
+pub use service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus};
+pub use two_phase_commit::{
+    Action, Context, ContextBuilder, Event, Message, Notification, Participant, State,
+};
 
 #[cfg(feature = "postgres")]
 pub use factory::{PgScabbardStoreFactory, PooledPgScabbardStoreFactory};

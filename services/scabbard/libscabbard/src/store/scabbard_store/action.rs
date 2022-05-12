@@ -22,7 +22,7 @@ use augrim::{error::InternalError, two_phase_commit::TwoPhaseCommitAction};
 
 #[cfg(feature = "scabbardv3-consensus")]
 use crate::service::v3::{ScabbardProcess, ScabbardValue};
-use crate::store::scabbard_store::two_phase_commit::Action;
+use crate::store::scabbard_store::Action;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConsensusAction {

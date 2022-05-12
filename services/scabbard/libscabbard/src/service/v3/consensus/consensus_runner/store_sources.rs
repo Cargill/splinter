@@ -19,10 +19,9 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::{
-    action::IdentifiedConsensusAction, context::ConsensusContext, event::IdentifiedConsensusEvent,
+    IdentifiedConsensusAction, ConsensusContext, IdentifiedConsensusEvent,
     ScabbardStore,
 };
-
 use super::{ContextSource, UnprocessedActionSource, UnprocessedEventSource};
 
 pub struct StoreUnprocessedEventSource {

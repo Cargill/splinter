@@ -32,12 +32,8 @@ use diesel::{
 use crate::store::pool::ConnectionPool;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    action::IdentifiedConsensusAction,
-    alarm::AlarmType,
-    commit::CommitEntry,
-    event::{ConsensusEvent, IdentifiedConsensusEvent},
-    service::ScabbardService,
-    ConsensusAction, ConsensusContext,
+    AlarmType, CommitEntry, ConsensusAction, ConsensusContext, ConsensusEvent,
+    IdentifiedConsensusAction, IdentifiedConsensusEvent, ScabbardService,
 };
 
 use super::ScabbardStore;
@@ -825,11 +821,11 @@ pub mod tests {
     use crate::migrations::run_sqlite_migrations;
 
     use crate::store::scabbard_store::{
-        commit::{CommitEntryBuilder, ConsensusDecision},
         service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
         two_phase_commit::{
             Action, ContextBuilder, Event, Message, Notification, Participant, State,
         },
+        CommitEntryBuilder, ConsensusDecision,
     };
 
     use diesel::{

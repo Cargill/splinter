@@ -20,7 +20,7 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
-use crate::store::action::ConsensusAction;
+use crate::store::ConsensusAction;
 use crate::store::ScabbardStoreFactory;
 
 pub struct ConsensusStoreCommandFactory<C> {

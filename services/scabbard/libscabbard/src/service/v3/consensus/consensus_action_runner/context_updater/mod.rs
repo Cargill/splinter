@@ -25,7 +25,7 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
-use crate::store::context::ConsensusContext;
+use crate::store::ConsensusContext;
 
 pub use store::ScabbardStoreContextUpdater;
 

@@ -17,10 +17,8 @@ use std::sync::Arc;
 use splinter::{error::InternalError, service::ServiceId, store::command::StoreCommand};
 
 use crate::store::{
-    context::ConsensusContext,
-    service::ScabbardService,
-    two_phase_commit::{Context, ContextBuilder, Participant, State},
-    ScabbardStoreFactory,
+    ConsensusContext, Context, ContextBuilder, Participant, ScabbardService, ScabbardStoreFactory,
+    State,
 };
 
 pub struct ScabbardPrepareServiceCommand<C> {
