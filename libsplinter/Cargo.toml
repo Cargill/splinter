@@ -209,7 +209,7 @@ service-timer =[
   "service-timer-handler",
   "service-timer-handler-factory"
 ]
-service-timer-filter = []
+service-timer-filter = ["service-routable"]
 service-timer-handler = ["service-message-converter", "service-message-sender"]
 service-message-handler-dispatch = ["service-message-handler", "service-message-handler-factory"]
 service-timer-handler-factory = ["service-timer-handler"]
