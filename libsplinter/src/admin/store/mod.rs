@@ -30,7 +30,7 @@
 mod circuit;
 mod circuit_node;
 mod circuit_proposal;
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
+#[cfg(feature = "diesel")]
 pub mod diesel;
 pub mod error;
 mod event;
