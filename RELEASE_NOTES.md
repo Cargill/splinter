@@ -1,5 +1,18 @@
 # Release Notes
 
+## Changes in Splinter 0.6.13
+
+### scabbard
+
+* The `/batches` endpoint has been updated to return `Unknown` instead of an
+  error message if the operation to get a batches status times out.
+
+* The `/batches` endpoint now returns an empty JSON array for the `message`
+  field when the `statusType` field is `Unknown` or `Pending`.
+
+* The scabbard client now correctly identifies both `Unknown` and `Pending`
+  batches and will return an error if they are encountered.
+
 ## Changes in Splinter 0.6.12
 
 ### splinter CLI
