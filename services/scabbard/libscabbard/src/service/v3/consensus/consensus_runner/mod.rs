@@ -16,3 +16,4 @@ mod action_source;
 mod consensus_store_command_factory;
 mod context_source;
 mod event_source;
+mod store_sources;
