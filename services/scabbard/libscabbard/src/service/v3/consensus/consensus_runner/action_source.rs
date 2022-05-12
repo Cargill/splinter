@@ -12,4 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod action_source;
+use splinter::error::InternalError;
+use splinter::service::FullyQualifiedServiceId;
+
+use crate::store::action::IdentifiedConsensusAction;
+
+pub trait UnprocessedActionSource {
+    /// Returns actions for a given service that require processing.
+    fn get_unprocessed_actions(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        epoch: u64,
+    ) -> Result<Vec<IdentifiedConsensusAction>, InternalError>;
+}
