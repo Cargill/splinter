@@ -22,6 +22,7 @@ mod diesel;
 mod error;
 mod event;
 mod factory;
+mod identified;
 mod service;
 mod two_phase_commit;
 
