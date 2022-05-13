@@ -29,20 +29,6 @@ pub enum ConsensusAction {
     TwoPhaseCommit(Action),
 }
 
-// A scabbard consensus action that includes the action ID associated with the action
-#[derive(Debug, PartialEq, Clone)]
-pub enum IdentifiedConsensusAction {
-    TwoPhaseCommit(i64, Action),
-}
-
-impl IdentifiedConsensusAction {
-    pub fn deconstruct(self) -> (i64, ConsensusAction) {
-        match self {
-            Self::TwoPhaseCommit(id, action) => (id, ConsensusAction::TwoPhaseCommit(action)),
-        }
-    }
-}
-
 #[cfg(feature = "scabbardv3-consensus")]
 impl TryFrom<TwoPhaseCommitAction<ScabbardProcess, ScabbardValue, SystemTime>> for ConsensusAction {
     type Error = InternalError;

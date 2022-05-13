@@ -36,7 +36,7 @@ use crate::store::scabbard_store::diesel::{
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     two_phase_commit::{Action, ContextBuilder, Message, Notification, Participant, State},
-    ConsensusContext, IdentifiedConsensusAction,
+    ConsensusAction, ConsensusContext, Identified,
 };
 
 use super::ScabbardStoreOperations;
@@ -46,7 +46,7 @@ pub(in crate::store::scabbard_store::diesel) trait ListActionsOperation {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError>;
+    ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError>;
 }
 
 impl<'a, C> ListActionsOperation for ScabbardStoreOperations<'a, C>
@@ -61,7 +61,7 @@ where
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
@@ -243,10 +243,13 @@ where
                 })?;
 
                 let action_alarm = get_system_time(update_context.action_alarm)?;
-                let action = IdentifiedConsensusAction::TwoPhaseCommit(
-                    update_context.action_id,
-                    Action::Update(ConsensusContext::TwoPhaseCommit(context), action_alarm),
-                );
+                let action = Identified {
+                    id: update_context.action_id,
+                    record: ConsensusAction::TwoPhaseCommit(Action::Update(
+                        ConsensusContext::TwoPhaseCommit(context),
+                        action_alarm,
+                    )),
+                };
                 all_actions.push((position, action));
             }
             for send_message in send_message_actions {
@@ -306,10 +309,13 @@ where
                         ))
                     }
                 };
-                let action = IdentifiedConsensusAction::TwoPhaseCommit(
-                    send_message.action_id,
-                    Action::SendMessage(service_id, message),
-                );
+
+                let action = Identified {
+                    id: send_message.action_id,
+                    record: ConsensusAction::TwoPhaseCommit(Action::SendMessage(
+                        service_id, message,
+                    )),
+                };
                 all_actions.push((position, action));
             }
 
@@ -348,10 +354,10 @@ where
                         )))
                     }
                 };
-                let action = IdentifiedConsensusAction::TwoPhaseCommit(
-                    notification.action_id,
-                    Action::Notify(notification_action),
-                );
+                let action = Identified {
+                    id: notification.action_id,
+                    record: ConsensusAction::TwoPhaseCommit(Action::Notify(notification_action)),
+                };
                 all_actions.push((position, action));
             }
 

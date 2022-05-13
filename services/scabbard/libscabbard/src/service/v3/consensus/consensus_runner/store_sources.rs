@@ -19,9 +19,10 @@ use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::{
-    IdentifiedConsensusAction, ConsensusContext, IdentifiedConsensusEvent,
+    ConsensusAction, Identified, ConsensusContext, IdentifiedConsensusEvent,
     ScabbardStore,
 };
+
 use super::{ContextSource, UnprocessedActionSource, UnprocessedEventSource};
 
 pub struct StoreUnprocessedEventSource {
@@ -67,7 +68,7 @@ impl UnprocessedActionSource for StoreUnprocessedActionSource {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusAction>, InternalError> {
+    ) -> Result<Vec<Identified<ConsensusAction>>, InternalError> {
         self.store
             .list_consensus_actions(service_id, epoch)
             .map_err(|err| InternalError::from_source(Box::new(err)))

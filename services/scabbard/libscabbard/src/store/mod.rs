@@ -41,7 +41,7 @@ pub use scabbard_store::PooledScabbardStoreFactory;
 pub use scabbard_store::{
     Action, AlarmType, CommitEntry, CommitEntryBuilder, ConsensusAction, ConsensusContext,
     ConsensusDecision, ConsensusEvent, ConsensusType, Context, ContextBuilder, Event,
-    IdentifiedConsensusAction, IdentifiedConsensusEvent, Message, Notification, Participant,
+    Identified, IdentifiedConsensusEvent, Message, Notification, Participant,
     ScabbardService, ScabbardServiceBuilder, ScabbardStore, ScabbardStoreFactory, ServiceStatus,
     State,
 };

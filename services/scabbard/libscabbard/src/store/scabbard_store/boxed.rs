@@ -19,7 +19,7 @@ use splinter::service::FullyQualifiedServiceId;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     AlarmType, CommitEntry, ConsensusAction, ConsensusContext, ConsensusEvent, IdentifiedConsensusEvent,
-    IdentifiedConsensusAction, ScabbardService,
+    Identified, ScabbardService,
 };
 
 use super::ScabbardStore;
@@ -103,7 +103,7 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         (&**self).list_consensus_actions(service_id, epoch)
     }
 

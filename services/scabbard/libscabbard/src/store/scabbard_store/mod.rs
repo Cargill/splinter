@@ -33,11 +33,12 @@ pub(crate) use error::ScabbardStoreError;
 
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 pub use self::diesel::DieselScabbardStore;
-pub use action::{ConsensusAction, IdentifiedConsensusAction};
+pub use action::ConsensusAction;
 pub use alarm::AlarmType;
 pub use commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision};
 pub use context::ConsensusContext;
 pub use event::{ConsensusEvent, IdentifiedConsensusEvent};
+pub use identified::Identified;
 pub use service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus};
 pub use two_phase_commit::{
     Action, Context, ContextBuilder, Event, Message, Notification, Participant, State,
@@ -120,7 +121,7 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError>;
+    ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError>;
 
     /// List ready services
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError>;

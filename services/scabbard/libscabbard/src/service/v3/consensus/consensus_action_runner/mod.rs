@@ -28,7 +28,8 @@ use splinter::service::MessageSenderFactory;
 use splinter::store::command::StoreCommand;
 
 use crate::store::Action;
-use crate::store::IdentifiedConsensusAction;
+use crate::store::ConsensusAction;
+use crate::store::Identified;
 use crate::store::ScabbardStoreFactory;
 
 pub use self::commands::actions::ExecuteActionCommand;
@@ -87,17 +88,14 @@ impl<C: 'static> ConsensusActionRunner<C> {
     /// * `epoch` - The current epoch of the consensus algorithm
     pub fn run_actions(
         &self,
-        actions: Vec<IdentifiedConsensusAction>,
+        actions: Vec<Identified<ConsensusAction>>,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError> {
         let mut commands = Vec::new();
         for action in actions {
-            match &action {
-                IdentifiedConsensusAction::TwoPhaseCommit(
-                    action_id,
-                    Action::Update(context, alarm),
-                ) => {
+            match &action.record {
+                ConsensusAction::TwoPhaseCommit(Action::Update(context, alarm)) => {
                     commands.extend(self.context_updater.update(
                         context.clone(),
                         service_id,
@@ -108,14 +106,11 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     commands.push(Box::new(ExecuteActionCommand::new(
                         service_id.clone(),
                         epoch,
-                        *action_id,
+                        action.id,
                         self.store_factory.clone(),
                     )));
                 }
-                IdentifiedConsensusAction::TwoPhaseCommit(
-                    action_id,
-                    Action::SendMessage(to_service, msg),
-                ) => {
+                ConsensusAction::TwoPhaseCommit(Action::SendMessage(to_service, msg)) => {
                     // close out notfication regardless of if this was succesful
                     let msg_bytes: Vec<u8> = Vec::<u8>::try_from(msg.clone())
                         .map_err(|err| InternalError::from_source(Box::new(err)))?;
@@ -132,14 +127,11 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     commands.push(Box::new(ExecuteActionCommand::new(
                         service_id.clone(),
                         epoch,
-                        *action_id,
+                        action.id,
                         self.store_factory.clone(),
                     )));
                 }
-                IdentifiedConsensusAction::TwoPhaseCommit(
-                    action_id,
-                    Action::Notify(notification),
-                ) => {
+                ConsensusAction::TwoPhaseCommit(Action::Notify(notification)) => {
                     commands.extend(self.notify_observer.notify(
                         notification.clone(),
                         service_id,
@@ -150,7 +142,7 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     commands.push(Box::new(ExecuteActionCommand::new(
                         service_id.clone(),
                         epoch,
-                        *action_id,
+                        action.id,
                         self.store_factory.clone(),
                     )));
                 }
