@@ -20,6 +20,7 @@ mod event_source;
 mod store_sources;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use augrim::Algorithm;
 use splinter::error::InternalError;
@@ -61,7 +62,7 @@ where
     >,
     consensus_store_command_factory:
         ConsensusStoreCommandFactory<<E as StoreCommandExecutor>::Context>,
-    store_command_executor: E,
+    store_command_executor: Arc<E>,
 }
 
 impl<E> ConsensusRunner<E>
@@ -212,9 +213,9 @@ mod tests {
             )
             .expect("unable to event to the scabbard store");
 
-        let store_command_executor = SqliteCommandExecutor {
+        let store_command_executor = Arc::new(SqliteCommandExecutor {
             pool: pool.clone().into(),
-        };
+        });
         let test_messsage_factory = TestMessageSenderFactory::default();
 
         let message_sender_factory = Box::new(test_messsage_factory.clone());
