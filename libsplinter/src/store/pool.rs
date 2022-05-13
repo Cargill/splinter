@@ -16,6 +16,10 @@ use std::sync::{Arc, RwLock};
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
+#[cfg(any(
+    any(feature = "postgres", feature = "sqlite"),
+    all(feature = "diesel", feature = "registry")
+))]
 use crate::error::InternalError;
 
 pub enum ConnectionPool<C: diesel::Connection + 'static> {
@@ -23,6 +27,10 @@ pub enum ConnectionPool<C: diesel::Connection + 'static> {
     WriteExclusive(Arc<RwLock<Pool<ConnectionManager<C>>>>),
 }
 
+#[cfg(any(
+    any(feature = "postgres", feature = "sqlite"),
+    all(feature = "diesel", feature = "registry")
+))]
 macro_rules! conn {
     ($pool:ident) => {
         $pool

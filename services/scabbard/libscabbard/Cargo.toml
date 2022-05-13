@@ -53,6 +53,7 @@ features = ["lmdb", "transaction-receipt-store"]
 
 [dev-dependencies]
 transact = { version = "0.5", features = ["family-command", "family-command-transaction-builder", "state-merkle-sql"] }
+splinter = { path = "../../../libsplinter", features = ["diesel"]}
 
 [build-dependencies]
 protoc-rust = "2.14"
@@ -83,6 +84,7 @@ experimental = [
   "scabbardv3",
   "scabbardv3-consensus",
   "scabbardv3-consensus-action-runner",
+  "scabbardv3-consensus-runner",
   "scabbardv3-store"
 ]
 
@@ -100,6 +102,7 @@ scabbardv3-consensus-action-runner = [
     "scabbardv3-consensus",
     "splinter/service-message-sender-factory",
     ]
+scabbardv3-consensus-runner = ["scabbardv3-consensus-action-runner"]
 scabbardv3 = [
     "scabbardv3-store",
     "splinter/service-arguments-converter",

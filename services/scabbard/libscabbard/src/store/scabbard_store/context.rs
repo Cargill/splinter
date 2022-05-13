@@ -29,6 +29,14 @@ pub enum ConsensusContext {
     TwoPhaseCommit(Context),
 }
 
+impl ConsensusContext {
+    pub fn epoch(&self) -> u64 {
+        match self {
+            Self::TwoPhaseCommit(two_phase_context) => *two_phase_context.epoch(),
+        }
+    }
+}
+
 #[cfg(feature = "scabbardv3-consensus")]
 impl TryFrom<ConsensusContext> for TwoPhaseCommitContext<ScabbardProcess, SystemTime> {
     type Error = InternalError;

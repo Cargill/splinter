@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::InternalError;
+use splinter::error::InternalError;
+use splinter::service::FullyQualifiedServiceId;
 
-impl From<diesel::result::Error> for InternalError {
-    fn from(err: diesel::result::Error) -> Self {
-        InternalError::from_source(Box::new(err))
-    }
+use crate::store::context::ConsensusContext;
+
+pub trait ContextSource {
+    fn get_context(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<ConsensusContext>, InternalError>;
 }

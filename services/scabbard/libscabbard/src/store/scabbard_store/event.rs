@@ -27,6 +27,14 @@ pub enum ConsensusEvent {
     TwoPhaseCommit(Event),
 }
 
+impl ConsensusEvent {
+    pub fn algorithm_name(&self) -> &str {
+        match self {
+            Self::TwoPhaseCommit(_) => "two-phase-commit",
+        }
+    }
+}
+
 // A scabbard consensus event that includes the event ID associated with the event
 #[derive(Debug, PartialEq, Clone)]
 pub enum IdentifiedConsensusEvent {
