@@ -18,10 +18,7 @@
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
-use crate::store::{
-    ConsensusAction, Identified, ConsensusContext, IdentifiedConsensusEvent,
-    ScabbardStore,
-};
+use crate::store::{ConsensusAction, ConsensusContext, ConsensusEvent, Identified, ScabbardStore};
 
 use super::{ContextSource, UnprocessedActionSource, UnprocessedEventSource};
 
@@ -42,7 +39,7 @@ impl UnprocessedEventSource for StoreUnprocessedEventSource {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Option<IdentifiedConsensusEvent>, InternalError> {
+    ) -> Result<Option<Identified<ConsensusEvent>>, InternalError> {
         Ok(self
             .store
             .list_consensus_events(service_id, epoch)

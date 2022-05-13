@@ -32,8 +32,8 @@ use diesel::{
 use crate::store::pool::ConnectionPool;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    AlarmType, CommitEntry, ConsensusAction, ConsensusContext, ConsensusEvent,
-    Identified, IdentifiedConsensusEvent, ScabbardService,
+    AlarmType, CommitEntry, ConsensusAction, ConsensusContext, ConsensusEvent, Identified,
+    ScabbardService,
 };
 
 use super::ScabbardStore;
@@ -218,7 +218,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
         })
@@ -413,7 +413,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
         })
@@ -604,7 +604,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
     }
     /// Get the current context for a given service
@@ -764,7 +764,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
     }
     /// Get the current context for a given service
@@ -1739,13 +1739,13 @@ pub mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0],
-            IdentifiedConsensusEvent::TwoPhaseCommit(
-                event_id,
-                Event::Deliver(
+            Identified {
+                id: event_id,
+                record: ConsensusEvent::TwoPhaseCommit(Event::Deliver(
                     participant2_fqsi.service_id().clone(),
                     Message::DecisionRequest(1)
-                )
-            )
+                )),
+            },
         );
 
         let event2 = ConsensusEvent::TwoPhaseCommit(Event::Alarm());
@@ -1761,17 +1761,20 @@ pub mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(
             events[0],
-            IdentifiedConsensusEvent::TwoPhaseCommit(
-                event_id,
-                Event::Deliver(
+            Identified {
+                id: event_id,
+                record: ConsensusEvent::TwoPhaseCommit(Event::Deliver(
                     participant2_fqsi.service_id().clone(),
                     Message::DecisionRequest(1)
-                )
-            ),
+                )),
+            },
         );
         assert_eq!(
             events[1],
-            IdentifiedConsensusEvent::TwoPhaseCommit(event_id2, Event::Alarm()),
+            Identified {
+                id: event_id2,
+                record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
+            },
         );
 
         store
@@ -1785,7 +1788,10 @@ pub mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0],
-            IdentifiedConsensusEvent::TwoPhaseCommit(event_id2, Event::Alarm()),
+            Identified {
+                id: event_id2,
+                record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
+            },
         );
     }
 

@@ -32,7 +32,8 @@ use crate::store::scabbard_store::diesel::{
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    event::IdentifiedConsensusEvent,
+    event::ConsensusEvent,
+    identified::Identified,
     two_phase_commit::{Event, Message},
 };
 
@@ -43,7 +44,7 @@ pub(in crate::store::scabbard_store::diesel) trait ListEventsOperation {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError>;
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError>;
 }
 
 impl<'a, C> ListEventsOperation for ScabbardStoreOperations<'a, C>
@@ -58,7 +59,7 @@ where
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let epoch = i64::try_from(epoch).map_err(|err| {
                 ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
@@ -113,11 +114,14 @@ where
                 .filter_map(|(id, position, event_type)| match event_type.as_str() {
                     "ALARM" => Some((
                         position,
-                        IdentifiedConsensusEvent::TwoPhaseCommit(id, Event::Alarm()),
+                        Identified {
+                            id,
+                            record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
+                        },
                     )),
                     _ => None,
                 })
-                .collect::<Vec<(i32, IdentifiedConsensusEvent)>>();
+                .collect::<Vec<(i32, Identified<ConsensusEvent>)>>();
 
             all_events.append(&mut alarm_events);
 
@@ -190,10 +194,11 @@ where
                             ),
                         )),
                     };
-                let event = IdentifiedConsensusEvent::TwoPhaseCommit(
-                    deliver.event_id,
-                    Event::Deliver(process, message),
-                );
+
+                let event = Identified {
+                    id: deliver.event_id,
+                    record: ConsensusEvent::TwoPhaseCommit(Event::Deliver(process, message)),
+                };
                 all_events.push((*position, event));
             }
 
@@ -203,10 +208,10 @@ where
                         "Failed to list consensus events, invalid event ID".to_string(),
                     ))
                 })?;
-                let event = IdentifiedConsensusEvent::TwoPhaseCommit(
-                    start.event_id,
-                    Event::Start(start.value),
-                );
+                let event = Identified {
+                    id: start.event_id,
+                    record: ConsensusEvent::TwoPhaseCommit(Event::Start(start.value)),
+                };
                 all_events.push((*position, event));
             }
 
@@ -227,10 +232,10 @@ where
                         ))
                     }
                 };
-                let event = IdentifiedConsensusEvent::TwoPhaseCommit(
-                    vote.event_id,
-                    Event::Vote(vote_decision),
-                );
+                let event = Identified {
+                    id: vote.event_id,
+                    record: ConsensusEvent::TwoPhaseCommit(Event::Vote(vote_decision)),
+                };
                 all_events.push((*position, event));
             }
 

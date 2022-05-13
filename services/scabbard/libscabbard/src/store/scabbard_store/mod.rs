@@ -37,7 +37,7 @@ pub use action::ConsensusAction;
 pub use alarm::AlarmType;
 pub use commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision};
 pub use context::ConsensusContext;
-pub use event::{ConsensusEvent, IdentifiedConsensusEvent};
+pub use event::ConsensusEvent;
 pub use identified::Identified;
 pub use service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus};
 pub use two_phase_commit::{
@@ -218,7 +218,7 @@ pub trait ScabbardStore {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError>;
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError>;
 
     /// Get the current context for a given service
     ///

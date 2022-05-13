@@ -40,10 +40,9 @@ pub use scabbard_store::PooledScabbardStoreFactory;
 #[cfg(feature = "scabbardv3-store")]
 pub use scabbard_store::{
     Action, AlarmType, CommitEntry, CommitEntryBuilder, ConsensusAction, ConsensusContext,
-    ConsensusDecision, ConsensusEvent, ConsensusType, Context, ContextBuilder, Event,
-    Identified, IdentifiedConsensusEvent, Message, Notification, Participant,
-    ScabbardService, ScabbardServiceBuilder, ScabbardStore, ScabbardStoreFactory, ServiceStatus,
-    State,
+    ConsensusDecision, ConsensusEvent, ConsensusType, Context, ContextBuilder, Event, Identified,
+    Message, Notification, Participant, ScabbardService, ScabbardServiceBuilder, ScabbardStore,
+    ScabbardStoreFactory, ServiceStatus, State,
 };
 #[cfg(all(feature = "scabbardv3-store", feature = "postgres"))]
 pub use scabbard_store::{PgScabbardStoreFactory, PooledPgScabbardStoreFactory};

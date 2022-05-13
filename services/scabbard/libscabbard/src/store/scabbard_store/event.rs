@@ -35,20 +35,6 @@ impl ConsensusEvent {
     }
 }
 
-// A scabbard consensus event that includes the event ID associated with the event
-#[derive(Debug, PartialEq, Clone)]
-pub enum IdentifiedConsensusEvent {
-    TwoPhaseCommit(i64, Event),
-}
-
-impl IdentifiedConsensusEvent {
-    pub fn deconstruct(self) -> (i64, ConsensusEvent) {
-        match self {
-            Self::TwoPhaseCommit(id, event) => (id, ConsensusEvent::TwoPhaseCommit(event)),
-        }
-    }
-}
-
 #[cfg(feature = "scabbardv3-consensus")]
 impl TryFrom<ConsensusEvent> for TwoPhaseCommitEvent<ScabbardProcess, ScabbardValue> {
     type Error = InternalError;
