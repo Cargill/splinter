@@ -55,7 +55,7 @@ impl PooledPgScabbardStoreFactory {
 }
 
 impl PooledScabbardStoreFactory for PooledPgScabbardStoreFactory {
-    fn new_store(&self) -> Box<dyn ScabbardStore + Send> {
+    fn new_store(&self) -> Box<dyn ScabbardStore> {
         Box::new(DieselScabbardStore::new_with_write_exclusivity(
             self.pool.clone(),
         ))
