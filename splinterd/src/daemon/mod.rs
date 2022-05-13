@@ -18,6 +18,8 @@ mod error;
 mod lifecycle;
 mod registry;
 mod store;
+#[cfg(feature = "service2")]
+mod timer;
 
 use std::collections::HashMap;
 use std::fs;
@@ -31,10 +33,7 @@ use std::time::Duration;
 
 use cylinder::{secp256k1::Secp256k1Context, Signer, SigningError, VerifierFactory};
 #[cfg(feature = "scabbardv3")]
-use scabbard::service::v3::{
-    ScabbardMessageByteConverter, ScabbardMessageHandlerFactory, ScabbardTimerFilter,
-    ScabbardTimerHandlerFactoryBuilder,
-};
+use scabbard::service::v3::{ScabbardMessageByteConverter, ScabbardMessageHandlerFactory};
 use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactoryBuilder;
 #[cfg(feature = "service2")]
@@ -101,9 +100,7 @@ use splinter::runtime::service::{
 };
 use splinter::service::instance::ServiceArgValidator;
 #[cfg(feature = "scabbardv3")]
-use splinter::service::{
-    MessageHandler, MessageHandlerFactory, ServiceType, TimerFilter, TimerHandlerFactory,
-};
+use splinter::service::{MessageHandler, MessageHandlerFactory, ServiceType};
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, Connection, Incoming, Listener,
@@ -127,12 +124,6 @@ const ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 const ADMIN_SERVICE_LIFECYCLE_TIMEOUT: u64 = 30;
 #[cfg(feature = "scabbardv3")]
 const SCABBARD_SERVICE_TYPE: ServiceType = ServiceType::new_static("scabbard:v3");
-
-#[cfg(feature = "service2")]
-type TimerFilterCollection = Vec<(
-    Box<dyn TimerFilter + Send>,
-    Box<dyn TimerHandlerFactory<Message = Vec<u8>>>,
-)>;
 
 #[cfg(feature = "service2")]
 type BoxedByteMessageHandlerFactory =
@@ -495,9 +486,6 @@ impl SplinterDaemon {
             }
         }
 
-        #[cfg(feature = "scabbardv3")]
-        let mut timer_scabbard_factory_builder = ScabbardTimerHandlerFactoryBuilder::default();
-
         #[cfg(feature = "service2")]
         let mut executor = lifecycle::create_lifecycle_executor(
             &connection_pool,
@@ -505,37 +493,27 @@ impl SplinterDaemon {
             self.lifecycle_executor_interval,
         )?;
 
+        #[cfg(feature = "service2")]
+        let timer_filter_collection = timer::create_timer_handlers(
+            &connection_pool,
+            &node_id,
+            network_sender.clone(),
+            routing_reader.clone(),
+        )?;
+
         let mut scabbard_factory_builder =
             ScabbardFactoryBuilder::new().with_signature_verifier_factory(signing_context);
 
         match connection_pool {
             #[cfg(feature = "database-postgres")]
-            #[cfg_attr(not(feature = "scabbardv3"), allow(clippy::redundant_clone))]
             store::ConnectionPool::Postgres { pool } => {
                 scabbard_factory_builder =
-                    scabbard_factory_builder.with_storage_configuration(pool.clone().into());
-                #[cfg(feature = "scabbardv3")]
-                {
-                    timer_scabbard_factory_builder = timer_scabbard_factory_builder
-                        .with_store_factory(Box::new(
-                            scabbard::store::PooledPgScabbardStoreFactory::new(pool),
-                        ));
-                }
+                    scabbard_factory_builder.with_storage_configuration(pool.into());
             }
             #[cfg(feature = "database-sqlite")]
-            #[cfg_attr(not(feature = "scabbardv3"), allow(clippy::redundant_clone))]
             store::ConnectionPool::Sqlite { pool } => {
                 scabbard_factory_builder =
-                    scabbard_factory_builder.with_storage_configuration(pool.clone().into());
-                #[cfg(feature = "scabbardv3")]
-                {
-                    timer_scabbard_factory_builder =
-                        timer_scabbard_factory_builder.with_store_factory(
-                        Box::new(
-                            scabbard::store::PooledSqliteScabbardStoreFactory::new_with_write_exclusivity(pool)
-                        ),
-                    );
-                }
+                    scabbard_factory_builder.with_storage_configuration(pool.into());
             }
             // This will have failed in create_store_factory above, but we return () to make
             // the compiler/linter happy under the following conditions
@@ -900,24 +878,6 @@ impl SplinterDaemon {
         let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api_builder.build()?.run()?;
 
         let mut admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
-
-        #[cfg(feature = "service2")]
-        let mut timer_filter_collection: TimerFilterCollection = Vec::new();
-
-        #[cfg(feature = "scabbardv3")]
-        {
-            let timer_scabbard_factory = timer_scabbard_factory_builder
-                .build()
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
-
-            let scabbard_timer_filter =
-                ScabbardTimerFilter::new(timer_scabbard_factory.store_factory().clone_box());
-
-            timer_filter_collection.push((
-                Box::new(scabbard_timer_filter),
-                Box::new(timer_scabbard_factory),
-            ))
-        };
 
         #[cfg(feature = "service2")]
         let mut timer = Timer::new(

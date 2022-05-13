@@ -104,6 +104,7 @@ scabbardv3-consensus-action-runner = [
     ]
 scabbardv3-consensus-runner = ["scabbardv3-consensus-action-runner"]
 scabbardv3 = [
+    "scabbardv3-consensus-runner",
     "scabbardv3-store",
     "splinter/service-arguments-converter",
     "splinter/service-lifecycle",
@@ -114,6 +115,7 @@ scabbardv3 = [
     "splinter/service-timer-filter",
     "splinter/service-timer-handler",
     "splinter/service-timer-handler-factory",
+    "splinter/service-message-sender-factory",
     ]
 scabbardv3-store = []
 splinter-service = ["log", "sawtooth"]
