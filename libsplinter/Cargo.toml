@@ -147,22 +147,23 @@ benchmark = []
 
 admin-service = ["store"]
 admin-service-client = ["admin-service"]
-admin-service-event-client = ["admin-service-client" ]
+admin-service-event-client = ["admin-service-client"]
 admin-service-event-client-actix-web-client = [
     "admin-service-event-client",
-    "events"
+    "events",
+    "rest-api",
 ]
 admin-service-event-subscriber-glob = ["admin-service"]
 authorization-handler-allow-keys = ["authorization"]
 authorization-handler-maintenance = ["authorization"]
 authorization = ["rest-api-actix-web-1"]
-authorization-handler-rbac = ["authorization"]
+authorization-handler-rbac = ["authorization", "store"]
 biome = []
 biome-client = ["biome"]
 biome-client-reqwest = ["biome", "reqwest"]
-biome-credentials = ["bcrypt", "biome"]
-biome-key-management = ["biome"]
-biome-profile = ["biome"]
+biome-credentials = ["bcrypt", "biome", "store"]
+biome-key-management = ["biome", "store"]
+biome-profile = ["biome", "store"]
 challenge-authorization = []
 circuit-template = ["admin-service", "glob"]
 client-reqwest = ["reqwest"]
@@ -170,12 +171,12 @@ cylinder-jwt = ["cylinder/jwt", "rest-api"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
 memory = ["sqlite"]
-node-id-store = []
-oauth = ["biome", "base64", "oauth2", "reqwest", "rest-api"]
+node-id-store = ["store"]
+oauth = ["biome", "base64", "oauth2", "reqwest", "rest-api", "store"]
 postgres = ["diesel/postgres", "diesel_migrations"]
-registry = []
+registry = ["store"]
 registry-client = ["registry"]
-registry-client-reqwest = ["registry-client", "reqwest"]
+registry-client-reqwest = ["registry-client", "reqwest", "rest-api"]
 registry-remote = ["reqwest", "registry"]
 rest-api = ["jsonwebtoken", "percent-encoding"]
 rest-api-actix-web-1 = [
@@ -189,14 +190,17 @@ rest-api-actix-web-1 = [
 rest-api-cors = []
 service-arguments-converter = []
 service-lifecycle = ["service-arguments-converter", "store"]
-service-lifecycle-executor = ["service-lifecycle", "service-lifecycle-store"]
+service-lifecycle-executor = ["service-lifecycle", "service-lifecycle-store", "service-type"]
 service-lifecycle-store = ["service-lifecycle"]
 service-message-converter = []
 service-message-handler = ["service-message-converter", "service-message-sender"]
 service-message-handler-factory = ["service-type", "service-routable", "service-message-handler"]
 service-message-sender = ["service-message-converter"]
 service-message-sender-factory = ["service-message-sender"]
-service-message-sender-factory-peer = ["service-message-sender"]
+service-message-sender-factory-peer = [
+    "service-message-sender",
+    "service-message-sender-factory"
+]
 service-routable = ["service-type"]
 service-timer =[
   "service-message-sender-factory",
@@ -205,9 +209,13 @@ service-timer =[
   "service-timer-handler",
   "service-timer-handler-factory"
 ]
-service-timer-filter = []
+service-timer-filter = ["service-routable"]
 service-timer-handler = ["service-message-converter", "service-message-sender"]
-service-message-handler-dispatch = ["service-message-handler", "service-message-handler-factory"]
+service-message-handler-dispatch = [
+    "service-message-handler",
+    "service-message-handler-factory",
+    "service-message-sender-factory",
+]
 service-timer-handler-factory = ["service-timer-handler"]
 service-type = []
 sqlite = ["diesel/sqlite", "diesel_migrations"]

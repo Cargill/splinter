@@ -16,7 +16,9 @@
 
 use crate::error::InternalError;
 
-use super::{MessageConverter, ServiceId};
+#[cfg(any(feature = "service-timer-handler", feature = "service-message-handler"))]
+use super::MessageConverter;
+use super::ServiceId;
 
 /// Sends a message between services on the same circuit.
 ///
@@ -31,12 +33,14 @@ pub trait MessageSender<M> {
     fn send(&self, to_service: &ServiceId, message: M) -> Result<(), InternalError>;
 }
 
+#[cfg(any(feature = "service-timer-handler", feature = "service-message-handler"))]
 pub(super) struct IntoMessageSender<'s, 'c, L, R> {
     inner: &'s dyn MessageSender<R>,
     converter: &'c dyn MessageConverter<L, R>,
     _left: std::marker::PhantomData<L>,
 }
 
+#[cfg(any(feature = "service-timer-handler", feature = "service-message-handler"))]
 impl<'s, 'c, L, R> IntoMessageSender<'s, 'c, L, R> {
     pub(super) fn new(
         inner: &'s dyn MessageSender<R>,
@@ -50,6 +54,7 @@ impl<'s, 'c, L, R> IntoMessageSender<'s, 'c, L, R> {
     }
 }
 
+#[cfg(any(feature = "service-timer-handler", feature = "service-message-handler"))]
 impl<'s, 'c, L, R> MessageSender<L> for IntoMessageSender<'s, 'c, L, R> {
     fn send(&self, to_service: &ServiceId, message: L) -> Result<(), InternalError> {
         self.inner

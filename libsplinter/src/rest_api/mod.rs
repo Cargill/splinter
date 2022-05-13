@@ -83,8 +83,10 @@ use percent_encoding::{AsciiSet, CONTROLS};
 #[cfg(feature = "oauth")]
 use std::boxed::Box;
 
+#[cfg(all(feature = "oauth", feature = "rest-api-actix-web-1"))]
+use crate::oauth::rest_api::OAuthResourceProvider;
 #[cfg(feature = "oauth")]
-use crate::oauth::{rest_api::OAuthResourceProvider, store::InflightOAuthRequestStore};
+use crate::oauth::store::InflightOAuthRequestStore;
 
 pub use errors::{RequestError, RestApiServerError};
 
@@ -99,11 +101,12 @@ pub use actix_web_1::{
 };
 
 #[cfg(any(
+    feature = "admin-service-event-client-actix-web-client",
     feature = "authorization",
     feature = "biome-credentials",
     feature = "biome-key-management",
-    feature = "oauth",
     feature = "registry",
+    all(feature = "oauth", feature = "rest-api-actix-web-1"),
 ))]
 pub(crate) const SPLINTER_PROTOCOL_VERSION: u32 = 2;
 

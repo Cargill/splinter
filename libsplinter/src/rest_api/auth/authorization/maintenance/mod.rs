@@ -56,6 +56,7 @@ impl MaintenanceModeAuthorizationHandler {
     ///
     /// * `rbac_store` - If provided, this will be used to allow identities with the "admin" role
     ///   defined in the RBAC store to perform write operations even with maintenance mode enabled
+    #[cfg(feature = "authorization-handler-rbac")]
     pub fn new(rbac_store: Option<Box<dyn RoleBasedAuthorizationStore>>) -> Self {
         Self {
             rbac_store,

@@ -29,34 +29,58 @@ use std::sync::{Arc, RwLock};
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use crate::admin::messages;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use crate::admin::store::{
     error::AdminServiceStoreError, AdminServiceStore, Circuit, CircuitNode, CircuitPredicate,
     CircuitProposal, Service, ServiceId,
 };
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use crate::admin::store::{AdminServiceEvent, EventIter};
 use crate::store::pool::ConnectionPool;
 
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::add_circuit::AdminServiceStoreAddCircuitOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::add_event::AdminServiceStoreAddEventOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::add_proposal::AdminServiceStoreAddProposalOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::count_circuits::AdminServiceStoreCountCircuitsOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::count_proposals::AdminServiceStoreCountProposalsOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::get_circuit::AdminServiceStoreFetchCircuitOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::get_node::AdminServiceStoreFetchNodeOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::get_proposal::AdminServiceStoreFetchProposalOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::get_service::AdminServiceStoreFetchServiceOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::list_circuits::AdminServiceStoreListCircuitsOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::list_events_by_management_type_since::AdminServiceStoreListEventsByManagementTypeSinceOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::list_events_since::AdminServiceStoreListEventsSinceOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::list_nodes::AdminServiceStoreListNodesOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::list_proposals::AdminServiceStoreListProposalsOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::list_services::AdminServiceStoreListServicesOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::remove_circuit::AdminServiceStoreRemoveCircuitOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::remove_proposal::AdminServiceStoreRemoveProposalOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::update_circuit::AdminServiceStoreUpdateCircuitOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::update_proposal::AdminServiceStoreUpdateProposalOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::upgrade::AdminServiceStoreUpgradeProposalToCircuitOperation as _;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use operations::AdminServiceStoreOperations;
 
 /// A database-backed AdminServiceStore, powered by [`Diesel`](https://crates.io/crates/diesel).

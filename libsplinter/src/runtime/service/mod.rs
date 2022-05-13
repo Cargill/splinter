@@ -34,11 +34,23 @@ pub use dispatch::ServiceTypeResolver;
 pub use dispatch::SingleThreadedMessageHandlerTaskRunner;
 #[cfg(feature = "service-message-handler-dispatch")]
 pub use dispatch::{MessageHandlerTaskPool, MessageHandlerTaskPoolBuilder};
-#[cfg(all(feature = "diesel", feature = "service-lifecycle-store"))]
+#[cfg(all(
+    feature = "diesel",
+    feature = "service-lifecycle-executor",
+    feature = "service-lifecycle-store"
+))]
 pub use lifecycle_executor::DieselLifecycleStore;
-#[cfg(all(feature = "service-lifecycle-store", feature = "postgres"))]
+#[cfg(all(
+    feature = "service-lifecycle-executor",
+    feature = "service-lifecycle-store",
+    feature = "postgres"
+))]
 pub use lifecycle_executor::PostgresLifecycleStoreFactory;
-#[cfg(all(feature = "service-lifecycle-store", feature = "sqlite"))]
+#[cfg(all(
+    feature = "service-lifecycle-executor",
+    feature = "service-lifecycle-store",
+    feature = "sqlite"
+))]
 pub use lifecycle_executor::SqliteLifecycleStoreFactory;
 #[cfg(feature = "service-lifecycle-executor")]
 pub use lifecycle_executor::{

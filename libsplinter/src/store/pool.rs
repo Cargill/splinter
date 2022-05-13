@@ -31,6 +31,10 @@ macro_rules! conn {
     };
 }
 
+#[cfg(any(
+    any(feature = "postgres", feature = "sqlite"),
+    all(feature = "diesel", feature = "registry")
+))]
 impl<C: diesel::Connection> ConnectionPool<C> {
     pub fn execute_write<F, T, E>(&self, f: F) -> Result<T, E>
     where

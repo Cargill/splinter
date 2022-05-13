@@ -17,7 +17,7 @@
 pub mod command;
 #[cfg(all(feature = "store-factory", feature = "memory"))]
 pub mod memory;
-#[cfg(any(feature = "postgres", feature = "sqlite"))]
+#[cfg(feature = "diesel")]
 pub(crate) mod pool;
 #[cfg(all(feature = "store-factory", feature = "postgres"))]
 pub mod postgres;

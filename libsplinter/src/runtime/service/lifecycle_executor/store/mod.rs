@@ -22,7 +22,7 @@ pub mod service;
 use crate::service::FullyQualifiedServiceId;
 
 use self::error::LifecycleStoreError;
-use self::service::{LifecycleCommand, LifecycleService, LifecycleServiceBuilder, LifecycleStatus};
+use self::service::{LifecycleService, LifecycleStatus};
 
 pub trait LifecycleStore {
     fn add_service(&self, service: LifecycleService) -> Result<(), LifecycleStoreError>;
