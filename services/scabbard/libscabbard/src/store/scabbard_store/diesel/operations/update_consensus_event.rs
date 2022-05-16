@@ -61,7 +61,7 @@ where
                 })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Context with service ID {} does not exist",
+                        "Cannot update event, context with service ID {} does not exist",
                         service_id,
                     )))
                 })?;

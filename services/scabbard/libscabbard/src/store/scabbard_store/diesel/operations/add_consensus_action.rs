@@ -73,7 +73,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Context with service ID {} does not exist",
+                        "Cannot add consensus action, context with service ID {} does not exist",
                         service_id,
                     )))
                 })?;
@@ -246,7 +246,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Context with service ID {} does not exist",
+                        "Cannot add consensus event, context with service ID {} does not exist",
                         service_id,
                     )))
                 })?;
