@@ -45,7 +45,7 @@ table! {
 }
 
 table! {
-    consensus_2pc_context (service_id, epoch) {
+    consensus_2pc_context (service_id) {
         service_id -> Text,
         coordinator -> Text,
         epoch -> BigInt,
@@ -58,7 +58,7 @@ table! {
 }
 
 table! {
-    consensus_2pc_context_participant (service_id, epoch, process) {
+    consensus_2pc_context_participant (service_id, process) {
         service_id -> Text,
         epoch -> BigInt,
         process -> Text,
