@@ -1880,7 +1880,7 @@ pub mod tests {
         let context3 = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
-            .add_consensus_context(&coordinator_fqsi, context3.clone())
+            .update_consensus_context(&coordinator_fqsi, context3.clone())
             .expect("failed to add context");
 
         let current_context = store
@@ -1903,7 +1903,7 @@ pub mod tests {
         let context4 = ConsensusContext::TwoPhaseCommit(participant_context);
 
         store
-            .add_consensus_context(&coordinator_fqsi.clone(), context4.clone())
+            .update_consensus_context(&coordinator_fqsi.clone(), context4.clone())
             .expect("failed to add context");
 
         let current_context = store
