@@ -153,8 +153,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                         self.store_factory.clone(),
                         updated_commit_entry,
                     )))
-                }
-                {
+                } else {
                     return Err(InternalError::with_message(
                         "Received commit for unknown entry".to_string(),
                     ));
@@ -178,11 +177,11 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                         self.store_factory.clone(),
                         updated_commit_entry,
                     )));
-                }
-                {
-                    return Err(InternalError::with_message(
-                        "Received abort for unknown entry".to_string(),
-                    ));
+                } else {
+                    return Err(InternalError::with_message(format!(
+                        "Received abort for unknown entry: epoch {}",
+                        epoch
+                    )));
                 }
             }
             // log dropped message
