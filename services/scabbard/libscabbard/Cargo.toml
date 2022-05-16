@@ -115,7 +115,6 @@ scabbardv3 = [
     "splinter/service-timer-filter",
     "splinter/service-timer-handler",
     "splinter/service-timer-handler-factory",
-    "splinter/service-type",
     ]
 scabbardv3-store = []
 splinter-service = ["log", "sawtooth"]

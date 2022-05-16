@@ -55,7 +55,6 @@ mod message_sender_factory;
 pub mod rest_api;
 #[cfg(feature = "service-routable")]
 mod routable;
-#[cfg(feature = "service-type")]
 mod service_type;
 #[cfg(feature = "service-timer-filter")]
 mod timer_filter;
@@ -86,7 +85,6 @@ pub use message_sender::MessageSender;
 pub use message_sender_factory::MessageSenderFactory;
 #[cfg(feature = "service-routable")]
 pub use routable::Routable;
-#[cfg(feature = "service-type")]
 pub use service_type::ServiceType;
 #[cfg(feature = "service-timer-filter")]
 pub use timer_filter::TimerFilter;

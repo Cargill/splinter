@@ -138,7 +138,6 @@ experimental = [
     "service-timer-filter",
     "service-timer-handler",
     "service-timer-handler-factory",
-    "service-type",
     "ws-transport",
 ]
 
@@ -190,18 +189,18 @@ rest-api-actix-web-1 = [
 rest-api-cors = []
 service-arguments-converter = []
 service-lifecycle = ["service-arguments-converter", "store"]
-service-lifecycle-executor = ["service-lifecycle", "service-lifecycle-store", "service-type"]
+service-lifecycle-executor = ["service-lifecycle", "service-lifecycle-store"]
 service-lifecycle-store = ["service-lifecycle"]
 service-message-converter = []
 service-message-handler = ["service-message-converter", "service-message-sender"]
-service-message-handler-factory = ["service-type", "service-routable", "service-message-handler"]
+service-message-handler-factory = ["service-routable", "service-message-handler"]
 service-message-sender = ["service-message-converter"]
 service-message-sender-factory = ["service-message-sender"]
 service-message-sender-factory-peer = [
     "service-message-sender",
     "service-message-sender-factory"
 ]
-service-routable = ["service-type"]
+service-routable = []
 service-timer =[
   "service-message-sender-factory",
   "service-routable",
@@ -217,7 +216,6 @@ service-message-handler-dispatch = [
     "service-message-sender-factory",
 ]
 service-timer-handler-factory = ["service-timer-handler"]
-service-type = []
 sqlite = ["diesel/sqlite", "diesel_migrations"]
 store = []
 store-factory = ["store"]
