@@ -1038,8 +1038,6 @@ pub mod tests {
     /// 1. Add a valid context to the store
     /// 2. Create a valid updated context
     /// 3. Attempt to update the original context, check that the operation is successful
-    /// 4. Create an invalid updated context
-    /// 5. Attempt to update the original context, check that the operation returns an error
     #[test]
     fn scabbard_store_update_context() {
         let pool = create_connection_pool_and_migrate();
@@ -1097,25 +1095,6 @@ pub mod tests {
                 ConsensusContext::TwoPhaseCommit(update_context)
             )
             .is_ok());
-
-        let bad_update_context = ContextBuilder::default()
-            .with_coordinator(coordinator_fqsi.clone().service_id())
-            .with_epoch(0)
-            .with_participants(vec![Participant {
-                process: participant_service_id.clone(),
-                vote: None,
-            }])
-            .with_state(State::Voting { vote_timeout_start })
-            .with_this_process(coordinator_fqsi.clone().service_id())
-            .build()
-            .expect("failed to build update context");
-
-        assert!(store
-            .update_consensus_context(
-                &coordinator_fqsi,
-                ConsensusContext::TwoPhaseCommit(bad_update_context)
-            )
-            .is_err());
     }
 
     /// Test that the scabbard store `update_consensus_action` operation is successful.
