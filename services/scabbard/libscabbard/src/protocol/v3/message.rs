@@ -38,7 +38,11 @@ impl FromProto<scabbard_v3::ScabbardMessageV3> for ScabbardMessage {
 
 impl FromNative<ScabbardMessage> for scabbard_v3::ScabbardMessageV3 {
     fn from_native(source: ScabbardMessage) -> Result<Self, ProtoConversionError> {
+        use scabbard_v3::ScabbardMessageV3_Type::*;
+
         let mut proto_msg = scabbard_v3::ScabbardMessageV3::new();
+
+        proto_msg.set_message_type(CONSENSUS_MESSAGE);
 
         match source {
             ScabbardMessage::ConsensusMessage(msg) => proto_msg.set_consensus_message(msg),

@@ -100,12 +100,17 @@ where
             let unprocessed_event = self
                 .unprocessed_event_source
                 .get_next_event(service_id, epoch)?;
+
             let event = match unprocessed_event {
                 Some(event) => event,
                 None => {
-                    // execute any commands returned from actions
-                    self.store_command_executor.execute(commands)?;
-                    break Ok(());
+                    if !commands.is_empty() {
+                        self.store_command_executor.execute(commands)?;
+                        continue;
+                    } else {
+                        // No actions and no events
+                        break Ok(());
+                    }
                 }
             };
 

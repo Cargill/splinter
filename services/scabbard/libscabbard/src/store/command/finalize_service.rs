@@ -16,7 +16,9 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use splinter::{
-    error::InternalError, service::FullyQualifiedServiceId, store::command::StoreCommand,
+    error::InternalError,
+    service::{FullyQualifiedServiceId, ServiceId},
+    store::command::StoreCommand,
 };
 
 use crate::store::{alarm::AlarmType, service::ServiceStatus, ScabbardStoreFactory};
@@ -56,15 +58,34 @@ impl<C> StoreCommand for ScabbardFinalizeServiceCommand<C> {
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         // set alarm to current time so it will be considered passed next time the timer runs
-        let alarm = SystemTime::now();
+        let mut peers = service.peers().to_vec();
+
+        peers.push(service.service_id().service_id().clone());
+
+        let coordinator = get_coordinator(peers).ok_or_else(|| {
+            InternalError::with_message(format!(
+                "Unable to get coordinator service ID for service {}",
+                service.service_id()
+            ))
+        })?;
+
+        if service.service_id().service_id() == &coordinator {
+            let alarm = SystemTime::now();
+            store
+                .set_alarm(&self.service_id, &AlarmType::TwoPhaseCommit, alarm)
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        }
 
         store
             .update_service(service)
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        store
-            .set_alarm(&self.service_id, &AlarmType::TwoPhaseCommit, alarm)
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
         Ok(())
     }
+}
+
+/// Gets the ID of the coordinator. The coordinator is the node with the lowest ID in the set of
+/// verifiers.
+fn get_coordinator(peers: Vec<ServiceId>) -> Option<ServiceId> {
+    peers.into_iter().min_by(|x, y| x.as_str().cmp(y.as_str()))
 }
