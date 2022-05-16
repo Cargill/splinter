@@ -177,22 +177,28 @@ impl FromProto<scabbard_v3::TwoPhaseCommitMessage> for TwoPhaseCommitMessage {
 
 impl FromNative<TwoPhaseCommitMessage> for scabbard_v3::TwoPhaseCommitMessage {
     fn from_native(source: TwoPhaseCommitMessage) -> Result<Self, ProtoConversionError> {
+        use scabbard_v3::TwoPhaseCommitMessage_Type::*;
         let mut proto_msg = scabbard_v3::TwoPhaseCommitMessage::new();
 
         match source {
             TwoPhaseCommitMessage::VoteRequest(msg) => {
+                proto_msg.set_message_type(VOTE_REQUEST);
                 proto_msg.set_vote_request(scabbard_v3::VoteRequest::from_native(msg)?)
             }
             TwoPhaseCommitMessage::VoteResponse(msg) => {
+                proto_msg.set_message_type(VOTE_RESPONSE);
                 proto_msg.set_vote_response(scabbard_v3::VoteResponse::from_native(msg)?)
             }
             TwoPhaseCommitMessage::Commit(msg) => {
+                proto_msg.set_message_type(COMMIT);
                 proto_msg.set_commit(scabbard_v3::Commit::from_native(msg)?)
             }
             TwoPhaseCommitMessage::Abort(msg) => {
+                proto_msg.set_message_type(ABORT);
                 proto_msg.set_abort(scabbard_v3::Abort::from_native(msg)?)
             }
             TwoPhaseCommitMessage::DecisionRequest(msg) => {
+                proto_msg.set_message_type(DECISION_REQUEST);
                 proto_msg.set_decision_request(scabbard_v3::DecisionRequest::from_native(msg)?)
             }
         }
