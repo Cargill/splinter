@@ -53,7 +53,6 @@ mod message_sender;
 mod message_sender_factory;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod rest_api;
-#[cfg(feature = "service-routable")]
 mod routable;
 mod service_type;
 #[cfg(feature = "service-timer-filter")]
@@ -83,7 +82,6 @@ use message_sender::IntoMessageSender;
 pub use message_sender::MessageSender;
 #[cfg(feature = "service-message-sender-factory")]
 pub use message_sender_factory::MessageSenderFactory;
-#[cfg(feature = "service-routable")]
 pub use routable::Routable;
 pub use service_type::ServiceType;
 #[cfg(feature = "service-timer-filter")]

@@ -111,7 +111,6 @@ scabbardv3 = [
     "splinter/service-message-handler",
     "splinter/service-message-handler-factory",
     "splinter/service-message-sender",
-    "splinter/service-routable",
     "splinter/service-timer-filter",
     "splinter/service-timer-handler",
     "splinter/service-timer-handler-factory",

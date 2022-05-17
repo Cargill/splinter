@@ -133,7 +133,6 @@ experimental = [
     "service-message-sender",
     "service-message-sender-factory",
     "service-message-sender-factory-peer",
-    "service-routable",
     "service-timer",
     "service-timer-filter",
     "service-timer-handler",
@@ -193,22 +192,20 @@ service-lifecycle-executor = ["service-lifecycle", "service-lifecycle-store"]
 service-lifecycle-store = ["service-lifecycle"]
 service-message-converter = []
 service-message-handler = ["service-message-converter", "service-message-sender"]
-service-message-handler-factory = ["service-routable", "service-message-handler"]
+service-message-handler-factory = ["service-message-handler"]
 service-message-sender = ["service-message-converter"]
 service-message-sender-factory = ["service-message-sender"]
 service-message-sender-factory-peer = [
     "service-message-sender",
     "service-message-sender-factory"
 ]
-service-routable = []
 service-timer =[
   "service-message-sender-factory",
-  "service-routable",
   "service-timer-filter",
   "service-timer-handler",
   "service-timer-handler-factory"
 ]
-service-timer-filter = ["service-routable"]
+service-timer-filter = []
 service-timer-handler = ["service-message-converter", "service-message-sender"]
 service-message-handler-dispatch = [
     "service-message-handler",
