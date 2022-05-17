@@ -20,12 +20,12 @@ use diesel::{delete, prelude::*};
 use splinter::error::InvalidStateError;
 use splinter::service::FullyQualifiedServiceId;
 
-use crate::store::alarm::AlarmType;
 use crate::store::scabbard_store::diesel::{
     models::{ScabbardAlarmModel, ScabbardServiceModel},
     schema::{scabbard_alarm, scabbard_service},
 };
 use crate::store::scabbard_store::ScabbardStoreError;
+use crate::store::AlarmType;
 
 use super::ScabbardStoreOperations;
 

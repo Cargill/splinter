@@ -21,7 +21,7 @@ use splinter::{
     store::command::StoreCommand,
 };
 
-use crate::store::{alarm::AlarmType, service::ServiceStatus, ScabbardStoreFactory};
+use crate::store::{AlarmType, ScabbardStoreFactory, ServiceStatus};
 
 pub struct ScabbardFinalizeServiceCommand<C> {
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,

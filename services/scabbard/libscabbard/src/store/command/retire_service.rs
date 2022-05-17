@@ -18,7 +18,7 @@ use splinter::{
     error::InternalError, service::FullyQualifiedServiceId, store::command::StoreCommand,
 };
 
-use crate::store::{service::ServiceStatus, ScabbardStoreFactory};
+use crate::store::{ScabbardStoreFactory, ServiceStatus};
 
 pub struct ScabbardRetireServiceCommand<C> {
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,

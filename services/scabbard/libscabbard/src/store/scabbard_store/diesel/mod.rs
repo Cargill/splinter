@@ -32,12 +32,8 @@ use diesel::{
 use crate::store::pool::ConnectionPool;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    action::IdentifiedConsensusAction,
-    alarm::AlarmType,
-    commit::CommitEntry,
-    event::{ConsensusEvent, IdentifiedConsensusEvent},
-    service::ScabbardService,
-    ConsensusAction, ConsensusContext,
+    AlarmType, CommitEntry, ConsensusAction, ConsensusContext, ConsensusEvent, Identified,
+    ScabbardService,
 };
 
 use super::ScabbardStore;
@@ -141,7 +137,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         self.pool.execute_read(|conn| {
             ScabbardStoreOperations::new(conn).list_consensus_actions(service_id, epoch)
         })
@@ -222,7 +218,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
         })
@@ -336,7 +332,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).list_consensus_actions(service_id, epoch)
         })
@@ -417,7 +413,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
         })
@@ -542,7 +538,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id, epoch)
     }
     /// List ready services
@@ -608,7 +604,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
     }
     /// Get the current context for a given service
@@ -703,7 +699,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusAction>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id, epoch)
     }
     /// List ready services
@@ -768,7 +764,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Vec<IdentifiedConsensusEvent>, ScabbardStoreError> {
+    ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
     }
     /// Get the current context for a given service
@@ -825,11 +821,11 @@ pub mod tests {
     use crate::migrations::run_sqlite_migrations;
 
     use crate::store::scabbard_store::{
-        commit::{CommitEntryBuilder, ConsensusDecision},
         service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
         two_phase_commit::{
             Action, ContextBuilder, Event, Message, Notification, Participant, State,
         },
+        CommitEntryBuilder, ConsensusDecision,
     };
 
     use diesel::{
@@ -1018,20 +1014,22 @@ pub mod tests {
 
         assert_eq!(
             action_list[0],
-            IdentifiedConsensusAction::TwoPhaseCommit(
-                action_id1,
-                Action::Notify(Notification::RequestForStart())
-            )
+            Identified {
+                id: action_id1,
+                record: ConsensusAction::TwoPhaseCommit(Action::Notify(
+                    Notification::RequestForStart()
+                )),
+            },
         );
         assert_eq!(
             action_list[1],
-            IdentifiedConsensusAction::TwoPhaseCommit(
-                action_id2,
-                Action::Update(
+            Identified {
+                id: action_id2,
+                record: ConsensusAction::TwoPhaseCommit(Action::Update(
                     ConsensusContext::TwoPhaseCommit(expected_update_context),
                     None,
-                )
-            )
+                )),
+            },
         );
     }
 
@@ -1040,8 +1038,6 @@ pub mod tests {
     /// 1. Add a valid context to the store
     /// 2. Create a valid updated context
     /// 3. Attempt to update the original context, check that the operation is successful
-    /// 4. Create an invalid updated context
-    /// 5. Attempt to update the original context, check that the operation returns an error
     #[test]
     fn scabbard_store_update_context() {
         let pool = create_connection_pool_and_migrate();
@@ -1099,25 +1095,6 @@ pub mod tests {
                 ConsensusContext::TwoPhaseCommit(update_context)
             )
             .is_ok());
-
-        let bad_update_context = ContextBuilder::default()
-            .with_coordinator(coordinator_fqsi.clone().service_id())
-            .with_epoch(0)
-            .with_participants(vec![Participant {
-                process: participant_service_id.clone(),
-                vote: None,
-            }])
-            .with_state(State::Voting { vote_timeout_start })
-            .with_this_process(coordinator_fqsi.clone().service_id())
-            .build()
-            .expect("failed to build update context");
-
-        assert!(store
-            .update_consensus_context(
-                &coordinator_fqsi,
-                ConsensusContext::TwoPhaseCommit(bad_update_context)
-            )
-            .is_err());
     }
 
     /// Test that the scabbard store `update_consensus_action` operation is successful.
@@ -1741,13 +1718,13 @@ pub mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0],
-            IdentifiedConsensusEvent::TwoPhaseCommit(
-                event_id,
-                Event::Deliver(
+            Identified {
+                id: event_id,
+                record: ConsensusEvent::TwoPhaseCommit(Event::Deliver(
                     participant2_fqsi.service_id().clone(),
                     Message::DecisionRequest(1)
-                )
-            )
+                )),
+            },
         );
 
         let event2 = ConsensusEvent::TwoPhaseCommit(Event::Alarm());
@@ -1763,17 +1740,20 @@ pub mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(
             events[0],
-            IdentifiedConsensusEvent::TwoPhaseCommit(
-                event_id,
-                Event::Deliver(
+            Identified {
+                id: event_id,
+                record: ConsensusEvent::TwoPhaseCommit(Event::Deliver(
                     participant2_fqsi.service_id().clone(),
                     Message::DecisionRequest(1)
-                )
-            ),
+                )),
+            },
         );
         assert_eq!(
             events[1],
-            IdentifiedConsensusEvent::TwoPhaseCommit(event_id2, Event::Alarm()),
+            Identified {
+                id: event_id2,
+                record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
+            },
         );
 
         store
@@ -1787,7 +1767,10 @@ pub mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0],
-            IdentifiedConsensusEvent::TwoPhaseCommit(event_id2, Event::Alarm()),
+            Identified {
+                id: event_id2,
+                record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
+            },
         );
     }
 
@@ -1897,7 +1880,7 @@ pub mod tests {
         let context3 = ConsensusContext::TwoPhaseCommit(coordinator_context);
 
         store
-            .add_consensus_context(&coordinator_fqsi, context3.clone())
+            .update_consensus_context(&coordinator_fqsi, context3.clone())
             .expect("failed to add context");
 
         let current_context = store
@@ -1920,7 +1903,7 @@ pub mod tests {
         let context4 = ConsensusContext::TwoPhaseCommit(participant_context);
 
         store
-            .add_consensus_context(&coordinator_fqsi.clone(), context4.clone())
+            .update_consensus_context(&coordinator_fqsi.clone(), context4.clone())
             .expect("failed to add context");
 
         let current_context = store

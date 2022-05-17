@@ -23,8 +23,8 @@ use splinter::store::command::StoreCommandExecutor;
 use crate::service::v3::consensus::consensus_action_runner::{
     NotifyObserver, ScabbardStoreContextUpdater,
 };
-use crate::store::action::ConsensusAction;
-use crate::store::event::ConsensusEvent;
+use crate::store::ConsensusAction;
+use crate::store::ConsensusEvent;
 use crate::store::ScabbardStoreFactory;
 
 use super::{

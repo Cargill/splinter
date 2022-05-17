@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use splinter::error::InternalError;
-use splinter::service::FullyQualifiedServiceId;
+/// A struct used to pair a type to an ID
+#[derive(Debug, PartialEq, Clone)]
+pub struct Identified<T: Clone> {
+    pub id: i64,
+    pub record: T,
+}
 
-use crate::store::{ConsensusAction, Identified};
-
-pub trait UnprocessedActionSource {
-    /// Returns actions for a given service that require processing.
-    fn get_unprocessed_actions(
-        &self,
-        service_id: &FullyQualifiedServiceId,
-        epoch: u64,
-    ) -> Result<Vec<Identified<ConsensusAction>>, InternalError>;
+impl<T: Clone> Identified<T> {
+    pub fn deconstruct(self) -> (i64, T) {
+        (self.id, self.record)
+    }
 }

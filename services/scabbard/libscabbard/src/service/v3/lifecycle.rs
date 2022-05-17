@@ -21,9 +21,8 @@ use splinter::{
 };
 
 use crate::store::{
-    service::{ScabbardServiceBuilder, ServiceStatus},
     ScabbardFinalizeServiceCommand, ScabbardPrepareServiceCommand, ScabbardPurgeServiceCommand,
-    ScabbardRetireServiceCommand, ScabbardStoreFactory,
+    ScabbardRetireServiceCommand, ScabbardServiceBuilder, ScabbardStoreFactory, ServiceStatus,
 };
 
 use super::ScabbardArguments;

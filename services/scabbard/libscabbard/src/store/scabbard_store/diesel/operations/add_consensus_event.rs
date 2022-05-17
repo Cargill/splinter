@@ -34,8 +34,8 @@ use crate::store::scabbard_store::diesel::{
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
-    event::ConsensusEvent,
     two_phase_commit::{Event, Message},
+    ConsensusEvent,
 };
 
 use super::ScabbardStoreOperations;

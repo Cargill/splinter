@@ -21,7 +21,7 @@ use crate::store::scabbard_store::diesel::{
     models::{Consensus2pcContextModel, Consensus2pcContextParticipantModel},
     schema::{consensus_2pc_context, consensus_2pc_context_participant},
 };
-use crate::store::scabbard_store::{context::ConsensusContext, ScabbardStoreError};
+use crate::store::scabbard_store::{ConsensusContext, ScabbardStoreError};
 
 use super::ScabbardStoreOperations;
 
@@ -45,7 +45,6 @@ where
         self.conn.transaction::<_, _, _>(|| {
             let context = consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
-                .order(consensus_2pc_context::epoch.desc())
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?;
 
@@ -54,8 +53,7 @@ where
                     consensus_2pc_context_participant::table
                         .filter(
                             consensus_2pc_context_participant::service_id
-                                .eq(format!("{}", service_id))
-                                .and(consensus_2pc_context_participant::epoch.eq(context.epoch)),
+                                .eq(format!("{}", service_id)),
                         )
                         .load::<Consensus2pcContextParticipantModel>(self.conn)?;
 

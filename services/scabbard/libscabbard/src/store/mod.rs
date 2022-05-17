@@ -34,13 +34,15 @@ pub use commit_hash::transact;
 pub use commit_hash::{CommitHashStore, CommitHashStoreError};
 
 #[cfg(all(feature = "scabbardv3-store", feature = "diesel"))]
-pub use scabbard_store::diesel::DieselScabbardStore;
+pub use scabbard_store::DieselScabbardStore;
 #[cfg(feature = "scabbardv3-store")]
 pub use scabbard_store::PooledScabbardStoreFactory;
 #[cfg(feature = "scabbardv3-store")]
 pub use scabbard_store::{
-    action, alarm, commit, context, event, service, two_phase_commit, ScabbardStore,
-    ScabbardStoreFactory,
+    Action, AlarmType, CommitEntry, CommitEntryBuilder, ConsensusAction, ConsensusContext,
+    ConsensusDecision, ConsensusEvent, ConsensusType, Context, ContextBuilder, Event, Identified,
+    Message, Notification, Participant, ScabbardService, ScabbardServiceBuilder, ScabbardStore,
+    ScabbardStoreFactory, ServiceStatus, State,
 };
 #[cfg(all(feature = "scabbardv3-store", feature = "postgres"))]
 pub use scabbard_store::{PgScabbardStoreFactory, PooledPgScabbardStoreFactory};

@@ -23,7 +23,7 @@ use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
 use crate::service::v3::consensus::consensus_action_runner::UpdateContextCommand;
-use crate::store::context::ConsensusContext;
+use crate::store::ConsensusContext;
 use crate::store::ScabbardStoreFactory;
 
 use super::ContextUpdater;

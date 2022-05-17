@@ -19,11 +19,11 @@ use diesel::prelude::*;
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
-use crate::store::alarm::AlarmType;
 use crate::store::scabbard_store::diesel::schema::{
     consensus_2pc_action, consensus_2pc_event, scabbard_alarm, scabbard_service,
 };
 use crate::store::scabbard_store::ScabbardStoreError;
+use crate::store::AlarmType;
 
 use super::ScabbardStoreOperations;
 

@@ -14,7 +14,7 @@
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS consensus_2pc_context (
-    service_id                TEXT NOT NULL,
+    service_id                TEXT PRIMARY KEY,
     coordinator               TEXT NOT NULL,
     epoch                     BIGINT NOT NULL,
     last_commit_epoch         BIGINT,
@@ -25,8 +25,7 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_context (
     vote                      TEXT
     CHECK ( (vote IN ('TRUE' , 'FALSE')) OR ( state != 'VOTED') ),
     decision_timeout_start    BIGINT
-    CHECK ( (decision_timeout_start IS NOT NULL) OR ( state != 'VOTED') ),
-    PRIMARY KEY (service_id, epoch)
+    CHECK ( (decision_timeout_start IS NOT NULL) OR ( state != 'VOTED') )
 );
 
 CREATE TABLE IF NOT EXISTS consensus_2pc_context_participant (
@@ -35,8 +34,8 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_context_participant (
     process                   TEXT NOT NULL,
     vote                      TEXT
     CHECK ( vote IN ('TRUE' , 'FALSE') OR vote IS NULL ),
-    PRIMARY KEY (service_id, epoch, process),
-    FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_context(service_id, epoch) ON DELETE CASCADE
+    PRIMARY KEY (service_id, process),
+    FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS consensus_2pc_action (
@@ -46,7 +45,7 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_action (
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     executed_at               BIGINT,
     position                  INTEGER NOT NULL,
-    FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_context(service_id, epoch) ON DELETE CASCADE
+    FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS consensus_2pc_update_context_action (
@@ -65,7 +64,7 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_update_context_action (
     CHECK ( (decision_timeout_start IS NOT NULL) OR ( state != 'VOTED') ),
     action_alarm  BIGINT,
     FOREIGN KEY (action_id) REFERENCES consensus_2pc_action(id) ON DELETE CASCADE,
-    FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_context(service_id, epoch) ON DELETE CASCADE
+    FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS consensus_2pc_send_message_action (
@@ -80,7 +79,7 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_send_message_action (
     vote_request              BINARY
     CHECK ( (vote_request IS NOT NULL) OR (message_type != 'VOTEREQUEST') ),
     FOREIGN KEY (action_id) REFERENCES consensus_2pc_action(id) ON DELETE CASCADE,
-    FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_context(service_id, epoch) ON DELETE CASCADE
+    FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS consensus_2pc_notification_action (
@@ -94,7 +93,7 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_notification_action (
     request_for_vote_value    BINARY
     CHECK ( (request_for_vote_value IS NOT NULL) OR (notification_type != 'PARTICIPANTREQUESTFORVOTE') ),
     FOREIGN KEY (action_id) REFERENCES consensus_2pc_action(id) ON DELETE CASCADE,
-    FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_context(service_id, epoch) ON DELETE CASCADE
+    FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS consensus_2pc_update_context_action_participant (

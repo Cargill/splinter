@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_deliver_event (
     vote_request              BYTEA
     CHECK ( (vote_request IS NOT NULL) OR (message_type != 'VOTEREQUEST') ),
     FOREIGN KEY (event_id) REFERENCES consensus_2pc_event(id) ON DELETE CASCADE,
-    FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_context(service_id, epoch) ON DELETE CASCADE
+    FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS consensus_2pc_start_event (
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_start_event (
     epoch                     BIGINT NOT NULL,
     value                     BYTEA,
     FOREIGN KEY (event_id) REFERENCES consensus_2pc_event(id) ON DELETE CASCADE,
-    FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_context(service_id, epoch) ON DELETE CASCADE
+    FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS consensus_2pc_vote_event (
@@ -56,5 +56,5 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_vote_event (
     vote                      TEXT
     CHECK ( vote IN ('TRUE' , 'FALSE') ),
     FOREIGN KEY (event_id) REFERENCES consensus_2pc_event(id) ON DELETE CASCADE,
-    FOREIGN KEY (service_id, epoch) REFERENCES consensus_2pc_context(service_id, epoch) ON DELETE CASCADE
+    FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
 );

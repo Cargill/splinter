@@ -19,7 +19,7 @@ use diesel::pg::PgConnection;
 #[cfg(feature = "sqlite")]
 use diesel::sqlite::SqliteConnection;
 use diesel::{delete, dsl::insert_into, prelude::*};
-use splinter::error::{InternalError, InvalidStateError};
+use splinter::error::InvalidStateError;
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
@@ -49,24 +49,14 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
                 ConsensusContext::TwoPhaseCommit(context) => {
-                    let epoch = i64::try_from(*context.epoch()).map_err(|err| {
-                        ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-                    })?;
-                    // check to see if a context with the given epoch and service_id exists
+                    // check to see if a context with the given service_id exists
                     consensus_2pc_context::table
-                        .filter(
-                            consensus_2pc_context::epoch.eq(epoch).and(
-                                consensus_2pc_context::service_id.eq(format!("{}", service_id)),
-                            ),
-                        )
+                        .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                         .first::<Consensus2pcContextModel>(self.conn)
                         .optional()?
                         .ok_or_else(|| {
                             ScabbardStoreError::InvalidState(InvalidStateError::with_message(
-                                format!(
-                                    "Context with service ID {} and epoch {} does not exist",
-                                    service_id, epoch,
-                                ),
+                                format!("Context with service ID {} does not exist", service_id,),
                             ))
                         })?;
 
@@ -75,9 +65,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
 
                     delete(
                         consensus_2pc_context::table.filter(
-                            consensus_2pc_context::epoch.eq(epoch).and(
-                                consensus_2pc_context::service_id.eq(format!("{}", service_id)),
-                            ),
+                            consensus_2pc_context::service_id.eq(format!("{}", service_id)),
                         ),
                     )
                     .execute(self.conn)?;
@@ -89,13 +77,9 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                     let updated_participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
 
-                    delete(
-                        consensus_2pc_context_participant::table.filter(
-                            consensus_2pc_context_participant::service_id
-                                .eq(format!("{}", service_id))
-                                .and(consensus_2pc_context_participant::epoch.eq(epoch)),
-                        ),
-                    )
+                    delete(consensus_2pc_context_participant::table.filter(
+                        consensus_2pc_context_participant::service_id.eq(format!("{}", service_id)),
+                    ))
                     .execute(self.conn)?;
 
                     insert_into(consensus_2pc_context_participant::table)
@@ -119,24 +103,14 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
                 ConsensusContext::TwoPhaseCommit(context) => {
-                    let epoch = i64::try_from(*context.epoch()).map_err(|err| {
-                        ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-                    })?;
-                    // check to see if a context with the given epoch and service_id exists
+                    // check to see if a context with the given service_id exists
                     consensus_2pc_context::table
-                        .filter(
-                            consensus_2pc_context::epoch.eq(epoch).and(
-                                consensus_2pc_context::service_id.eq(format!("{}", service_id)),
-                            ),
-                        )
+                        .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                         .first::<Consensus2pcContextModel>(self.conn)
                         .optional()?
                         .ok_or_else(|| {
                             ScabbardStoreError::InvalidState(InvalidStateError::with_message(
-                                format!(
-                                    "Context with service ID {} and epoch {} does not exist",
-                                    service_id, epoch,
-                                ),
+                                format!("Context with service ID {} does not exist", service_id,),
                             ))
                         })?;
 
@@ -145,9 +119,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
 
                     delete(
                         consensus_2pc_context::table.filter(
-                            consensus_2pc_context::epoch.eq(epoch).and(
-                                consensus_2pc_context::service_id.eq(format!("{}", service_id)),
-                            ),
+                            consensus_2pc_context::service_id.eq(format!("{}", service_id)),
                         ),
                     )
                     .execute(self.conn)?;
@@ -159,13 +131,9 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                     let updated_participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
 
-                    delete(
-                        consensus_2pc_context_participant::table.filter(
-                            consensus_2pc_context_participant::service_id
-                                .eq(format!("{}", service_id))
-                                .and(consensus_2pc_context_participant::epoch.eq(epoch)),
-                        ),
-                    )
+                    delete(consensus_2pc_context_participant::table.filter(
+                        consensus_2pc_context_participant::service_id.eq(format!("{}", service_id)),
+                    ))
                     .execute(self.conn)?;
 
                     insert_into(consensus_2pc_context_participant::table)

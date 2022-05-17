@@ -21,9 +21,9 @@ use splinter::service::{FullyQualifiedServiceId, ServiceId};
 use crate::store::scabbard_store::{
     alarm::AlarmType,
     commit::{CommitEntry, CommitEntryBuilder, ConsensusDecision},
-    context::ConsensusContext,
     service::{ConsensusType, ScabbardService, ServiceStatus},
     two_phase_commit::{Context, ContextBuilder, Event, Message, Notification, Participant, State},
+    ConsensusContext,
 };
 
 use super::schema::{
@@ -214,7 +214,7 @@ pub struct ScabbardAlarmModel {
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_context"]
-#[primary_key(service_id, epoch)]
+#[primary_key(service_id)]
 pub struct Consensus2pcContextModel {
     pub service_id: String,
     pub coordinator: String,
@@ -407,7 +407,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_context_participant"]
-#[primary_key(service_id, epoch, process)]
+#[primary_key(service_id, process)]
 pub struct Consensus2pcContextParticipantModel {
     pub service_id: String,
     pub epoch: i64,

@@ -15,7 +15,7 @@
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
-use crate::store::context::ConsensusContext;
+use crate::store::ConsensusContext;
 
 pub trait ContextSource {
     fn get_context(

@@ -15,7 +15,8 @@
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
-use crate::store::event::IdentifiedConsensusEvent;
+use crate::store::ConsensusEvent;
+use crate::store::Identified;
 
 pub trait UnprocessedEventSource {
     /// Returns the next event for a given service that requires processing,
@@ -24,5 +25,5 @@ pub trait UnprocessedEventSource {
         &self,
         service_id: &FullyQualifiedServiceId,
         epoch: u64,
-    ) -> Result<Option<IdentifiedConsensusEvent>, InternalError>;
+    ) -> Result<Option<Identified<ConsensusEvent>>, InternalError>;
 }

@@ -22,25 +22,11 @@ use augrim::{error::InternalError, two_phase_commit::TwoPhaseCommitAction};
 
 #[cfg(feature = "scabbardv3-consensus")]
 use crate::service::v3::{ScabbardProcess, ScabbardValue};
-use crate::store::scabbard_store::two_phase_commit::Action;
+use crate::store::scabbard_store::Action;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConsensusAction {
     TwoPhaseCommit(Action),
-}
-
-// A scabbard consensus action that includes the action ID associated with the action
-#[derive(Debug, PartialEq, Clone)]
-pub enum IdentifiedConsensusAction {
-    TwoPhaseCommit(i64, Action),
-}
-
-impl IdentifiedConsensusAction {
-    pub fn deconstruct(self) -> (i64, ConsensusAction) {
-        match self {
-            Self::TwoPhaseCommit(id, action) => (id, ConsensusAction::TwoPhaseCommit(action)),
-        }
-    }
 }
 
 #[cfg(feature = "scabbardv3-consensus")]

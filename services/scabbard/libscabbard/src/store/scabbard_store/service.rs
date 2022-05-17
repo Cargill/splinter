@@ -80,7 +80,7 @@ impl ScabbardServiceBuilder {
         self.consensus.clone()
     }
 
-    /// Returns the peers for the service
+    /// Returns the status for the service
     pub fn status(&self) -> Option<ServiceStatus> {
         self.status.clone()
     }

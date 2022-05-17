@@ -60,18 +60,15 @@ mod tests {
     use splinter::service::ServiceId;
 
     use crate::migrations::run_sqlite_migrations;
-    use crate::store::service::ServiceStatus;
-    use crate::store::service::{ConsensusType, ScabbardServiceBuilder};
     use crate::store::DieselScabbardStore;
     use crate::store::PooledSqliteScabbardStoreFactory;
     use crate::store::ScabbardStore;
+    use crate::store::ServiceStatus;
     use crate::store::{
-        action::ConsensusAction,
-        alarm::AlarmType,
-        context::ConsensusContext,
-        event::ConsensusEvent,
-        two_phase_commit::{Action, ContextBuilder, Event, Notification, Participant, State},
+        Action, AlarmType, ConsensusAction, ConsensusContext, ConsensusEvent, ContextBuilder,
+        Event, Notification, Participant, State,
     };
+    use crate::store::{ConsensusType, ScabbardServiceBuilder};
 
     /// Test that the `ScabbardTimerFilter`'s `filter` function works
     ///
