@@ -30,7 +30,7 @@ use crate::store::ConsensusAction;
 use crate::store::ConsensusContext;
 use crate::store::ConsensusEvent;
 
-use super::{ConsensusActionRunner, ScabbardProcess};
+use super::ConsensusActionRunner;
 
 pub use action_source::UnprocessedActionSource;
 pub use builder::ConsensusRunnerBuilder;
@@ -53,7 +53,6 @@ where
         String,
         Box<
             dyn Algorithm<
-                ScabbardProcess,
                 Event = ConsensusEvent,
                 Action = ConsensusAction,
                 Context = ConsensusContext,

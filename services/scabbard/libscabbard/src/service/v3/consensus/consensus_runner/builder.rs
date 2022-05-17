@@ -29,7 +29,7 @@ use crate::store::ScabbardStoreFactory;
 
 use super::{
     ConsensusActionRunner, ConsensusContext, ConsensusRunner, ConsensusStoreCommandFactory,
-    ContextSource, ScabbardProcess, UnprocessedActionSource, UnprocessedEventSource,
+    ContextSource, UnprocessedActionSource, UnprocessedEventSource,
 };
 
 #[derive(Default)]
@@ -45,7 +45,6 @@ where
         String,
         Box<
             dyn Algorithm<
-                ScabbardProcess,
                 Event = ConsensusEvent,
                 Action = ConsensusAction,
                 Context = ConsensusContext,
@@ -116,7 +115,6 @@ where
         algorithm_name: S,
         algorithm: Box<
             dyn Algorithm<
-                ScabbardProcess,
                 Event = ConsensusEvent,
                 Action = ConsensusAction,
                 Context = ConsensusContext,
