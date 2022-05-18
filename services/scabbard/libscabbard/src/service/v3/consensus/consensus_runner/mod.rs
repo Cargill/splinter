@@ -81,19 +81,16 @@ where
                     ))
                 })?;
 
-            let epoch = context.epoch();
-
             let unprocessed_actions = self
                 .unprocessed_action_source
                 .get_unprocessed_actions(service_id)?;
 
             let mut commands = vec![];
             if !unprocessed_actions.is_empty() {
-                commands.extend(self.action_runner.run_actions(
-                    unprocessed_actions,
-                    service_id,
-                    epoch,
-                )?);
+                commands.extend(
+                    self.action_runner
+                        .run_actions(unprocessed_actions, service_id)?,
+                );
             }
 
             let unprocessed_event = self.unprocessed_event_source.get_next_event(service_id)?;
