@@ -15,6 +15,8 @@
 mod orchestrator;
 mod processor;
 
+#[cfg(feature = "rest-api-actix-web-1")]
+pub use orchestrator::ServiceOrchestratorRestResourceProvider;
 pub use orchestrator::{
     AddServiceError, InitializeServiceError, ListServicesError, NewOrchestratorError,
     OrchestratorError, ServiceDefinition, ServiceOrchestrator, ServiceOrchestratorBuilder,

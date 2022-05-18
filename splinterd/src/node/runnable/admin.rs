@@ -26,7 +26,9 @@ use splinter::peer::PeerManagerConnector;
 use splinter::public_key::PublicKey;
 use splinter::registry::{LocalYamlRegistry, RegistryReader, UnifiedRegistry};
 use splinter::rest_api::actix_web_1::RestResourceProvider as _;
-use splinter::runtime::service::instance::{ServiceOrchestratorBuilder, ServiceProcessorBuilder};
+use splinter::runtime::service::instance::{
+    ServiceOrchestratorBuilder, ServiceOrchestratorRestResourceProvider, ServiceProcessorBuilder,
+};
 use splinter::store::StoreFactory;
 use splinter::transport::{inproc::InprocTransport, Transport};
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
@@ -121,7 +123,8 @@ impl RunnableAdminSubsystem {
             .run()
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
-        let mut orchestrator_resources = orchestrator.resources();
+        let orchestrator_rest_provider =
+            ServiceOrchestratorRestResourceProvider::new(&orchestrator);
 
         let mut admin_service_builder = AdminServiceBuilder::new();
 
@@ -155,7 +158,7 @@ impl RunnableAdminSubsystem {
         actix1_resources.append(&mut AdminServiceRestProvider::new(&admin_service).resources());
         actix1_resources.append(&mut circuit_resource_provider.resources());
         actix1_resources.append(&mut RwRegistryRestResourceProvider::new(&registry).resources());
-        actix1_resources.append(&mut orchestrator_resources);
+        actix1_resources.append(&mut orchestrator_rest_provider.resources());
 
         // set up inproc connections
         let admin_connection = service_transport

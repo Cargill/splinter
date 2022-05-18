@@ -50,6 +50,8 @@ pub use self::error::{
     AddServiceError, InitializeServiceError, ListServicesError, NewOrchestratorError,
     OrchestratorError, ShutdownServiceError,
 };
+#[cfg(feature = "rest-api-actix-web-1")]
+pub use self::rest_api::ServiceOrchestratorRestResourceProvider;
 pub use self::runnable::RunnableServiceOrchestrator;
 
 // Recv timeout in secs

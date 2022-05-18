@@ -90,6 +90,7 @@ use splinter::rest_api::auth::authorization::Permission;
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
+use splinter::runtime::service::instance::ServiceOrchestratorRestResourceProvider;
 use splinter::runtime::service::instance::{
     ServiceOrchestratorBuilder, ServiceProcessor, ServiceProcessorShutdownHandle,
 };
@@ -542,7 +543,8 @@ impl SplinterDaemon {
                 StartError::OrchestratorError(format!("failed to start orchestrator: {}", err))
             })?;
 
-        let orchestrator_resources = orchestrator.resources();
+        let orchestrator_resources =
+            ServiceOrchestratorRestResourceProvider::new(&orchestrator).resources();
         let mut orchestator_shutdown_handle =
             orchestrator.take_shutdown_handle().ok_or_else(|| {
                 StartError::OrchestratorError(
