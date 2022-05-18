@@ -105,7 +105,6 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     // add command to mark the action as executed
                     commands.push(Box::new(ExecuteActionCommand::new(
                         service_id.clone(),
-                        epoch,
                         action.id,
                         self.store_factory.clone(),
                     )));
@@ -126,7 +125,6 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     // add command to mark the action as executed
                     commands.push(Box::new(ExecuteActionCommand::new(
                         service_id.clone(),
-                        epoch,
                         action.id,
                         self.store_factory.clone(),
                     )));
@@ -141,7 +139,6 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     // add command to mark the action as executed
                     commands.push(Box::new(ExecuteActionCommand::new(
                         service_id.clone(),
-                        epoch,
                         action.id,
                         self.store_factory.clone(),
                     )));

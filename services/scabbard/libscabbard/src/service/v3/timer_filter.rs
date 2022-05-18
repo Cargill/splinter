@@ -229,7 +229,7 @@ mod tests {
         // update the second service's action's executed_at time so that it appears to have
         // been executed
         store
-            .update_consensus_action(&fqsi2, 1, action_id2, SystemTime::now())
+            .update_consensus_action(&fqsi2, action_id2, SystemTime::now())
             .expect("failed to update action");
 
         let ids = scabbard_timer_filter.filter().expect("failed to filter");
@@ -241,7 +241,7 @@ mod tests {
         // update the first service's action's executed_at time so that it appears to have
         // been executed
         store
-            .update_consensus_action(&fqsi, 1, action_id, SystemTime::now())
+            .update_consensus_action(&fqsi, action_id, SystemTime::now())
             .expect("failed to update action");
 
         let ids = scabbard_timer_filter.filter().expect("failed to filter");

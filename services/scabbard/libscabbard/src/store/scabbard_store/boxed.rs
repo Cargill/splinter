@@ -77,17 +77,15 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the action
     ///    belongs to
-    /// * `epoch` - The epoch that the action belongs to
     /// * `action_id` - The ID of the action being updated
     /// * `executed_at` - The time that the action was executed
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
-        (&**self).update_consensus_action(service_id, epoch, action_id, executed_at)
+        (&**self).update_consensus_action(service_id, action_id, executed_at)
     }
 
     /// List all coordinator actions for a given service_id and epoch

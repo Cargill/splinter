@@ -118,14 +118,12 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_action(
                 service_id,
-                epoch,
                 action_id,
                 executed_at,
             )
@@ -312,14 +310,12 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_action(
                 service_id,
-                epoch,
                 action_id,
                 executed_at,
             )
@@ -518,13 +514,11 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_action(
             service_id,
-            epoch,
             action_id,
             executed_at,
         )
@@ -677,13 +671,11 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_action(
             service_id,
-            epoch,
             action_id,
             executed_at,
         )
@@ -1157,7 +1149,7 @@ pub mod tests {
             .expect("failed to add actions");
 
         assert!(store
-            .update_consensus_action(&coordinator_fqsi, 1, action_id, SystemTime::now())
+            .update_consensus_action(&coordinator_fqsi, action_id, SystemTime::now())
             .is_ok());
     }
 
@@ -1286,7 +1278,7 @@ pub mod tests {
         assert_eq!(&ready_services[0], &service_fqsi);
 
         store
-            .update_consensus_action(&service_fqsi, 1, action_id, SystemTime::now())
+            .update_consensus_action(&service_fqsi, action_id, SystemTime::now())
             .expect("failed to update action");
 
         // check that no services are returned because there are no un-exectuted actions or

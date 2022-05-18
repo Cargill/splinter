@@ -97,13 +97,11 @@ pub trait ScabbardStore {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the action
     ///    belongs to
-    /// * `epoch` - The epoch that the action belongs to
     /// * `action_id` - The ID of the action being updated
     /// * `executed_at` - The time that the action was executed
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError>;
