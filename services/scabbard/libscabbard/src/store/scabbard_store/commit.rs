@@ -20,7 +20,7 @@ use splinter::service::FullyQualifiedServiceId;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitEntry {
     service_id: FullyQualifiedServiceId,
-    epoch: u64,
+    epoch: Option<u64>,
     value: String,
     decision: Option<ConsensusDecision>,
 }
@@ -32,8 +32,8 @@ impl CommitEntry {
     }
 
     /// Returns the epoch for the commit entry
-    pub fn epoch(&self) -> u64 {
-        self.epoch
+    pub fn epoch(&self) -> &Option<u64> {
+        &self.epoch
     }
 
     /// Returns the value for the commit entry
@@ -49,7 +49,7 @@ impl CommitEntry {
     pub fn into_builder(self) -> CommitEntryBuilder {
         CommitEntryBuilder {
             service_id: Some(self.service_id),
-            epoch: Some(self.epoch),
+            epoch: self.epoch,
             value: Some(self.value),
             decision: self.decision,
         }
@@ -135,9 +135,7 @@ impl CommitEntryBuilder {
             )
         })?;
 
-        let epoch = self.epoch.ok_or_else(|| {
-            InvalidStateError::with_message("unable to build, missing field: `epoch`".to_string())
-        })?;
+        let epoch = self.epoch;
 
         let value = self.value.ok_or_else(|| {
             InvalidStateError::with_message("unable to build, missing field: `value`".to_string())

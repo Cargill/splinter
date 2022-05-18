@@ -94,8 +94,10 @@ impl TryFrom<&CommitEntry> for CommitEntryModel {
     fn try_from(entry: &CommitEntry) -> Result<Self, Self::Error> {
         Ok(CommitEntryModel {
             service_id: entry.service_id().to_string(),
-            epoch: i64::try_from(entry.epoch())
-                .map_err(|err| InternalError::from_source(Box::new(err)))?,
+            epoch: i64::try_from(entry.epoch().ok_or_else(|| {
+                InternalError::with_message("Epoch is not set on commit entry".to_string())
+            })?)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?,
             value: entry.value().to_string(),
             decision: entry
                 .decision()

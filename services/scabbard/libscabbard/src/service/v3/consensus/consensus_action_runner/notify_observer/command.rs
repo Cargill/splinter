@@ -83,7 +83,6 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                 let entry = CommitEntryBuilder::default()
                     .with_service_id(service_id)
                     .with_value(&s)
-                    .with_epoch(epoch)
                     .build()
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
@@ -114,7 +113,6 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                         &String::from_utf8(value)
                             .map_err(|err| InternalError::from_source(Box::new(err)))?,
                     )
-                    .with_epoch(epoch)
                     .build()
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
