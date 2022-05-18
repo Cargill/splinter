@@ -206,14 +206,13 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
             )
         })
     }
-    /// List all consensus events for a given service_id and epoch
+    /// List all consensus events for a given service_id
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
+            ScabbardStoreOperations::new(conn).list_consensus_events(service_id)
         })
     }
     /// Get the current context for a given service
@@ -394,14 +393,13 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
             )
         })
     }
-    /// List all consensus events for a given service_id and epoch
+    /// List all consensus events for a given service_id
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
+            ScabbardStoreOperations::new(conn).list_consensus_events(service_id)
         })
     }
     /// Get the current context for a given service
@@ -577,13 +575,12 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
             executed_at,
         )
     }
-    /// List all consensus events for a given service_id and epoch
+    /// List all consensus events for a given service_id
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
+        ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id)
     }
     /// Get the current context for a given service
     fn get_current_consensus_context(
@@ -729,13 +726,12 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
             executed_at,
         )
     }
-    /// List all consensus events for a given service_id and epoch
+    /// List all consensus events for a given service_id
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
+        ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id)
     }
     /// Get the current context for a given service
     fn get_current_consensus_context(
@@ -1682,7 +1678,7 @@ pub mod tests {
             .expect("failed to add event");
 
         let events = store
-            .list_consensus_events(&participant_fqsi, 1)
+            .list_consensus_events(&participant_fqsi)
             .expect("failed to list events");
 
         assert_eq!(events.len(), 1);
@@ -1704,7 +1700,7 @@ pub mod tests {
             .expect("failed to add event");
 
         let events = store
-            .list_consensus_events(&participant_fqsi, 1)
+            .list_consensus_events(&participant_fqsi)
             .expect("failed to list events");
 
         assert_eq!(events.len(), 2);
@@ -1731,7 +1727,7 @@ pub mod tests {
             .expect("failed to update event");
 
         let events = store
-            .list_consensus_events(&participant_fqsi, 1)
+            .list_consensus_events(&participant_fqsi)
             .expect("failed to list events");
 
         assert_eq!(events.len(), 1);

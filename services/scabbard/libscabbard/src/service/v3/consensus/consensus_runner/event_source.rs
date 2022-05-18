@@ -24,6 +24,5 @@ pub trait UnprocessedEventSource {
     fn get_next_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Option<Identified<ConsensusEvent>>, InternalError>;
 }

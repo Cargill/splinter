@@ -38,11 +38,10 @@ impl UnprocessedEventSource for StoreUnprocessedEventSource {
     fn get_next_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Option<Identified<ConsensusEvent>>, InternalError> {
         Ok(self
             .store
-            .list_consensus_events(service_id, epoch)
+            .list_consensus_events(service_id)
             .map_err(|err| InternalError::from_source(Box::new(err)))?
             .get(0)
             .cloned())

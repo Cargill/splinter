@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::collections::HashMap;
-use std::convert::TryFrom;
 
 use diesel::prelude::*;
 use splinter::error::{InternalError, InvalidStateError};
@@ -43,7 +42,6 @@ pub(in crate::store::scabbard_store::diesel) trait ListEventsOperation {
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError>;
 }
 
@@ -58,25 +56,17 @@ where
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let epoch = i64::try_from(epoch).map_err(|err| {
-                ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-            })?;
-            // check to see if a context with the given epoch and service_id exists
+            // check to see if a context with the given service_id exists
             consensus_2pc_context::table
-                .filter(
-                    consensus_2pc_context::epoch
-                        .eq(epoch)
-                        .and(consensus_2pc_context::service_id.eq(format!("{}", service_id))),
-                )
+                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Context with service ID {} and epoch {} does not exist",
-                        service_id, epoch,
+                        "Context with service ID {} does not exist",
+                        service_id,
                     )))
                 })?;
 
@@ -84,7 +74,6 @@ where
                 .filter(
                     consensus_2pc_event::service_id
                         .eq(format!("{}", service_id))
-                        .and(consensus_2pc_event::epoch.eq(epoch))
                         .and(consensus_2pc_event::executed_at.is_null()),
                 )
                 .order(consensus_2pc_event::position.desc())

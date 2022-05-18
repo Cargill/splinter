@@ -199,19 +199,17 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         (&**self).update_consensus_event(service_id, event_id, executed_at)
     }
 
-    /// List all consensus events for a given service_id and epoch
+    /// List all consensus events for a given service_id
     ///
     /// # Arguments
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service for which events
     ///    should be listed
-    /// * `epoch` - The epoch for which events should be listed
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
-        (&**self).list_consensus_events(service_id, epoch)
+        (&**self).list_consensus_events(service_id)
     }
 
     /// Get the current context for a given service

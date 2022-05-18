@@ -96,9 +96,7 @@ where
                 )?);
             }
 
-            let unprocessed_event = self
-                .unprocessed_event_source
-                .get_next_event(service_id, epoch)?;
+            let unprocessed_event = self.unprocessed_event_source.get_next_event(service_id)?;
 
             let event = match unprocessed_event {
                 Some(event) => event,
