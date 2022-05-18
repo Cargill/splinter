@@ -153,7 +153,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).add_commit_entry(commit_entry))
     }
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     fn get_last_commit_entry(
         &self,
         service_id: &FullyQualifiedServiceId,
@@ -340,7 +340,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).add_commit_entry(commit_entry))
     }
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     fn get_last_commit_entry(
         &self,
         service_id: &FullyQualifiedServiceId,
@@ -532,7 +532,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn add_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).add_commit_entry(commit_entry)
     }
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     fn get_last_commit_entry(
         &self,
         service_id: &FullyQualifiedServiceId,
@@ -684,7 +684,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     fn add_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).add_commit_entry(commit_entry)
     }
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     fn get_last_commit_entry(
         &self,
         service_id: &FullyQualifiedServiceId,

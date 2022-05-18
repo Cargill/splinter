@@ -124,7 +124,7 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         (&**self).add_commit_entry(commit_entry)
     }
 
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     ///
     /// # Arguments
     ///

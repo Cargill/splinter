@@ -134,7 +134,7 @@ pub trait ScabbardStore {
     /// * `commit_entry` - The `CommitEntry` that is to be added to the database
     fn add_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError>;
 
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     ///
     /// # Arguments
     ///
