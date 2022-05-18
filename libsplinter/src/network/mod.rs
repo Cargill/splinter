@@ -18,4 +18,5 @@ pub mod auth;
 pub mod connection_manager;
 pub mod dispatch;
 pub mod handlers;
+#[cfg(feature = "runtime-service")]
 pub(crate) mod reply;

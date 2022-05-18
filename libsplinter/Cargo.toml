@@ -100,6 +100,8 @@ stable = [
     "rest-api",
     "rest-api-actix-web-1",
     "rest-api-cors",
+    "runtime-service",
+    "service",
     "sqlite",
     "store",
     "store-factory",
@@ -143,7 +145,7 @@ experimental = [
 # used for turning benchmark tests on
 benchmark = []
 
-admin-service = ["store"]
+admin-service = ["store", "runtime-service"]
 admin-service-client = ["admin-service"]
 admin-service-event-client = ["admin-service-client"]
 admin-service-event-client-actix-web-client = [
@@ -186,33 +188,37 @@ rest-api-actix-web-1 = [
     "rest-api",
 ]
 rest-api-cors = []
-service-arguments-converter = []
-service-lifecycle = ["service-arguments-converter", "store"]
-service-lifecycle-executor = ["service-lifecycle", "service-lifecycle-store"]
-service-lifecycle-store = ["service-lifecycle"]
-service-message-converter = []
-service-message-handler = ["service-message-converter", "service-message-sender"]
-service-message-handler-factory = ["service-message-handler"]
-service-message-sender = ["service-message-converter"]
-service-message-sender-factory = ["service-message-sender"]
+runtime-service = ["service"]
+service = []
+service-arguments-converter = ["service"]
+service-lifecycle = ["service", "service-arguments-converter", "store"]
+service-lifecycle-executor = ["runtime-service", "service-lifecycle", "service-lifecycle-store"]
+service-lifecycle-store = ["service", "service-lifecycle"]
+service-message-converter = ["service"]
+service-message-handler = ["service", "service-message-converter", "service-message-sender"]
+service-message-handler-factory = ["service", "service-message-handler"]
+service-message-sender = ["service", "service-message-converter"]
+service-message-sender-factory = ["service", "service-message-sender"]
 service-message-sender-factory-peer = [
     "service-message-sender",
     "service-message-sender-factory"
 ]
 service-timer =[
+  "runtime-service",
   "service-message-sender-factory",
   "service-timer-filter",
   "service-timer-handler",
   "service-timer-handler-factory"
 ]
-service-timer-filter = []
-service-timer-handler = ["service-message-converter", "service-message-sender"]
+service-timer-filter = ["service"]
+service-timer-handler = ["service", "service-message-converter", "service-message-sender"]
 service-message-handler-dispatch = [
+    "runtime-service",
     "service-message-handler",
     "service-message-handler-factory",
     "service-message-sender-factory",
 ]
-service-timer-handler-factory = ["service-timer-handler"]
+service-timer-handler-factory = ["service", "service-timer-handler"]
 sqlite = ["diesel/sqlite", "diesel_migrations"]
 store = []
 store-factory = ["store"]

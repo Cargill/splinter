@@ -112,6 +112,7 @@ pub mod registry;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 pub mod runtime;
+#[cfg(feature = "service")]
 pub mod service;
 #[cfg(feature = "store")]
 pub mod store;
