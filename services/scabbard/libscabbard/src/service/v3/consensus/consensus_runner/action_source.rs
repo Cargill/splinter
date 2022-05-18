@@ -22,6 +22,5 @@ pub trait UnprocessedActionSource {
     fn get_unprocessed_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, InternalError>;
 }

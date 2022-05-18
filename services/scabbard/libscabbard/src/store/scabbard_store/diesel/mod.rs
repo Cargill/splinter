@@ -129,14 +129,13 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
             )
         })
     }
-    /// List all coordinator actions for a given service_id and epoch
+    /// List all coordinator actions for a given service_id
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         self.pool.execute_read(|conn| {
-            ScabbardStoreOperations::new(conn).list_consensus_actions(service_id, epoch)
+            ScabbardStoreOperations::new(conn).list_consensus_actions(service_id)
         })
     }
     /// List ready services
@@ -321,14 +320,13 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
             )
         })
     }
-    /// List all coordinator actions for a given service_id and epoch
+    /// List all coordinator actions for a given service_id
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).list_consensus_actions(service_id, epoch)
+            ScabbardStoreOperations::new(conn).list_consensus_actions(service_id)
         })
     }
     /// List ready services
@@ -523,13 +521,12 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
             executed_at,
         )
     }
-    /// List all coordinator actions for a given service_id and epoch
+    /// List all coordinator actions for a given service_id
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id, epoch)
+        ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id)
     }
     /// List ready services
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError> {
@@ -680,13 +677,12 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
             executed_at,
         )
     }
-    /// List all coordinator actions for a given service_id and epoch
+    /// List all coordinator actions for a given service_id
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id, epoch)
+        ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id)
     }
     /// List ready services
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError> {
@@ -983,7 +979,7 @@ pub mod tests {
             .expect("failed to add actions");
 
         let action_list = store
-            .list_consensus_actions(&coordinator_fqsi, 1)
+            .list_consensus_actions(&coordinator_fqsi)
             .expect("failed to list all actions");
 
         let expected_update_context = ContextBuilder::default()

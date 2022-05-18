@@ -88,19 +88,17 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         (&**self).update_consensus_action(service_id, action_id, executed_at)
     }
 
-    /// List all coordinator actions for a given service_id and epoch
+    /// List all coordinator actions for a given service_id
     ///
     /// # Arguments
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service for which actions
     ///    should be listed
-    /// * `epoch` - The epoch for which actions should be listed
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
-        (&**self).list_consensus_actions(service_id, epoch)
+        (&**self).list_consensus_actions(service_id)
     }
 
     /// List ready services

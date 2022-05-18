@@ -106,17 +106,15 @@ pub trait ScabbardStore {
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError>;
 
-    /// List all pending consensus actions for a given service_id and epoch
+    /// List all pending consensus actions for a given service_id
     ///
     /// # Arguments
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service for which actions
     ///    should be listed
-    /// * `epoch` - The epoch for which actions should be listed
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError>;
 
     /// List ready services

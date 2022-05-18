@@ -64,10 +64,9 @@ impl UnprocessedActionSource for StoreUnprocessedActionSource {
     fn get_unprocessed_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, InternalError> {
         self.store
-            .list_consensus_actions(service_id, epoch)
+            .list_consensus_actions(service_id)
             .map_err(|err| InternalError::from_source(Box::new(err)))
     }
 }

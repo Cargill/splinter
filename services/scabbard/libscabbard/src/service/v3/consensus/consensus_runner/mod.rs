@@ -85,7 +85,7 @@ where
 
             let unprocessed_actions = self
                 .unprocessed_action_source
-                .get_unprocessed_actions(service_id, epoch)?;
+                .get_unprocessed_actions(service_id)?;
 
             let mut commands = vec![];
             if !unprocessed_actions.is_empty() {
