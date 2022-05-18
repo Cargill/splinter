@@ -195,14 +195,12 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
     fn update_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_event(
                 service_id,
-                epoch,
                 event_id,
                 executed_at,
             )
@@ -385,14 +383,12 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
     fn update_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_event(
                 service_id,
-                epoch,
                 event_id,
                 executed_at,
             )
@@ -572,13 +568,11 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn update_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_event(
             service_id,
-            epoch,
             event_id,
             executed_at,
         )
@@ -726,13 +720,11 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     fn update_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_event(
             service_id,
-            epoch,
             event_id,
             executed_at,
         )
@@ -1633,7 +1625,7 @@ pub mod tests {
             .expect("failed to add event");
 
         assert!(store
-            .update_consensus_event(&participant_fqsi, 1, event_id, SystemTime::now())
+            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now())
             .is_ok());
     }
 
@@ -1735,7 +1727,7 @@ pub mod tests {
         );
 
         store
-            .update_consensus_event(&participant_fqsi, 1, event_id, SystemTime::now())
+            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now())
             .expect("failed to update event");
 
         let events = store

@@ -188,13 +188,11 @@ pub trait ScabbardStore {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the event
     ///    belongs to
-    /// * `epoch` - The epoch that the event belongs to
     /// * `event_id` - The ID of the event to be updated
     /// * `executed_at` - The time that the event was executed
     fn update_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError>;

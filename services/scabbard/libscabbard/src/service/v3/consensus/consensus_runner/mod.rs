@@ -128,7 +128,7 @@ where
             );
             commands.push(
                 self.consensus_store_command_factory
-                    .new_mark_event_complete_command(service_id, epoch, event_id),
+                    .new_mark_event_complete_command(service_id, event_id),
             );
             self.store_command_executor.execute(commands)?;
         }
