@@ -105,7 +105,6 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     // add command to mark the action as executed
                     commands.push(Box::new(ExecuteActionCommand::new(
                         service_id.clone(),
-                        epoch,
                         action.id,
                         self.store_factory.clone(),
                     )));
@@ -126,7 +125,6 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     // add command to mark the action as executed
                     commands.push(Box::new(ExecuteActionCommand::new(
                         service_id.clone(),
-                        epoch,
                         action.id,
                         self.store_factory.clone(),
                     )));
@@ -141,7 +139,6 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     // add command to mark the action as executed
                     commands.push(Box::new(ExecuteActionCommand::new(
                         service_id.clone(),
-                        epoch,
                         action.id,
                         self.store_factory.clone(),
                     )));
@@ -413,7 +410,6 @@ mod tests {
                     Some(SystemTime::now()),
                 )),
                 &service_fqsi,
-                1,
             )
             .expect("unable to add context to scabbard store");
 
@@ -424,7 +420,6 @@ mod tests {
                     Message::DecisionRequest(1),
                 )),
                 &service_fqsi,
-                1,
             )
             .expect("unable to add context to scabbard store");
 
@@ -432,12 +427,11 @@ mod tests {
             .add_consensus_action(
                 ConsensusAction::TwoPhaseCommit(Action::Notify(Notification::RequestForStart())),
                 &service_fqsi,
-                1,
             )
             .expect("unable to add context to scabbard store");
 
         let actions = scabbard_store
-            .list_consensus_actions(&service_fqsi, 1)
+            .list_consensus_actions(&service_fqsi)
             .expect("unable to get actions");
 
         let commands = action_runner
@@ -448,7 +442,7 @@ mod tests {
 
         // verify that all actions were handled
         assert!(scabbard_store
-            .list_consensus_actions(&service_fqsi, 1)
+            .list_consensus_actions(&service_fqsi)
             .expect("unable to get actions")
             .is_empty());
 

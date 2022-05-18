@@ -85,7 +85,7 @@ where
 
             let unprocessed_actions = self
                 .unprocessed_action_source
-                .get_unprocessed_actions(service_id, epoch)?;
+                .get_unprocessed_actions(service_id)?;
 
             let mut commands = vec![];
             if !unprocessed_actions.is_empty() {
@@ -96,9 +96,7 @@ where
                 )?);
             }
 
-            let unprocessed_event = self
-                .unprocessed_event_source
-                .get_next_event(service_id, epoch)?;
+            let unprocessed_event = self.unprocessed_event_source.get_next_event(service_id)?;
 
             let event = match unprocessed_event {
                 Some(event) => event,
@@ -124,11 +122,11 @@ where
 
             commands.push(
                 self.consensus_store_command_factory
-                    .new_save_actions_command(service_id, epoch, actions),
+                    .new_save_actions_command(service_id, actions),
             );
             commands.push(
                 self.consensus_store_command_factory
-                    .new_mark_event_complete_command(service_id, epoch, event_id),
+                    .new_mark_event_complete_command(service_id, event_id),
             );
             self.store_command_executor.execute(commands)?;
         }
@@ -213,7 +211,6 @@ mod tests {
         scabbard_store
             .add_consensus_event(
                 &service_id,
-                1,
                 ConsensusEvent::TwoPhaseCommit(Event::Start(b"test".to_vec())),
             )
             .expect("unable to event to the scabbard store");

@@ -109,37 +109,33 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<i64, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).add_consensus_action(action, service_id, epoch)
+            ScabbardStoreOperations::new(conn).add_consensus_action(action, service_id)
         })
     }
     /// Update an existing 2 phase commit action
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_action(
                 service_id,
-                epoch,
                 action_id,
                 executed_at,
             )
         })
     }
-    /// List all coordinator actions for a given service_id and epoch
+    /// List all coordinator actions for a given service_id
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         self.pool.execute_read(|conn| {
-            ScabbardStoreOperations::new(conn).list_consensus_actions(service_id, epoch)
+            ScabbardStoreOperations::new(conn).list_consensus_actions(service_id)
         })
     }
     /// List ready services
@@ -157,7 +153,7 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).add_commit_entry(commit_entry))
     }
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     fn get_last_commit_entry(
         &self,
         service_id: &FullyQualifiedServiceId,
@@ -189,38 +185,34 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).add_consensus_event(service_id, epoch, event)
+            ScabbardStoreOperations::new(conn).add_consensus_event(service_id, event)
         })
     }
     /// Update an existing consensus event
     fn update_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_event(
                 service_id,
-                epoch,
                 event_id,
                 executed_at,
             )
         })
     }
-    /// List all consensus events for a given service_id and epoch
+    /// List all consensus events for a given service_id
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
+            ScabbardStoreOperations::new(conn).list_consensus_events(service_id)
         })
     }
     /// Get the current context for a given service
@@ -304,37 +296,33 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<i64, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).add_consensus_action(action, service_id, epoch)
+            ScabbardStoreOperations::new(conn).add_consensus_action(action, service_id)
         })
     }
     /// Update an existing 2 phase commit action
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_action(
                 service_id,
-                epoch,
                 action_id,
                 executed_at,
             )
         })
     }
-    /// List all coordinator actions for a given service_id and epoch
+    /// List all coordinator actions for a given service_id
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).list_consensus_actions(service_id, epoch)
+            ScabbardStoreOperations::new(conn).list_consensus_actions(service_id)
         })
     }
     /// List ready services
@@ -352,7 +340,7 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         self.pool
             .execute_write(|conn| ScabbardStoreOperations::new(conn).add_commit_entry(commit_entry))
     }
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     fn get_last_commit_entry(
         &self,
         service_id: &FullyQualifiedServiceId,
@@ -384,38 +372,34 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).add_consensus_event(service_id, epoch, event)
+            ScabbardStoreOperations::new(conn).add_consensus_event(service_id, event)
         })
     }
     /// Update an existing consensus event
     fn update_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_event(
                 service_id,
-                epoch,
                 event_id,
                 executed_at,
             )
         })
     }
-    /// List all consensus events for a given service_id and epoch
+    /// List all consensus events for a given service_id
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).list_consensus_events(service_id, epoch)
+            ScabbardStoreOperations::new(conn).list_consensus_events(service_id)
         })
     }
     /// Get the current context for a given service
@@ -513,33 +497,28 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<i64, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection)
-            .add_consensus_action(action, service_id, epoch)
+        ScabbardStoreOperations::new(self.connection).add_consensus_action(action, service_id)
     }
     /// Update an existing 2 phase commit action
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_action(
             service_id,
-            epoch,
             action_id,
             executed_at,
         )
     }
-    /// List all coordinator actions for a given service_id and epoch
+    /// List all coordinator actions for a given service_id
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id, epoch)
+        ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id)
     }
     /// List ready services
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError> {
@@ -553,7 +532,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn add_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).add_commit_entry(commit_entry)
     }
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     fn get_last_commit_entry(
         &self,
         service_id: &FullyQualifiedServiceId,
@@ -579,33 +558,29 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, epoch, event)
+        ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, event)
     }
     /// Update an existing consensus event
     fn update_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_event(
             service_id,
-            epoch,
             event_id,
             executed_at,
         )
     }
-    /// List all consensus events for a given service_id and epoch
+    /// List all consensus events for a given service_id
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
+        ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id)
     }
     /// Get the current context for a given service
     fn get_current_consensus_context(
@@ -674,33 +649,28 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<i64, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection)
-            .add_consensus_action(action, service_id, epoch)
+        ScabbardStoreOperations::new(self.connection).add_consensus_action(action, service_id)
     }
     /// Update an existing 2 phase commit action
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_action(
             service_id,
-            epoch,
             action_id,
             executed_at,
         )
     }
-    /// List all coordinator actions for a given service_id and epoch
+    /// List all coordinator actions for a given service_id
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id, epoch)
+        ScabbardStoreOperations::new(self.connection).list_consensus_actions(service_id)
     }
     /// List ready services
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError> {
@@ -714,7 +684,7 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     fn add_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).add_commit_entry(commit_entry)
     }
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     fn get_last_commit_entry(
         &self,
         service_id: &FullyQualifiedServiceId,
@@ -739,33 +709,29 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, epoch, event)
+        ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, event)
     }
     /// Update an existing consensus event
     fn update_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_event(
             service_id,
-            epoch,
             event_id,
             executed_at,
         )
     }
-    /// List all consensus events for a given service_id and epoch
+    /// List all consensus events for a given service_id
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id, epoch)
+        ScabbardStoreOperations::new(self.connection).list_consensus_events(service_id)
     }
     /// Get the current context for a given service
     fn get_current_consensus_context(
@@ -921,7 +887,7 @@ pub mod tests {
         let action = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
 
         assert!(store
-            .add_consensus_action(action, &coordinator_fqsi, 1)
+            .add_consensus_action(action, &coordinator_fqsi)
             .is_ok());
     }
 
@@ -990,14 +956,14 @@ pub mod tests {
         ));
 
         let action_id1 = store
-            .add_consensus_action(action1, &coordinator_fqsi, 1)
+            .add_consensus_action(action1, &coordinator_fqsi)
             .expect("failed to add actions");
         let action_id2 = store
-            .add_consensus_action(action2, &coordinator_fqsi, 1)
+            .add_consensus_action(action2, &coordinator_fqsi)
             .expect("failed to add actions");
 
         let action_list = store
-            .list_consensus_actions(&coordinator_fqsi, 1)
+            .list_consensus_actions(&coordinator_fqsi)
             .expect("failed to list all actions");
 
         let expected_update_context = ContextBuilder::default()
@@ -1159,11 +1125,11 @@ pub mod tests {
         ));
 
         let action_id = store
-            .add_consensus_action(action, &coordinator_fqsi, 1)
+            .add_consensus_action(action, &coordinator_fqsi)
             .expect("failed to add actions");
 
         assert!(store
-            .update_consensus_action(&coordinator_fqsi, 1, action_id, SystemTime::now())
+            .update_consensus_action(&coordinator_fqsi, action_id, SystemTime::now())
             .is_ok());
     }
 
@@ -1281,7 +1247,7 @@ pub mod tests {
 
         // add an action for the service
         let action_id = store
-            .add_consensus_action(action, &service_fqsi, 1)
+            .add_consensus_action(action, &service_fqsi)
             .expect("failed to add actions");
 
         let ready_services = store
@@ -1292,7 +1258,7 @@ pub mod tests {
         assert_eq!(&ready_services[0], &service_fqsi);
 
         store
-            .update_consensus_action(&service_fqsi, 1, action_id, SystemTime::now())
+            .update_consensus_action(&service_fqsi, action_id, SystemTime::now())
             .expect("failed to update action");
 
         // check that no services are returned because there are no un-exectuted actions or
@@ -1597,11 +1563,11 @@ pub mod tests {
         ));
 
         assert!(store
-            .add_consensus_event(&participant_fqsi, 1, event.clone())
+            .add_consensus_event(&participant_fqsi, event.clone())
             .is_ok());
 
         assert!(store
-            .add_consensus_event(&participant2_fqsi, 1, event)
+            .add_consensus_event(&participant2_fqsi, event)
             .is_err());
     }
 
@@ -1651,11 +1617,11 @@ pub mod tests {
         ));
 
         let event_id = store
-            .add_consensus_event(&participant_fqsi, 1, event)
+            .add_consensus_event(&participant_fqsi, event)
             .expect("failed to add event");
 
         assert!(store
-            .update_consensus_event(&participant_fqsi, 1, event_id, SystemTime::now())
+            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now())
             .is_ok());
     }
 
@@ -1708,11 +1674,11 @@ pub mod tests {
         ));
 
         let event_id = store
-            .add_consensus_event(&participant_fqsi, 1, event)
+            .add_consensus_event(&participant_fqsi, event)
             .expect("failed to add event");
 
         let events = store
-            .list_consensus_events(&participant_fqsi, 1)
+            .list_consensus_events(&participant_fqsi)
             .expect("failed to list events");
 
         assert_eq!(events.len(), 1);
@@ -1730,11 +1696,11 @@ pub mod tests {
         let event2 = ConsensusEvent::TwoPhaseCommit(Event::Alarm());
 
         let event_id2 = store
-            .add_consensus_event(&participant_fqsi, 1, event2)
+            .add_consensus_event(&participant_fqsi, event2)
             .expect("failed to add event");
 
         let events = store
-            .list_consensus_events(&participant_fqsi, 1)
+            .list_consensus_events(&participant_fqsi)
             .expect("failed to list events");
 
         assert_eq!(events.len(), 2);
@@ -1757,11 +1723,11 @@ pub mod tests {
         );
 
         store
-            .update_consensus_event(&participant_fqsi, 1, event_id, SystemTime::now())
+            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now())
             .expect("failed to update event");
 
         let events = store
-            .list_consensus_events(&participant_fqsi, 1)
+            .list_consensus_events(&participant_fqsi)
             .expect("failed to list events");
 
         assert_eq!(events.len(), 1);

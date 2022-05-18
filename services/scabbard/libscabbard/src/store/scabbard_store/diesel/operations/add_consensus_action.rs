@@ -48,7 +48,6 @@ pub(in crate::store::scabbard_store::diesel) trait AddActionOperation {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<i64, ScabbardStoreError>;
 }
 
@@ -58,35 +57,24 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let ConsensusAction::TwoPhaseCommit(action) = action;
-            let epoch = i64::try_from(epoch).map_err(|err| {
-                ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-            })?;
-            // check to see if a context with the given epoch and service_id exists
-            consensus_2pc_context::table
-                .filter(
-                    consensus_2pc_context::epoch
-                        .eq(epoch)
-                        .and(consensus_2pc_context::service_id.eq(format!("{}", service_id))),
-                )
+
+            // check to see if a context with the given service_id exists
+            let context = consensus_2pc_context::table
+                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Context with service ID {} and epoch {} does not exist",
-                        service_id, epoch,
+                        "Context with service ID {} does not exist",
+                        service_id,
                     )))
                 })?;
 
             let position = consensus_2pc_action::table
-                .filter(
-                    consensus_2pc_action::service_id
-                        .eq(format!("{}", service_id))
-                        .and(consensus_2pc_action::epoch.eq(epoch)),
-                )
+                .filter(consensus_2pc_action::service_id.eq(format!("{}", service_id)))
                 .order(consensus_2pc_action::position.desc())
                 .select(consensus_2pc_action::position)
                 .first::<i32>(self.conn)
@@ -96,7 +84,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
             let insertable_action = InsertableConsensus2pcActionModel {
                 service_id: format!("{}", service_id),
-                epoch,
+                epoch: context.epoch,
                 executed_at: None,
                 position,
             };
@@ -152,7 +140,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     let send_message_action = Consensus2pcSendMessageActionModel {
                         action_id,
                         service_id: format!("{}", service_id),
-                        epoch,
+                        epoch: context.epoch,
                         receiver_service_id: format!("{}", receiving_process),
                         message_type,
                         vote_response,
@@ -178,7 +166,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     let notification_action = Consensus2pcNotificationModel {
                         action_id,
                         service_id: format!("{}", service_id),
-                        epoch,
+                        epoch: context.epoch,
                         notification_type,
                         dropped_message,
                         request_for_vote_value,
@@ -199,35 +187,24 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let ConsensusAction::TwoPhaseCommit(action) = action;
-            let epoch = i64::try_from(epoch).map_err(|err| {
-                ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-            })?;
-            // check to see if a context with the given epoch and service_id exists
-            consensus_2pc_context::table
-                .filter(
-                    consensus_2pc_context::epoch
-                        .eq(epoch)
-                        .and(consensus_2pc_context::service_id.eq(format!("{}", service_id))),
-                )
+
+            // check to see if a context with the given service_id exists
+            let context = consensus_2pc_context::table
+                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Context with service ID {} and epoch {} does not exist",
-                        service_id, epoch,
+                        "Context with service ID {} does not exist",
+                        service_id,
                     )))
                 })?;
 
             let position = consensus_2pc_action::table
-                .filter(
-                    consensus_2pc_action::service_id
-                        .eq(format!("{}", service_id))
-                        .and(consensus_2pc_action::epoch.eq(epoch)),
-                )
+                .filter(consensus_2pc_action::service_id.eq(format!("{}", service_id)))
                 .order(consensus_2pc_action::position.desc())
                 .select(consensus_2pc_action::position)
                 .first::<i32>(self.conn)
@@ -237,7 +214,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
 
             let insertable_action = InsertableConsensus2pcActionModel {
                 service_id: format!("{}", service_id),
-                epoch,
+                epoch: context.epoch,
                 executed_at: None,
                 position,
             };
@@ -290,7 +267,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     let send_message_action = Consensus2pcSendMessageActionModel {
                         action_id,
                         service_id: format!("{}", service_id),
-                        epoch,
+                        epoch: context.epoch,
                         receiver_service_id: format!("{}", receiving_process),
                         message_type,
                         vote_response,
@@ -316,7 +293,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     let notification_action = Consensus2pcNotificationModel {
                         action_id,
                         service_id: format!("{}", service_id),
-                        epoch,
+                        epoch: context.epoch,
                         notification_type,
                         dropped_message,
                         request_for_vote_value,

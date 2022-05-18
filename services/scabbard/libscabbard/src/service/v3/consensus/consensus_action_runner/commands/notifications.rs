@@ -27,7 +27,6 @@ use crate::store::ScabbardStoreFactory;
 pub struct AddEventCommand<C> {
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,
     service_id: FullyQualifiedServiceId,
-    epoch: u64,
     event: ConsensusEvent,
 }
 
@@ -35,13 +34,11 @@ impl<C> AddEventCommand<C> {
     pub fn new(
         store_factory: Arc<dyn ScabbardStoreFactory<C>>,
         service_id: FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Self {
         Self {
             store_factory,
             service_id,
-            epoch,
             event,
         }
     }
@@ -53,7 +50,7 @@ impl<C> StoreCommand for AddEventCommand<C> {
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         self.store_factory
             .new_store(&*conn)
-            .add_consensus_event(&self.service_id, self.epoch, self.event.clone())
+            .add_consensus_event(&self.service_id, self.event.clone())
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
         Ok(())

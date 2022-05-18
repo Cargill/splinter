@@ -85,12 +85,10 @@ pub trait ScabbardStore {
     /// * `action` - The `ConsensusAction` to be added to the database
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the action
     ///    belongs to
-    /// * `epoch` - The epoch that the given action belongs to
     fn add_consensus_action(
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<i64, ScabbardStoreError>;
 
     /// Update an existing 2 phase commit action
@@ -99,28 +97,24 @@ pub trait ScabbardStore {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the action
     ///    belongs to
-    /// * `epoch` - The epoch that the action belongs to
     /// * `action_id` - The ID of the action being updated
     /// * `executed_at` - The time that the action was executed
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError>;
 
-    /// List all pending consensus actions for a given service_id and epoch
+    /// List all pending consensus actions for a given service_id
     ///
     /// # Arguments
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service for which actions
     ///    should be listed
-    /// * `epoch` - The epoch for which actions should be listed
     fn list_consensus_actions(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError>;
 
     /// List ready services
@@ -140,7 +134,7 @@ pub trait ScabbardStore {
     /// * `commit_entry` - The `CommitEntry` that is to be added to the database
     fn add_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError>;
 
-    /// Get the commit entry for the specified service_id and epoch
+    /// Get the commit entry for the specified service_id
     ///
     /// # Arguments
     ///
@@ -181,12 +175,10 @@ pub trait ScabbardStore {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the event
     ///    belongs to
-    /// * `epoch` - The epoch that the event belongs to
     /// * `event` - The `ConsensusEvent` to be added
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError>;
 
@@ -196,28 +188,24 @@ pub trait ScabbardStore {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the event
     ///    belongs to
-    /// * `epoch` - The epoch that the event belongs to
     /// * `event_id` - The ID of the event to be updated
     /// * `executed_at` - The time that the event was executed
     fn update_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError>;
 
-    /// List all pending consensus events for a given service_id and epoch
+    /// List all pending consensus events for a given service_id
     ///
     /// # Arguments
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service for which events
     ///    should be listed
-    /// * `epoch` - The epoch for which events should be listed
     fn list_consensus_events(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError>;
 
     /// Get the current context for a given service

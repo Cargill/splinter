@@ -31,7 +31,6 @@ pub(in crate::store::scabbard_store::diesel) trait UpdateActionOperation {
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError>;
@@ -46,27 +45,19 @@ where
     fn update_consensus_action(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let epoch = i64::try_from(epoch).map_err(|err| {
-                ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-            })?;
-            // check to see if a context with the given epoch and service_id exists
+            // check to see if a context with the given service_id exists
             consensus_2pc_context::table
-                .filter(
-                    consensus_2pc_context::epoch
-                        .eq(epoch)
-                        .and(consensus_2pc_context::service_id.eq(format!("{}", service_id))),
-                )
+                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Context with service ID {} and epoch {} does not exist",
-                        service_id, epoch,
+                        "Context with service ID {} does not exist",
+                        service_id,
                     )))
                 })?;
 
@@ -86,8 +77,7 @@ where
                 .filter(
                     consensus_2pc_action::id
                         .eq(action_id)
-                        .and(consensus_2pc_action::service_id.eq(format!("{}", service_id)))
-                        .and(consensus_2pc_action::epoch.eq(epoch)),
+                        .and(consensus_2pc_action::service_id.eq(format!("{}", service_id))),
                 )
                 .set(consensus_2pc_action::executed_at.eq(Some(update_executed_at)))
                 .execute(self.conn)

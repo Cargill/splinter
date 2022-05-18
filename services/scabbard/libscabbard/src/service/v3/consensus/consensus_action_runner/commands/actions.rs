@@ -25,7 +25,6 @@ use crate::store::ScabbardStoreFactory;
 
 pub struct ExecuteActionCommand<C> {
     service_id: FullyQualifiedServiceId,
-    epoch: u64,
     action_id: i64,
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,
 }
@@ -33,13 +32,11 @@ pub struct ExecuteActionCommand<C> {
 impl<C> ExecuteActionCommand<C> {
     pub fn new(
         service_id: FullyQualifiedServiceId,
-        epoch: u64,
         action_id: i64,
         store_factory: Arc<dyn ScabbardStoreFactory<C>>,
     ) -> Self {
         Self {
             service_id,
-            epoch,
             action_id,
             store_factory,
         }
@@ -52,12 +49,7 @@ impl<C> StoreCommand for ExecuteActionCommand<C> {
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         self.store_factory
             .new_store(&*conn)
-            .update_consensus_action(
-                &self.service_id,
-                self.epoch,
-                self.action_id,
-                SystemTime::now(),
-            )
+            .update_consensus_action(&self.service_id, self.action_id, SystemTime::now())
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }
 }

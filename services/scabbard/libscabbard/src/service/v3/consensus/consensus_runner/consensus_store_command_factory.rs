@@ -38,13 +38,11 @@ where
     pub fn new_save_actions_command(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         actions: Vec<ConsensusAction>,
     ) -> Box<dyn StoreCommand<Context = C>> {
         Box::new(SaveActionsCommand {
             factory: self.factory.clone(),
             service_id: service_id.clone(),
-            epoch,
             actions: RefCell::new(actions),
         })
     }
@@ -52,13 +50,11 @@ where
     pub fn new_mark_event_complete_command(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event_id: i64,
     ) -> Box<dyn StoreCommand<Context = C>> {
         Box::new(MarkEventCompleteCommand {
             factory: self.factory.clone(),
             service_id: service_id.clone(),
-            epoch,
             event_id,
         })
     }
@@ -67,7 +63,6 @@ where
 struct SaveActionsCommand<C> {
     factory: Arc<dyn ScabbardStoreFactory<C>>,
     service_id: FullyQualifiedServiceId,
-    epoch: u64,
     actions: RefCell<Vec<ConsensusAction>>,
 }
 
@@ -82,7 +77,7 @@ where
 
         for action in self.actions.borrow_mut().drain(..) {
             store
-                .add_consensus_action(action, &self.service_id, self.epoch)
+                .add_consensus_action(action, &self.service_id)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
         }
 
@@ -93,7 +88,6 @@ where
 struct MarkEventCompleteCommand<C> {
     factory: Arc<dyn ScabbardStoreFactory<C>>,
     service_id: FullyQualifiedServiceId,
-    epoch: u64,
     event_id: i64,
 }
 
@@ -106,12 +100,7 @@ where
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         let store = self.factory.new_store(conn);
         store
-            .update_consensus_event(
-                &self.service_id,
-                self.epoch,
-                self.event_id,
-                SystemTime::now(),
-            )
+            .update_consensus_event(&self.service_id, self.event_id, SystemTime::now())
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
         Ok(())

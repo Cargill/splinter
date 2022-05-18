@@ -154,7 +154,7 @@ mod tests {
 
         // add an unexecuted action for the first service
         let action_id = store
-            .add_consensus_action(action, &fqsi, 1)
+            .add_consensus_action(action, &fqsi)
             .expect("failed to add action");
 
         let scabbard_timer_filter = ScabbardTimerFilter::new(Box::new(
@@ -203,7 +203,7 @@ mod tests {
 
         // add an unexecuted action for the second service
         let action_id2 = store
-            .add_consensus_action(action2, &fqsi2, 1)
+            .add_consensus_action(action2, &fqsi2)
             .expect("failed to add action2");
 
         let ids = scabbard_timer_filter.filter().expect("failed to filter");
@@ -229,7 +229,7 @@ mod tests {
         // update the second service's action's executed_at time so that it appears to have
         // been executed
         store
-            .update_consensus_action(&fqsi2, 1, action_id2, SystemTime::now())
+            .update_consensus_action(&fqsi2, action_id2, SystemTime::now())
             .expect("failed to update action");
 
         let ids = scabbard_timer_filter.filter().expect("failed to filter");
@@ -241,7 +241,7 @@ mod tests {
         // update the first service's action's executed_at time so that it appears to have
         // been executed
         store
-            .update_consensus_action(&fqsi, 1, action_id, SystemTime::now())
+            .update_consensus_action(&fqsi, action_id, SystemTime::now())
             .expect("failed to update action");
 
         let ids = scabbard_timer_filter.filter().expect("failed to filter");
@@ -251,7 +251,7 @@ mod tests {
 
         // add a new event for the second service
         store
-            .add_consensus_event(&fqsi2, 1, ConsensusEvent::TwoPhaseCommit(Event::Alarm()))
+            .add_consensus_event(&fqsi2, ConsensusEvent::TwoPhaseCommit(Event::Alarm()))
             .expect("failed to add event for second service");
 
         let ids = scabbard_timer_filter.filter().expect("failed to filter");
