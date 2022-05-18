@@ -318,6 +318,20 @@ impl ServiceOrchestrator {
     pub fn supported_service_types(&self) -> &[String] {
         &self.supported_service_types
     }
+
+    #[cfg(feature = "rest-api-actix-web-1")]
+    pub(in super::orchestrator) fn service_factories(
+        &self,
+    ) -> &[Box<dyn OrchestratableServiceFactory>] {
+        &self.service_factories
+    }
+
+    #[cfg(feature = "rest-api-actix-web-1")]
+    pub(in super::orchestrator) fn services(
+        &self,
+    ) -> Arc<Mutex<HashMap<ServiceDefinition, ManagedService>>> {
+        self.services.clone()
+    }
 }
 
 pub struct JoinHandles<T> {
