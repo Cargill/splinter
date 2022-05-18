@@ -85,12 +85,10 @@ pub trait ScabbardStore {
     /// * `action` - The `ConsensusAction` to be added to the database
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the action
     ///    belongs to
-    /// * `epoch` - The epoch that the given action belongs to
     fn add_consensus_action(
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<i64, ScabbardStoreError>;
 
     /// Update an existing 2 phase commit action

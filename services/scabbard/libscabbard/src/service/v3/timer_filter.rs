@@ -154,7 +154,7 @@ mod tests {
 
         // add an unexecuted action for the first service
         let action_id = store
-            .add_consensus_action(action, &fqsi, 1)
+            .add_consensus_action(action, &fqsi)
             .expect("failed to add action");
 
         let scabbard_timer_filter = ScabbardTimerFilter::new(Box::new(
@@ -203,7 +203,7 @@ mod tests {
 
         // add an unexecuted action for the second service
         let action_id2 = store
-            .add_consensus_action(action2, &fqsi2, 1)
+            .add_consensus_action(action2, &fqsi2)
             .expect("failed to add action2");
 
         let ids = scabbard_timer_filter.filter().expect("failed to filter");

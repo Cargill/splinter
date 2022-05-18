@@ -413,7 +413,6 @@ mod tests {
                     Some(SystemTime::now()),
                 )),
                 &service_fqsi,
-                1,
             )
             .expect("unable to add context to scabbard store");
 
@@ -424,7 +423,6 @@ mod tests {
                     Message::DecisionRequest(1),
                 )),
                 &service_fqsi,
-                1,
             )
             .expect("unable to add context to scabbard store");
 
@@ -432,7 +430,6 @@ mod tests {
             .add_consensus_action(
                 ConsensusAction::TwoPhaseCommit(Action::Notify(Notification::RequestForStart())),
                 &service_fqsi,
-                1,
             )
             .expect("unable to add context to scabbard store");
 

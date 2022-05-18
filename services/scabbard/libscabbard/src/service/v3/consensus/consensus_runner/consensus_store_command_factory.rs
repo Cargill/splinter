@@ -38,13 +38,11 @@ where
     pub fn new_save_actions_command(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         actions: Vec<ConsensusAction>,
     ) -> Box<dyn StoreCommand<Context = C>> {
         Box::new(SaveActionsCommand {
             factory: self.factory.clone(),
             service_id: service_id.clone(),
-            epoch,
             actions: RefCell::new(actions),
         })
     }
@@ -67,7 +65,6 @@ where
 struct SaveActionsCommand<C> {
     factory: Arc<dyn ScabbardStoreFactory<C>>,
     service_id: FullyQualifiedServiceId,
-    epoch: u64,
     actions: RefCell<Vec<ConsensusAction>>,
 }
 
@@ -82,7 +79,7 @@ where
 
         for action in self.actions.borrow_mut().drain(..) {
             store
-                .add_consensus_action(action, &self.service_id, self.epoch)
+                .add_consensus_action(action, &self.service_id)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
         }
 
