@@ -72,7 +72,6 @@ impl MessageHandler for ScabbardMessageHandler {
                     self.store
                         .add_consensus_event(
                             &to_service,
-                            message.epoch(),
                             ConsensusEvent::TwoPhaseCommit(Event::Deliver(
                                 from_service,
                                 into_store_msg(message),

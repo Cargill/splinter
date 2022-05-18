@@ -185,11 +185,10 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).add_consensus_event(service_id, epoch, event)
+            ScabbardStoreOperations::new(conn).add_consensus_event(service_id, event)
         })
     }
     /// Update an existing consensus event
@@ -376,11 +375,10 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).add_consensus_event(service_id, epoch, event)
+            ScabbardStoreOperations::new(conn).add_consensus_event(service_id, event)
         })
     }
     /// Update an existing consensus event
@@ -566,10 +564,9 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, epoch, event)
+        ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, event)
     }
     /// Update an existing consensus event
     fn update_consensus_event(
@@ -721,10 +718,9 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, epoch, event)
+        ScabbardStoreOperations::new(self.connection).add_consensus_event(service_id, event)
     }
     /// Update an existing consensus event
     fn update_consensus_event(
@@ -1579,11 +1575,11 @@ pub mod tests {
         ));
 
         assert!(store
-            .add_consensus_event(&participant_fqsi, 1, event.clone())
+            .add_consensus_event(&participant_fqsi, event.clone())
             .is_ok());
 
         assert!(store
-            .add_consensus_event(&participant2_fqsi, 1, event)
+            .add_consensus_event(&participant2_fqsi, event)
             .is_err());
     }
 
@@ -1633,7 +1629,7 @@ pub mod tests {
         ));
 
         let event_id = store
-            .add_consensus_event(&participant_fqsi, 1, event)
+            .add_consensus_event(&participant_fqsi, event)
             .expect("failed to add event");
 
         assert!(store
@@ -1690,7 +1686,7 @@ pub mod tests {
         ));
 
         let event_id = store
-            .add_consensus_event(&participant_fqsi, 1, event)
+            .add_consensus_event(&participant_fqsi, event)
             .expect("failed to add event");
 
         let events = store
@@ -1712,7 +1708,7 @@ pub mod tests {
         let event2 = ConsensusEvent::TwoPhaseCommit(Event::Alarm());
 
         let event_id2 = store
-            .add_consensus_event(&participant_fqsi, 1, event2)
+            .add_consensus_event(&participant_fqsi, event2)
             .expect("failed to add event");
 
         let events = store

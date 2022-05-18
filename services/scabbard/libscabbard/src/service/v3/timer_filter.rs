@@ -251,7 +251,7 @@ mod tests {
 
         // add a new event for the second service
         store
-            .add_consensus_event(&fqsi2, 1, ConsensusEvent::TwoPhaseCommit(Event::Alarm()))
+            .add_consensus_event(&fqsi2, ConsensusEvent::TwoPhaseCommit(Event::Alarm()))
             .expect("failed to add event for second service");
 
         let ids = scabbard_timer_filter.filter().expect("failed to filter");

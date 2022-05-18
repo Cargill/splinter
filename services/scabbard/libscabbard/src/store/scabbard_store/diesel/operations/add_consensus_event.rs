@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::convert::TryFrom;
-
 #[cfg(feature = "postgres")]
 use diesel::pg::PgConnection;
 #[cfg(feature = "sqlite")]
 use diesel::sqlite::SqliteConnection;
 use diesel::{dsl::insert_into, prelude::*};
-use splinter::error::{InternalError, InvalidStateError};
+use splinter::error::InvalidStateError;
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
@@ -44,7 +42,6 @@ pub(in crate::store::scabbard_store::diesel) trait AddEventOperation {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError>;
 }
@@ -54,36 +51,24 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let ConsensusEvent::TwoPhaseCommit(event) = event;
-            let epoch = i64::try_from(epoch).map_err(|err| {
-                ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-            })?;
-            // check to see if a context with the given epoch and service_id exists
-            consensus_2pc_context::table
-                .filter(
-                    consensus_2pc_context::epoch
-                        .eq(epoch)
-                        .and(consensus_2pc_context::service_id.eq(format!("{}", service_id))),
-                )
+            // check to see if a context with the given service_id exists
+            let context = consensus_2pc_context::table
+                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Context with service ID {} and epoch {} does not exist",
-                        service_id, epoch,
+                        "Context with service ID {} does not exist",
+                        service_id,
                     )))
                 })?;
 
             let position = consensus_2pc_event::table
-                .filter(
-                    consensus_2pc_event::service_id
-                        .eq(format!("{}", service_id))
-                        .and(consensus_2pc_event::epoch.eq(epoch)),
-                )
+                .filter(consensus_2pc_event::service_id.eq(format!("{}", service_id)))
                 .order(consensus_2pc_event::position.desc())
                 .select(consensus_2pc_event::position)
                 .first::<i32>(self.conn)
@@ -93,7 +78,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
             let insertable_event = InsertableConsensus2pcEventModel {
                 service_id: format!("{}", service_id),
-                epoch,
+                epoch: context.epoch,
                 executed_at: None,
                 position,
                 event_type: String::from(&event),
@@ -128,7 +113,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     let deliver_event = Consensus2pcDeliverEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch,
+                        epoch: context.epoch,
                         receiver_service_id: format!("{}", receiving_process),
                         message_type,
                         vote_response,
@@ -143,7 +128,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     let start_event = Consensus2pcStartEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch,
+                        epoch: context.epoch,
                         value,
                     };
                     insert_into(consensus_2pc_start_event::table)
@@ -159,7 +144,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     let vote_event = Consensus2pcVoteEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch,
+                        epoch: context.epoch,
                         vote,
                     };
                     insert_into(consensus_2pc_vote_event::table)
@@ -177,36 +162,24 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let ConsensusEvent::TwoPhaseCommit(event) = event;
-            let epoch = i64::try_from(epoch).map_err(|err| {
-                ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-            })?;
-            // check to see if a context with the given epoch and service_id exists
-            consensus_2pc_context::table
-                .filter(
-                    consensus_2pc_context::epoch
-                        .eq(epoch)
-                        .and(consensus_2pc_context::service_id.eq(format!("{}", service_id))),
-                )
+            // check to see if a context with the given service_id exists
+            let context = consensus_2pc_context::table
+                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Context with service ID {} and epoch {} does not exist",
-                        service_id, epoch,
+                        "Context with service ID {} does not exist",
+                        service_id,
                     )))
                 })?;
 
             let position = consensus_2pc_event::table
-                .filter(
-                    consensus_2pc_event::service_id
-                        .eq(format!("{}", service_id))
-                        .and(consensus_2pc_event::epoch.eq(epoch)),
-                )
+                .filter(consensus_2pc_event::service_id.eq(format!("{}", service_id)))
                 .order(consensus_2pc_event::position.desc())
                 .select(consensus_2pc_event::position)
                 .first::<i32>(self.conn)
@@ -216,7 +189,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
 
             let insertable_event = InsertableConsensus2pcEventModel {
                 service_id: format!("{}", service_id),
-                epoch,
+                epoch: context.epoch,
                 executed_at: None,
                 position,
                 event_type: String::from(&event),
@@ -248,7 +221,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     let deliver_event = Consensus2pcDeliverEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch,
+                        epoch: context.epoch,
                         receiver_service_id: format!("{}", receiving_process),
                         message_type,
                         vote_response,
@@ -263,7 +236,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     let start_event = Consensus2pcStartEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch,
+                        epoch: context.epoch,
                         value,
                     };
                     insert_into(consensus_2pc_start_event::table)
@@ -279,7 +252,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     let vote_event = Consensus2pcVoteEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch,
+                        epoch: context.epoch,
                         vote,
                     };
                     insert_into(consensus_2pc_vote_event::table)

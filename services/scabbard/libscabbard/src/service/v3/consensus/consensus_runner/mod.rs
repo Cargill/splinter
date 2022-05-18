@@ -213,7 +213,6 @@ mod tests {
         scabbard_store
             .add_consensus_event(
                 &service_id,
-                1,
                 ConsensusEvent::TwoPhaseCommit(Event::Start(b"test".to_vec())),
             )
             .expect("unable to event to the scabbard store");

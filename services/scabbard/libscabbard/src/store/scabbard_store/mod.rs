@@ -175,12 +175,10 @@ pub trait ScabbardStore {
     ///
     /// * `service_id` - The combined `CircuitId` and `ServiceId` of the service the event
     ///    belongs to
-    /// * `epoch` - The epoch that the event belongs to
     /// * `event` - The `ConsensusEvent` to be added
     fn add_consensus_event(
         &self,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
         event: ConsensusEvent,
     ) -> Result<i64, ScabbardStoreError>;
 
