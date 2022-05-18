@@ -15,12 +15,14 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::actix_web::HttpResponse;
-use crate::error::InternalError;
-use crate::futures::IntoFuture;
-use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
-
-use super::{ManagedService, OrchestratableService, ServiceDefinition, ServiceOrchestrator};
+use splinter::actix_web::HttpResponse;
+use splinter::error::InternalError;
+use splinter::futures::IntoFuture;
+use splinter::rest_api::actix_web_1::{Resource, RestResourceProvider};
+use splinter::runtime::service::instance::{
+    ManagedService, ServiceDefinition, ServiceOrchestrator,
+};
+use splinter::service::instance::OrchestratableService;
 
 /// The `ServiceOrchestratorRestResourceProvider` exposes REST API resources
 /// provided by the [`ServiceFactory::get_rest_endpoints`] methods of the

@@ -26,13 +26,12 @@ use splinter::peer::PeerManagerConnector;
 use splinter::public_key::PublicKey;
 use splinter::registry::{LocalYamlRegistry, RegistryReader, UnifiedRegistry};
 use splinter::rest_api::actix_web_1::RestResourceProvider as _;
-use splinter::runtime::service::instance::{
-    ServiceOrchestratorBuilder, ServiceOrchestratorRestResourceProvider, ServiceProcessorBuilder,
-};
+use splinter::runtime::service::instance::{ServiceOrchestratorBuilder, ServiceProcessorBuilder};
 use splinter::store::StoreFactory;
 use splinter::transport::{inproc::InprocTransport, Transport};
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
 use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
+use splinter_rest_api_actix_web_1::service::ServiceOrchestratorRestResourceProvider;
 
 use crate::node::builder::admin::AdminServiceEventClientVariant;
 use crate::node::running::admin::{self as running_admin, AdminSubsystem};

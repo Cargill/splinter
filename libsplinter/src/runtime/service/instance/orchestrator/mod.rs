@@ -16,8 +16,6 @@
 
 mod builder;
 mod error;
-#[cfg(feature = "rest-api-actix-web-1")]
-mod rest_api;
 mod runnable;
 
 use std::collections::HashMap;
@@ -50,8 +48,6 @@ pub use self::error::{
     AddServiceError, InitializeServiceError, ListServicesError, NewOrchestratorError,
     OrchestratorError, ShutdownServiceError,
 };
-#[cfg(feature = "rest-api-actix-web-1")]
-pub use self::rest_api::ServiceOrchestratorRestResourceProvider;
 pub use self::runnable::RunnableServiceOrchestrator;
 
 // Recv timeout in secs
@@ -76,7 +72,7 @@ impl std::fmt::Display for ServiceDefinition {
 }
 
 /// Stores a service and other structures that are used to manage it
-struct ManagedService {
+pub struct ManagedService {
     pub service: Box<dyn OrchestratableService>,
     pub registry: StandardServiceNetworkRegistry,
 }
@@ -322,16 +318,12 @@ impl ServiceOrchestrator {
     }
 
     #[cfg(feature = "rest-api-actix-web-1")]
-    pub(in super::orchestrator) fn service_factories(
-        &self,
-    ) -> &[Box<dyn OrchestratableServiceFactory>] {
+    pub fn service_factories(&self) -> &[Box<dyn OrchestratableServiceFactory>] {
         &self.service_factories
     }
 
     #[cfg(feature = "rest-api-actix-web-1")]
-    pub(in super::orchestrator) fn services(
-        &self,
-    ) -> Arc<Mutex<HashMap<ServiceDefinition, ManagedService>>> {
+    pub fn services(&self) -> Arc<Mutex<HashMap<ServiceDefinition, ManagedService>>> {
         self.services.clone()
     }
 }

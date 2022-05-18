@@ -90,7 +90,6 @@ use splinter::rest_api::auth::authorization::Permission;
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
-use splinter::runtime::service::instance::ServiceOrchestratorRestResourceProvider;
 use splinter::runtime::service::instance::{
     ServiceOrchestratorBuilder, ServiceProcessor, ServiceProcessorShutdownHandle,
 };
@@ -111,6 +110,7 @@ use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitReso
 #[cfg(feature = "biome-key-management")]
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
 use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
+use splinter_rest_api_actix_web_1::service::ServiceOrchestratorRestResourceProvider;
 
 use crate::node_id::get_node_id;
 use crate::routes;
