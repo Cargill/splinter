@@ -20,8 +20,6 @@ top_dir=$(cd $(dirname $(dirname $0)) && pwd)
 export VERSION=AUTO_STRICT
 export REPO_VERSION=$($top_dir/bin/get_version)
 
-export NAMESPACE=${NAMESPACE}
-
 SERVICES="
     scabbard-cli
     splinter-cli
@@ -38,6 +36,19 @@ build_docker() {
     do
         echo "Building $SERVICE"
         docker buildx bake -f ci/docker-bake.hcl $SERVICE --push
+    done
+}
+
+mirror_docker() {
+    for SERVICE in $SERVICES
+    do
+        docker run quay.io/skopeo/stable \
+          copy \
+          --dest-username "${DOCKER_HUB_USERNAME}" \
+          --dest-password "${DOCKER_HUB_ACCESS_TOKEN}" \
+          --multi-arch all \
+          "docker://ghcr.io/splintercommunity/$SERVICE:$ISOLATION_ID" \
+          "docker://docker.io/splintercommunity/$SERVICE:$ISOLATION_ID"
     done
 }
 
@@ -72,3 +83,5 @@ echo "Publishing main images for an untagged build"
 echo "ISOLATION_ID is: $ISOLATION_ID"
 
 build_docker
+
+mirror_docker

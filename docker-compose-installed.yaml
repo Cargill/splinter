@@ -23,7 +23,7 @@ services:
       args:
       - CARGO_ARGS=${CARGO_ARGS}
       - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}scabbard-cli:${ISOLATION_ID}
+    image: scabbard-cli:${ISOLATION_ID}
     container_name: scabbard-cli
 
   splinter-cli:
@@ -33,7 +33,7 @@ services:
       args:
       - CARGO_ARGS=${CARGO_ARGS}
       - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}splinter-cli:${ISOLATION_ID}
+    image: splinter-cli:${ISOLATION_ID}
     container_name: splinter-cli
 
   splinterd:
@@ -43,7 +43,7 @@ services:
       args:
       - CARGO_ARGS=${CARGO_ARGS}
       - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}splinterd:${ISOLATION_ID}
+    image: splinterd:${ISOLATION_ID}
     container_name: splinterd
 
 # ---==== gameroom components ====---
@@ -55,7 +55,7 @@ services:
       args:
       - CARGO_ARGS=${CARGO_ARGS}
       - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}gameroomd:${ISOLATION_ID}
+    image: gameroomd:${ISOLATION_ID}
     container_name: gameroomd
 
   gameroom-app-acme:
@@ -65,7 +65,7 @@ services:
       args:
         - VUE_APP_BRAND=acme
         - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}gameroom-app-acme:${ISOLATION_ID}
+    image: gameroom-app-acme:${ISOLATION_ID}
     container_name: gameroom-app-acme
 
   gameroom-app-bubba:
@@ -75,7 +75,7 @@ services:
       args:
         - VUE_APP_BRAND=bubba
         - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}gameroom-app-bubba:${ISOLATION_ID}
+    image: gameroom-app-bubba:${ISOLATION_ID}
     container_name: gameroom-app-bubba
 
   gameroom-app:
@@ -85,7 +85,7 @@ services:
       args:
         - VUE_APP_BRAND=generic
         - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}gameroom-app:${ISOLATION_ID}
+    image: gameroom-app:${ISOLATION_ID}
     container_name: gameroom-app
 
   gameroom-database:
@@ -94,5 +94,5 @@ services:
       dockerfile: examples/gameroom/database/Dockerfile-installed
       args:
       - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}gameroom-database:${ISOLATION_ID}
+    image: gameroom-database:${ISOLATION_ID}
     container_name: gameroom-database

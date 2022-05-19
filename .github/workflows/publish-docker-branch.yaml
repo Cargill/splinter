@@ -66,11 +66,12 @@ jobs:
       - name: Display envvars
         run: env
 
-      - name: Login to DockerHub
+      - name: Login to ghcr.io
         uses: docker/login-action@v1
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          registry: ghcr.io
+          username: splintercommunity
+          password: ${{ secrets.SPLINTERCOMMUNITY_GH_PAT }}
 
       - uses: actions/checkout@v2
         with:
@@ -79,9 +80,10 @@ jobs:
       - name: Publish branch to dockerhub
         run: docker buildx ls && ./ci/publish-docker main
         env:
-          NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
           VERSION: AUTO_STRICT
           CARGO_TERM_COLOR: always
+          DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
 
       - name: Notify Slack of Failure
         if: failure()
@@ -175,11 +177,12 @@ jobs:
       - name: Display envvars
         run: env
 
-      - name: Login to DockerHub
+      - name: Login to ghcr.io
         uses: docker/login-action@v1
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          registry: ghcr.io
+          username: splintercommunity
+          password: ${{ secrets.SPLINTERCOMMUNITY_GH_PAT }}
 
       - uses: actions/checkout@v2
         with:
@@ -188,9 +191,10 @@ jobs:
       - name: Publish branch to dockerhub
         run: docker buildx ls && ./ci/publish-docker experimental
         env:
-          NAMESPACE: ${{ secrets.DOCKER_HUB_NAMESPACE }}/
           VERSION: AUTO_STRICT
           CARGO_TERM_COLOR: always
+          DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
 
       - name: Notify Slack of Failure
         if: failure()
