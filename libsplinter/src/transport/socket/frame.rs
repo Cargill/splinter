@@ -277,7 +277,7 @@ impl FrameHeader {
                 cursor.get_mut()[HEADER_LENGTH] =
                     compute_checksum(&cursor.get_ref()[..HEADER_LENGTH]);
 
-                writer.write_all(&cursor.into_inner()[..])?;
+                writer.write_all(cursor.into_inner())?;
             }
         }
 
