@@ -22,7 +22,7 @@ use crate::store::command::StoreCommand;
 pub use self::diesel::DieselStoreCommandExecutor;
 
 /// Provides an API for executing `StoreCommand`s
-pub trait StoreCommandExecutor {
+pub trait StoreCommandExecutor: Sync + Send {
     type Context;
 
     /// Execute each [`StoreCommand`] in `store_commands`

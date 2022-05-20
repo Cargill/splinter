@@ -53,7 +53,7 @@ where
     >,
     scabbard_store_factory:
         Option<Arc<dyn ScabbardStoreFactory<<E as StoreCommandExecutor>::Context>>>,
-    store_command_executor: Option<E>,
+    store_command_executor: Option<Arc<E>>,
     message_sender_factory: Option<Box<dyn MessageSenderFactory<Vec<u8>>>>,
     notify_observer: Option<Box<dyn NotifyObserver<<E as StoreCommandExecutor>::Context>>>,
 }
@@ -105,7 +105,7 @@ where
         self
     }
 
-    pub fn with_store_command_executor(mut self, store_command_executor: E) -> Self {
+    pub fn with_store_command_executor(mut self, store_command_executor: Arc<E>) -> Self {
         self.store_command_executor = Some(store_command_executor);
         self
     }

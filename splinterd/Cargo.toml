@@ -160,7 +160,7 @@ oauth = [
     "splinter/oauth"
 ]
 rest-api-cors = ["splinter/rest-api-cors"]
-scabbardv3 = ["scabbard/scabbardv3", "service2"]
+scabbardv3 = ["scabbard/scabbardv3", "service2", "scabbard/scabbardv3-consensus",]
 service-endpoint = []
 service-timer-interval = []
 service2 = [
