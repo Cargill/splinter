@@ -32,8 +32,12 @@ pub(in crate::store::scabbard_store::diesel) trait UpdateCommitEntryOperation {
 impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnection> {
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let epoch = i64::try_from(commit_entry.epoch())
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            let epoch = i64::try_from(commit_entry.epoch().ok_or_else(|| {
+                ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
+                    "Commit entry does not have an epoch",
+                )))
+            })?)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
             // check to see if a commit entry with the given service_id and epoch exists
             scabbard_v3_commit_history::table
                 .filter(
@@ -68,8 +72,12 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnec
 impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection> {
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let epoch = i64::try_from(commit_entry.epoch())
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            let epoch = i64::try_from(commit_entry.epoch().ok_or_else(|| {
+                ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
+                    "Commit entry does not have an epoch",
+                )))
+            })?)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
             // check to see if a commit entry with the given service_id and epoch exists
             scabbard_v3_commit_history::table
                 .filter(

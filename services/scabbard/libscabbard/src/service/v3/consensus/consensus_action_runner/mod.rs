@@ -85,12 +85,10 @@ impl<C: 'static> ConsensusActionRunner<C> {
     ///
     /// * `actions` - The list of action that must be processed, in order of execution
     /// * `service_id` - The service ID of the service the actions are for
-    /// * `epoch` - The current epoch of the consensus algorithm
     pub fn run_actions(
         &self,
         actions: Vec<Identified<ConsensusAction>>,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError> {
         let mut commands = Vec::new();
         for action in actions {
@@ -130,11 +128,10 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     )));
                 }
                 ConsensusAction::TwoPhaseCommit(Action::Notify(notification)) => {
-                    commands.extend(self.notify_observer.notify(
-                        notification.clone(),
-                        service_id,
-                        epoch,
-                    )?);
+                    commands.extend(
+                        self.notify_observer
+                            .notify(notification.clone(), service_id)?,
+                    );
 
                     // add command to mark the action as executed
                     commands.push(Box::new(ExecuteActionCommand::new(
@@ -434,9 +431,7 @@ mod tests {
             .list_consensus_actions(&service_fqsi)
             .expect("unable to get actions");
 
-        let commands = action_runner
-            .run_actions(actions, &service_fqsi, 1)
-            .unwrap();
+        let commands = action_runner.run_actions(actions, &service_fqsi).unwrap();
 
         executor.execute(commands).unwrap();
 

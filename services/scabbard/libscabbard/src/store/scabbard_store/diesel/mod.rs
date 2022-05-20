@@ -1301,6 +1301,24 @@ pub mod tests {
 
         store.add_service(service).expect("faield to add service");
 
+        let coordinator_context = ContextBuilder::default()
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+            }])
+            .with_state(State::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
+
+        store
+            .add_consensus_context(&service_fqsi, context)
+            .expect("failed to add context to store");
+
         let commit_entry = CommitEntryBuilder::default()
             .with_service_id(&service_fqsi)
             .with_epoch(1)
@@ -1359,6 +1377,24 @@ pub mod tests {
 
         store.add_service(service).expect("faield to add service");
 
+        let coordinator_context = ContextBuilder::default()
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+            }])
+            .with_state(State::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
+
+        store
+            .add_consensus_context(&service_fqsi, context)
+            .expect("failed to add context to store");
+
         let commit_entry = CommitEntryBuilder::default()
             .with_service_id(&service_fqsi)
             .with_epoch(1)
@@ -1412,6 +1448,24 @@ pub mod tests {
             .expect("failed to build service");
 
         store.add_service(service).expect("faield to add service");
+
+        let coordinator_context = ContextBuilder::default()
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+            }])
+            .with_state(State::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
+
+        store
+            .add_consensus_context(&service_fqsi, context)
+            .expect("failed to add context to store");
 
         let commit_entry = CommitEntryBuilder::default()
             .with_service_id(&service_fqsi)

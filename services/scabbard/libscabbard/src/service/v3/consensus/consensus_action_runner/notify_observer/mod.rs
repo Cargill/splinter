@@ -35,11 +35,9 @@ pub trait NotifyObserver<C> {
     ///
     /// * `notification` - The notification that needs to be handled
     /// * `service_id` - The service ID of of the service the notification is for
-    /// * `epoch` - The current epoch of the consensus algorithm
     fn notify(
         &self,
         notification: Notification,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError>;
 }

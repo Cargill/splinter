@@ -61,12 +61,10 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
     ///
     /// * `notification` - The notification that needs to be handled
     /// * `service_id` - The service ID of of the service the notification is for
-    /// * `epoch` - The current epoch of the consensus algorithm
     fn notify(
         &self,
         notification: Notification,
         service_id: &FullyQualifiedServiceId,
-        epoch: u64,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError> {
         let mut commands: Vec<Box<dyn StoreCommand<Context = C>>> = Vec::new();
         match notification {
@@ -83,7 +81,6 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                 let entry = CommitEntryBuilder::default()
                     .with_service_id(service_id)
                     .with_value(&s)
-                    .with_epoch(epoch)
                     .build()
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
@@ -114,7 +111,6 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                         &String::from_utf8(value)
                             .map_err(|err| InternalError::from_source(Box::new(err)))?,
                     )
-                    .with_epoch(epoch)
                     .build()
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
@@ -171,10 +167,9 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
                         updated_commit_entry,
                     )));
                 } else {
-                    return Err(InternalError::with_message(format!(
-                        "Received abort for unknown entry: epoch {}",
-                        epoch
-                    )));
+                    return Err(InternalError::with_message(
+                        "Received abort for unknown entry".to_string(),
+                    ));
                 }
             }
             // log dropped message
