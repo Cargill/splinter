@@ -86,26 +86,22 @@ where
                 .unprocessed_action_source
                 .get_unprocessed_actions(service_id)?;
 
-            let mut commands = vec![];
             if !unprocessed_actions.is_empty() {
-                commands.extend(
-                    self.action_runner
-                        .run_actions(unprocessed_actions, service_id)?,
-                );
+                // run each action and execute the commands before running the next action
+                for action in unprocessed_actions {
+                    let commands = self.action_runner.run_actions(vec![action], service_id)?;
+                    self.store_command_executor.execute(commands)?;
+                }
             }
 
             let unprocessed_event = self.unprocessed_event_source.get_next_event(service_id)?;
 
+            let mut commands = vec![];
             let event = match unprocessed_event {
                 Some(event) => event,
                 None => {
-                    if !commands.is_empty() {
-                        self.store_command_executor.execute(commands)?;
-                        continue;
-                    } else {
-                        // No actions and no events
-                        break Ok(());
-                    }
+                    // No events
+                    break Ok(());
                 }
             };
 
