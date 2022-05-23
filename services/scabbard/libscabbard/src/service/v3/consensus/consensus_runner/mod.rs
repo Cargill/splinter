@@ -134,7 +134,6 @@ mod tests {
         Connection,
     };
 
-    use augrim::two_phase_commit::TwoPhaseCommitAlgorithm;
     use splinter::service::{MessageSender, MessageSenderFactory, ServiceId};
     use splinter::store::command::StoreCommand;
 
@@ -221,12 +220,6 @@ mod tests {
             .with_store_command_executor(store_command_executor)
             .with_message_sender_factory(message_sender_factory)
             .with_notify_observer(notify_observer)
-            .with_algorithm(
-                "two-phase-commit",
-                Box::new(
-                    TwoPhaseCommitAlgorithm::new(augrim::SystemTimeFactory::new()).into_algorithm(),
-                ),
-            )
             .build()?;
 
         // runner should handle 1 event(Event::Start), which should result in to actions,

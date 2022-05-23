@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use augrim::two_phase_commit::TwoPhaseCommitAlgorithm;
 use augrim::Algorithm;
 use splinter::error::InvalidStateError;
 use splinter::service::MessageSenderFactory;
@@ -38,16 +39,6 @@ where
     <E as StoreCommandExecutor>::Context: Sized,
 {
     pooled_scabbard_store_factory: Option<Arc<dyn PooledScabbardStoreFactory>>,
-    algorithms: HashMap<
-        String,
-        Box<
-            dyn Algorithm<
-                Event = ConsensusEvent,
-                Action = ConsensusAction,
-                Context = ConsensusContext,
-            >,
-        >,
-    >,
     scabbard_store_factory:
         Option<Arc<dyn ScabbardStoreFactory<<E as StoreCommandExecutor>::Context>>>,
     store_command_executor: Option<Arc<E>>,
@@ -63,7 +54,6 @@ where
     pub fn new() -> Self {
         Self {
             pooled_scabbard_store_factory: None,
-            algorithms: HashMap::new(),
             scabbard_store_factory: None,
             store_command_executor: None,
             message_sender_factory: None,
@@ -89,21 +79,6 @@ where
 
     pub fn with_store_command_executor(mut self, store_command_executor: Arc<E>) -> Self {
         self.store_command_executor = Some(store_command_executor);
-        self
-    }
-
-    pub fn with_algorithm<S: Into<String>>(
-        mut self,
-        algorithm_name: S,
-        algorithm: Box<
-            dyn Algorithm<
-                Event = ConsensusEvent,
-                Action = ConsensusAction,
-                Context = ConsensusContext,
-            >,
-        >,
-    ) -> Self {
-        self.algorithms.insert(algorithm_name.into(), algorithm);
         self
     }
 
@@ -150,6 +125,23 @@ where
         let consensus_store_command_factory =
             ConsensusStoreCommandFactory::new(scabbard_store_factory.clone());
 
+        let mut algorithms: HashMap<
+            _,
+            Box<
+                dyn Algorithm<
+                    Event = ConsensusEvent,
+                    Action = ConsensusAction,
+                    Context = ConsensusContext,
+                >,
+            >,
+        > = HashMap::new();
+        algorithms.insert(
+            "two-phase-commit".to_string(),
+            Box::new(
+                TwoPhaseCommitAlgorithm::new(augrim::SystemTimeFactory::new()).into_algorithm(),
+            ),
+        );
+
         Ok(ConsensusRunner {
             pooled_scabbard_store_factory,
             action_runner: ConsensusActionRunner::new(
@@ -160,7 +152,7 @@ where
                 notify_observer,
                 scabbard_store_factory,
             ),
-            algorithms: self.algorithms,
+            algorithms,
             consensus_store_command_factory,
             store_command_executor,
         })

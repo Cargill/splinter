@@ -14,8 +14,6 @@
 
 use std::sync::Arc;
 
-use augrim::two_phase_commit::TwoPhaseCommitAlgorithm;
-use augrim::Algorithm;
 use splinter::error::{InternalError, InvalidArgumentError};
 use splinter::service::{MessageSenderFactory, TimerHandler, TimerHandlerFactory};
 use splinter::store::command::StoreCommandExecutor;
@@ -56,12 +54,6 @@ impl<E: StoreCommandExecutor + 'static> TimerHandlerFactory for ScabbardTimerHan
                 self.store_factory.clone(),
                 self.pooled_store_factory.new_store(),
             )))
-            .with_algorithm(
-                "two-phase-commit",
-                Box::new(
-                    TwoPhaseCommitAlgorithm::new(augrim::SystemTimeFactory::new()).into_algorithm(),
-                ),
-            )
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
