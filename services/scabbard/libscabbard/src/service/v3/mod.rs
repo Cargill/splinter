@@ -32,11 +32,7 @@ pub use consensus::consensus_action_runner::{
     ScabbardStoreContextUpdater,
 };
 #[cfg(feature = "scabbardv3-consensus-runner")]
-pub use consensus::{
-    ConsensusRunner, ConsensusRunnerBuilder, ContextSource, StoreContextSource,
-    StoreUnprocessedActionSource, StoreUnprocessedEventSource, UnprocessedActionSource,
-    UnprocessedEventSource,
-};
+pub use consensus::{ConsensusRunner, ConsensusRunnerBuilder};
 #[cfg(feature = "scabbardv3-consensus")]
 pub use consensus::{ScabbardProcess, ScabbardValue};
 pub use lifecycle::ScabbardLifecycle;
