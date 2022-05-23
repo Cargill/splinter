@@ -30,6 +30,8 @@ use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "add_commit_entry";
+
 pub(in crate::store::scabbard_store::diesel) trait AddCommitEntryOperation {
     fn add_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError>;
 }
@@ -42,7 +44,10 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnectio
             scabbard_service::table
                 .filter(scabbard_service::service_id.eq(format!("{}", commit_entry.service_id())))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
                         "Service does not exist",
@@ -55,7 +60,10 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnectio
                     consensus_2pc_context::service_id.eq(format!("{}", commit_entry.service_id())),
                 )
                 .first::<Consensus2pcContextModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
                         "Cannot add commit entry, context with service ID {} does not exist",
@@ -74,7 +82,10 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnectio
 
             insert_into(scabbard_v3_commit_history::table)
                 .values(vec![CommitEntryModel::try_from(&commit_entry)?])
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             Ok(())
         })
@@ -89,7 +100,10 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection> {
             scabbard_service::table
                 .filter(scabbard_service::service_id.eq(format!("{}", commit_entry.service_id())))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
                         "Service does not exist",
@@ -102,7 +116,10 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection> {
                     consensus_2pc_context::service_id.eq(format!("{}", commit_entry.service_id())),
                 )
                 .first::<Consensus2pcContextModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
                         "Cannot add commit entry, context with service ID {} does not exist",
@@ -121,7 +138,10 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection> {
 
             insert_into(scabbard_v3_commit_history::table)
                 .values(vec![CommitEntryModel::try_from(&commit_entry)?])
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             Ok(())
         })

@@ -26,6 +26,8 @@ use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "get_last_commit_entry";
+
 pub(in crate::store::scabbard_store::diesel) trait GetLastCommitEntryOperation {
     fn get_last_commit_entry(
         &self,
@@ -48,7 +50,10 @@ where
                 .filter(scabbard_v3_commit_history::service_id.eq(format!("{}", service_id)))
                 .order(scabbard_v3_commit_history::epoch.desc())
                 .first::<CommitEntryModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .map(CommitEntry::try_from)
                 .transpose()
                 .map_err(|err| {

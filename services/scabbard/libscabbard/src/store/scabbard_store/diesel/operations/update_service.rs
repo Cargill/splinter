@@ -28,6 +28,8 @@ use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "update_service";
+
 pub(in crate::store::scabbard_store::diesel) trait UpdateServiceAction {
     fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError>;
 }
@@ -35,12 +37,15 @@ pub(in crate::store::scabbard_store::diesel) trait UpdateServiceAction {
 #[cfg(feature = "sqlite")]
 impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, SqliteConnection> {
     fn update_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError> {
-        self.conn.transaction::<_, _, _>(|| {
+        self.conn.transaction::<_, ScabbardStoreError, _>(|| {
             // check to see if the service exists
             scabbard_service::table
                 .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
                         "Failed to update service, service does not exist",
@@ -51,19 +56,29 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, SqliteConnection> {
                 .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
                 .set(scabbard_service::status.eq(String::from(service.status())))
                 .execute(self.conn)
-                .map(|_| ())
-                .map_err(ScabbardStoreError::from)?;
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             if !service.peers().is_empty() {
                 delete(
                     scabbard_peer::table
                         .filter(scabbard_peer::service_id.eq(format!("{}", service.service_id()))),
                 )
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
                 insert_into(scabbard_peer::table)
                     .values(Vec::<ScabbardPeerModel>::from(&service))
-                    .execute(self.conn)?;
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
             }
             Ok(())
         })
@@ -78,7 +93,10 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, PgConnection> {
             scabbard_service::table
                 .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
                         "Failed to update service, service does not exist",
@@ -89,19 +107,29 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, PgConnection> {
                 .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
                 .set(scabbard_service::status.eq(String::from(service.status())))
                 .execute(self.conn)
-                .map(|_| ())
-                .map_err(ScabbardStoreError::from)?;
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             if !service.peers().is_empty() {
                 delete(
                     scabbard_peer::table
                         .filter(scabbard_peer::service_id.eq(format!("{}", service.service_id()))),
                 )
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
                 insert_into(scabbard_peer::table)
                     .values(Vec::<ScabbardPeerModel>::from(&service))
-                    .execute(self.conn)?;
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
             }
             Ok(())
         })

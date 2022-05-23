@@ -43,6 +43,8 @@ use crate::store::scabbard_store::{
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "add_consensus_action";
+
 pub(in crate::store::scabbard_store::diesel) trait AddActionOperation {
     fn add_consensus_action(
         &self,
@@ -65,7 +67,10 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
             consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
                         "Context with service ID {} does not exist",
@@ -78,7 +83,10 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 .order(consensus_2pc_action::position.desc())
                 .select(consensus_2pc_action::position)
                 .first::<i32>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .unwrap_or(0)
                 + 1;
 
@@ -90,11 +98,17 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
             insert_into(consensus_2pc_action::table)
                 .values(vec![insertable_action])
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
             let action_id = consensus_2pc_action::table
                 .order(consensus_2pc_action::id.desc())
                 .select(consensus_2pc_action::id)
-                .first::<i64>(self.conn)?;
+                .first::<i64>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             match action {
                 Action::Update(context, alarm) => match context {
@@ -107,7 +121,13 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
                         insert_into(consensus_2pc_update_context_action::table)
                             .values(vec![update_context_action])
-                            .execute(self.conn)?;
+                            .execute(self.conn)
+                            .map_err(|err| {
+                                ScabbardStoreError::from_source_with_operation(
+                                    err,
+                                    OPERATION_NAME.to_string(),
+                                )
+                            })?;
 
                         let participants = UpdateContextActionParticipantList::try_from((
                             &context, service_id, &action_id,
@@ -115,7 +135,13 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         .inner;
                         insert_into(consensus_2pc_update_context_action_participant::table)
                             .values(participants)
-                            .execute(self.conn)?;
+                            .execute(self.conn)
+                            .map_err(|err| {
+                                ScabbardStoreError::from_source_with_operation(
+                                    err,
+                                    OPERATION_NAME.to_string(),
+                                )
+                            })?;
 
                         Ok(action_id)
                     }
@@ -156,7 +182,13 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     };
                     insert_into(consensus_2pc_send_message_action::table)
                         .values(vec![send_message_action])
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
                     Ok(action_id)
                 }
                 Action::Notify(notification) => {
@@ -180,7 +212,13 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     };
                     insert_into(consensus_2pc_notification_action::table)
                         .values(vec![notification_action])
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
                     Ok(action_id)
                 }
             }
@@ -202,7 +240,10 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
             consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
                         "Context with service ID {} does not exist",
@@ -215,7 +256,10 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 .order(consensus_2pc_action::position.desc())
                 .select(consensus_2pc_action::position)
                 .first::<i32>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .unwrap_or(0)
                 + 1;
 
@@ -228,7 +272,10 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
             let action_id: i64 = insert_into(consensus_2pc_action::table)
                 .values(vec![insertable_action])
                 .returning(consensus_2pc_action::id)
-                .get_result(self.conn)?;
+                .get_result(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             match action {
                 Action::Update(context, alarm) => match context {
@@ -241,7 +288,13 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
 
                         insert_into(consensus_2pc_update_context_action::table)
                             .values(vec![update_context_action])
-                            .execute(self.conn)?;
+                            .execute(self.conn)
+                            .map_err(|err| {
+                                ScabbardStoreError::from_source_with_operation(
+                                    err,
+                                    OPERATION_NAME.to_string(),
+                                )
+                            })?;
 
                         let participants = UpdateContextActionParticipantList::try_from((
                             &context, service_id, &action_id,
@@ -249,7 +302,13 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                         .inner;
                         insert_into(consensus_2pc_update_context_action_participant::table)
                             .values(participants)
-                            .execute(self.conn)?;
+                            .execute(self.conn)
+                            .map_err(|err| {
+                                ScabbardStoreError::from_source_with_operation(
+                                    err,
+                                    OPERATION_NAME.to_string(),
+                                )
+                            })?;
 
                         Ok(action_id)
                     }
@@ -290,7 +349,13 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     };
                     insert_into(consensus_2pc_send_message_action::table)
                         .values(vec![send_message_action])
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
                     Ok(action_id)
                 }
                 Action::Notify(notification) => {
@@ -314,7 +379,13 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     };
                     insert_into(consensus_2pc_notification_action::table)
                         .values(vec![notification_action])
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
                     Ok(action_id)
                 }
             }

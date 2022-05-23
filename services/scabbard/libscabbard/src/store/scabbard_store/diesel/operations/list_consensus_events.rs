@@ -38,6 +38,8 @@ use crate::store::scabbard_store::{
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "list_consensus_events";
+
 pub(in crate::store::scabbard_store::diesel) trait ListEventsOperation {
     fn list_consensus_events(
         &self,
@@ -62,7 +64,10 @@ where
             consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
                         "Context with service ID {} does not exist",
@@ -82,7 +87,10 @@ where
                     consensus_2pc_event::position,
                     consensus_2pc_event::event_type,
                 ))
-                .load::<(i64, i32, String)>(self.conn)?;
+                .load::<(i64, i32, String)>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             let event_ids = consensus_events
                 .clone()
@@ -116,15 +124,24 @@ where
 
             let deliver_events = consensus_2pc_deliver_event::table
                 .filter(consensus_2pc_deliver_event::event_id.eq_any(&event_ids))
-                .load::<Consensus2pcDeliverEventModel>(self.conn)?;
+                .load::<Consensus2pcDeliverEventModel>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             let start_events = consensus_2pc_start_event::table
                 .filter(consensus_2pc_start_event::event_id.eq_any(&event_ids))
-                .load::<Consensus2pcStartEventModel>(self.conn)?;
+                .load::<Consensus2pcStartEventModel>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             let vote_events = consensus_2pc_vote_event::table
                 .filter(consensus_2pc_vote_event::event_id.eq_any(&event_ids))
-                .load::<Consensus2pcVoteEventModel>(self.conn)?;
+                .load::<Consensus2pcVoteEventModel>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             for deliver in deliver_events {
                 let position = events_map.get(&deliver.event_id).ok_or_else(|| {

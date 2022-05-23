@@ -25,6 +25,8 @@ use crate::store::scabbard_store::{ConsensusContext, ScabbardStoreError};
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "get_current_consensus_context";
+
 pub(in crate::store::scabbard_store::diesel) trait GetCurrentContextAction {
     fn get_current_consensus_context(
         &self,
@@ -46,7 +48,10 @@ where
             let context = consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
-                .optional()?;
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             if let Some(context) = context {
                 let participants: Vec<Consensus2pcContextParticipantModel> =
@@ -55,7 +60,13 @@ where
                             consensus_2pc_context_participant::service_id
                                 .eq(format!("{}", service_id)),
                         )
-                        .load::<Consensus2pcContextParticipantModel>(self.conn)?;
+                        .load::<Consensus2pcContextParticipantModel>(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
 
                 Ok(Some(ConsensusContext::try_from((&context, participants))?))
             } else {
