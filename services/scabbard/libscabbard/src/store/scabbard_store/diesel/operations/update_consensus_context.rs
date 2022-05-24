@@ -18,7 +18,7 @@ use std::convert::TryFrom;
 use diesel::pg::PgConnection;
 #[cfg(feature = "sqlite")]
 use diesel::sqlite::SqliteConnection;
-use diesel::{delete, dsl::insert_into, prelude::*};
+use diesel::{delete, dsl::insert_into, prelude::*, update};
 use splinter::error::InvalidStateError;
 use splinter::service::FullyQualifiedServiceId;
 
@@ -63,16 +63,22 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                     let update_context =
                         Consensus2pcContextModel::try_from((&context, service_id))?;
 
-                    delete(
-                        consensus_2pc_context::table.filter(
-                            consensus_2pc_context::service_id.eq(format!("{}", service_id)),
-                        ),
-                    )
-                    .execute(self.conn)?;
-
-                    insert_into(consensus_2pc_context::table)
-                        .values(vec![update_context])
-                        .execute(self.conn)?;
+                    update(consensus_2pc_context::table)
+                        .filter(consensus_2pc_context::service_id.eq(service_id.to_string()))
+                        .set((
+                            consensus_2pc_context::coordinator.eq(update_context.coordinator),
+                            consensus_2pc_context::epoch.eq(update_context.epoch),
+                            consensus_2pc_context::last_commit_epoch
+                                .eq(update_context.last_commit_epoch),
+                            consensus_2pc_context::state.eq(update_context.state),
+                            consensus_2pc_context::vote_timeout_start
+                                .eq(update_context.vote_timeout_start),
+                            consensus_2pc_context::vote.eq(update_context.vote),
+                            consensus_2pc_context::decision_timeout_start
+                                .eq(update_context.decision_timeout_start),
+                        ))
+                        .execute(self.conn)
+                        .map(|_| ())?;
 
                     let updated_participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
@@ -117,16 +123,22 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                     let update_context =
                         Consensus2pcContextModel::try_from((&context, service_id))?;
 
-                    delete(
-                        consensus_2pc_context::table.filter(
-                            consensus_2pc_context::service_id.eq(format!("{}", service_id)),
-                        ),
-                    )
-                    .execute(self.conn)?;
-
-                    insert_into(consensus_2pc_context::table)
-                        .values(vec![update_context])
-                        .execute(self.conn)?;
+                    update(consensus_2pc_context::table)
+                        .filter(consensus_2pc_context::service_id.eq(service_id.to_string()))
+                        .set((
+                            consensus_2pc_context::coordinator.eq(update_context.coordinator),
+                            consensus_2pc_context::epoch.eq(update_context.epoch),
+                            consensus_2pc_context::last_commit_epoch
+                                .eq(update_context.last_commit_epoch),
+                            consensus_2pc_context::state.eq(update_context.state),
+                            consensus_2pc_context::vote_timeout_start
+                                .eq(update_context.vote_timeout_start),
+                            consensus_2pc_context::vote.eq(update_context.vote),
+                            consensus_2pc_context::decision_timeout_start
+                                .eq(update_context.decision_timeout_start),
+                        ))
+                        .execute(self.conn)
+                        .map(|_| ())?;
 
                     let updated_participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
