@@ -72,16 +72,6 @@ where
 {
     pub fn run(&self, service_id: &FullyQualifiedServiceId) -> Result<(), InternalError> {
         loop {
-            let context = self
-                .context_source
-                .get_context(service_id)?
-                .ok_or_else(|| {
-                    InternalError::with_message(format!(
-                        "No scabbard context for service {}",
-                        service_id
-                    ))
-                })?;
-
             let unprocessed_actions = self
                 .unprocessed_action_source
                 .get_unprocessed_actions(service_id)?;
@@ -110,6 +100,17 @@ where
             let algorithm = self.algorithms.get(event.algorithm_name()).ok_or_else(|| {
                 InternalError::with_message(format!("{} is not configured", event.algorithm_name()))
             })?;
+
+            let context = self
+                .context_source
+                .get_context(service_id)?
+                .ok_or_else(|| {
+                    InternalError::with_message(format!(
+                        "No scabbard context for service {}",
+                        service_id
+                    ))
+                })?;
+
             let actions = algorithm
                 .event(event, context)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
