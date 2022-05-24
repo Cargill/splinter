@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::convert::TryFrom;
+
 #[cfg(feature = "postgres")]
 use diesel::pg::PgConnection;
 #[cfg(feature = "sqlite")]
 use diesel::sqlite::SqliteConnection;
 use diesel::{dsl::insert_into, prelude::*};
-use splinter::error::InvalidStateError;
+use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
@@ -56,7 +58,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
         self.conn.transaction::<_, _, _>(|| {
             let ConsensusEvent::TwoPhaseCommit(event) = event;
             // check to see if a context with the given service_id exists
-            let context = consensus_2pc_context::table
+            consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?
@@ -78,7 +80,6 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
             let insertable_event = InsertableConsensus2pcEventModel {
                 service_id: format!("{}", service_id),
-                epoch: context.epoch,
                 executed_at: None,
                 position,
                 event_type: String::from(&event),
@@ -95,25 +96,34 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
             match event {
                 Event::Alarm() => Ok(event_id),
                 Event::Deliver(receiving_process, message) => {
-                    let (message_type, vote_response, vote_request) = match message {
-                        Message::DecisionRequest(_) => (String::from(&message), None, None),
-                        Message::VoteResponse(_, true) => {
-                            (String::from(&message), Some("TRUE".to_string()), None)
+                    let (message_type, vote_response, vote_request, epoch) = match message {
+                        Message::DecisionRequest(epoch) => {
+                            (String::from(&message), None, None, epoch)
                         }
-                        Message::VoteResponse(_, false) => {
-                            (String::from(&message), Some("FALSE".to_string()), None)
-                        }
-                        Message::Commit(_) => (String::from(&message), None, None),
-                        Message::Abort(_) => (String::from(&message), None, None),
-                        Message::VoteRequest(_, ref value) => {
-                            (String::from(&message), None, Some(value.clone()))
+                        Message::VoteResponse(epoch, true) => (
+                            String::from(&message),
+                            Some("TRUE".to_string()),
+                            None,
+                            epoch,
+                        ),
+                        Message::VoteResponse(epoch, false) => (
+                            String::from(&message),
+                            Some("FALSE".to_string()),
+                            None,
+                            epoch,
+                        ),
+                        Message::Commit(epoch) => (String::from(&message), None, None, epoch),
+                        Message::Abort(epoch) => (String::from(&message), None, None, epoch),
+                        Message::VoteRequest(epoch, ref value) => {
+                            (String::from(&message), None, Some(value.clone()), epoch)
                         }
                     };
 
                     let deliver_event = Consensus2pcDeliverEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch: context.epoch,
+                        epoch: i64::try_from(epoch)
+                            .map_err(|err| InternalError::from_source(Box::new(err)))?,
                         receiver_service_id: format!("{}", receiving_process),
                         message_type,
                         vote_response,
@@ -128,7 +138,6 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     let start_event = Consensus2pcStartEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch: context.epoch,
                         value,
                     };
                     insert_into(consensus_2pc_start_event::table)
@@ -144,7 +153,6 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     let vote_event = Consensus2pcVoteEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch: context.epoch,
                         vote,
                     };
                     insert_into(consensus_2pc_vote_event::table)
@@ -167,7 +175,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
         self.conn.transaction::<_, _, _>(|| {
             let ConsensusEvent::TwoPhaseCommit(event) = event;
             // check to see if a context with the given service_id exists
-            let context = consensus_2pc_context::table
+            consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?
@@ -189,7 +197,6 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
 
             let insertable_event = InsertableConsensus2pcEventModel {
                 service_id: format!("{}", service_id),
-                epoch: context.epoch,
                 executed_at: None,
                 position,
                 event_type: String::from(&event),
@@ -203,25 +210,34 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
             match event {
                 Event::Alarm() => Ok(event_id),
                 Event::Deliver(receiving_process, message) => {
-                    let (message_type, vote_response, vote_request) = match message {
-                        Message::DecisionRequest(_) => (String::from(&message), None, None),
-                        Message::VoteResponse(_, true) => {
-                            (String::from(&message), Some("TRUE".to_string()), None)
+                    let (message_type, vote_response, vote_request, epoch) = match message {
+                        Message::DecisionRequest(epoch) => {
+                            (String::from(&message), None, None, epoch)
                         }
-                        Message::VoteResponse(_, false) => {
-                            (String::from(&message), Some("FALSE".to_string()), None)
-                        }
-                        Message::Commit(_) => (String::from(&message), None, None),
-                        Message::Abort(_) => (String::from(&message), None, None),
-                        Message::VoteRequest(_, ref value) => {
-                            (String::from(&message), None, Some(value.clone()))
+                        Message::VoteResponse(epoch, true) => (
+                            String::from(&message),
+                            Some("TRUE".to_string()),
+                            None,
+                            epoch,
+                        ),
+                        Message::VoteResponse(epoch, false) => (
+                            String::from(&message),
+                            Some("FALSE".to_string()),
+                            None,
+                            epoch,
+                        ),
+                        Message::Commit(epoch) => (String::from(&message), None, None, epoch),
+                        Message::Abort(epoch) => (String::from(&message), None, None, epoch),
+                        Message::VoteRequest(epoch, ref value) => {
+                            (String::from(&message), None, Some(value.clone()), epoch)
                         }
                     };
 
                     let deliver_event = Consensus2pcDeliverEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch: context.epoch,
+                        epoch: i64::try_from(epoch)
+                            .map_err(|err| InternalError::from_source(Box::new(err)))?,
                         receiver_service_id: format!("{}", receiving_process),
                         message_type,
                         vote_response,
@@ -236,7 +252,6 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     let start_event = Consensus2pcStartEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch: context.epoch,
                         value,
                     };
                     insert_into(consensus_2pc_start_event::table)
@@ -252,7 +267,6 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     let vote_event = Consensus2pcVoteEventModel {
                         event_id,
                         service_id: format!("{}", service_id),
-                        epoch: context.epoch,
                         vote,
                     };
                     insert_into(consensus_2pc_vote_event::table)

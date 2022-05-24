@@ -129,7 +129,6 @@ table! {
     consensus_2pc_event (id) {
         id -> Int8,
         service_id -> Text,
-        epoch -> BigInt,
         created_at -> Timestamp,
         executed_at -> Nullable<BigInt>,
         position -> Integer,
@@ -153,7 +152,6 @@ table! {
     consensus_2pc_start_event (event_id) {
         event_id -> Int8,
         service_id -> Text,
-        epoch -> BigInt,
         value -> Binary,
     }
 }
@@ -162,7 +160,6 @@ table! {
     consensus_2pc_vote_event (event_id) {
         event_id -> Int8,
         service_id -> Text,
-        epoch -> BigInt,
         vote -> Text,
     }
 }

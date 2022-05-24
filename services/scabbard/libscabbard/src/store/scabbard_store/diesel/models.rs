@@ -712,7 +712,6 @@ impl From<&Message> for String {
 pub struct Consensus2pcEventModel {
     pub id: i64,
     pub service_id: String,
-    pub epoch: i64,
     pub created_at: SystemTime,
     pub executed_at: Option<i64>,
     pub position: i32,
@@ -723,7 +722,6 @@ pub struct Consensus2pcEventModel {
 #[table_name = "consensus_2pc_event"]
 pub struct InsertableConsensus2pcEventModel {
     pub service_id: String,
-    pub epoch: i64,
     pub executed_at: Option<i64>,
     pub position: i32,
     pub event_type: String,
@@ -761,7 +759,6 @@ pub struct Consensus2pcDeliverEventModel {
 pub struct Consensus2pcStartEventModel {
     pub event_id: i64,
     pub service_id: String,
-    pub epoch: i64,
     pub value: Vec<u8>,
 }
 
@@ -772,7 +769,6 @@ pub struct Consensus2pcStartEventModel {
 pub struct Consensus2pcVoteEventModel {
     pub event_id: i64,
     pub service_id: String,
-    pub epoch: i64,
     pub vote: String, // TRUE or FALSE
 }
 
