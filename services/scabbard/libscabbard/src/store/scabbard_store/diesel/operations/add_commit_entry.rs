@@ -19,15 +19,16 @@ use diesel::pg::PgConnection;
 #[cfg(feature = "sqlite")]
 use diesel::sqlite::SqliteConnection;
 use diesel::{dsl::insert_into, prelude::*};
-use splinter::error::{InternalError, InvalidStateError};
+use splinter::error::InvalidStateError;
 
 use crate::store::scabbard_store::commit::CommitEntry;
 use crate::store::scabbard_store::diesel::{
-    models::{CommitEntryModel, Consensus2pcContextModel, ScabbardServiceModel},
-    schema::{consensus_2pc_context, scabbard_service, scabbard_v3_commit_history},
+    models::{CommitEntryModel, ScabbardServiceModel},
+    schema::{scabbard_service, scabbard_v3_commit_history},
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 
+use super::get_last_commit_entry::GetLastCommitEntryOperation;
 use super::ScabbardStoreOperations;
 
 pub(in crate::store::scabbard_store::diesel) trait AddCommitEntryOperation {
@@ -49,26 +50,21 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnectio
                     )))
                 })?;
 
-            // check to see if a context with the given service_id exists
-            let context = consensus_2pc_context::table
-                .filter(
-                    consensus_2pc_context::service_id.eq(format!("{}", commit_entry.service_id())),
-                )
-                .first::<Consensus2pcContextModel>(self.conn)
-                .optional()?
-                .ok_or_else(|| {
-                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Cannot add commit entry, context with service ID {} does not exist",
-                        commit_entry.service_id()
-                    )))
-                })?;
+            let id = {
+                if let Some(entry) = self.get_last_commit_entry(commit_entry.service_id())? {
+                    entry.id().ok_or_else(|| {
+                        ScabbardStoreError::InvalidState(InvalidStateError::with_message(
+                            String::from("Previous commit entry does not have an ID"),
+                        ))
+                    })? + 1
+                } else {
+                    1
+                }
+            };
 
             let commit_entry = commit_entry
                 .into_builder()
-                .with_epoch(
-                    u64::try_from(context.epoch)
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?,
-                )
+                .with_id(id)
                 .build()
                 .map_err(ScabbardStoreError::InvalidState)?;
 
@@ -96,26 +92,20 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection> {
                     )))
                 })?;
 
-            // check to see if a context with the given service_id exists
-            let context = consensus_2pc_context::table
-                .filter(
-                    consensus_2pc_context::service_id.eq(format!("{}", commit_entry.service_id())),
-                )
-                .first::<Consensus2pcContextModel>(self.conn)
-                .optional()?
-                .ok_or_else(|| {
-                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Cannot add commit entry, context with service ID {} does not exist",
-                        commit_entry.service_id()
-                    )))
-                })?;
-
+            let id = {
+                if let Some(entry) = self.get_last_commit_entry(commit_entry.service_id())? {
+                    entry.id().ok_or_else(|| {
+                        ScabbardStoreError::InvalidState(InvalidStateError::with_message(
+                            String::from("Previous commit entry does not have an ID"),
+                        ))
+                    })? + 1
+                } else {
+                    1
+                }
+            };
             let commit_entry = commit_entry
                 .into_builder()
-                .with_epoch(
-                    u64::try_from(context.epoch)
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?,
-                )
+                .with_id(id)
                 .build()
                 .map_err(ScabbardStoreError::InvalidState)?;
 

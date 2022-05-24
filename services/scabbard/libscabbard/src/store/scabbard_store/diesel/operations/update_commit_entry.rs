@@ -11,10 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::convert::TryFrom;
 
-use diesel::{delete, dsl::insert_into, prelude::*};
-use splinter::error::{InternalError, InvalidStateError};
+use diesel::{prelude::*, update};
+use splinter::error::InvalidStateError;
 
 use crate::store::scabbard_store::commit::CommitEntry;
 use crate::store::scabbard_store::diesel::{
@@ -32,18 +31,17 @@ pub(in crate::store::scabbard_store::diesel) trait UpdateCommitEntryOperation {
 impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnection> {
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let epoch = i64::try_from(commit_entry.epoch().ok_or_else(|| {
+            let id = commit_entry.id().ok_or_else(|| {
                 ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
-                    "Commit entry does not have an epoch",
+                    "Commit entry does not have an ID",
                 )))
-            })?)
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            })?;
             // check to see if a commit entry with the given service_id and epoch exists
             scabbard_v3_commit_history::table
                 .filter(
                     scabbard_v3_commit_history::service_id
                         .eq(format!("{}", commit_entry.service_id()))
-                        .and(scabbard_v3_commit_history::epoch.eq(epoch)),
+                        .and(scabbard_v3_commit_history::id.eq(id)),
                 )
                 .first::<CommitEntryModel>(self.conn)
                 .optional()?
@@ -53,15 +51,22 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnec
                     )))
                 })?;
 
-            delete(
-                scabbard_v3_commit_history::table
-                    .find((format!("{}", commit_entry.service_id()), epoch)),
-            )
-            .execute(self.conn)?;
-
-            insert_into(scabbard_v3_commit_history::table)
-                .values(vec![CommitEntryModel::try_from(&commit_entry)?])
-                .execute(self.conn)?;
+            if let Some(decision) = commit_entry.decision() {
+                update(scabbard_v3_commit_history::table)
+                    .filter(
+                        scabbard_v3_commit_history::service_id
+                            .eq(format!("{}", commit_entry.service_id()))
+                            .and(scabbard_v3_commit_history::id.eq(id)),
+                    )
+                    .set(scabbard_v3_commit_history::decision.eq(String::from(decision)))
+                    .execute(self.conn)?;
+            } else {
+                return Err(ScabbardStoreError::InvalidState(
+                    InvalidStateError::with_message(String::from(
+                        "Updated contexts must include a decision",
+                    )),
+                ));
+            }
 
             Ok(())
         })
@@ -72,18 +77,17 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnec
 impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection> {
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            let epoch = i64::try_from(commit_entry.epoch().ok_or_else(|| {
+            let id = commit_entry.id().ok_or_else(|| {
                 ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
-                    "Commit entry does not have an epoch",
+                    "Commit entry does not have an ID",
                 )))
-            })?)
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            })?;
             // check to see if a commit entry with the given service_id and epoch exists
             scabbard_v3_commit_history::table
                 .filter(
                     scabbard_v3_commit_history::service_id
                         .eq(format!("{}", commit_entry.service_id()))
-                        .and(scabbard_v3_commit_history::epoch.eq(epoch)),
+                        .and(scabbard_v3_commit_history::id.eq(id)),
                 )
                 .first::<CommitEntryModel>(self.conn)
                 .optional()?
@@ -93,15 +97,22 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection
                     )))
                 })?;
 
-            delete(
-                scabbard_v3_commit_history::table
-                    .find((format!("{}", commit_entry.service_id()), epoch)),
-            )
-            .execute(self.conn)?;
-
-            insert_into(scabbard_v3_commit_history::table)
-                .values(vec![CommitEntryModel::try_from(&commit_entry)?])
-                .execute(self.conn)?;
+            if let Some(decision) = commit_entry.decision() {
+                update(scabbard_v3_commit_history::table)
+                    .filter(
+                        scabbard_v3_commit_history::service_id
+                            .eq(format!("{}", commit_entry.service_id()))
+                            .and(scabbard_v3_commit_history::id.eq(id)),
+                    )
+                    .set(scabbard_v3_commit_history::decision.eq(String::from(decision)))
+                    .execute(self.conn)?;
+            } else {
+                return Err(ScabbardStoreError::InvalidState(
+                    InvalidStateError::with_message(String::from(
+                        "Updated contexts must include a decision",
+                    )),
+                ));
+            }
 
             Ok(())
         })

@@ -20,7 +20,7 @@ use splinter::service::FullyQualifiedServiceId;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitEntry {
     service_id: FullyQualifiedServiceId,
-    epoch: Option<u64>,
+    id: Option<i64>,
     value: String,
     decision: Option<ConsensusDecision>,
 }
@@ -31,9 +31,9 @@ impl CommitEntry {
         &self.service_id
     }
 
-    /// Returns the epoch for the commit entry
-    pub fn epoch(&self) -> &Option<u64> {
-        &self.epoch
+    /// Returns the ID for the commit entry
+    pub fn id(&self) -> &Option<i64> {
+        &self.id
     }
 
     /// Returns the value for the commit entry
@@ -49,7 +49,7 @@ impl CommitEntry {
     pub fn into_builder(self) -> CommitEntryBuilder {
         CommitEntryBuilder {
             service_id: Some(self.service_id),
-            epoch: self.epoch,
+            id: self.id,
             value: Some(self.value),
             decision: self.decision,
         }
@@ -59,7 +59,7 @@ impl CommitEntry {
 #[derive(Default, Clone)]
 pub struct CommitEntryBuilder {
     service_id: Option<FullyQualifiedServiceId>,
-    epoch: Option<u64>,
+    id: Option<i64>,
     value: Option<String>,
     decision: Option<ConsensusDecision>,
 }
@@ -70,9 +70,9 @@ impl CommitEntryBuilder {
         self.service_id.clone()
     }
 
-    /// Returns the epoch for the commit entry
-    pub fn epoch(&self) -> Option<u64> {
-        self.epoch
+    /// Returns the ID for the commit entry
+    pub fn id(&self) -> Option<i64> {
+        self.id
     }
 
     /// Returns the value for the commit entry
@@ -95,13 +95,13 @@ impl CommitEntryBuilder {
         self
     }
 
-    /// Sets the epoch
+    /// Sets the ID
     ///
     /// # Arguments
     ///
-    ///  * `epoch` - The epoch for commit entry
-    pub fn with_epoch(mut self, epoch: u64) -> CommitEntryBuilder {
-        self.epoch = Some(epoch);
+    ///  * `id` - The ID for commit entry
+    pub fn with_id(mut self, id: i64) -> CommitEntryBuilder {
+        self.id = Some(id);
         self
     }
 
@@ -127,7 +127,7 @@ impl CommitEntryBuilder {
 
     /// Builds the `CommitEntry`
     ///
-    /// Returns an error if the service ID, epoch, or value is not set
+    /// Returns an error if the service ID or value is not set
     pub fn build(self) -> Result<CommitEntry, InvalidStateError> {
         let service_id = self.service_id.ok_or_else(|| {
             InvalidStateError::with_message(
@@ -135,7 +135,7 @@ impl CommitEntryBuilder {
             )
         })?;
 
-        let epoch = self.epoch;
+        let id = self.id;
 
         let value = self.value.ok_or_else(|| {
             InvalidStateError::with_message("unable to build, missing field: `value`".to_string())
@@ -143,7 +143,7 @@ impl CommitEntryBuilder {
 
         Ok(CommitEntry {
             service_id,
-            epoch,
+            id,
             value,
             decision: self.decision,
         })

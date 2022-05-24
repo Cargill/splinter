@@ -28,9 +28,9 @@ table! {
 }
 
 table! {
-    scabbard_v3_commit_history (service_id, epoch) {
+    scabbard_v3_commit_history (service_id, id) {
         service_id  -> Text,
-        epoch -> BigInt,
+        id -> BigInt,
         value -> VarChar,
         decision -> Nullable<Text>,
     }

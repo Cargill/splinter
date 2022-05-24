@@ -80,10 +80,10 @@ impl From<&ScabbardService> for Vec<ScabbardPeerModel> {
 /// Database model representation of `ScabbardService` commit entry
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "scabbard_v3_commit_history"]
-#[primary_key(service_id, epoch)]
+#[primary_key(service_id, id)]
 pub struct CommitEntryModel {
     pub service_id: String,
-    pub epoch: i64,
+    pub id: i64,
     pub value: String,
     pub decision: Option<String>,
 }
@@ -94,10 +94,9 @@ impl TryFrom<&CommitEntry> for CommitEntryModel {
     fn try_from(entry: &CommitEntry) -> Result<Self, Self::Error> {
         Ok(CommitEntryModel {
             service_id: entry.service_id().to_string(),
-            epoch: i64::try_from(entry.epoch().ok_or_else(|| {
-                InternalError::with_message("Epoch is not set on commit entry".to_string())
-            })?)
-            .map_err(|err| InternalError::from_source(Box::new(err)))?,
+            id: entry.id().ok_or_else(|| {
+                InternalError::with_message("ID is not set on commit entry".to_string())
+            })?,
             value: entry.value().to_string(),
             decision: entry
                 .decision()
@@ -116,10 +115,7 @@ impl TryFrom<CommitEntryModel> for CommitEntry {
 
         let mut builder = CommitEntryBuilder::default()
             .with_service_id(&service_id)
-            .with_epoch(
-                u64::try_from(entry.epoch)
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?,
-            )
+            .with_id(entry.id)
             .with_value(&entry.value);
 
         if let Some(d) = entry.decision {

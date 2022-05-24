@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS scabbard_peer (
 
 CREATE TABLE IF NOT EXISTS scabbard_v3_commit_history (
     service_id TEXT NOT NULL,
-    epoch      INTEGER NOT NULL,
+    id      INTEGER NOT NULL,
     value      TEXT NOT NULL,
     decision   TEXT,
     CHECK ( decision IN ('COMMIT', 'ABORT') ),
-    PRIMARY KEY (service_id, epoch)
+    PRIMARY KEY (service_id, id)
 );

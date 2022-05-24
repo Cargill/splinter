@@ -46,7 +46,7 @@ where
         self.conn.transaction::<_, _, _>(|| {
             scabbard_v3_commit_history::table
                 .filter(scabbard_v3_commit_history::service_id.eq(format!("{}", service_id)))
-                .order(scabbard_v3_commit_history::epoch.desc())
+                .order(scabbard_v3_commit_history::id.desc())
                 .first::<CommitEntryModel>(self.conn)
                 .optional()?
                 .map(CommitEntry::try_from)

@@ -1321,7 +1321,6 @@ pub mod tests {
 
         let commit_entry = CommitEntryBuilder::default()
             .with_service_id(&service_fqsi)
-            .with_epoch(1)
             .with_value("commit entry value")
             .with_decision(&ConsensusDecision::Commit)
             .build()
@@ -1329,15 +1328,21 @@ pub mod tests {
 
         assert!(store.add_commit_entry(commit_entry.clone()).is_ok());
 
+        // update commit_entry to add expected id
+        let id_commit_entry = commit_entry
+            .into_builder()
+            .with_id(1)
+            .build()
+            .expect("failed to build commit entry");
+
         let get_last_commit_entry = store
             .get_last_commit_entry(&service_fqsi.clone())
             .expect("failed to get commit entry");
 
-        assert_eq!(get_last_commit_entry, Some(commit_entry));
+        assert_eq!(get_last_commit_entry, Some(id_commit_entry));
 
         let bad_commit_entry = CommitEntryBuilder::default()
             .with_service_id(&FullyQualifiedServiceId::new_random())
-            .with_epoch(1)
             .with_value("commit entry value")
             .with_decision(&ConsensusDecision::Commit)
             .build()
@@ -1397,7 +1402,6 @@ pub mod tests {
 
         let commit_entry = CommitEntryBuilder::default()
             .with_service_id(&service_fqsi)
-            .with_epoch(1)
             .with_value("commit entry value")
             .with_decision(&ConsensusDecision::Commit)
             .build()
@@ -1405,11 +1409,18 @@ pub mod tests {
 
         assert!(store.add_commit_entry(commit_entry.clone()).is_ok());
 
+        // update commit_entry for expected id
+        let id_commit_entry = commit_entry
+            .into_builder()
+            .with_id(1)
+            .build()
+            .expect("failed to build commit entry with id");
+
         let get_last_commit_entry = store
             .get_last_commit_entry(&service_fqsi.clone())
             .expect("failed to get commit entry");
 
-        assert_eq!(get_last_commit_entry, Some(commit_entry));
+        assert_eq!(get_last_commit_entry, Some(id_commit_entry));
 
         let get_last_commit_entry = store
             .get_last_commit_entry(&FullyQualifiedServiceId::new_random())
@@ -1469,7 +1480,6 @@ pub mod tests {
 
         let commit_entry = CommitEntryBuilder::default()
             .with_service_id(&service_fqsi)
-            .with_epoch(1)
             .with_value("commit entry value")
             .build()
             .expect("failed to build commit entry");
@@ -1480,7 +1490,8 @@ pub mod tests {
 
         let update_commit_entry = CommitEntryBuilder::default()
             .with_service_id(&service_fqsi)
-            .with_epoch(1)
+            // set expected id
+            .with_id(1)
             .with_value("commit entry value")
             .with_decision(&ConsensusDecision::Commit)
             .build()
