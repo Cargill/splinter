@@ -72,14 +72,18 @@ fn create_context(service: &ScabbardService) -> Result<Context, InternalError> {
         ))
     })?;
 
-    let state = if service.service_id().service_id() == &coordinator {
-        State::WaitingForStart
+    let mut builder = ContextBuilder::default();
+
+    if service.service_id().service_id() == &coordinator {
+        builder = builder.with_epoch(1).with_state(State::WaitingForStart);
     } else {
-        State::WaitingForVoteRequest
+        builder = builder
+            .with_epoch(0)
+            .with_state(State::WaitingForVoteRequest);
     };
-    ContextBuilder::default()
+
+    builder
         .with_coordinator(&coordinator)
-        .with_epoch(1)
         .with_participants(
             service
                 .peers()
@@ -90,7 +94,6 @@ fn create_context(service: &ScabbardService) -> Result<Context, InternalError> {
                 })
                 .collect(),
         )
-        .with_state(state)
         .with_this_process(service.service_id().clone().service_id())
         .build()
         .map_err(|err| InternalError::from_source(Box::new(err)))
