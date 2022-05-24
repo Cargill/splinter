@@ -47,6 +47,7 @@ stable = [
     "authorization",
     "biome",
     "biome-key-management",
+    "registry",
     "rest-api",
 ]
 
@@ -67,6 +68,7 @@ admin-service = [
     "splinter/admin-service"
 ]
 authorization = ["splinter/authorization"]
-rest-api = ["splinter/rest-api"]
 biome = ["splinter/biome"]
 biome-key-management = ["biome", "splinter/biome-key-management"]
+registry = ["splinter/registry"]
+rest-api = ["splinter/rest-api"]

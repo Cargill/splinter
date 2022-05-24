@@ -14,15 +14,16 @@
 
 //! This module defines the REST API endpoints for interacting with registries.
 
-mod actix;
 mod error;
+mod nodes;
+mod nodes_identity;
 mod resources;
 
-use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
+use splinter::rest_api::actix_web_1::{Resource, RestResourceProvider};
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::authorization::Permission;
+use splinter::rest_api::auth::authorization::Permission;
 
-use super::RwRegistry;
+use splinter::registry::RwRegistry;
 
 #[cfg(feature = "authorization")]
 const REGISTRY_READ_PERMISSION: Permission = Permission::Check {
@@ -37,18 +38,30 @@ const REGISTRY_WRITE_PERMISSION: Permission = Permission::Check {
     permission_description: "Allows the client to modify the registry",
 };
 
-/// The `RwRegistry` trait service provides the following endpoints as REST API resources:
+pub struct RwRegistryRestResourceProvider {
+    resources: Vec<Resource>,
+}
+
+impl RwRegistryRestResourceProvider {
+    pub fn new(registry: &dyn RwRegistry) -> Self {
+        let resources = vec![
+            nodes_identity::make_nodes_identity_resource(registry.clone_box()),
+            nodes::make_nodes_resource(registry.clone_box()),
+        ];
+        Self { resources }
+    }
+}
+
+/// The `RwRegistryRestResourceProvider` struct provides the following endpoints
+/// as REST API resources:
 ///
 /// * `GET /registry/nodes` - List the nodes in the registry
 /// * `POST /registry/nodes` - Add a node to the registry
 /// * `GET /registry/nodes/{identity}` - Fetch a specific node in the registry
 /// * `PUT /registry/nodes/{identity}` - Replace a node in the registry
 /// * `DELETE /registry/nodes/{identity}` - Delete a node from the registry
-impl RestResourceProvider for dyn RwRegistry {
+impl RestResourceProvider for RwRegistryRestResourceProvider {
     fn resources(&self) -> Vec<Resource> {
-        vec![
-            actix::nodes_identity::make_nodes_identity_resource(self.clone_box()),
-            actix::nodes::make_nodes_resource(self.clone_box()),
-        ]
+        self.resources.clone()
     }
 }

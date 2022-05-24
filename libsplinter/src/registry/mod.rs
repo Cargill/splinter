@@ -29,8 +29,6 @@ pub mod client;
 #[cfg(feature = "diesel")]
 mod diesel;
 mod error;
-#[cfg(feature = "rest-api-actix-web-1")]
-mod rest_api;
 mod unified;
 mod yaml;
 
@@ -323,6 +321,20 @@ pub trait RwRegistry: RegistryWriter + RegistryReader {
 impl Clone for Box<dyn RwRegistry> {
     fn clone(&self) -> Box<dyn RwRegistry> {
         self.clone_box()
+    }
+}
+
+impl RwRegistry for Box<dyn RwRegistry> {
+    fn clone_box(&self) -> Box<dyn RwRegistry> {
+        (**self).clone_box()
+    }
+
+    fn clone_box_as_reader(&self) -> Box<dyn RegistryReader> {
+        (**self).clone_box_as_reader()
+    }
+
+    fn clone_box_as_writer(&self) -> Box<dyn RegistryWriter> {
+        (**self).clone_box_as_writer()
     }
 }
 

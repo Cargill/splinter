@@ -26,5 +26,7 @@ extern crate serde_json;
 pub mod admin;
 #[cfg(feature = "biome")]
 pub mod biome;
+#[cfg(feature = "registry")]
+pub mod registry;
 
 mod hex;

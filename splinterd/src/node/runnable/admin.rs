@@ -30,6 +30,7 @@ use splinter::runtime::service::instance::{ServiceOrchestratorBuilder, ServicePr
 use splinter::store::StoreFactory;
 use splinter::transport::{inproc::InprocTransport, Transport};
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
+use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
 
 use crate::node::builder::admin::AdminServiceEventClientVariant;
 use crate::node::running::admin::{self as running_admin, AdminSubsystem};
@@ -153,7 +154,7 @@ impl RunnableAdminSubsystem {
 
         actix1_resources.append(&mut AdminServiceRestProvider::new(&admin_service).resources());
         actix1_resources.append(&mut circuit_resource_provider.resources());
-        actix1_resources.append(&mut registry.resources());
+        actix1_resources.append(&mut RwRegistryRestResourceProvider::new(&registry).resources());
         actix1_resources.append(&mut orchestrator_resources);
 
         // set up inproc connections

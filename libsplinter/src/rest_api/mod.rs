@@ -105,7 +105,6 @@ pub use actix_web_1::{
     feature = "authorization",
     feature = "biome-credentials",
     feature = "biome-key-management",
-    feature = "registry",
     all(feature = "oauth", feature = "rest-api-actix-web-1"),
 ))]
 pub(crate) const SPLINTER_PROTOCOL_VERSION: u32 = 2;

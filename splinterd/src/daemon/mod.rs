@@ -109,6 +109,7 @@ use splinter::transport::{
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
 #[cfg(feature = "biome-key-management")]
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
+use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
 
 use crate::node_id::get_node_id;
 use crate::routes;
@@ -639,8 +640,8 @@ impl SplinterDaemon {
         #[allow(unused_mut)]
         let mut rest_api_builder = RestApiBuilder::new()
             .with_bind(bind)
-            .add_resources(registry.resources())
             .add_resources(AdminServiceRestProvider::new(&admin_service).resources())
+            .add_resources(RwRegistryRestResourceProvider::new(&registry).resources())
             .add_resources(orchestrator_resources)
             .add_resources(circuit_resource_provider.resources());
 
