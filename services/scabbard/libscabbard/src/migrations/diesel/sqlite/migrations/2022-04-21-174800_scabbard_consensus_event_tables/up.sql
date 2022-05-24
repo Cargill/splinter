@@ -16,7 +16,6 @@
 CREATE TABLE IF NOT EXISTS consensus_2pc_event (
     id                        INTEGER PRIMARY KEY AUTOINCREMENT,
     service_id                TEXT NOT NULL,
-    epoch                     BIGINT NOT NULL,
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     executed_at               BIGINT,
     position                  INTEGER NOT NULL,
@@ -42,7 +41,6 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_deliver_event (
 CREATE TABLE IF NOT EXISTS consensus_2pc_start_event (
     event_id                  INTEGER PRIMARY KEY,
     service_id                TEXT NOT NULL,
-    epoch                     BIGINT NOT NULL,
     value                     BINARY,
     FOREIGN KEY (event_id) REFERENCES consensus_2pc_event(id) ON DELETE CASCADE,
     FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
@@ -51,7 +49,6 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_start_event (
 CREATE TABLE IF NOT EXISTS consensus_2pc_vote_event (
     event_id                  INTEGER PRIMARY KEY,
     service_id                TEXT NOT NULL,
-    epoch                     BIGINT NOT NULL,
     vote                      TEXT
     CHECK ( vote IN ('TRUE' , 'FALSE') ),
     FOREIGN KEY (event_id) REFERENCES consensus_2pc_event(id) ON DELETE CASCADE,
