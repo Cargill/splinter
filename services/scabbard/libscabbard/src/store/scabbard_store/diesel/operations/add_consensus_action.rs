@@ -62,7 +62,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
             let ConsensusAction::TwoPhaseCommit(action) = action;
 
             // check to see if a context with the given service_id exists
-            let context = consensus_2pc_context::table
+            consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?
@@ -84,7 +84,6 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
             let insertable_action = InsertableConsensus2pcActionModel {
                 service_id: format!("{}", service_id),
-                epoch: context.epoch,
                 executed_at: None,
                 position,
             };
@@ -122,25 +121,34 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     }
                 },
                 Action::SendMessage(receiving_process, message) => {
-                    let (message_type, vote_response, vote_request) = match message {
-                        Message::DecisionRequest(_) => (String::from(&message), None, None),
-                        Message::VoteResponse(_, true) => {
-                            (String::from(&message), Some("TRUE".to_string()), None)
+                    let (message_type, vote_response, vote_request, epoch) = match message {
+                        Message::DecisionRequest(epoch) => {
+                            (String::from(&message), None, None, epoch)
                         }
-                        Message::VoteResponse(_, false) => {
-                            (String::from(&message), Some("FALSE".to_string()), None)
-                        }
-                        Message::Commit(_) => (String::from(&message), None, None),
-                        Message::Abort(_) => (String::from(&message), None, None),
-                        Message::VoteRequest(_, ref value) => {
-                            (String::from(&message), None, Some(value.clone()))
+                        Message::VoteResponse(epoch, true) => (
+                            String::from(&message),
+                            Some("TRUE".to_string()),
+                            None,
+                            epoch,
+                        ),
+                        Message::VoteResponse(epoch, false) => (
+                            String::from(&message),
+                            Some("FALSE".to_string()),
+                            None,
+                            epoch,
+                        ),
+                        Message::Commit(epoch) => (String::from(&message), None, None, epoch),
+                        Message::Abort(epoch) => (String::from(&message), None, None, epoch),
+                        Message::VoteRequest(epoch, ref value) => {
+                            (String::from(&message), None, Some(value.clone()), epoch)
                         }
                     };
 
                     let send_message_action = Consensus2pcSendMessageActionModel {
                         action_id,
                         service_id: format!("{}", service_id),
-                        epoch: context.epoch,
+                        epoch: i64::try_from(epoch)
+                            .map_err(|err| InternalError::from_source(Box::new(err)))?,
                         receiver_service_id: format!("{}", receiving_process),
                         message_type,
                         vote_response,
@@ -166,7 +174,6 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     let notification_action = Consensus2pcNotificationModel {
                         action_id,
                         service_id: format!("{}", service_id),
-                        epoch: context.epoch,
                         notification_type,
                         dropped_message,
                         request_for_vote_value,
@@ -192,7 +199,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
             let ConsensusAction::TwoPhaseCommit(action) = action;
 
             // check to see if a context with the given service_id exists
-            let context = consensus_2pc_context::table
+            consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()?
@@ -214,7 +221,6 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
 
             let insertable_action = InsertableConsensus2pcActionModel {
                 service_id: format!("{}", service_id),
-                epoch: context.epoch,
                 executed_at: None,
                 position,
             };
@@ -249,25 +255,34 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     }
                 },
                 Action::SendMessage(receiving_process, message) => {
-                    let (message_type, vote_response, vote_request) = match message {
-                        Message::DecisionRequest(_) => (String::from(&message), None, None),
-                        Message::VoteResponse(_, true) => {
-                            (String::from(&message), Some("TRUE".to_string()), None)
+                    let (message_type, vote_response, vote_request, epoch) = match message {
+                        Message::DecisionRequest(epoch) => {
+                            (String::from(&message), None, None, epoch)
                         }
-                        Message::VoteResponse(_, false) => {
-                            (String::from(&message), Some("FALSE".to_string()), None)
-                        }
-                        Message::Commit(_) => (String::from(&message), None, None),
-                        Message::Abort(_) => (String::from(&message), None, None),
-                        Message::VoteRequest(_, ref value) => {
-                            (String::from(&message), None, Some(value.clone()))
+                        Message::VoteResponse(epoch, true) => (
+                            String::from(&message),
+                            Some("TRUE".to_string()),
+                            None,
+                            epoch,
+                        ),
+                        Message::VoteResponse(epoch, false) => (
+                            String::from(&message),
+                            Some("FALSE".to_string()),
+                            None,
+                            epoch,
+                        ),
+                        Message::Commit(epoch) => (String::from(&message), None, None, epoch),
+                        Message::Abort(epoch) => (String::from(&message), None, None, epoch),
+                        Message::VoteRequest(epoch, ref value) => {
+                            (String::from(&message), None, Some(value.clone()), epoch)
                         }
                     };
 
                     let send_message_action = Consensus2pcSendMessageActionModel {
                         action_id,
                         service_id: format!("{}", service_id),
-                        epoch: context.epoch,
+                        epoch: i64::try_from(epoch)
+                            .map_err(|err| InternalError::from_source(Box::new(err)))?,
                         receiver_service_id: format!("{}", receiving_process),
                         message_type,
                         vote_response,
@@ -293,7 +308,6 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                     let notification_action = Consensus2pcNotificationModel {
                         action_id,
                         service_id: format!("{}", service_id),
-                        epoch: context.epoch,
                         notification_type,
                         dropped_message,
                         request_for_vote_value,

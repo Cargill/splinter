@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_context_participant (
 CREATE TABLE IF NOT EXISTS consensus_2pc_action (
     id                        INTEGER PRIMARY KEY AUTOINCREMENT,
     service_id                TEXT NOT NULL,
-    epoch                     BIGINT NOT NULL,
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     executed_at               BIGINT,
     position                  INTEGER NOT NULL,
@@ -85,7 +84,6 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_send_message_action (
 CREATE TABLE IF NOT EXISTS consensus_2pc_notification_action (
     action_id                 INTEGER PRIMARY KEY,
     service_id                TEXT NOT NULL,
-    epoch                     BIGINT NOT NULL,
     notification_type         TEXT NOT NULL
     CHECK ( notification_type IN ('REQUESTFORSTART', 'COORDINATORREQUESTFORVOTE', 'PARTICIPANTREQUESTFORVOTE', 'COMMIT', 'ABORT', 'MESSAGEDROPPED') ),
     dropped_message           TEXT
@@ -99,7 +97,6 @@ CREATE TABLE IF NOT EXISTS consensus_2pc_notification_action (
 CREATE TABLE IF NOT EXISTS consensus_2pc_update_context_action_participant (
     action_id                 INTEGER PRIMARY KEY,
     service_id                TEXT NOT NULL,
-    epoch                     BIGINT NOT NULL,
     process                   TEXT NOT NULL,
     vote                      TEXT
     CHECK ( vote IN ('TRUE' , 'FALSE') OR vote IS NULL ),

@@ -580,7 +580,6 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
 pub struct Consensus2pcUpdateContextActionParticipantModel {
     pub action_id: i64,
     pub service_id: String,
-    pub epoch: i64,
     pub process: String,
     pub vote: Option<String>,
 }
@@ -596,8 +595,6 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)> for UpdateContextAction
     fn try_from(
         (context, service_id, action_id): (&Context, &FullyQualifiedServiceId, &i64),
     ) -> Result<Self, Self::Error> {
-        let epoch = i64::try_from(*context.epoch())
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
         let mut participants = Vec::new();
         for participant in context.participants() {
             let vote = participant.vote.map(|vote| match vote {
@@ -607,7 +604,6 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)> for UpdateContextAction
             participants.push(Consensus2pcUpdateContextActionParticipantModel {
                 action_id: *action_id,
                 service_id: format!("{}", service_id),
-                epoch,
                 process: format!("{}", participant.process),
                 vote,
             })
@@ -639,7 +635,6 @@ pub struct Consensus2pcSendMessageActionModel {
 pub struct Consensus2pcNotificationModel {
     pub action_id: i64,
     pub service_id: String,
-    pub epoch: i64,
     pub notification_type: String,
     pub dropped_message: Option<String>,
     pub request_for_vote_value: Option<Vec<u8>>,
@@ -666,7 +661,6 @@ impl From<&State> for String {
 pub struct Consensus2pcActionModel {
     pub id: i64,
     pub service_id: String,
-    pub epoch: i64,
     pub created_at: SystemTime,
     pub executed_at: Option<i64>,
     pub position: i32,
@@ -676,7 +670,6 @@ pub struct Consensus2pcActionModel {
 #[table_name = "consensus_2pc_action"]
 pub struct InsertableConsensus2pcActionModel {
     pub service_id: String,
-    pub epoch: i64,
     pub executed_at: Option<i64>,
     pub position: i32,
 }

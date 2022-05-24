@@ -70,7 +70,6 @@ table! {
     consensus_2pc_notification_action (action_id) {
         action_id -> Int8,
         service_id -> Text,
-        epoch -> BigInt,
         notification_type -> Text,
         dropped_message -> Nullable<Text>,
         request_for_vote_value -> Nullable<Binary>,
@@ -108,7 +107,6 @@ table! {
     consensus_2pc_update_context_action_participant (action_id) {
         action_id -> Int8,
         service_id -> Text,
-        epoch -> BigInt,
         process -> Text,
         vote -> Nullable<Text>,
     }
@@ -118,7 +116,6 @@ table! {
     consensus_2pc_action (id) {
         id -> Int8,
         service_id -> Text,
-        epoch -> BigInt,
         created_at -> Timestamp,
         executed_at -> Nullable<BigInt>,
         position -> Integer,
