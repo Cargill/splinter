@@ -247,6 +247,10 @@ impl Assignment {
     pub fn into_parts(self) -> (Identity, Vec<String>) {
         (self.identity, self.roles)
     }
+
+    pub(super) fn new_unchecked(identity: Identity, roles: Vec<String>) -> Self {
+        Self { identity, roles }
+    }
 }
 
 /// Constructs new Assignments.
