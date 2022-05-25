@@ -24,6 +24,8 @@ use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "update_commit_entry";
+
 pub(in crate::store::scabbard_store::diesel) trait UpdateCommitEntryOperation {
     fn update_commit_entry(&self, commit_entry: CommitEntry) -> Result<(), ScabbardStoreError>;
 }
@@ -46,7 +48,10 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnec
                         .and(scabbard_v3_commit_history::epoch.eq(epoch)),
                 )
                 .first::<CommitEntryModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
                         "Commit entry does not exist",
@@ -57,11 +62,17 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnec
                 scabbard_v3_commit_history::table
                     .find((format!("{}", commit_entry.service_id()), epoch)),
             )
-            .execute(self.conn)?;
+            .execute(self.conn)
+            .map_err(|err| {
+                ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+            })?;
 
             insert_into(scabbard_v3_commit_history::table)
                 .values(vec![CommitEntryModel::try_from(&commit_entry)?])
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             Ok(())
         })
@@ -86,7 +97,10 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection
                         .and(scabbard_v3_commit_history::epoch.eq(epoch)),
                 )
                 .first::<CommitEntryModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
                         "Commit entry does not exist",
@@ -97,11 +111,17 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection
                 scabbard_v3_commit_history::table
                     .find((format!("{}", commit_entry.service_id()), epoch)),
             )
-            .execute(self.conn)?;
+            .execute(self.conn)
+            .map_err(|err| {
+                ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+            })?;
 
             insert_into(scabbard_v3_commit_history::table)
                 .values(vec![CommitEntryModel::try_from(&commit_entry)?])
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             Ok(())
         })

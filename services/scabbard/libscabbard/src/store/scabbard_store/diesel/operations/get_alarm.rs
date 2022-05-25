@@ -31,6 +31,8 @@ use crate::store::AlarmType;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "get_alarm";
+
 pub(in crate::store::scabbard_store::diesel) trait GetAlarmOperation {
     fn get_alarm(
         &self,
@@ -51,7 +53,10 @@ impl<'a> GetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
             scabbard_service::table
                 .filter(scabbard_service::service_id.eq(format!("{}", service_id)))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
                         "Failed to get scabbard alarm, service does not exist",
@@ -66,7 +71,10 @@ impl<'a> GetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 )
                 .select(scabbard_alarm::alarm)
                 .first::<i64>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .map(|t| {
                     SystemTime::UNIX_EPOCH
                         .checked_add(Duration::from_secs(t as u64))
@@ -94,7 +102,10 @@ impl<'a> GetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
             scabbard_service::table
                 .filter(scabbard_service::service_id.eq(format!("{}", service_id)))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
                         "Failed to get scabbard alarm, service does not exist",
@@ -109,7 +120,10 @@ impl<'a> GetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
                 )
                 .select(scabbard_alarm::alarm)
                 .first::<i64>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .map(|t| {
                     SystemTime::UNIX_EPOCH
                         .checked_add(Duration::from_secs(t as u64))

@@ -27,6 +27,8 @@ use crate::store::AlarmType;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "list_ready_services";
+
 pub(in crate::store::scabbard_store::diesel) trait ListReadyServicesOperation {
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError>;
 }
@@ -42,7 +44,10 @@ where
             let finalized_services: Vec<String> = scabbard_service::table
                 .filter(scabbard_service::status.eq("FINALIZED"))
                 .select(scabbard_service::service_id)
-                .load::<String>(self.conn)?
+                .load::<String>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .into_iter()
                 .collect();
 
@@ -59,7 +64,10 @@ where
                         .and(scabbard_alarm::alarm.le(current_time)),
                 )
                 .select(scabbard_alarm::service_id)
-                .load::<String>(self.conn)?
+                .load::<String>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .into_iter()
                 .collect::<Vec<String>>();
 
@@ -69,7 +77,13 @@ where
                     .filter(consensus_2pc_action::service_id.eq_any(&finalized_services))
                     .filter(consensus_2pc_action::executed_at.is_null())
                     .select(consensus_2pc_action::service_id)
-                    .load::<String>(self.conn)?
+                    .load::<String>(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?
                     .into_iter()
                     .collect::<Vec<String>>(),
             );
@@ -80,7 +94,13 @@ where
                     .filter(consensus_2pc_event::service_id.eq_any(&finalized_services))
                     .filter(consensus_2pc_event::executed_at.is_null())
                     .select(consensus_2pc_event::service_id)
-                    .load::<String>(self.conn)?
+                    .load::<String>(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?
                     .into_iter()
                     .collect::<Vec<String>>(),
             );

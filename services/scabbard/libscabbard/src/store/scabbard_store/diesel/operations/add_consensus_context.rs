@@ -30,6 +30,8 @@ use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "add_consensus_context";
+
 pub(in crate::store::scabbard_store::diesel) trait AddContextOperation {
     fn add_consensus_context(
         &self,
@@ -54,11 +56,23 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
                     insert_into(consensus_2pc_context::table)
                         .values(vec![new_context])
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
 
                     insert_into(consensus_2pc_context_participant::table)
                         .values(participants)
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
                 }
             }
             Ok(())
@@ -82,11 +96,23 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, PgConnection> {
 
                     insert_into(consensus_2pc_context::table)
                         .values(vec![new_context])
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
 
                     insert_into(consensus_2pc_context_participant::table)
                         .values(participants)
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
                 }
             }
             Ok(())

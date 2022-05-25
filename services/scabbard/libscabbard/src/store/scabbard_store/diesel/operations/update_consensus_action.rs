@@ -27,6 +27,8 @@ use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "update_consensus_action";
+
 pub(in crate::store::scabbard_store::diesel) trait UpdateActionOperation {
     fn update_consensus_action(
         &self,
@@ -53,7 +55,10 @@ where
             consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
                         "Context with service ID {} does not exist",
@@ -81,8 +86,9 @@ where
                 )
                 .set(consensus_2pc_action::executed_at.eq(Some(update_executed_at)))
                 .execute(self.conn)
-                .map(|_| ())
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
             Ok(())
         })
     }

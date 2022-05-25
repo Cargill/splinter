@@ -27,6 +27,8 @@ use crate::store::scabbard_store::{
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "get_service";
+
 pub(in crate::store::scabbard_store::diesel) trait GetServiceOperation {
     fn get_service(
         &self,
@@ -47,8 +49,10 @@ where
             let service_model: ScabbardServiceModel = match scabbard_service::table
                 .filter(scabbard_service::service_id.eq(&service_id.to_string()))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
-            {
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })? {
                 Some(service) => service,
                 None => return Ok(None),
             };
@@ -56,7 +60,10 @@ where
             let service_peers: Vec<ServiceId> = scabbard_peer::table
                 .filter(scabbard_peer::service_id.eq(&service_id.to_string()))
                 .order(scabbard_peer::peer_service_id.asc())
-                .load(self.conn)?
+                .load(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .into_iter()
                 .map(|peer: ScabbardPeerModel| ServiceId::new(peer.peer_service_id))
                 .collect::<Result<Vec<_>, InvalidArgumentError>>()

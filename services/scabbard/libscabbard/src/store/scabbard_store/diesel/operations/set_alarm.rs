@@ -32,6 +32,8 @@ use crate::store::AlarmType;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "set_alarm";
+
 pub(in crate::store::scabbard_store::diesel) trait SetAlarmOperation {
     fn set_alarm(
         &self,
@@ -54,7 +56,10 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
             scabbard_service::table
                 .filter(scabbard_service::service_id.eq(format!("{}", service_id)))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
                         "Failed to set scabbard alarm, service does not exist",
@@ -68,7 +73,10 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
                 )
                 .first::<ScabbardAlarmModel>(self.conn)
-                .optional()?;
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             let new_alarm = ScabbardAlarmModel {
                 service_id: format!("{}", service_id),
@@ -85,12 +93,18 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                             .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
                     ),
                 )
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
             }
 
             insert_into(scabbard_alarm::table)
                 .values(vec![new_alarm])
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             Ok(())
         })
@@ -110,7 +124,10 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
             scabbard_service::table
                 .filter(scabbard_service::service_id.eq(format!("{}", service_id)))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
                         "Failed to set scabbard alarm, service does not exist",
@@ -124,7 +141,10 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
                         .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
                 )
                 .first::<ScabbardAlarmModel>(self.conn)
-                .optional()?;
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             let new_alarm = ScabbardAlarmModel {
                 service_id: format!("{}", service_id),
@@ -141,12 +161,18 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
                             .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
                     ),
                 )
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
             }
 
             insert_into(scabbard_alarm::table)
                 .values(vec![new_alarm])
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             Ok(())
         })

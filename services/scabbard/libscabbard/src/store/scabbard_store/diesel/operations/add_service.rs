@@ -28,6 +28,8 @@ use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "add_service";
+
 pub(in crate::store::scabbard_store::diesel) trait AddServiceOperation {
     fn add_service(&self, service: ScabbardService) -> Result<(), ScabbardStoreError>;
 }
@@ -40,7 +42,10 @@ impl<'a> AddServiceOperation for ScabbardStoreOperations<'a, SqliteConnection> {
             if scabbard_service::table
                 .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .is_some()
             {
                 return Err(ScabbardStoreError::ConstraintViolation(
@@ -50,12 +55,21 @@ impl<'a> AddServiceOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
             insert_into(scabbard_service::table)
                 .values(vec![ScabbardServiceModel::from(&service)])
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             if !service.peers().is_empty() {
                 insert_into(scabbard_peer::table)
                     .values(Vec::<ScabbardPeerModel>::from(&service))
-                    .execute(self.conn)?;
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
             }
             Ok(())
         })
@@ -70,7 +84,10 @@ impl<'a> AddServiceOperation for ScabbardStoreOperations<'a, PgConnection> {
             if scabbard_service::table
                 .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
                 .first::<ScabbardServiceModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .is_some()
             {
                 return Err(ScabbardStoreError::ConstraintViolation(
@@ -80,12 +97,21 @@ impl<'a> AddServiceOperation for ScabbardStoreOperations<'a, PgConnection> {
 
             insert_into(scabbard_service::table)
                 .values(vec![ScabbardServiceModel::from(&service)])
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             if !service.peers().is_empty() {
                 insert_into(scabbard_peer::table)
                     .values(Vec::<ScabbardPeerModel>::from(&service))
-                    .execute(self.conn)?;
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
             }
             Ok(())
         })

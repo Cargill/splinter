@@ -40,6 +40,8 @@ use crate::store::scabbard_store::{
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "list_consensus_actions";
+
 pub(in crate::store::scabbard_store::diesel) trait ListActionsOperation {
     fn list_consensus_actions(
         &self,
@@ -64,7 +66,10 @@ where
             consensus_2pc_context::table
                 .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                 .first::<Consensus2pcContextModel>(self.conn)
-                .optional()?
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
                         "Context with service ID {} and does not exist",
@@ -80,7 +85,10 @@ where
                 )
                 .order(consensus_2pc_action::position.desc())
                 .select((consensus_2pc_action::id, consensus_2pc_action::position))
-                .load::<(i64, i32)>(self.conn)?;
+                .load::<(i64, i32)>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             let action_ids = all_actions
                 .clone()
@@ -93,15 +101,24 @@ where
 
             let update_context_actions = consensus_2pc_update_context_action::table
                 .filter(consensus_2pc_update_context_action::action_id.eq_any(&action_ids))
-                .load::<Consensus2pcUpdateContextActionModel>(self.conn)?;
+                .load::<Consensus2pcUpdateContextActionModel>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             let send_message_actions = consensus_2pc_send_message_action::table
                 .filter(consensus_2pc_send_message_action::action_id.eq_any(&action_ids))
-                .load::<Consensus2pcSendMessageActionModel>(self.conn)?;
+                .load::<Consensus2pcSendMessageActionModel>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             let notification_actions = consensus_2pc_notification_action::table
                 .filter(consensus_2pc_notification_action::action_id.eq_any(&action_ids))
-                .load::<Consensus2pcNotificationModel>(self.conn)?;
+                .load::<Consensus2pcNotificationModel>(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
             for update_context in update_context_actions {
                 let position = actions_map.get(&update_context.action_id).ok_or_else(|| {
@@ -119,7 +136,13 @@ where
                         consensus_2pc_update_context_action_participant::process,
                         consensus_2pc_update_context_action_participant::vote,
                     ))
-                    .load::<(String, Option<String>)>(self.conn)?;
+                    .load::<(String, Option<String>)>(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
 
                 let mut final_participants = Vec::new();
 

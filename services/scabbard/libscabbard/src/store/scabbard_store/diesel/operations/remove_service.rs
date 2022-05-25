@@ -27,6 +27,8 @@ use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "remove_service";
+
 pub(in crate::store::scabbard_store::diesel) trait RemoveServiceOperation {
     fn remove_service(
         &self,
@@ -45,16 +47,32 @@ impl<'a> RemoveServiceOperation for ScabbardStoreOperations<'a, SqliteConnection
             self.get_service(service_id).and_then(|_| {
                 let service_id = service_id.to_string();
                 // delete service and peers
-                delete(scabbard_service::table.find(&service_id)).execute(self.conn)?;
+                delete(scabbard_service::table.find(&service_id))
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
                 delete(scabbard_peer::table.filter(scabbard_peer::service_id.eq(&service_id)))
-                    .execute(self.conn)?;
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
 
                 // delete all commit history for the service
                 delete(
                     scabbard_v3_commit_history::table
                         .filter(scabbard_v3_commit_history::service_id.eq(&service_id)),
                 )
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
                 // delete all consensus state associated with the services
                 //
@@ -63,7 +81,10 @@ impl<'a> RemoveServiceOperation for ScabbardStoreOperations<'a, SqliteConnection
                     consensus_2pc_context::table
                         .filter(consensus_2pc_context::service_id.eq(&service_id)),
                 )
-                .execute(self.conn)?;
+                .execute(self.conn)
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
 
                 Ok(())
             })
@@ -83,16 +104,35 @@ impl<'a> RemoveServiceOperation for ScabbardStoreOperations<'a, PgConnection> {
                 self.get_service(service_id).and_then(|_| {
                     let service_id = service_id.to_string();
                     // delete service and peers
-                    delete(scabbard_service::table.find(&service_id)).execute(self.conn)?;
+                    delete(scabbard_service::table.find(&service_id))
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
                     delete(scabbard_peer::table.filter(scabbard_peer::service_id.eq(&service_id)))
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
 
                     // delete all commit history for the service
                     delete(
                         scabbard_v3_commit_history::table
                             .filter(scabbard_v3_commit_history::service_id.eq(&service_id)),
                     )
-                    .execute(self.conn)?;
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
 
                     // delete all consensus state associated with the services
                     //
@@ -101,7 +141,13 @@ impl<'a> RemoveServiceOperation for ScabbardStoreOperations<'a, PgConnection> {
                         consensus_2pc_context::table
                             .filter(consensus_2pc_context::service_id.eq(&service_id)),
                     )
-                    .execute(self.conn)?;
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
 
                     Ok(())
                 })

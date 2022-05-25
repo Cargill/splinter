@@ -55,6 +55,8 @@ impl fmt::Display for ConstraintViolationType {
 pub struct ConstraintViolationError {
     violation_type: ConstraintViolationType,
     source: Option<Box<dyn error::Error>>,
+    store: Option<String>,
+    operation: Option<String>,
 }
 
 impl ConstraintViolationError {
@@ -77,6 +79,8 @@ impl ConstraintViolationError {
         Self {
             violation_type,
             source: None,
+            store: None,
+            operation: None,
         }
     }
 
@@ -104,6 +108,43 @@ impl ConstraintViolationError {
         Self {
             violation_type,
             source: Some(source),
+            store: None,
+            operation: None,
+        }
+    }
+
+    /// Constructs a new `ConstraintViolationError` from a specified source error and violation
+    /// type with store and operation.
+    ///
+    /// The implementation of `std::fmt::Display` for this error will  pass through the
+    /// display of the source message prefixed with the store and operation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use splinter::error::{ ConstraintViolationError, ConstraintViolationType };
+    ///
+    /// let db_err = std::io::Error::new(std::io::ErrorKind::Other, "db error");
+    /// let constraint_violation_error =
+    ///     ConstraintViolationError::from_source_with_violation_type_and_store(
+    ///          ConstraintViolationType::Unique,
+    ///          Box::new(db_err),
+    ///         "DbStore".to_string(),
+    ///         "db_operation".to_string()
+    /// );
+    /// assert_eq!(format!("{}", constraint_violation_error), "DbStore db_operation: db error");
+    /// ```
+    pub fn from_source_with_violation_type_and_store(
+        violation_type: ConstraintViolationType,
+        source: Box<dyn error::Error>,
+        store: String,
+        operation: String,
+    ) -> Self {
+        Self {
+            violation_type,
+            source: Some(source),
+            store: Some(store),
+            operation: Some(operation),
         }
     }
 
@@ -121,10 +162,22 @@ impl error::Error for ConstraintViolationError {
 
 impl fmt::Display for ConstraintViolationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.source {
-            Some(s) => write!(f, "{}", s),
-            None => write!(f, "{} constraint violated", &self.violation_type),
+        let mut format_string = String::new();
+        if let Some(store) = &self.store {
+            format_string += &format!("{} ", store);
         }
+
+        if let Some(operation) = &self.operation {
+            format_string += &format!("{}: ", operation);
+        }
+
+        if let Some(source) = &self.source {
+            format_string += &source.to_string();
+        } else {
+            format_string += &format!("{} constraint violated", self.violation_type);
+        }
+
+        write!(f, "{}", format_string)
     }
 }
 
@@ -136,6 +189,14 @@ impl fmt::Debug for ConstraintViolationError {
 
         if let Some(source) = &self.source {
             debug_struct.field("source", source);
+        }
+
+        if let Some(store) = &self.store {
+            debug_struct.field("store", store);
+        }
+
+        if let Some(operation) = &self.operation {
+            debug_struct.field("operation", operation);
         }
 
         debug_struct.finish()
@@ -190,6 +251,24 @@ pub mod tests {
             Box::new(ConstraintViolationError::with_violation_type(
                 ConstraintViolationType::Unique,
             )),
+        );
+        assert_eq!(format!("{}", err), disp);
+    }
+
+    /// Tests that error constructed with
+    /// `ConstraintViolationError::from_source_with_violation_type_and_store`
+    /// return a display string which specifies the source's display string prefixed by store
+    /// and operation.
+    #[test]
+    fn test_display_from_source_with_violation_type_and_store() {
+        let disp = "TestStore test_op: Unique constraint violated";
+        let err = ConstraintViolationError::from_source_with_violation_type_and_store(
+            ConstraintViolationType::Unique,
+            Box::new(ConstraintViolationError::with_violation_type(
+                ConstraintViolationType::Unique,
+            )),
+            "TestStore".to_string(),
+            "test_op".to_string(),
         );
         assert_eq!(format!("{}", err), disp);
     }

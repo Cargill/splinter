@@ -31,6 +31,8 @@ use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
 
+const OPERATION_NAME: &str = "update_consensus_context";
+
 pub(in crate::store::scabbard_store::diesel) trait UpdateContextAction {
     fn update_consensus_context(
         &self,
@@ -53,7 +55,13 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                     consensus_2pc_context::table
                         .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                         .first::<Consensus2pcContextModel>(self.conn)
-                        .optional()?
+                        .optional()
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?
                         .ok_or_else(|| {
                             ScabbardStoreError::InvalidState(InvalidStateError::with_message(
                                 format!("Context with service ID {} does not exist", service_id,),
@@ -78,7 +86,12 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                                 .eq(update_context.decision_timeout_start),
                         ))
                         .execute(self.conn)
-                        .map(|_| ())?;
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
 
                     let updated_participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
@@ -86,11 +99,23 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                     delete(consensus_2pc_context_participant::table.filter(
                         consensus_2pc_context_participant::service_id.eq(format!("{}", service_id)),
                     ))
-                    .execute(self.conn)?;
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
 
                     insert_into(consensus_2pc_context_participant::table)
                         .values(updated_participants)
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
 
                     Ok(())
                 }
@@ -113,7 +138,13 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                     consensus_2pc_context::table
                         .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
                         .first::<Consensus2pcContextModel>(self.conn)
-                        .optional()?
+                        .optional()
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?
                         .ok_or_else(|| {
                             ScabbardStoreError::InvalidState(InvalidStateError::with_message(
                                 format!("Context with service ID {} does not exist", service_id,),
@@ -138,7 +169,12 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                                 .eq(update_context.decision_timeout_start),
                         ))
                         .execute(self.conn)
-                        .map(|_| ())?;
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
 
                     let updated_participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
@@ -146,11 +182,23 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                     delete(consensus_2pc_context_participant::table.filter(
                         consensus_2pc_context_participant::service_id.eq(format!("{}", service_id)),
                     ))
-                    .execute(self.conn)?;
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?;
 
                     insert_into(consensus_2pc_context_participant::table)
                         .values(updated_participants)
-                        .execute(self.conn)?;
+                        .execute(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
 
                     Ok(())
                 }

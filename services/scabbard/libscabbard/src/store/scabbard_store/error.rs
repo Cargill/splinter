@@ -21,6 +21,8 @@ use splinter::error::{
     ConstraintViolationError, InternalError, InvalidStateError, ResourceTemporarilyUnavailableError,
 };
 
+const STORE_NAME: &str = "ScabbardStore";
+
 /// Represents ScabbardStore errors
 #[derive(Debug)]
 pub enum ScabbardStoreError {
@@ -33,6 +35,46 @@ pub enum ScabbardStoreError {
     /// Represents when an operation cannot be completed because the state of the underlying
     /// struct is inconsistent.
     InvalidState(InvalidStateError),
+}
+
+#[cfg(feature = "diesel")]
+impl ScabbardStoreError {
+    pub fn from_source_with_operation(err: diesel::result::Error, operation: String) -> Self {
+        match err {
+            diesel::result::Error::DatabaseError(db_err_kind, _) => match db_err_kind {
+                diesel::result::DatabaseErrorKind::UniqueViolation => {
+                    ScabbardStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type_and_store(
+                            ConstraintViolationType::Unique,
+                            Box::new(err),
+                            STORE_NAME.to_string(),
+                            operation,
+                        ),
+                    )
+                }
+                diesel::result::DatabaseErrorKind::ForeignKeyViolation => {
+                    ScabbardStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type_and_store(
+                            ConstraintViolationType::ForeignKey,
+                            Box::new(err),
+                            STORE_NAME.to_string(),
+                            operation,
+                        ),
+                    )
+                }
+                _ => ScabbardStoreError::Internal(InternalError::from_source(Box::new(err))),
+            },
+            diesel::NotFound => ScabbardStoreError::ConstraintViolation(
+                ConstraintViolationError::from_source_with_violation_type_and_store(
+                    ConstraintViolationType::NotFound,
+                    Box::new(err),
+                    STORE_NAME.to_string(),
+                    operation,
+                ),
+            ),
+            _ => ScabbardStoreError::Internal(InternalError::from_source(Box::new(err))),
+        }
+    }
 }
 
 impl Error for ScabbardStoreError {
