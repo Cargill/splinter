@@ -15,7 +15,7 @@
 mod builder;
 mod update_builder;
 
-use crate::rest_api::auth::authorization::rbac::store::Identity;
+use crate::rbac::store::Identity;
 
 pub use builder::AssignmentBuilder;
 pub use update_builder::AssignmentUpdateBuilder;

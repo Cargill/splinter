@@ -16,23 +16,24 @@ use std::convert::TryInto;
 
 use diesel::prelude::*;
 
-use crate::rest_api::auth::authorization::rbac::store::{
+use crate::rbac::store::{
     diesel::{
         models::{AssignmentModel, IdentityModel, IdentityModelType, IdentityModelTypeMapping},
         schema::rbac_identities,
     },
-    Assignment, RoleBasedAuthorizationStoreError,
+    Assignment, Identity, RoleBasedAuthorizationStoreError,
 };
 
 use super::RoleBasedAuthorizationStoreOperations;
 
-pub trait RoleBasedAuthorizationStoreListAssignments {
-    fn list_assignments(
+pub trait RoleBasedAuthorizationStoreGetAssignment {
+    fn get_assignment(
         &self,
-    ) -> Result<Box<dyn ExactSizeIterator<Item = Assignment>>, RoleBasedAuthorizationStoreError>;
+        identity: &Identity,
+    ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError>;
 }
 
-impl<'a, C> RoleBasedAuthorizationStoreListAssignments
+impl<'a, C> RoleBasedAuthorizationStoreGetAssignment
     for RoleBasedAuthorizationStoreOperations<'a, C>
 where
     C: diesel::Connection,
@@ -41,27 +42,30 @@ where
     <C as diesel::Connection>::Backend: diesel::types::HasSqlType<IdentityModelTypeMapping>,
     IdentityModelType: diesel::deserialize::FromSql<IdentityModelTypeMapping, C::Backend>,
 {
-    fn list_assignments(
+    fn get_assignment(
         &self,
-    ) -> Result<Box<dyn ExactSizeIterator<Item = Assignment>>, RoleBasedAuthorizationStoreError>
-    {
-        self.conn
-            .transaction::<Box<dyn ExactSizeIterator<Item = Assignment>>, _, _>(|| {
-                let identities = rbac_identities::table.load::<IdentityModel>(self.conn)?;
+        identity: &Identity,
+    ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError> {
+        let search_identity = match identity {
+            Identity::Key(ref key) => key,
+            Identity::User(ref user_id) => user_id,
+        };
+        self.conn.transaction(|| {
+            let identities = rbac_identities::table
+                .filter(rbac_identities::identity.eq(search_identity))
+                .load::<IdentityModel>(self.conn)?;
 
-                let assignments = AssignmentModel::belonging_to(&identities)
-                    .load::<AssignmentModel>(self.conn)?
-                    .grouped_by(&identities);
+            let assignments = AssignmentModel::belonging_to(&identities)
+                .load::<AssignmentModel>(self.conn)?
+                .grouped_by(&identities);
 
-                Ok(Box::new(
-                    identities
-                        .into_iter()
-                        .zip(assignments)
-                        .map(|models| models.try_into())
-                        .collect::<Result<Vec<_>, _>>()
-                        .map_err(RoleBasedAuthorizationStoreError::from)?
-                        .into_iter(),
-                ))
-            })
+            identities
+                .into_iter()
+                .zip(assignments)
+                .next()
+                .map(|model| model.try_into())
+                .transpose()
+                .map_err(RoleBasedAuthorizationStoreError::from)
+        })
     }
 }

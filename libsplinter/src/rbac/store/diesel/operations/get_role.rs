@@ -16,7 +16,7 @@ use std::convert::TryInto;
 
 use diesel::prelude::*;
 
-use crate::rest_api::auth::authorization::rbac::store::{
+use crate::rbac::store::{
     diesel::{
         models::{RoleModel, RolePermissionModel},
         schema::rbac_roles,

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use crate::error::InvalidStateError;
-use crate::rest_api::auth::authorization::rbac::store::Assignment;
-use crate::rest_api::auth::authorization::rbac::store::Identity;
+use crate::rbac::store::Assignment;
+use crate::rbac::store::Identity;
 
 // Constructs new Assignments.
 #[derive(Default)]

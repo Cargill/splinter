@@ -57,7 +57,7 @@ pub trait StoreFactory {
     #[cfg(feature = "authorization-handler-rbac")]
     fn get_role_based_authorization_store(
         &self,
-    ) -> Box<dyn crate::rest_api::auth::authorization::rbac::store::RoleBasedAuthorizationStore>;
+    ) -> Box<dyn crate::rbac::store::RoleBasedAuthorizationStore>;
 
     #[cfg(feature = "biome-profile")]
     fn get_biome_user_profile_store(&self) -> Box<dyn crate::biome::UserProfileStore>;
