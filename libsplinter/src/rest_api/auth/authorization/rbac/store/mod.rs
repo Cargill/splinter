@@ -53,11 +53,9 @@ impl Role {
 
     /// Convert this role back into a builder, in order to update its values.
     pub fn into_update_builder(self) -> RoleUpdateBuilder {
-        RoleUpdateBuilder {
-            id: self.id,
-            display_name: Some(self.display_name),
-            permissions: self.permissions,
-        }
+        RoleUpdateBuilder::new(self.id)
+            .with_display_name(self.display_name)
+            .with_permissions(self.permissions)
     }
 
     /// Converts this role into it's constituent parts.  These parts are in the tuple:
@@ -150,6 +148,14 @@ pub struct RoleUpdateBuilder {
 }
 
 impl RoleUpdateBuilder {
+    fn new(id: String) -> Self {
+        Self {
+            id,
+            display_name: None,
+            permissions: Vec::new(),
+        }
+    }
+
     /// Updates the display name for the updated role.
     pub fn with_display_name(mut self, display_name: String) -> Self {
         self.display_name = Some(display_name);
