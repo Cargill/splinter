@@ -18,9 +18,9 @@ use crate::error::InternalError;
 
 use super::{FullyQualifiedServiceId, IntoMessageSender, MessageConverter, MessageSender};
 
-/// Handles an inbound messages for a service implementation.
+/// Handles an inbound message for a service implementation.
 ///
-/// A `MessageHandler` is run when there is work to be performed from an incoming messages
+/// A `MessageHandler` is run when there is work to be performed from an incoming message
 /// and together with `TimerHandler`, will contain most of the logic of the service. When run, a
 /// `MessageSender` is provided a sender, the sender and recipient of the message and the message.
 pub trait MessageHandler {
@@ -32,7 +32,7 @@ pub trait MessageHandler {
     ///
     /// * `sender` - The sender for any messages that need to be sent
     /// * `to_service` - The service the message is for
-    /// * `from_service` - The service that send the message
+    /// * `from_service` - The service that sent the message
     /// * `message` - The message to be handled
     fn handle_message(
         &mut self,
