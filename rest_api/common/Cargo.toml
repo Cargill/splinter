@@ -23,6 +23,9 @@ description = """\
 """
 
 [dependencies]
+log =  "0.4"
+rand = "0.8"
+jsonwebtoken = { version = "7.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", optional = true }
 splinter = { path = "../../libsplinter" }
@@ -38,6 +41,8 @@ stable = [
     "default",
     # The following features are stable:
     "authorization",
+    "oauth",
+    "rbac"
 ]
 
 experimental = [
@@ -47,5 +52,7 @@ experimental = [
 ]
 
 authorization = ["splinter/authorization"]
+oauth = ["splinter/oauth"]
+rbac = ["splinter/authorization-handler-rbac"]
 scabbard-service = ["scabbard", "splinter/rest-api", "splinter/rest-api-actix-web-1", "serde_json"]
 service-endpoint = []

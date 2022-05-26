@@ -48,7 +48,9 @@ stable = [
     "admin-service",
     "authorization",
     "biome",
+    "biome-credentials",
     "biome-key-management",
+    "oauth",
     "registry",
     "rest-api",
     "scabbard-service",
@@ -69,8 +71,10 @@ admin-service = [
 ]
 authorization = ["splinter/authorization", "splinter-rest-api-common/authorization"]
 biome = ["splinter/biome", "serde"]
+biome-credentials = ["biome"]
 biome-key-management = ["biome", "splinter/biome-key-management"]
 registry = ["splinter/registry"]
+oauth = ["log"]
 rest-api = ["splinter/rest-api"]
 scabbard-service = ["scabbard/splinter-service", "scabbard/rest-api", "transact", "log"]
 service = ["splinter/runtime-service", "serde_json", "log"]
