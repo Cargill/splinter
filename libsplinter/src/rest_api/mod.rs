@@ -70,6 +70,7 @@
 #[cfg(feature = "rest-api-actix-web-1")]
 pub mod actix_web_1;
 pub mod auth;
+mod bind_config;
 #[cfg(feature = "rest-api-cors")]
 pub mod cors;
 mod errors;
@@ -85,6 +86,7 @@ use percent_encoding::{AsciiSet, CONTROLS};
 #[cfg(all(feature = "oauth", feature = "rest-api-actix-web-1"))]
 use crate::oauth::rest_api::OAuthResourceProvider;
 
+pub use bind_config::BindConfig;
 pub use errors::{RequestError, RestApiServerError};
 #[cfg(feature = "oauth")]
 pub use oauth_config::OAuthConfig;
@@ -122,30 +124,6 @@ const QUERY_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b']')
     .add(b':')
     .add(b',');
-
-/// Bind configuration for the REST API.
-#[derive(Clone)]
-pub enum BindConfig {
-    #[cfg(feature = "https-bind")]
-    /// A secure HTTPS binding, including certificate and key paths.
-    Https {
-        bind: String,
-        cert_path: String,
-        key_path: String,
-    },
-    /// A insecure HTTP binding.
-    Http(String),
-}
-
-impl std::fmt::Display for BindConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            #[cfg(feature = "https-bind")]
-            BindConfig::Https { bind, .. } => write!(f, "{}", bind),
-            BindConfig::Http(bind) => write!(f, "{}", bind),
-        }
-    }
-}
 
 pub fn percent_encode_filter_query(input: &str) -> String {
     percent_encoding::utf8_percent_encode(input, QUERY_ENCODE_SET).to_string()
