@@ -38,12 +38,4 @@ pub trait CommitHashStore: Sync + Send {
     ///
     /// * `current_commit_hash` - the new "current" commit hash.
     fn set_current_commit_hash(&self, commit_hash: &str) -> Result<(), CommitHashStoreError>;
-
-    fn clone_boxed(&self) -> Box<dyn CommitHashStore>;
-}
-
-impl Clone for Box<dyn CommitHashStore> {
-    fn clone(&self) -> Self {
-        (*self).clone_boxed()
-    }
 }
