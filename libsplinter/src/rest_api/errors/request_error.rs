@@ -12,8 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod request_error;
-mod rest_api_server_error;
+use std::error::Error;
+use std::fmt;
 
-pub use request_error::RequestError;
-pub use rest_api_server_error::RestApiServerError;
+#[derive(Debug)]
+pub enum RequestError {
+    MissingHeader(String),
+    InvalidHeaderValue(String),
+}
+
+impl Error for RequestError {}
+
+impl fmt::Display for RequestError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RequestError::MissingHeader(msg) => f.write_str(msg),
+            RequestError::InvalidHeaderValue(msg) => f.write_str(msg),
+        }
+    }
+}
