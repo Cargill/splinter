@@ -12,68 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod rest_api_server_error;
+
 use std::error::Error;
 use std::fmt;
 
-use crate::error::{InternalError, InvalidStateError};
-#[cfg(feature = "oauth")]
-use crate::oauth::OAuthClientBuildError;
-
-/// Error module for `rest_api`.
-#[derive(Debug)]
-pub enum RestApiServerError {
-    BindError(String),
-    StartUpError(String),
-    MissingField(String),
-    StdError(std::io::Error),
-    InvalidStateError(InvalidStateError),
-    InternalError(InternalError),
-}
-
-impl From<std::io::Error> for RestApiServerError {
-    fn from(err: std::io::Error) -> RestApiServerError {
-        RestApiServerError::StdError(err)
-    }
-}
-
-#[cfg(feature = "oauth")]
-impl From<OAuthClientBuildError> for RestApiServerError {
-    fn from(err: OAuthClientBuildError) -> Self {
-        match err {
-            OAuthClientBuildError::InvalidStateError(err) => Self::InvalidStateError(err),
-            OAuthClientBuildError::InternalError(err) => Self::InternalError(err),
-            _ => Self::InternalError(InternalError::from_source(err.into())),
-        }
-    }
-}
-
-impl Error for RestApiServerError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            RestApiServerError::BindError(_) => None,
-            RestApiServerError::StartUpError(_) => None,
-            RestApiServerError::StdError(err) => Some(err),
-            RestApiServerError::MissingField(_) => None,
-            RestApiServerError::InvalidStateError(err) => Some(err),
-            RestApiServerError::InternalError(err) => Some(err),
-        }
-    }
-}
-
-impl fmt::Display for RestApiServerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            RestApiServerError::BindError(e) => write!(f, "Bind Error: {}", e),
-            RestApiServerError::StartUpError(e) => write!(f, "Start-up Error: {}", e),
-            RestApiServerError::StdError(e) => write!(f, "Std Error: {}", e),
-            RestApiServerError::MissingField(field) => {
-                write!(f, "Missing required field: {}", field)
-            }
-            RestApiServerError::InvalidStateError(e) => write!(f, "{}", e),
-            RestApiServerError::InternalError(e) => write!(f, "{}", e),
-        }
-    }
-}
+pub use rest_api_server_error::RestApiServerError;
 
 #[derive(Debug)]
 pub enum RequestError {
@@ -89,12 +33,5 @@ impl fmt::Display for RequestError {
             RequestError::MissingHeader(msg) => f.write_str(msg),
             RequestError::InvalidHeaderValue(msg) => f.write_str(msg),
         }
-    }
-}
-
-#[cfg(feature = "https-bind")]
-impl From<openssl::error::ErrorStack> for RestApiServerError {
-    fn from(err: openssl::error::ErrorStack) -> Self {
-        RestApiServerError::InternalError(InternalError::from_source(Box::new(err)))
     }
 }
