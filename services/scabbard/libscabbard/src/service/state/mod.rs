@@ -63,7 +63,7 @@ pub type StateIter = Box<dyn Iterator<Item = Result<(String, Vec<u8>), ScabbardS
 
 pub struct ScabbardState {
     merkle_state: merkle_state::MerkleState,
-    commit_hash_store: Box<dyn CommitHashStore>,
+    commit_hash_store: Arc<dyn CommitHashStore + Sync + Send>,
     context_manager: ContextManager,
     executor: Option<Executor>,
     current_state_root: String,
@@ -80,7 +80,7 @@ pub struct ScabbardState {
 impl ScabbardState {
     pub fn new(
         merkle_state: merkle_state::MerkleState,
-        commit_hash_store: Box<dyn CommitHashStore>,
+        commit_hash_store: Arc<dyn CommitHashStore + Sync + Send>,
         receipt_store: Arc<dyn ReceiptStore>,
         #[cfg(feature = "metrics")] service_id: String,
         #[cfg(feature = "metrics")] circuit_id: String,
@@ -1151,7 +1151,7 @@ mod tests {
 
         let mut state = ScabbardState::new(
             merkle_state,
-            Box::new(commit_hash_store),
+            Arc::new(commit_hash_store),
             receipt_store,
             #[cfg(feature = "metrics")]
             "svc0".to_string(),
@@ -1228,7 +1228,7 @@ mod tests {
 
         let mut state = ScabbardState::new(
             merkle_state,
-            Box::new(commit_hash_store),
+            Arc::new(commit_hash_store),
             receipt_store,
             #[cfg(feature = "metrics")]
             "svc0".to_string(),
