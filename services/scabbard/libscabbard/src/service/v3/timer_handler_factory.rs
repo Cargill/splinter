@@ -14,8 +14,6 @@
 
 use std::sync::Arc;
 
-use augrim::two_phase_commit::TwoPhaseCommitAlgorithm;
-use augrim::Algorithm;
 use splinter::error::{InternalError, InvalidArgumentError};
 use splinter::service::{MessageSenderFactory, TimerHandler, TimerHandlerFactory};
 use splinter::store::command::StoreCommandExecutor;
@@ -24,10 +22,7 @@ use crate::store::{PooledScabbardStoreFactory, ScabbardStoreFactory};
 
 use super::ScabbardMessageByteConverter;
 use super::ScabbardTimerHandler;
-use super::{
-    CommandNotifyObserver, ConsensusRunnerBuilder, StoreContextSource,
-    StoreUnprocessedActionSource, StoreUnprocessedEventSource,
-};
+use super::{CommandNotifyObserver, ConsensusRunnerBuilder};
 
 #[derive(Clone)]
 pub struct ScabbardTimerHandlerFactory<E>
@@ -51,28 +46,14 @@ impl<E: StoreCommandExecutor + 'static> TimerHandlerFactory for ScabbardTimerHan
 
     fn new_handler(&self) -> Result<Box<dyn TimerHandler<Message = Self::Message>>, InternalError> {
         let consensus_runner = ConsensusRunnerBuilder::new()
-            .with_scabbard_store_factory(self.store_factory.clone())
-            .with_unprocessed_action_source(Box::new(StoreUnprocessedActionSource::new(Box::new(
-                self.pooled_store_factory.new_store(),
-            ))))
-            .with_unprocessed_event_source(Box::new(StoreUnprocessedEventSource::new(Box::new(
-                self.pooled_store_factory.new_store(),
-            ))))
             .with_store_command_executor(self.store_command_executor.clone())
-            .with_context_source(Box::new(StoreContextSource::new(Box::new(
-                self.pooled_store_factory.new_store(),
-            ))))
+            .with_scabbard_store_factory(self.store_factory.clone())
+            .with_pooled_scabbard_store_factory(self.pooled_store_factory.clone().into())
             .with_message_sender_factory(self.message_sender_factory.clone())
             .with_notify_observer(Box::new(CommandNotifyObserver::new(
                 self.store_factory.clone(),
                 self.pooled_store_factory.new_store(),
             )))
-            .with_algorithm(
-                "two-phase-commit",
-                Box::new(
-                    TwoPhaseCommitAlgorithm::new(augrim::SystemTimeFactory::new()).into_algorithm(),
-                ),
-            )
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 

@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod action_source;
 mod builder;
 mod consensus_store_command_factory;
-mod context_source;
-mod event_source;
-mod store_sources;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -30,26 +26,19 @@ use splinter::store::command::StoreCommandExecutor;
 use crate::store::ConsensusAction;
 use crate::store::ConsensusContext;
 use crate::store::ConsensusEvent;
+use crate::store::PooledScabbardStoreFactory;
 
 use super::ConsensusActionRunner;
 
-pub use action_source::UnprocessedActionSource;
 pub use builder::ConsensusRunnerBuilder;
 use consensus_store_command_factory::ConsensusStoreCommandFactory;
-pub use context_source::ContextSource;
-pub use event_source::UnprocessedEventSource;
-pub use store_sources::{
-    StoreContextSource, StoreUnprocessedActionSource, StoreUnprocessedEventSource,
-};
 
 pub struct ConsensusRunner<E>
 where
     E: StoreCommandExecutor + 'static,
 {
-    unprocessed_action_source: Box<dyn UnprocessedActionSource>,
+    pooled_scabbard_store_factory: Arc<dyn PooledScabbardStoreFactory>,
     action_runner: ConsensusActionRunner<<E as StoreCommandExecutor>::Context>,
-    unprocessed_event_source: Box<dyn UnprocessedEventSource>,
-    context_source: Box<dyn ContextSource>,
     algorithms: HashMap<
         String,
         Box<
@@ -72,9 +61,11 @@ where
 {
     pub fn run(&self, service_id: &FullyQualifiedServiceId) -> Result<(), InternalError> {
         loop {
-            let unprocessed_actions = self
-                .unprocessed_action_source
-                .get_unprocessed_actions(service_id)?;
+            let store = self.pooled_scabbard_store_factory.new_store();
+
+            let unprocessed_actions = store
+                .list_consensus_actions(service_id)
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
             if !unprocessed_actions.is_empty() {
                 // run each action and execute the commands before running the next action
@@ -84,7 +75,11 @@ where
                 }
             }
 
-            let unprocessed_event = self.unprocessed_event_source.get_next_event(service_id)?;
+            let unprocessed_event = store
+                .list_consensus_events(service_id)
+                .map_err(|err| InternalError::from_source(Box::new(err)))?
+                .get(0)
+                .cloned();
 
             let mut commands = vec![];
             let event = match unprocessed_event {
@@ -97,13 +92,9 @@ where
 
             let (event_id, event) = event.deconstruct();
 
-            let algorithm = self.algorithms.get(event.algorithm_name()).ok_or_else(|| {
-                InternalError::with_message(format!("{} is not configured", event.algorithm_name()))
-            })?;
-
-            let context = self
-                .context_source
-                .get_context(service_id)?
+            let context = store
+                .get_current_consensus_context(service_id)
+                .map_err(|err| InternalError::from_source(Box::new(err)))?
                 .ok_or_else(|| {
                     InternalError::with_message(format!(
                         "No scabbard context for service {}",
@@ -111,6 +102,9 @@ where
                     ))
                 })?;
 
+            let algorithm = self.algorithms.get(event.algorithm_name()).ok_or_else(|| {
+                InternalError::with_message(format!("{} is not configured", event.algorithm_name()))
+            })?;
             let actions = algorithm
                 .event(event, context)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
@@ -140,7 +134,6 @@ mod tests {
         Connection,
     };
 
-    use augrim::two_phase_commit::TwoPhaseCommitAlgorithm;
     use splinter::service::{MessageSender, MessageSenderFactory, ServiceId};
     use splinter::store::command::StoreCommand;
 
@@ -148,13 +141,9 @@ mod tests {
     use crate::service::v3::CommandNotifyObserver;
     use crate::store::pool::ConnectionPool;
     use crate::store::{
-        AlarmType, ConsensusContext, ConsensusType, ContextBuilder, DieselScabbardStore, Event,
-        Participant, ScabbardServiceBuilder, ScabbardStore, ServiceStatus,
+        AlarmType, ConsensusContext, ConsensusType, ContextBuilder, Event, Participant,
+        PooledSqliteScabbardStoreFactory, ScabbardServiceBuilder, ScabbardStore, ServiceStatus,
         SqliteScabbardStoreFactory, State,
-    };
-
-    use self::store_sources::{
-        StoreContextSource, StoreUnprocessedActionSource, StoreUnprocessedEventSource,
     };
 
     /// Test that the ConsensusRunner properly handles an event and the resulting actions
@@ -171,7 +160,8 @@ mod tests {
     #[test]
     fn test_run_start_event() -> Result<(), Box<dyn std::error::Error>> {
         let pool = create_connection_pool_and_migrate();
-        let scabbard_store = Box::new(DieselScabbardStore::new(pool.clone()));
+        let pooled_scabbard_store_factory =
+            Arc::new(PooledSqliteScabbardStoreFactory::new(pool.clone()));
 
         let service_id = FullyQualifiedServiceId::new_from_string("AAAAA-bbbbb::test")?;
         let peer_service_id = ServiceId::new("bb00").unwrap();
@@ -196,6 +186,7 @@ mod tests {
                 }])
                 .build()?,
         );
+        let scabbard_store = pooled_scabbard_store_factory.new_store();
 
         scabbard_store.add_service(service.clone()).unwrap();
 
@@ -220,29 +211,15 @@ mod tests {
 
         let notify_observer = Box::new(CommandNotifyObserver::new(
             store_factory.clone(),
-            Box::new(DieselScabbardStore::new(pool.clone())),
+            pooled_scabbard_store_factory.new_store(),
         ));
 
         let runner = ConsensusRunnerBuilder::new()
+            .with_pooled_scabbard_store_factory(pooled_scabbard_store_factory)
             .with_scabbard_store_factory(store_factory)
-            .with_unprocessed_action_source(Box::new(StoreUnprocessedActionSource::new(Box::new(
-                DieselScabbardStore::new(pool.clone()),
-            ))))
-            .with_unprocessed_event_source(Box::new(StoreUnprocessedEventSource::new(Box::new(
-                DieselScabbardStore::new(pool.clone()),
-            ))))
             .with_store_command_executor(store_command_executor)
-            .with_context_source(Box::new(StoreContextSource::new(Box::new(
-                DieselScabbardStore::new(pool.clone()),
-            ))))
             .with_message_sender_factory(message_sender_factory)
             .with_notify_observer(notify_observer)
-            .with_algorithm(
-                "two-phase-commit",
-                Box::new(
-                    TwoPhaseCommitAlgorithm::new(augrim::SystemTimeFactory::new()).into_algorithm(),
-                ),
-            )
             .build()?;
 
         // runner should handle 1 event(Event::Start), which should result in to actions,

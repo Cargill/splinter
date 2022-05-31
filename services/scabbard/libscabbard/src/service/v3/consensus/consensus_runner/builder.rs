@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use augrim::two_phase_commit::TwoPhaseCommitAlgorithm;
 use augrim::Algorithm;
 use splinter::error::InvalidStateError;
 use splinter::service::MessageSenderFactory;
@@ -25,11 +26,10 @@ use crate::service::v3::consensus::consensus_action_runner::{
 };
 use crate::store::ConsensusAction;
 use crate::store::ConsensusEvent;
-use crate::store::ScabbardStoreFactory;
+use crate::store::{PooledScabbardStoreFactory, ScabbardStoreFactory};
 
 use super::{
     ConsensusActionRunner, ConsensusContext, ConsensusRunner, ConsensusStoreCommandFactory,
-    ContextSource, UnprocessedActionSource, UnprocessedEventSource,
 };
 
 #[derive(Default)]
@@ -38,19 +38,7 @@ where
     E: StoreCommandExecutor,
     <E as StoreCommandExecutor>::Context: Sized,
 {
-    unprocessed_action_source: Option<Box<dyn UnprocessedActionSource>>,
-    unprocessed_event_source: Option<Box<dyn UnprocessedEventSource>>,
-    context_source: Option<Box<dyn ContextSource>>,
-    algorithms: HashMap<
-        String,
-        Box<
-            dyn Algorithm<
-                Event = ConsensusEvent,
-                Action = ConsensusAction,
-                Context = ConsensusContext,
-            >,
-        >,
-    >,
+    pooled_scabbard_store_factory: Option<Arc<dyn PooledScabbardStoreFactory>>,
     scabbard_store_factory:
         Option<Arc<dyn ScabbardStoreFactory<<E as StoreCommandExecutor>::Context>>>,
     store_command_executor: Option<Arc<E>>,
@@ -65,10 +53,7 @@ where
 {
     pub fn new() -> Self {
         Self {
-            unprocessed_action_source: None,
-            unprocessed_event_source: None,
-            context_source: None,
-            algorithms: HashMap::new(),
+            pooled_scabbard_store_factory: None,
             scabbard_store_factory: None,
             store_command_executor: None,
             message_sender_factory: None,
@@ -76,24 +61,11 @@ where
         }
     }
 
-    pub fn with_unprocessed_action_source(
+    pub fn with_pooled_scabbard_store_factory(
         mut self,
-        unprocessed_action_source: Box<dyn UnprocessedActionSource>,
+        factory: Arc<dyn PooledScabbardStoreFactory>,
     ) -> Self {
-        self.unprocessed_action_source = Some(unprocessed_action_source);
-        self
-    }
-
-    pub fn with_unprocessed_event_source(
-        mut self,
-        unprocessed_event_source: Box<dyn UnprocessedEventSource>,
-    ) -> Self {
-        self.unprocessed_event_source = Some(unprocessed_event_source);
-        self
-    }
-
-    pub fn with_context_source(mut self, context_source: Box<dyn ContextSource>) -> Self {
-        self.context_source = Some(context_source);
+        self.pooled_scabbard_store_factory = Some(factory);
         self
     }
 
@@ -107,21 +79,6 @@ where
 
     pub fn with_store_command_executor(mut self, store_command_executor: Arc<E>) -> Self {
         self.store_command_executor = Some(store_command_executor);
-        self
-    }
-
-    pub fn with_algorithm<S: Into<String>>(
-        mut self,
-        algorithm_name: S,
-        algorithm: Box<
-            dyn Algorithm<
-                Event = ConsensusEvent,
-                Action = ConsensusAction,
-                Context = ConsensusContext,
-            >,
-        >,
-    ) -> Self {
-        self.algorithms.insert(algorithm_name.into(), algorithm);
         self
     }
 
@@ -142,17 +99,12 @@ where
     }
 
     pub fn build(self) -> Result<ConsensusRunner<E>, InvalidStateError> {
-        let unprocessed_action_source = self.unprocessed_action_source.ok_or_else(|| {
-            InvalidStateError::with_message("A unprocessed_action_source must be provided".into())
-        })?;
-
-        let unprocessed_event_source = self.unprocessed_event_source.ok_or_else(|| {
-            InvalidStateError::with_message("A unprocessed_event_source must be provided".into())
-        })?;
-
-        let context_source = self.context_source.ok_or_else(|| {
-            InvalidStateError::with_message("A context_source must be provided".into())
-        })?;
+        let pooled_scabbard_store_factory =
+            self.pooled_scabbard_store_factory.ok_or_else(|| {
+                InvalidStateError::with_message(
+                    "A pooled_scabbard_store_factory must be provided".into(),
+                )
+            })?;
 
         let scabbard_store_factory = self.scabbard_store_factory.ok_or_else(|| {
             InvalidStateError::with_message("A scabbard_store_factory must be provided".into())
@@ -173,8 +125,25 @@ where
         let consensus_store_command_factory =
             ConsensusStoreCommandFactory::new(scabbard_store_factory.clone());
 
+        let mut algorithms: HashMap<
+            _,
+            Box<
+                dyn Algorithm<
+                    Event = ConsensusEvent,
+                    Action = ConsensusAction,
+                    Context = ConsensusContext,
+                >,
+            >,
+        > = HashMap::new();
+        algorithms.insert(
+            "two-phase-commit".to_string(),
+            Box::new(
+                TwoPhaseCommitAlgorithm::new(augrim::SystemTimeFactory::new()).into_algorithm(),
+            ),
+        );
+
         Ok(ConsensusRunner {
-            unprocessed_action_source,
+            pooled_scabbard_store_factory,
             action_runner: ConsensusActionRunner::new(
                 message_sender_factory,
                 Box::new(ScabbardStoreContextUpdater::new(
@@ -183,9 +152,7 @@ where
                 notify_observer,
                 scabbard_store_factory,
             ),
-            unprocessed_event_source,
-            context_source,
-            algorithms: self.algorithms,
+            algorithms,
             consensus_store_command_factory,
             store_command_executor,
         })

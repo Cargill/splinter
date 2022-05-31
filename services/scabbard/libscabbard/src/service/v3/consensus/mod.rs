@@ -24,10 +24,6 @@ mod value;
 #[cfg(feature = "scabbardv3-consensus-action-runner")]
 pub use consensus_action_runner::ConsensusActionRunner;
 #[cfg(feature = "scabbardv3-consensus-runner")]
-pub use consensus_runner::{
-    ConsensusRunner, ConsensusRunnerBuilder, ContextSource, StoreContextSource,
-    StoreUnprocessedActionSource, StoreUnprocessedEventSource, UnprocessedActionSource,
-    UnprocessedEventSource,
-};
+pub use consensus_runner::{ConsensusRunner, ConsensusRunnerBuilder};
 pub use process::ScabbardProcess;
 pub use value::ScabbardValue;
