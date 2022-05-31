@@ -13,12 +13,14 @@
 // limitations under the License.
 
 mod method;
+mod path_component;
 mod request_definition;
 
 use super::Permission;
 
 pub use method::Method;
 
+use path_component::PathComponent;
 use request_definition::RequestDefinition;
 
 /// A map used to correlate requests with the permissions that guard them.
@@ -64,34 +66,6 @@ impl PermissionMap {
     /// contents of the other map.
     pub fn append(&mut self, other: &mut PermissionMap) {
         self.internal.append(&mut other.internal)
-    }
-}
-
-/// A component of an endpoint path
-#[derive(PartialEq)]
-enum PathComponent {
-    /// A standard path component where matching is done on the internal string
-    Text(String),
-    /// A variable path component that matches any string
-    Variable,
-}
-
-impl From<&str> for PathComponent {
-    fn from(component: &str) -> Self {
-        if component.starts_with('{') && component.ends_with('}') {
-            PathComponent::Variable
-        } else {
-            PathComponent::Text(component.into())
-        }
-    }
-}
-
-impl PartialEq<&str> for PathComponent {
-    fn eq(&self, other: &&str) -> bool {
-        match self {
-            PathComponent::Variable => true,
-            PathComponent::Text(component) => other == component,
-        }
     }
 }
 
