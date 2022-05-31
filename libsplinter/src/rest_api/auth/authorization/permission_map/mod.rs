@@ -13,10 +13,13 @@
 // limitations under the License.
 
 mod method;
+mod request_definition;
 
 use super::Permission;
 
 pub use method::Method;
+
+use request_definition::RequestDefinition;
 
 /// A map used to correlate requests with the permissions that guard them.
 #[derive(Default)]
@@ -61,45 +64,6 @@ impl PermissionMap {
     /// contents of the other map.
     pub fn append(&mut self, other: &mut PermissionMap) {
         self.internal.append(&mut other.internal)
-    }
-}
-
-/// A (method, endpoint) definition that will be used to match requests
-struct RequestDefinition {
-    method: Method,
-    path: Vec<PathComponent>,
-}
-
-impl RequestDefinition {
-    /// Creates a new request definition
-    pub fn new(method: Method, endpoint: &str) -> Self {
-        let path = endpoint
-            .strip_prefix('/')
-            .unwrap_or(endpoint)
-            .split('/')
-            .map(PathComponent::from)
-            .collect();
-
-        Self { method, path }
-    }
-
-    /// Checks if the given request matches this definition, considering any variable path
-    /// components.
-    pub fn matches(&self, method: &Method, endpoint: &str) -> bool {
-        let components = endpoint
-            .strip_prefix('/')
-            .unwrap_or(endpoint)
-            .split('/')
-            .collect::<Vec<_>>();
-
-        method == &self.method
-            && self.path.len() == components.len()
-            && components.iter().enumerate().all(|(idx, component)| {
-                self.path
-                    .get(idx)
-                    .map(|path_component| path_component == component)
-                    .unwrap_or(false)
-            })
     }
 }
 
