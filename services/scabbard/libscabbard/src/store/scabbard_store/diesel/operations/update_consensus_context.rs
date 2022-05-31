@@ -64,7 +64,11 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                         })?
                         .ok_or_else(|| {
                             ScabbardStoreError::InvalidState(InvalidStateError::with_message(
-                                format!("Context with service ID {} does not exist", service_id,),
+                                format!(
+                                    "Cannot update context, context with service ID {} does \
+                                 not exist",
+                                    service_id
+                                ),
                             ))
                         })?;
 
@@ -147,7 +151,11 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                         })?
                         .ok_or_else(|| {
                             ScabbardStoreError::InvalidState(InvalidStateError::with_message(
-                                format!("Context with service ID {} does not exist", service_id,),
+                                format!(
+                                    "Cannot update context, context with service ID {} does \
+                                 not exist",
+                                    service_id,
+                                ),
                             ))
                         })?;
 

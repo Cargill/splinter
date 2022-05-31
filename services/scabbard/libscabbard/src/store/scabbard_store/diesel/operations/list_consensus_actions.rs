@@ -72,7 +72,7 @@ where
                 })?
                 .ok_or_else(|| {
                     ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Context with service ID {} and does not exist",
+                        "Cannot list consensus actions, context with service ID {} and does not exist",
                         service_id,
                     )))
                 })?;
