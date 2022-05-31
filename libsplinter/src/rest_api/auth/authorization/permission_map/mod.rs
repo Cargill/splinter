@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::rest_api::actix_web_1::Method as Actix1Method;
+mod method;
 
 use super::Permission;
+
+pub use method::Method;
 
 /// A map used to correlate requests with the permissions that guard them.
 #[derive(Default)]
@@ -59,39 +61,6 @@ impl PermissionMap {
     /// contents of the other map.
     pub fn append(&mut self, other: &mut PermissionMap) {
         self.internal.append(&mut other.internal)
-    }
-}
-
-#[derive(PartialEq, Clone)]
-pub enum Method {
-    Get,
-    Post,
-    Put,
-    Patch,
-    Delete,
-    Head,
-    Options,
-    Connect,
-    Trace,
-    Extension(String),
-}
-
-impl From<&Actix1Method> for Method {
-    fn from(source: &Actix1Method) -> Self {
-        match source {
-            Actix1Method::Get => Method::Get,
-            Actix1Method::Post => Method::Post,
-            Actix1Method::Put => Method::Put,
-            Actix1Method::Patch => Method::Patch,
-            Actix1Method::Delete => Method::Delete,
-            Actix1Method::Head => Method::Head,
-        }
-    }
-}
-
-impl From<Actix1Method> for Method {
-    fn from(source: crate::rest_api::actix_web_1::Method) -> Self {
-        (&source).into()
     }
 }
 
@@ -165,6 +134,8 @@ impl PartialEq<&str> for PathComponent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::rest_api::actix_web_1::Method as Actix1Method;
 
     /// Verifies that a `PathComponent` is correctly parsed
     #[test]
