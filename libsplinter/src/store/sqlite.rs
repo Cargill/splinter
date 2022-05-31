@@ -24,9 +24,7 @@ use diesel::{
 use crate::error::InternalError;
 use crate::migrations::{any_pending_sqlite_migrations, run_sqlite_migrations};
 #[cfg(feature = "authorization-handler-rbac")]
-use crate::rest_api::auth::authorization::rbac::store::{
-    DieselRoleBasedAuthorizationStore, RoleBasedAuthorizationStore,
-};
+use crate::rbac::store::{DieselRoleBasedAuthorizationStore, RoleBasedAuthorizationStore};
 
 use super::StoreFactory;
 

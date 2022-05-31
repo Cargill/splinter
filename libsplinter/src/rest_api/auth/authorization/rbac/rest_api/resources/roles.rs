@@ -17,10 +17,8 @@
 use std::convert::TryFrom;
 
 use crate::error::InvalidStateError;
-use crate::rest_api::{
-    auth::authorization::rbac::store::{Role, RoleBuilder},
-    paging::Paging,
-};
+use crate::rbac::store::{Role, RoleBuilder};
+use crate::rest_api::paging::Paging;
 
 #[derive(Serialize)]
 pub struct ListRoleResponse<'a> {

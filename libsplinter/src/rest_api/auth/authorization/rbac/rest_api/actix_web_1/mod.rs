@@ -18,9 +18,8 @@ mod assignments;
 mod error;
 mod roles;
 
-use crate::rest_api::{
-    auth::authorization::rbac::store::RoleBasedAuthorizationStore, Resource, RestResourceProvider,
-};
+use crate::rbac::store::RoleBasedAuthorizationStore;
+use crate::rest_api::{Resource, RestResourceProvider};
 
 /// REST Resource Provider for Role-based Authorization REST resources.
 pub struct RoleBasedAuthorizationResourceProvider {

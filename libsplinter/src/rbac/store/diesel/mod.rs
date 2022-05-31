@@ -442,17 +442,18 @@ impl TryFrom<(models::IdentityModel, Vec<models::AssignmentModel>)> for Assignme
             models::IdentityModelType::Key => Identity::Key(identity),
             models::IdentityModelType::User => Identity::User(identity),
         };
-        // We create the assignment directly, vs using the builder, as a deleted role may result
-        // in an empty assignment.  The builder prevents the library user from constructing an
-        // assignment with no roles, but we have no way of preventing the database from creating
+        // We create the with the unchecked constructor, vs using the builder,
+        // as a deleted role may result in an empty assignment.  The builder
+        // prevents the library user from constructing an assignment with no
+        // roles, but we have no way of preventing the database from creating
         // this situation.
-        Ok(Assignment {
+        Ok(Assignment::new_unchecked(
             identity,
-            roles: assignments
+            assignments
                 .into_iter()
                 .map(|models::AssignmentModel { role_id, .. }| role_id)
                 .collect(),
-        })
+        ))
     }
 }
 
@@ -497,7 +498,7 @@ impl From<diesel::r2d2::PoolError> for RoleBasedAuthorizationStoreError {
 mod tests {
     use super::*;
 
-    use crate::rest_api::auth::authorization::rbac::store::{AssignmentBuilder, RoleBuilder};
+    use crate::rbac::store::{AssignmentBuilder, RoleBuilder};
 
     use crate::store::sqlite::create_sqlite_connection_pool;
 

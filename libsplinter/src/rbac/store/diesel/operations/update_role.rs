@@ -18,7 +18,7 @@ use diesel::{
 };
 
 use crate::error::{ConstraintViolationError, ConstraintViolationType};
-use crate::rest_api::auth::authorization::rbac::store::{
+use crate::rbac::store::{
     diesel::{
         models::{RoleModel, RolePermissionModel},
         schema::{rbac_role_permissions, rbac_roles},

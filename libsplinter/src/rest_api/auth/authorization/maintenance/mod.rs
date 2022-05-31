@@ -23,9 +23,7 @@ use std::sync::{
 
 use crate::error::InternalError;
 #[cfg(feature = "authorization-handler-rbac")]
-use crate::rest_api::auth::authorization::rbac::store::{
-    Identity as RBACIdentity, RoleBasedAuthorizationStore, ADMIN_ROLE_ID,
-};
+use crate::rbac::store::{Identity as RBACIdentity, RoleBasedAuthorizationStore, ADMIN_ROLE_ID};
 use crate::rest_api::auth::identity::Identity;
 
 use super::{AuthorizationHandler, AuthorizationHandlerResult};
@@ -121,7 +119,7 @@ impl AuthorizationHandler for MaintenanceModeAuthorizationHandler {
 mod tests {
     use super::*;
 
-    use crate::rest_api::auth::authorization::rbac::store::{
+    use crate::rbac::store::{
         Assignment, AssignmentBuilder, Role, RoleBasedAuthorizationStore,
         RoleBasedAuthorizationStoreError,
     };

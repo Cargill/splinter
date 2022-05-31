@@ -29,13 +29,11 @@ use splinter::biome::credentials::rest_api::{
 };
 use splinter::error::InternalError;
 use splinter::public_key::PublicKey;
+use splinter::rbac::store::{AssignmentBuilder, Identity as AssignmentIdentity, RoleBuilder};
 use splinter::rest_api::actix_web_1::RestApiBuilder as RestApiBuilder1;
 use splinter::rest_api::auth::authorization::rbac::RoleBasedAuthorizationHandler;
 use splinter::rest_api::auth::{
-    authorization::{
-        rbac::store::{AssignmentBuilder, Identity as AssignmentIdentity, RoleBuilder},
-        AuthorizationHandler, AuthorizationHandlerResult,
-    },
+    authorization::{AuthorizationHandler, AuthorizationHandlerResult},
     identity::Identity,
 };
 use splinter::rest_api::BindConfig;

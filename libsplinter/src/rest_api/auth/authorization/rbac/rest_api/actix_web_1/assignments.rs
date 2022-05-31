@@ -17,20 +17,18 @@ use std::convert::TryInto;
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use crate::error::InvalidStateError;
 use crate::futures::{Future, IntoFuture, Stream};
+use crate::rbac::store::{Assignment, Identity, RoleBasedAuthorizationStore};
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    auth::authorization::rbac::{
-        rest_api::{
-            resources::{
-                assignments::{
-                    AssignmentPayload, AssignmentResponse, AssignmentUpdatePayload,
-                    ListAssignmentsResponse,
-                },
-                PagingQuery,
+    auth::authorization::rbac::rest_api::{
+        resources::{
+            assignments::{
+                AssignmentPayload, AssignmentResponse, AssignmentUpdatePayload,
+                ListAssignmentsResponse,
             },
-            RBAC_READ_PERMISSION, RBAC_WRITE_PERMISSION,
+            PagingQuery,
         },
-        store::{Assignment, Identity, RoleBasedAuthorizationStore},
+        RBAC_READ_PERMISSION, RBAC_WRITE_PERMISSION,
     },
     paging::get_response_paging_info,
     ErrorResponse, SPLINTER_PROTOCOL_VERSION,
@@ -375,7 +373,7 @@ mod tests {
     use serde_json::{to_value, Value as JsonValue};
 
     use crate::error::{ConstraintViolationError, ConstraintViolationType};
-    use crate::rest_api::auth::authorization::rbac::store::{
+    use crate::rbac::store::{
         Assignment, AssignmentBuilder, Identity, Role, RoleBasedAuthorizationStoreError,
         RoleBuilder,
     };

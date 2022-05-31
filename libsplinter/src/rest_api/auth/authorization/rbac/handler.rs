@@ -19,7 +19,7 @@ use crate::rest_api::auth::{
     identity::Identity,
 };
 
-use super::store::{RoleBasedAuthorizationStore, ADMIN_ROLE_ID};
+use crate::rbac::store::{RoleBasedAuthorizationStore, ADMIN_ROLE_ID};
 
 /// A Role-based authorization handler.
 ///
@@ -73,7 +73,7 @@ impl AuthorizationHandler for RoleBasedAuthorizationHandler {
 mod tests {
     use super::*;
 
-    use crate::rest_api::auth::authorization::rbac::store::{
+    use crate::rbac::store::{
         AssignmentBuilder, DieselRoleBasedAuthorizationStore, Identity as StoreIdentity,
         RoleBuilder,
     };

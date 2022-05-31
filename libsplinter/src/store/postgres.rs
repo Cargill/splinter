@@ -118,13 +118,10 @@ impl StoreFactory for PgStoreFactory {
     #[cfg(feature = "authorization-handler-rbac")]
     fn get_role_based_authorization_store(
         &self,
-    ) -> Box<dyn crate::rest_api::auth::authorization::rbac::store::RoleBasedAuthorizationStore>
-    {
-        Box::new(
-            crate::rest_api::auth::authorization::rbac::store::DieselRoleBasedAuthorizationStore::new(
-                self.pool.clone(),
-            ),
-        )
+    ) -> Box<dyn crate::rbac::store::RoleBasedAuthorizationStore> {
+        Box::new(crate::rbac::store::DieselRoleBasedAuthorizationStore::new(
+            self.pool.clone(),
+        ))
     }
 
     #[cfg(feature = "biome-profile")]

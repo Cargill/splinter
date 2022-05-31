@@ -12,7 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod handler;
-pub mod rest_api;
-
-pub use handler::RoleBasedAuthorizationHandler;
+#[cfg(feature = "store")]
+pub mod store;

@@ -107,6 +107,12 @@ pub mod peer;
 pub mod protocol;
 pub mod protos;
 pub mod public_key;
+#[cfg(all(
+    feature = "rest-api",
+    feature = "authorization",
+    feature = "authorization-handler-rbac"
+))]
+pub mod rbac;
 #[cfg(feature = "registry")]
 pub mod registry;
 #[cfg(feature = "rest-api")]

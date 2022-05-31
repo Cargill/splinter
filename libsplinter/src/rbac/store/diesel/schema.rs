@@ -34,7 +34,7 @@ table! {
         identity -> Text,
         identity_type ->
             // the macro output can't find this type if it isn't fully qualified.
-            crate::rest_api::auth::authorization::rbac::store::diesel::models::IdentityModelTypeMapping,
+            crate::rbac::store::diesel::models::IdentityModelTypeMapping,
     }
 }
 

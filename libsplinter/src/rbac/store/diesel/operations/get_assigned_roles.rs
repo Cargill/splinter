@@ -16,33 +16,58 @@ use std::convert::TryInto;
 
 use diesel::prelude::*;
 
-use crate::rest_api::auth::authorization::rbac::store::{
+use crate::rbac::store::{
     diesel::{
-        models::{RoleModel, RolePermissionModel},
-        schema::rbac_roles,
+        models::{
+            AssignmentModel, IdentityModel, IdentityModelType, IdentityModelTypeMapping, RoleModel,
+            RolePermissionModel,
+        },
+        schema::{rbac_identities, rbac_roles},
     },
-    Role, RoleBasedAuthorizationStoreError,
+    Identity, Role, RoleBasedAuthorizationStoreError,
 };
 
 use super::RoleBasedAuthorizationStoreOperations;
 
-pub trait RoleBasedAuthorizationStoreListRoles {
-    fn list_roles(
+pub trait RoleBasedAuthorizationStoreGetAssignedRoles {
+    fn get_assigned_roles(
         &self,
+        identity: &Identity,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError>;
 }
 
-impl<'a, C> RoleBasedAuthorizationStoreListRoles for RoleBasedAuthorizationStoreOperations<'a, C>
+impl<'a, C> RoleBasedAuthorizationStoreGetAssignedRoles
+    for RoleBasedAuthorizationStoreOperations<'a, C>
 where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+    i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<IdentityModelTypeMapping>,
+    IdentityModelType: diesel::deserialize::FromSql<IdentityModelTypeMapping, C::Backend>,
 {
-    fn list_roles(
+    fn get_assigned_roles(
         &self,
+        identity: &Identity,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError> {
+        let search_identity = match identity {
+            Identity::Key(ref key) => key,
+            Identity::User(ref user_id) => user_id,
+        };
         self.conn
             .transaction::<Box<dyn ExactSizeIterator<Item = Role>>, _, _>(|| {
-                let roles = rbac_roles::table.load::<RoleModel>(self.conn)?;
+                let identities = rbac_identities::table
+                    .filter(rbac_identities::identity.eq(search_identity))
+                    .load::<IdentityModel>(self.conn)?;
+
+                let role_ids = AssignmentModel::belonging_to(&identities)
+                    .load::<AssignmentModel>(self.conn)?
+                    .into_iter()
+                    .map(|assignment| assignment.role_id)
+                    .collect::<Vec<_>>();
+
+                let roles = rbac_roles::table
+                    .filter(rbac_roles::id.eq_any(role_ids))
+                    .load::<RoleModel>(self.conn)?;
 
                 let perms = RolePermissionModel::belonging_to(&roles)
                     .load::<RolePermissionModel>(self.conn)?
