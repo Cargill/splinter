@@ -12,17 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{Method, PathComponent};
+use std::borrow::Borrow;
+
+use super::PathComponent;
 
 /// A (method, endpoint) definition that will be used to match requests
-pub struct RequestDefinition {
-    method: Method,
+pub struct RequestDefinition<M> {
+    method: M,
     path: Vec<PathComponent>,
 }
 
-impl RequestDefinition {
+impl<M: PartialEq + Clone> RequestDefinition<M> {
     /// Creates a new request definition
-    pub fn new(method: Method, endpoint: &str) -> Self {
+    pub fn new(method: M, endpoint: &str) -> Self {
         let path = endpoint
             .strip_prefix('/')
             .unwrap_or(endpoint)
@@ -35,7 +37,11 @@ impl RequestDefinition {
 
     /// Checks if the given request matches this definition, considering any variable path
     /// components.
-    pub fn matches(&self, method: &Method, endpoint: &str) -> bool {
+    pub fn matches<O>(&self, method: &O, endpoint: &str) -> bool
+    where
+        M: Borrow<O>,
+        O: PartialEq + Clone + PartialEq<M>,
+    {
         let components = endpoint
             .strip_prefix('/')
             .unwrap_or(endpoint)

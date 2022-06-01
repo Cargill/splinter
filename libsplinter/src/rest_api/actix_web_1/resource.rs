@@ -229,7 +229,7 @@ impl Resource {
     }
 
     #[cfg(feature = "authorization")]
-    pub(super) fn into_route(self) -> (actix_web::Resource, PermissionMap) {
+    pub(super) fn into_route(self) -> (actix_web::Resource, PermissionMap<Method>) {
         let mut resource = web::resource(&self.route);
 
         let mut allowed_methods = self

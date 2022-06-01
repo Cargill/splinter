@@ -16,6 +16,8 @@ mod method;
 mod path_component;
 mod request_definition;
 
+use std::borrow::Borrow;
+
 use super::Permission;
 
 pub use method::Method;
@@ -24,15 +26,22 @@ use path_component::PathComponent;
 use request_definition::RequestDefinition;
 
 /// A map used to correlate requests with the permissions that guard them.
-#[derive(Default)]
-pub struct PermissionMap {
-    internal: Vec<(RequestDefinition, Permission)>,
+pub struct PermissionMap<M> {
+    internal: Vec<(RequestDefinition<M>, Permission)>,
 }
 
-impl PermissionMap {
+impl<M: PartialEq + Clone> Default for PermissionMap<M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<M: PartialEq + Clone> PermissionMap<M> {
     /// Creates a new permission map
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            internal: Vec::new(),
+        }
     }
 
     /// Gets a list of all permissions.
@@ -40,32 +49,29 @@ impl PermissionMap {
         self.internal.iter().map(|(_, perm)| *perm)
     }
 
+    /// Takes the contents of another `PermissionMap` and merges them into itself. This consumes the
+    /// contents of the other map.
+    pub fn append(&mut self, other: &mut PermissionMap<M>) {
+        self.internal.append(&mut other.internal)
+    }
+
     /// Sets the permission for the given (method, endpoint) pair. The endpoint may contain path
     /// variables surrounded by `{}`.
-    pub fn add_permission<M>(&mut self, method: M, endpoint: &str, permission: Permission)
-    where
-        M: Into<Method>,
-    {
+    pub fn add_permission(&mut self, method: M, endpoint: &str, permission: Permission) {
         self.internal
-            .push((RequestDefinition::new(method.into(), endpoint), permission));
+            .push((RequestDefinition::new(method, endpoint), permission));
     }
 
     /// Gets the permission for a request. This will attempt to match the method and endpoint to a
     /// known (method, endpoint) pair, considering path variables of known endpoints.
-    pub fn get_permission<M>(&self, method: M, endpoint: &str) -> Option<&Permission>
+    pub fn get_permission<O>(&self, method: &O, endpoint: &str) -> Option<&Permission>
     where
-        M: Into<Method> + Copy,
+        O: Borrow<M>,
     {
         self.internal
             .iter()
-            .find(|(req, _)| req.matches(&method.into(), endpoint))
+            .find(|(req, _)| req.matches(method.borrow(), endpoint))
             .map(|(_, perm)| perm)
-    }
-
-    /// Takes the contents of another `PermissionMap` and merges them into itself. This consumes the
-    /// contents of the other map.
-    pub fn append(&mut self, other: &mut PermissionMap) {
-        self.internal.append(&mut other.internal)
     }
 }
 
