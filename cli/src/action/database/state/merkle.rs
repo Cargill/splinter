@@ -23,14 +23,13 @@ use transact::state::{
             store::{MerkleRadixStore, SqlMerkleRadixStore},
             SqlMerkleState,
         },
-        MerkleRadixLeafReadError, MerkleRadixLeafReader,
     },
-    Prune, Read, StateChange, StatePruneError, StateReadError, StateWriteError, Write,
+    Committer, DryRunCommitter, Pruner, Reader, State, StateChange, StateError, ValueIter,
+    ValueIterResult,
 };
 
 use super::CliError;
 
-#[derive(Clone)]
 pub enum MerkleState {
     Lmdb {
         state: TransactMerkleState,
@@ -100,16 +99,20 @@ impl MerkleState {
     }
 }
 
-impl Write for MerkleState {
+impl State for MerkleState {
     type StateId = String;
     type Key = String;
     type Value = Vec<u8>;
+}
+
+impl Committer for MerkleState {
+    type StateChange = StateChange;
 
     fn commit(
         &self,
         state_id: &Self::StateId,
-        state_changes: &[StateChange],
-    ) -> Result<Self::StateId, StateWriteError> {
+        state_changes: &[Self::StateChange],
+    ) -> Result<Self::StateId, StateError> {
         match self {
             MerkleState::Lmdb { state, .. } => state.commit(state_id, state_changes),
             #[cfg(feature = "postgres")]
@@ -118,31 +121,35 @@ impl Write for MerkleState {
             MerkleState::Sqlite { state } => state.commit(state_id, state_changes),
         }
     }
+}
 
-    fn compute_state_id(
+impl DryRunCommitter for MerkleState {
+    type StateChange = StateChange;
+
+    fn dry_run_commit(
         &self,
         state_id: &Self::StateId,
-        state_changes: &[StateChange],
-    ) -> Result<Self::StateId, StateWriteError> {
+        state_changes: &[Self::StateChange],
+    ) -> Result<Self::StateId, StateError> {
         match self {
-            MerkleState::Lmdb { state, .. } => state.compute_state_id(state_id, state_changes),
+            MerkleState::Lmdb { state, .. } => state.dry_run_commit(state_id, state_changes),
             #[cfg(feature = "postgres")]
-            MerkleState::Postgres { state } => state.compute_state_id(state_id, state_changes),
+            MerkleState::Postgres { state } => state.dry_run_commit(state_id, state_changes),
             #[cfg(feature = "sqlite")]
-            MerkleState::Sqlite { state } => state.compute_state_id(state_id, state_changes),
+            MerkleState::Sqlite { state } => state.dry_run_commit(state_id, state_changes),
         }
     }
 }
 
-impl Read for MerkleState {
-    type StateId = String;
-    type Key = String;
-    type Value = Vec<u8>;
+impl Reader for MerkleState {
+    /// The filter used for the iterating over state values.
+    type Filter = str;
+
     fn get(
         &self,
         state_id: &Self::StateId,
         keys: &[Self::Key],
-    ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
+    ) -> Result<HashMap<Self::Key, Self::Value>, StateError> {
         match self {
             MerkleState::Lmdb { state, .. } => state.get(state_id, keys),
             #[cfg(feature = "postgres")]
@@ -152,45 +159,29 @@ impl Read for MerkleState {
         }
     }
 
-    fn clone_box(
+    fn filter_iter(
         &self,
-    ) -> Box<dyn Read<StateId = Self::StateId, Key = Self::Key, Value = Self::Value>> {
-        Box::new(self.clone())
+        state_id: &Self::StateId,
+        filter: Option<&Self::Filter>,
+    ) -> ValueIterResult<ValueIter<(Self::Key, Self::Value)>> {
+        match self {
+            MerkleState::Lmdb { state, .. } => state.filter_iter(state_id, filter),
+            #[cfg(feature = "postgres")]
+            MerkleState::Postgres { state } => state.filter_iter(state_id, filter),
+            #[cfg(feature = "sqlite")]
+            MerkleState::Sqlite { state } => state.filter_iter(state_id, filter),
+        }
     }
 }
 
-impl Prune for MerkleState {
-    type StateId = String;
-    type Key = String;
-    type Value = Vec<u8>;
-
-    fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
+impl Pruner for MerkleState {
+    fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StateError> {
         match self {
             MerkleState::Lmdb { state, .. } => state.prune(state_ids),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.prune(state_ids),
             #[cfg(feature = "sqlite")]
             MerkleState::Sqlite { state } => state.prune(state_ids),
-        }
-    }
-}
-
-// These types make the clippy happy
-type IterResult<T> = Result<T, MerkleRadixLeafReadError>;
-type LeafIter<T> = Box<dyn Iterator<Item = IterResult<T>>>;
-
-impl MerkleRadixLeafReader for MerkleState {
-    fn leaves(
-        &self,
-        state_id: &Self::StateId,
-        subtree: Option<&str>,
-    ) -> IterResult<LeafIter<(Self::Key, Self::Value)>> {
-        match self {
-            MerkleState::Lmdb { state, .. } => state.leaves(state_id, subtree),
-            #[cfg(feature = "postgres")]
-            MerkleState::Postgres { state } => state.leaves(state_id, subtree),
-            #[cfg(feature = "sqlite")]
-            MerkleState::Sqlite { state } => state.leaves(state_id, subtree),
         }
     }
 }

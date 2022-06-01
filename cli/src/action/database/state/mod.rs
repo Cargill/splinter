@@ -27,9 +27,8 @@ use transact::state::{
     merkle::{
         kv::{MerkleRadixTree, MerkleState as TransactMerkleState},
         sql::{backend, SqlMerkleStateBuilder},
-        MerkleRadixLeafReader,
     },
-    Prune, StateChange, Write,
+    Committer, Pruner, Reader, StateChange,
 };
 
 use crate::action::database::{
@@ -308,7 +307,7 @@ fn copy_state(
     state_writer: &MerkleState,
 ) -> Result<(), CliError> {
     let state_changes_iter = state_reader
-        .leaves(&current_commit_hash, None)
+        .filter_iter(&current_commit_hash, None)
         .map_err(|e| {
             CliError::ActionError(format!("Unable to get leaves for commit hash: {}", e))
         })?;
