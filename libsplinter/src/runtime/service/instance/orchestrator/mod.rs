@@ -16,8 +16,6 @@
 
 mod builder;
 mod error;
-#[cfg(feature = "rest-api-actix-web-1")]
-mod rest_api;
 mod runnable;
 
 use std::collections::HashMap;
@@ -74,7 +72,7 @@ impl std::fmt::Display for ServiceDefinition {
 }
 
 /// Stores a service and other structures that are used to manage it
-struct ManagedService {
+pub struct ManagedService {
     pub service: Box<dyn OrchestratableService>,
     pub registry: StandardServiceNetworkRegistry,
 }
@@ -317,6 +315,16 @@ impl ServiceOrchestrator {
 
     pub fn supported_service_types(&self) -> &[String] {
         &self.supported_service_types
+    }
+
+    #[cfg(feature = "rest-api-actix-web-1")]
+    pub fn service_factories(&self) -> &[Box<dyn OrchestratableServiceFactory>] {
+        &self.service_factories
+    }
+
+    #[cfg(feature = "rest-api-actix-web-1")]
+    pub fn services(&self) -> Arc<Mutex<HashMap<ServiceDefinition, ManagedService>>> {
+        self.services.clone()
     }
 }
 

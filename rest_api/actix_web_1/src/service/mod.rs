@@ -15,36 +15,45 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::actix_web::HttpResponse;
-use crate::error::InternalError;
-use crate::futures::IntoFuture;
-use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
+use splinter::actix_web::HttpResponse;
+use splinter::error::InternalError;
+use splinter::futures::IntoFuture;
+use splinter::rest_api::actix_web_1::{Resource, RestResourceProvider};
+use splinter::runtime::service::instance::{
+    ManagedService, ServiceDefinition, ServiceOrchestrator,
+};
+use splinter::service::instance::OrchestratableService;
 
-use super::{ManagedService, OrchestratableService, ServiceDefinition, ServiceOrchestrator};
-
-/// The `ServiceOrchestrator` exposes REST API resources provided by the
-/// [`ServiceFactory::get_rest_endpoints`] methods of its factories. Each factory defines the
-/// endpoints provided by the services it creates; the `ServiceOrchestrator` then exposes these
-/// endpoints under the `/{service_type}/{circuit}/{service_id}` route.
+/// The `ServiceOrchestratorRestResourceProvider` exposes REST API resources
+/// provided by the [`ServiceFactory::get_rest_endpoints`] methods of the
+/// `ServiceOrchestrator` factories. Each factory defines the endpoints provided
+/// by the services it creates; the `ServiceOrchestratorRestResourceProvider`
+/// then exposes these endpoints under the
+/// `/{service_type}/{circuit}/{service_id}` route.
 ///
 /// [`ServiceFactory::get_rest_endpoints`]:
 ///   ../service/factory/trait.ServiceFactory.html#tymethod.get_rest_endpoints
-impl RestResourceProvider for ServiceOrchestrator {
-    fn resources(&self) -> Vec<Resource> {
-        // Get endpoints for all factories
-        self.service_factories
+pub struct ServiceOrchestratorRestResourceProvider {
+    resources: Vec<Resource>,
+}
+
+impl ServiceOrchestratorRestResourceProvider {
+    pub fn new(orchestrator: &ServiceOrchestrator) -> Self {
+        let resources = orchestrator
+            .service_factories()
             .iter()
             .fold(vec![], |mut acc, factory| {
                 // Get all endpoints for the factory
                 let mut resources = factory
-                    .get_rest_endpoints()
+                    .get_rest_endpoint_provider()
+                    .endpoints()
                     .into_iter()
                     .map(|endpoint| {
                         let route = format!(
                             "/{}/{{circuit}}/{{service_id}}{}",
                             endpoint.service_type, endpoint.route
                         );
-                        let services = self.services.clone();
+                        let services = orchestrator.services();
 
                         let mut resource_builder = Resource::build(&route);
 
@@ -112,7 +121,14 @@ impl RestResourceProvider for ServiceOrchestrator {
 
                 acc.append(&mut resources);
                 acc
-            })
+            });
+        Self { resources }
+    }
+}
+
+impl RestResourceProvider for ServiceOrchestratorRestResourceProvider {
+    fn resources(&self) -> Vec<Resource> {
+        self.resources.clone()
     }
 }
 

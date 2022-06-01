@@ -53,6 +53,13 @@ pub struct ServiceEndpoint {
     pub permission: Permission,
 }
 
+// Trait capturing the behaviour of providing a Vec of ServiceEndpoints
+pub trait ServiceEndpointProvider {
+    fn endpoints(&self) -> Vec<ServiceEndpoint> {
+        Vec::new()
+    }
+}
+
 /// This trait enforces that the Request guard is Clone.
 pub trait ServiceRequestGuard: RequestGuard {
     fn clone_box(&self) -> Box<dyn ServiceRequestGuard>;

@@ -110,6 +110,7 @@ use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitReso
 #[cfg(feature = "biome-key-management")]
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
 use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
+use splinter_rest_api_actix_web_1::service::ServiceOrchestratorRestResourceProvider;
 
 use crate::node_id::get_node_id;
 use crate::routes;
@@ -542,7 +543,8 @@ impl SplinterDaemon {
                 StartError::OrchestratorError(format!("failed to start orchestrator: {}", err))
             })?;
 
-        let orchestrator_resources = orchestrator.resources();
+        let orchestrator_resources =
+            ServiceOrchestratorRestResourceProvider::new(&orchestrator).resources();
         let mut orchestator_shutdown_handle =
             orchestrator.take_shutdown_handle().ok_or_else(|| {
                 StartError::OrchestratorError(

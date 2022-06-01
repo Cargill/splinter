@@ -16,9 +16,9 @@ mod orchestrator;
 mod processor;
 
 pub use orchestrator::{
-    AddServiceError, InitializeServiceError, ListServicesError, NewOrchestratorError,
-    OrchestratorError, ServiceDefinition, ServiceOrchestrator, ServiceOrchestratorBuilder,
-    ShutdownServiceError,
+    AddServiceError, InitializeServiceError, ListServicesError, ManagedService,
+    NewOrchestratorError, OrchestratorError, ServiceDefinition, ServiceOrchestrator,
+    ServiceOrchestratorBuilder, ShutdownServiceError,
 };
 
 pub use processor::{

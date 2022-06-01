@@ -49,6 +49,7 @@ stable = [
     "biome-key-management",
     "registry",
     "rest-api",
+    "service",
 ]
 
 experimental = [
@@ -72,3 +73,4 @@ biome = ["splinter/biome"]
 biome-key-management = ["biome", "splinter/biome-key-management"]
 registry = ["splinter/registry"]
 rest-api = ["splinter/rest-api"]
+service = ["splinter/runtime-service", "serde_json", "log"]

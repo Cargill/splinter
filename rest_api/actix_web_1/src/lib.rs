@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #[macro_use]
-#[cfg(feature = "admin-service")]
+#[cfg(any(feature = "admin-service", feature = "service"))]
 extern crate log;
 #[macro_use]
 #[cfg(feature = "admin-service")]
 extern crate serde;
 #[macro_use]
-#[cfg(feature = "admin-service")]
+#[cfg(any(feature = "admin-service", feature = "service"))]
 extern crate serde_json;
 
 #[cfg(feature = "admin-service")]
@@ -28,5 +28,7 @@ pub mod admin;
 pub mod biome;
 #[cfg(feature = "registry")]
 pub mod registry;
+#[cfg(feature = "service")]
+pub mod service;
 
 mod hex;
