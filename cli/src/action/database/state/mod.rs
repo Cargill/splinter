@@ -38,7 +38,7 @@ use crate::action::database::{
 
 use super::{Action, CliError};
 
-use self::merkle::MerkleState;
+pub use self::merkle::MerkleState;
 
 pub struct StateMigrateAction;
 

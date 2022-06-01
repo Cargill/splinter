@@ -20,7 +20,9 @@ use splinter::{
     error::InternalError,
     node_id::store::{diesel::DieselNodeIdStore, NodeIdStore},
 };
+use transact::state::merkle::sql::{backend, SqlMerkleStateBuilder};
 
+use super::state::MerkleState;
 use super::ConnectionUri;
 
 pub trait UpgradeStores {
@@ -35,6 +37,13 @@ pub trait UpgradeStores {
 
     #[cfg(feature = "sqlite")]
     fn get_sqlite_pool(&self) -> Pool<ConnectionManager<diesel::SqliteConnection>>;
+
+    fn get_merkle_state(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+        create_tree: bool,
+    ) -> Result<MerkleState, InternalError>;
 
     #[cfg(feature = "postgres")]
     fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>>;
@@ -129,6 +138,27 @@ impl UpgradeStores for PostgresUpgradeStores {
         unimplemented!()
     }
 
+    fn get_merkle_state(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+        create_tree: bool,
+    ) -> Result<MerkleState, InternalError> {
+        let backend = backend::PostgresBackend::from(self.0.clone());
+        let mut builder = SqlMerkleStateBuilder::new()
+            .with_backend(backend)
+            .with_tree(format!("{}::{}", circuit_id, service_id));
+
+        if create_tree {
+            builder = builder.create_tree_if_necessary();
+        }
+
+        let state = builder
+            .build()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+        Ok(MerkleState::Postgres { state })
+    }
+
     fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
         self.0.clone()
     }
@@ -168,6 +198,27 @@ impl UpgradeStores for SqliteUpgradeStores {
 
     fn get_sqlite_pool(&self) -> Pool<ConnectionManager<diesel::SqliteConnection>> {
         self.0.clone()
+    }
+
+    fn get_merkle_state(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+        create_tree: bool,
+    ) -> Result<MerkleState, InternalError> {
+        let backend = backend::SqliteBackend::from(self.0.clone());
+        let mut builder = SqlMerkleStateBuilder::new()
+            .with_backend(backend)
+            .with_tree(format!("{}::{}", circuit_id, service_id));
+
+        if create_tree {
+            builder = builder.create_tree_if_necessary();
+        }
+
+        let state = builder
+            .build()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+        Ok(MerkleState::Sqlite { state })
     }
 
     // should never be used if using sqlite
