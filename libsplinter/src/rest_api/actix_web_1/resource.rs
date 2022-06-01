@@ -29,7 +29,7 @@ use crate::rest_api::auth::authorization::{Permission, PermissionMap};
 use super::{Continuation, RequestGuard};
 
 /// Rest methods compatible with `RestApi`.
-#[derive(Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Method {
     Get,
     Post,
@@ -273,7 +273,7 @@ impl Resource {
                     }
                     (handler)(r, p)
                 };
-                permission_map.add_permission(method.clone(), &route, permission);
+                permission_map.add_permission(method, &route, permission);
                 resource.route(match method {
                     Method::Get => web::get().to_async(func),
                     Method::Post => web::post().to_async(func),
