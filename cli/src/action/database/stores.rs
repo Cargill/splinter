@@ -26,7 +26,9 @@ use transact::state::merkle::{
     sql::{backend, SqlMerkleStateBuilder},
 };
 
-use super::state::MerkleState;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+use super::state::DieselStateTreeStore;
+use super::state::{LmdbStateTreeStore, MerkleState, StateTreeStore};
 use super::ConnectionUri;
 
 pub trait UpgradeStores {
@@ -51,6 +53,8 @@ pub trait UpgradeStores {
 
     #[cfg(feature = "postgres")]
     fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>>;
+
+    fn new_state_tree_store(&self) -> Box<dyn StateTreeStore>;
 }
 
 pub fn new_upgrade_stores(
@@ -166,6 +170,10 @@ impl UpgradeStores for PostgresUpgradeStores {
     fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
         self.0.clone()
     }
+
+    fn new_state_tree_store(&self) -> Box<dyn StateTreeStore> {
+        Box::new(DieselStateTreeStore::new(self.0.clone()))
+    }
 }
 
 #[cfg(feature = "sqlite")]
@@ -230,6 +238,10 @@ impl UpgradeStores for SqliteUpgradeStores {
     fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
         unimplemented!()
     }
+
+    fn new_state_tree_store(&self) -> Box<dyn StateTreeStore> {
+        Box::new(DieselStateTreeStore::new(self.0.clone()))
+    }
 }
 
 pub struct UpgradeStoresWithLmdb {
@@ -288,6 +300,10 @@ impl UpgradeStores for UpgradeStoresWithLmdb {
     #[cfg(feature = "postgres")]
     fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
         self.upgrade_stores.get_postgres_pool()
+    }
+
+    fn new_state_tree_store(&self) -> Box<dyn StateTreeStore> {
+        Box::new(LmdbStateTreeStore::new(self.lmdb_db_factory.clone()))
     }
 }
 

@@ -23,6 +23,7 @@ use std::str::FromStr;
 
 use clap::ArgMatches;
 use scabbard::store::transact::factory::LmdbDatabaseFactory;
+use splinter::error::InternalError;
 use transact::state::{
     merkle::{
         kv::{MerkleRadixTree, MerkleState as TransactMerkleState},
@@ -38,7 +39,14 @@ use crate::action::database::{
 
 use super::{Action, CliError};
 
-pub use self::merkle::MerkleState;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+pub use self::merkle::DieselStateTreeStore;
+pub use self::merkle::{LmdbStateTreeStore, MerkleState};
+
+/// A source of available trees
+pub trait StateTreeStore {
+    fn has_tree(&self, circuit_id: &str, service_id: &str) -> Result<bool, InternalError>;
+}
 
 pub struct StateMigrateAction;
 
