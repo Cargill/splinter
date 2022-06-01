@@ -14,13 +14,17 @@
 
 use diesel::r2d2::{ConnectionManager, Pool};
 use sawtooth::receipt::store::{diesel::DieselReceiptStore, ReceiptStore};
+use scabbard::store::transact::factory::LmdbDatabaseFactory;
 use scabbard::store::{diesel::DieselCommitHashStore, CommitHashStore};
 use splinter::{
     admin::store::{diesel::DieselAdminServiceStore, AdminServiceStore},
     error::InternalError,
     node_id::store::{diesel::DieselNodeIdStore, NodeIdStore},
 };
-use transact::state::merkle::sql::{backend, SqlMerkleStateBuilder};
+use transact::state::merkle::{
+    kv::{MerkleRadixTree, MerkleState as TransactMerkleState},
+    sql::{backend, SqlMerkleStateBuilder},
+};
 
 use super::state::MerkleState;
 use super::ConnectionUri;
@@ -226,4 +230,95 @@ impl UpgradeStores for SqliteUpgradeStores {
     fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
         unimplemented!()
     }
+}
+
+pub struct UpgradeStoresWithLmdb {
+    upgrade_stores: Box<dyn UpgradeStores>,
+    lmdb_db_factory: LmdbDatabaseFactory,
+}
+
+impl UpgradeStoresWithLmdb {
+    pub fn new(
+        upgrade_stores: Box<dyn UpgradeStores>,
+        lmdb_db_factory: LmdbDatabaseFactory,
+    ) -> Self {
+        Self {
+            upgrade_stores,
+            lmdb_db_factory,
+        }
+    }
+}
+
+impl UpgradeStores for UpgradeStoresWithLmdb {
+    fn new_admin_service_store(&self) -> Box<dyn AdminServiceStore> {
+        self.upgrade_stores.new_admin_service_store()
+    }
+
+    fn new_node_id_store(&self) -> Box<dyn NodeIdStore> {
+        self.upgrade_stores.new_node_id_store()
+    }
+
+    fn new_commit_hash_store(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> Box<dyn CommitHashStore> {
+        self.upgrade_stores
+            .new_commit_hash_store(circuit_id, service_id)
+    }
+
+    fn new_receipt_store(&self, circuit_id: &str, service_id: &str) -> Box<dyn ReceiptStore> {
+        self.upgrade_stores
+            .new_receipt_store(circuit_id, service_id)
+    }
+
+    fn get_merkle_state(
+        &self,
+        circuit_id: &str,
+        service_id: &str,
+        create_tree: bool,
+    ) -> Result<MerkleState, InternalError> {
+        create_lmdb_merkle_state(&self.lmdb_db_factory, circuit_id, service_id, create_tree)
+    }
+
+    fn get_sqlite_pool(&self) -> Pool<ConnectionManager<diesel::SqliteConnection>> {
+        self.upgrade_stores.get_sqlite_pool()
+    }
+
+    #[cfg(feature = "postgres")]
+    fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
+        self.upgrade_stores.get_postgres_pool()
+    }
+}
+
+fn create_lmdb_merkle_state(
+    lmdb_db_factory: &LmdbDatabaseFactory,
+    circuit_id: &str,
+    service_id: &str,
+    create_tree: bool,
+) -> Result<MerkleState, InternalError> {
+    if !create_tree {
+        let path = lmdb_db_factory
+            .compute_path(circuit_id, service_id)
+            .map_err(|e| InternalError::with_message(format!("{}", e)))?
+            .with_extension("lmdb");
+
+        if !path.is_file() {
+            return Err(InternalError::with_message(format!(
+                "LMDB file for service {}::{} ({:?}) does not exist",
+                circuit_id, service_id, path
+            )));
+        }
+    }
+    let state = lmdb_db_factory
+        .get_database(circuit_id, service_id)
+        .map_err(|e| InternalError::with_message(format!("{}", e)))?;
+    let merkle_root = MerkleRadixTree::new(Box::new(state.clone()), None)
+        .map_err(|e| InternalError::with_message(format!("{}", e)))?
+        .get_merkle_root();
+    Ok(MerkleState::Lmdb {
+        state: TransactMerkleState::new(Box::new(state)),
+        merkle_root,
+        tree_id: (circuit_id.to_string(), service_id.to_string()),
+    })
 }
