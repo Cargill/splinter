@@ -15,6 +15,7 @@ use std::collections::HashMap;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 use scabbard::store::transact::factory::LmdbDatabaseFactory;
+use splinter::error::InternalError;
 use transact::state::{
     merkle::{
         kv::MerkleState as TransactMerkleState,
@@ -29,6 +30,7 @@ use transact::state::{
 };
 
 use super::CliError;
+use super::StateTreeStore;
 
 pub enum MerkleState {
     Lmdb {
@@ -186,6 +188,18 @@ impl Pruner for MerkleState {
     }
 }
 
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+pub struct DieselStateTreeStore<C: diesel::Connection + 'static> {
+    pool: Pool<ConnectionManager<C>>,
+}
+
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+impl<C: diesel::Connection + 'static> DieselStateTreeStore<C> {
+    pub fn new(pool: Pool<ConnectionManager<C>>) -> Self {
+        Self { pool }
+    }
+}
+
 #[cfg(feature = "sqlite")]
 pub fn sqlite_list_available_trees(
     pool: &Pool<ConnectionManager<diesel::SqliteConnection>>,
@@ -197,6 +211,42 @@ pub fn sqlite_list_available_trees(
         .map_err(|e| CliError::ActionError(format!("{}", e)))
 }
 
+#[cfg(feature = "sqlite")]
+impl StateTreeStore for DieselStateTreeStore<diesel::SqliteConnection> {
+    fn has_tree(&self, circuit_id: &str, service_id: &str) -> Result<bool, InternalError> {
+        let sqlite_backend = backend::SqliteBackend::from(self.pool.clone());
+        let tree_name = format!("{}::{}", circuit_id, service_id);
+        let iter = SqlMerkleRadixStore::new(&sqlite_backend)
+            .list_trees()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        for tree_id in iter {
+            if tree_id.map_err(|e| InternalError::from_source(Box::new(e)))? == tree_name {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl StateTreeStore for DieselStateTreeStore<diesel::pg::PgConnection> {
+    fn has_tree(&self, circuit_id: &str, service_id: &str) -> Result<bool, InternalError> {
+        let postgres_backend = backend::PostgresBackend::from(self.pool.clone());
+        let tree_name = format!("{}::{}", circuit_id, service_id);
+        let iter = SqlMerkleRadixStore::new(&postgres_backend)
+            .list_trees()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        for tree_id in iter {
+            if tree_id.map_err(|e| InternalError::from_source(Box::new(e)))? == tree_name {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}
+
 #[cfg(feature = "postgres")]
 pub fn postgres_list_available_trees(
     pool: &Pool<ConnectionManager<diesel::pg::PgConnection>>,
@@ -206,4 +256,26 @@ pub fn postgres_list_available_trees(
         .list_trees()
         .and_then(|iter| iter.collect::<Result<Vec<_>, _>>())
         .map_err(|e| CliError::ActionError(format!("{}", e)))
+}
+
+pub struct LmdbStateTreeStore {
+    lmdb_db_factory: LmdbDatabaseFactory,
+}
+
+impl LmdbStateTreeStore {
+    pub fn new(lmdb_db_factory: LmdbDatabaseFactory) -> Self {
+        Self { lmdb_db_factory }
+    }
+}
+
+impl StateTreeStore for LmdbStateTreeStore {
+    fn has_tree(&self, circuit_id: &str, service_id: &str) -> Result<bool, InternalError> {
+        let path = self
+            .lmdb_db_factory
+            .compute_path(circuit_id, service_id)
+            .map_err(|e| InternalError::from_source(Box::new(e)))?
+            .with_extension("lmdb");
+
+        Ok(path.is_file())
+    }
 }
