@@ -32,7 +32,7 @@ use transact::state::{
 use super::CliError;
 use super::StateTreeStore;
 
-pub enum MerkleState {
+pub enum MerkleState<'a> {
     Lmdb {
         state: TransactMerkleState,
         merkle_root: String,
@@ -43,27 +43,43 @@ pub enum MerkleState {
     Postgres {
         state: SqlMerkleState<backend::PostgresBackend>,
     },
+    #[cfg(feature = "postgres")]
+    InTransactionPostgres {
+        state: SqlMerkleState<backend::InTransactionPostgresBackend<'a>>,
+    },
     #[cfg(feature = "sqlite")]
     Sqlite {
         state: SqlMerkleState<backend::SqliteBackend>,
     },
+    #[cfg(feature = "sqlite")]
+    InTransactionSqlite {
+        state: SqlMerkleState<backend::InTransactionSqliteBackend<'a>>,
+    },
 }
 
-impl std::fmt::Debug for MerkleState {
+impl<'a> std::fmt::Debug for MerkleState<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug_struct = f.debug_tuple("MerkleState");
         match self {
             MerkleState::Lmdb { .. } => debug_struct.field(&"Lmdb".to_string()),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { .. } => debug_struct.field(&"Postgres".to_string()),
+            #[cfg(feature = "postgres")]
+            MerkleState::InTransactionPostgres { .. } => {
+                debug_struct.field(&"Postgres (in transaction)".to_string())
+            }
             #[cfg(feature = "sqlite")]
             MerkleState::Sqlite { .. } => debug_struct.field(&"Sqlite".to_string()),
+            #[cfg(feature = "sqlite")]
+            MerkleState::InTransactionSqlite { .. } => {
+                debug_struct.field(&"Sqlite (in transaction)".to_string())
+            }
         };
         debug_struct.finish()
     }
 }
 
-impl MerkleState {
+impl<'a> MerkleState<'a> {
     pub fn get_state_root(&self) -> Result<String, CliError> {
         match self {
             // lmdb provides current state root,
@@ -72,8 +88,16 @@ impl MerkleState {
             MerkleState::Postgres { state } => state
                 .initial_state_root_hash()
                 .map_err(|e| CliError::ActionError(format!("{}", e))),
+            #[cfg(feature = "postgres")]
+            MerkleState::InTransactionPostgres { state } => state
+                .initial_state_root_hash()
+                .map_err(|e| CliError::ActionError(format!("{}", e))),
             #[cfg(feature = "sqlite")]
             MerkleState::Sqlite { state } => state
+                .initial_state_root_hash()
+                .map_err(|e| CliError::ActionError(format!("{}", e))),
+            #[cfg(feature = "sqlite")]
+            MerkleState::InTransactionSqlite { state } => state
                 .initial_state_root_hash()
                 .map_err(|e| CliError::ActionError(format!("{}", e))),
         }
@@ -93,21 +117,29 @@ impl MerkleState {
             MerkleState::Postgres { state } => state
                 .delete_tree()
                 .map_err(|e| CliError::ActionError(format!("{}", e))),
+            #[cfg(feature = "postgres")]
+            MerkleState::InTransactionPostgres { state } => state
+                .delete_tree()
+                .map_err(|e| CliError::ActionError(format!("{}", e))),
             #[cfg(feature = "sqlite")]
             MerkleState::Sqlite { state } => state
+                .delete_tree()
+                .map_err(|e| CliError::ActionError(format!("{}", e))),
+            #[cfg(feature = "sqlite")]
+            MerkleState::InTransactionSqlite { state } => state
                 .delete_tree()
                 .map_err(|e| CliError::ActionError(format!("{}", e))),
         }
     }
 }
 
-impl State for MerkleState {
+impl<'a> State for MerkleState<'a> {
     type StateId = String;
     type Key = String;
     type Value = Vec<u8>;
 }
 
-impl Committer for MerkleState {
+impl<'a> Committer for MerkleState<'a> {
     type StateChange = StateChange;
 
     fn commit(
@@ -119,13 +151,17 @@ impl Committer for MerkleState {
             MerkleState::Lmdb { state, .. } => state.commit(state_id, state_changes),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.commit(state_id, state_changes),
+            #[cfg(feature = "postgres")]
+            MerkleState::InTransactionPostgres { state } => state.commit(state_id, state_changes),
             #[cfg(feature = "sqlite")]
             MerkleState::Sqlite { state } => state.commit(state_id, state_changes),
+            #[cfg(feature = "sqlite")]
+            MerkleState::InTransactionSqlite { state } => state.commit(state_id, state_changes),
         }
     }
 }
 
-impl DryRunCommitter for MerkleState {
+impl<'a> DryRunCommitter for MerkleState<'a> {
     type StateChange = StateChange;
 
     fn dry_run_commit(
@@ -137,13 +173,21 @@ impl DryRunCommitter for MerkleState {
             MerkleState::Lmdb { state, .. } => state.dry_run_commit(state_id, state_changes),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.dry_run_commit(state_id, state_changes),
+            #[cfg(feature = "postgres")]
+            MerkleState::InTransactionPostgres { state } => {
+                state.dry_run_commit(state_id, state_changes)
+            }
             #[cfg(feature = "sqlite")]
             MerkleState::Sqlite { state } => state.dry_run_commit(state_id, state_changes),
+            #[cfg(feature = "sqlite")]
+            MerkleState::InTransactionSqlite { state } => {
+                state.dry_run_commit(state_id, state_changes)
+            }
         }
     }
 }
 
-impl Reader for MerkleState {
+impl<'a> Reader for MerkleState<'a> {
     /// The filter used for the iterating over state values.
     type Filter = str;
 
@@ -156,8 +200,12 @@ impl Reader for MerkleState {
             MerkleState::Lmdb { state, .. } => state.get(state_id, keys),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.get(state_id, keys),
+            #[cfg(feature = "postgres")]
+            MerkleState::InTransactionPostgres { state } => state.get(state_id, keys),
             #[cfg(feature = "sqlite")]
             MerkleState::Sqlite { state } => state.get(state_id, keys),
+            #[cfg(feature = "sqlite")]
+            MerkleState::InTransactionSqlite { state } => state.get(state_id, keys),
         }
     }
 
@@ -170,20 +218,28 @@ impl Reader for MerkleState {
             MerkleState::Lmdb { state, .. } => state.filter_iter(state_id, filter),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.filter_iter(state_id, filter),
+            #[cfg(feature = "postgres")]
+            MerkleState::InTransactionPostgres { state } => state.filter_iter(state_id, filter),
             #[cfg(feature = "sqlite")]
             MerkleState::Sqlite { state } => state.filter_iter(state_id, filter),
+            #[cfg(feature = "sqlite")]
+            MerkleState::InTransactionSqlite { state } => state.filter_iter(state_id, filter),
         }
     }
 }
 
-impl Pruner for MerkleState {
+impl<'a> Pruner for MerkleState<'a> {
     fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StateError> {
         match self {
             MerkleState::Lmdb { state, .. } => state.prune(state_ids),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.prune(state_ids),
+            #[cfg(feature = "postgres")]
+            MerkleState::InTransactionPostgres { state } => state.prune(state_ids),
             #[cfg(feature = "sqlite")]
             MerkleState::Sqlite { state } => state.prune(state_ids),
+            #[cfg(feature = "sqlite")]
+            MerkleState::InTransactionSqlite { state } => state.prune(state_ids),
         }
     }
 }
