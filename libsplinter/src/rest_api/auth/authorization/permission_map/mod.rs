@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(test)]
 mod method;
 mod path_component;
 mod request_definition;
@@ -20,6 +21,7 @@ use std::borrow::Borrow;
 
 use super::Permission;
 
+#[cfg(test)]
 pub use method::Method;
 
 use path_component::PathComponent;

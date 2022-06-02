@@ -27,7 +27,10 @@ use crate::error::InternalError;
 
 use super::identity::Identity;
 
-pub use permission_map::{Method, PermissionMap};
+pub use permission_map::PermissionMap;
+
+#[cfg(test)]
+pub use permission_map::Method;
 
 /// A permission assigned to an endpoint
 #[derive(Clone, Copy, Debug, PartialEq)]
