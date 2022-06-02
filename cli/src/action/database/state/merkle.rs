@@ -292,6 +292,54 @@ impl StateTreeStore for DieselStateTreeStore<diesel::pg::PgConnection> {
     }
 }
 
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+pub struct DieselInTransactionStateTreeStore<'a, C: diesel::Connection> {
+    conn: &'a C,
+}
+
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+impl<'a, C: diesel::Connection> DieselInTransactionStateTreeStore<'a, C> {
+    pub fn new(conn: &'a C) -> Self {
+        Self { conn }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl<'a> StateTreeStore for DieselInTransactionStateTreeStore<'a, diesel::pg::PgConnection> {
+    fn has_tree(&self, circuit_id: &str, service_id: &str) -> Result<bool, InternalError> {
+        let postgres_backend = backend::InTransactionPostgresBackend::from(self.conn);
+        let tree_name = format!("{}::{}", circuit_id, service_id);
+        let iter = SqlMerkleRadixStore::new(&postgres_backend)
+            .list_trees()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        for tree_id in iter {
+            if tree_id.map_err(|e| InternalError::from_source(Box::new(e)))? == tree_name {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl<'a> StateTreeStore for DieselInTransactionStateTreeStore<'a, diesel::SqliteConnection> {
+    fn has_tree(&self, circuit_id: &str, service_id: &str) -> Result<bool, InternalError> {
+        let sqlite_backend = backend::InTransactionSqliteBackend::from(self.conn);
+        let tree_name = format!("{}::{}", circuit_id, service_id);
+        let iter = SqlMerkleRadixStore::new(&sqlite_backend)
+            .list_trees()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        for tree_id in iter {
+            if tree_id.map_err(|e| InternalError::from_source(Box::new(e)))? == tree_name {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}
+
 pub struct LmdbStateTreeStore {
     lmdb_db_factory: LmdbDatabaseFactory,
 }
