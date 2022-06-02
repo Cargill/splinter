@@ -16,6 +16,7 @@
 
 #[cfg(feature = "authorization-handler-allow-keys")]
 pub mod allow_keys;
+mod authorization_handler_result;
 #[cfg(feature = "authorization-handler-maintenance")]
 pub mod maintenance;
 mod permission;
@@ -28,22 +29,12 @@ use crate::error::InternalError;
 
 use super::identity::Identity;
 
+pub use authorization_handler_result::AuthorizationHandlerResult;
 pub use permission::Permission;
 pub use permission_map::PermissionMap;
 
 #[cfg(test)]
 pub use permission_map::Method;
-
-/// An authorization handler's decision about whether to allow, deny, or pass on the request
-pub enum AuthorizationHandlerResult {
-    /// The authorization handler has granted the requested permission
-    Allow,
-    /// The authorization handler has denied the requested permission
-    Deny,
-    /// The authorization handler is not able to determine if the requested permission should be
-    /// granted or denied
-    Continue,
-}
 
 /// Determines if a client has some permissions
 pub trait AuthorizationHandler: Send + Sync {
