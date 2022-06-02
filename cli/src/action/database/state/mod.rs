@@ -248,16 +248,24 @@ impl Action for StateMigrateAction {
 
                 // If dry_run, do not actually attempt to move the data
                 if !args.is_present("dry_run") {
-                    let state_writer = out_upgrade_stores.get_merkle_state(
-                        &circuit_id,
-                        &service_id,
-                        true,
-                    )?;
+                    out_upgrade_stores
+                        .in_transaction(Box::new(|out_upgrade_stores| {
+                            let state_writer = out_upgrade_stores.get_merkle_state(
+                                &circuit_id,
+                                &service_id,
+                                true,
+                            )?;
 
-                    copy_state(&state_reader, commit_hash.to_string(), &state_writer)?;
+                            copy_state(&state_reader, commit_hash.to_string(), &state_writer)?;
 
-                    // delete the existing scabbard state
-                    state_reader.delete_tree(&lmdb_db_factory)?;
+                            // delete the existing scabbard state
+                            state_reader
+                                .delete_tree(&lmdb_db_factory)
+                                .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+                            Ok(())
+                        }))
+                        .map_err(|e| CliError::ActionError(e.to_string()))?;
                 }
             }
             if !args.is_present("dry_run") {
@@ -316,15 +324,17 @@ fn copy_state(
     state_reader: &MerkleState,
     current_commit_hash: String,
     state_writer: &MerkleState,
-) -> Result<(), CliError> {
+) -> Result<(), InternalError> {
     let state_changes_iter = state_reader
         .filter_iter(&current_commit_hash, None)
         .map_err(|e| {
-            CliError::ActionError(format!("Unable to get leaves for commit hash: {}", e))
+            InternalError::with_message(format!("Unable to get leaves for commit hash: {}", e))
         })?;
 
     let mut count = 0;
-    let mut last_state_id = state_writer.get_state_root()?;
+    let mut last_state_id = state_writer
+        .get_state_root()
+        .map_err(|e| InternalError::from_source(Box::new(e)))?;
     let mut state_changes = vec![];
     let mut to_prune = vec![];
     for state_change in state_changes_iter {
@@ -338,14 +348,17 @@ fn copy_state(
                     last_state_id = state_writer
                         .commit(&last_state_id, &state_changes)
                         .map_err(|e| {
-                            CliError::ActionError(format!("Unable to commit state changes {}", e))
+                            InternalError::with_message(format!(
+                                "Unable to commit state changes {}",
+                                e
+                            ))
                         })?;
                     count = 0;
                     state_changes.clear()
                 }
             }
             Err(err) => {
-                return Err(CliError::ActionError(format!(
+                return Err(InternalError::with_message(format!(
                     "Cannot get state change: {}",
                     err
                 )))
@@ -356,14 +369,16 @@ fn copy_state(
     to_prune.push(last_state_id.to_string());
     last_state_id = state_writer
         .commit(&last_state_id, &state_changes)
-        .map_err(|e| CliError::ActionError(format!("Unable to commit state changes {}", e)))?;
+        .map_err(|e| {
+            InternalError::with_message(format!("Unable to commit state changes {}", e))
+        })?;
 
     if last_state_id == current_commit_hash {
         state_writer.prune(to_prune).map_err(|e| {
-            CliError::ActionError(format!("Unable to purge old commit hashes {}", e))
+            InternalError::with_message(format!("Unable to purge old commit hashes {}", e))
         })?;
     } else {
-        return Err(CliError::ActionError(format!(
+        return Err(InternalError::with_message(format!(
             "Ending commit hash did not match expected {} != {}",
             last_state_id, current_commit_hash
         )));
