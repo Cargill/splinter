@@ -257,17 +257,6 @@ impl<C: diesel::Connection + 'static> DieselStateTreeStore<C> {
 }
 
 #[cfg(feature = "sqlite")]
-pub fn sqlite_list_available_trees(
-    pool: &Pool<ConnectionManager<diesel::SqliteConnection>>,
-) -> Result<Vec<String>, CliError> {
-    let sqlite_backend = backend::SqliteBackend::from(pool.clone());
-    SqlMerkleRadixStore::new(&sqlite_backend)
-        .list_trees()
-        .and_then(|iter| iter.collect::<Result<Vec<_>, _>>())
-        .map_err(|e| CliError::ActionError(format!("{}", e)))
-}
-
-#[cfg(feature = "sqlite")]
 impl StateTreeStore for DieselStateTreeStore<diesel::SqliteConnection> {
     fn has_tree(&self, circuit_id: &str, service_id: &str) -> Result<bool, InternalError> {
         let sqlite_backend = backend::SqliteBackend::from(self.pool.clone());
@@ -301,17 +290,6 @@ impl StateTreeStore for DieselStateTreeStore<diesel::pg::PgConnection> {
         }
         Ok(false)
     }
-}
-
-#[cfg(feature = "postgres")]
-pub fn postgres_list_available_trees(
-    pool: &Pool<ConnectionManager<diesel::pg::PgConnection>>,
-) -> Result<Vec<String>, CliError> {
-    let postgres_backend = backend::PostgresBackend::from(pool.clone());
-    SqlMerkleRadixStore::new(&postgres_backend)
-        .list_trees()
-        .and_then(|iter| iter.collect::<Result<Vec<_>, _>>())
-        .map_err(|e| CliError::ActionError(format!("{}", e)))
 }
 
 pub struct LmdbStateTreeStore {
