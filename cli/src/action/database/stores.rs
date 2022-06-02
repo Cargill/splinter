@@ -41,9 +41,6 @@ pub trait UpgradeStores {
 
     fn new_receipt_store(&self, circuit_id: &str, service_id: &str) -> Box<dyn ReceiptStore>;
 
-    #[cfg(feature = "sqlite")]
-    fn get_sqlite_pool(&self) -> Pool<ConnectionManager<diesel::SqliteConnection>>;
-
     fn get_merkle_state(
         &self,
         circuit_id: &str,
@@ -51,8 +48,6 @@ pub trait UpgradeStores {
         create_tree: bool,
     ) -> Result<MerkleState, InternalError>;
 
-    #[cfg(feature = "postgres")]
-    fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>>;
 
     fn new_state_tree_store(&self) -> Box<dyn StateTreeStore>;
 }
@@ -140,12 +135,6 @@ impl UpgradeStores for PostgresUpgradeStores {
         ))
     }
 
-    // should never be used if using postgres
-    #[cfg(feature = "sqlite")]
-    fn get_sqlite_pool(&self) -> Pool<ConnectionManager<diesel::SqliteConnection>> {
-        unimplemented!()
-    }
-
     fn get_merkle_state(
         &self,
         circuit_id: &str,
@@ -165,10 +154,6 @@ impl UpgradeStores for PostgresUpgradeStores {
             .build()
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
         Ok(MerkleState::Postgres { state })
-    }
-
-    fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
-        self.0.clone()
     }
 
     fn new_state_tree_store(&self) -> Box<dyn StateTreeStore> {
@@ -208,10 +193,6 @@ impl UpgradeStores for SqliteUpgradeStores {
         ))
     }
 
-    fn get_sqlite_pool(&self) -> Pool<ConnectionManager<diesel::SqliteConnection>> {
-        self.0.clone()
-    }
-
     fn get_merkle_state(
         &self,
         circuit_id: &str,
@@ -231,12 +212,6 @@ impl UpgradeStores for SqliteUpgradeStores {
             .build()
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
         Ok(MerkleState::Sqlite { state })
-    }
-
-    // should never be used if using sqlite
-    #[cfg(feature = "postgres")]
-    fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
-        unimplemented!()
     }
 
     fn new_state_tree_store(&self) -> Box<dyn StateTreeStore> {
@@ -291,15 +266,6 @@ impl UpgradeStores for UpgradeStoresWithLmdb {
         create_tree: bool,
     ) -> Result<MerkleState, InternalError> {
         create_lmdb_merkle_state(&self.lmdb_db_factory, circuit_id, service_id, create_tree)
-    }
-
-    fn get_sqlite_pool(&self) -> Pool<ConnectionManager<diesel::SqliteConnection>> {
-        self.upgrade_stores.get_sqlite_pool()
-    }
-
-    #[cfg(feature = "postgres")]
-    fn get_postgres_pool(&self) -> Pool<ConnectionManager<diesel::PgConnection>> {
-        self.upgrade_stores.get_postgres_pool()
     }
 
     fn new_state_tree_store(&self) -> Box<dyn StateTreeStore> {
