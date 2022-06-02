@@ -24,16 +24,10 @@ use std::str::FromStr;
 use clap::ArgMatches;
 use scabbard::store::transact::factory::LmdbDatabaseFactory;
 use splinter::error::InternalError;
-use transact::state::{
-    merkle::{
-        kv::{MerkleRadixTree, MerkleState as TransactMerkleState},
-        sql::{backend, SqlMerkleStateBuilder},
-    },
-    Committer, Pruner, Reader, StateChange,
-};
+use transact::state::{Committer, Pruner, Reader, StateChange};
 
 use crate::action::database::{
-    stores::{new_upgrade_stores, UpgradeStores},
+    stores::{new_upgrade_stores, UpgradeStoresWithLmdb},
     ConnectionUri, SplinterEnvironment,
 };
 
@@ -123,27 +117,47 @@ impl Action for StateMigrateAction {
         };
 
         let in_upgrade_stores = match in_database {
-            "lmdb" => None,
-            _ => Some(
-                new_upgrade_stores(&ConnectionUri::from_str(in_database)?).map_err(|e| {
+            "lmdb" => {
+                let upgrade_stores = new_upgrade_stores(&ConnectionUri::from_str(&database_uri)?)
+                    .map_err(|e| {
                     CliError::ActionError(format!(
-                        "Unable to get stores for `--in` database {}: {}",
-                        in_database, e
+                        "Unable to get stores to fetch circuit information {}",
+                        e
                     ))
-                })?,
-            ),
+                })?;
+                Box::new(UpgradeStoresWithLmdb::new(
+                    upgrade_stores,
+                    lmdb_db_factory.clone(),
+                ))
+            }
+            _ => new_upgrade_stores(&ConnectionUri::from_str(in_database)?).map_err(|e| {
+                CliError::ActionError(format!(
+                    "Unable to get stores for `--in` database {}: {}",
+                    in_database, e
+                ))
+            })?,
         };
 
         let out_upgrade_stores = match out_database {
-            "lmdb" => None,
-            _ => Some(
-                new_upgrade_stores(&ConnectionUri::from_str(out_database)?).map_err(|e| {
+            "lmdb" => {
+                let upgrade_stores = new_upgrade_stores(&ConnectionUri::from_str(&database_uri)?)
+                    .map_err(|e| {
                     CliError::ActionError(format!(
-                        "Unable to get stores for `--out` database {}: {}",
-                        out_database, e
+                        "Unable to get stores to fetch circuit information {}",
+                        e
                     ))
-                })?,
-            ),
+                })?;
+                Box::new(UpgradeStoresWithLmdb::new(
+                    upgrade_stores,
+                    lmdb_db_factory.clone(),
+                ))
+            }
+            _ => new_upgrade_stores(&ConnectionUri::from_str(out_database)?).map_err(|e| {
+                CliError::ActionError(format!(
+                    "Unable to get stores for `--out` database {}: {}",
+                    out_database, e
+                ))
+            })?,
         };
 
         // Get the database that will be used to get circuit information
@@ -215,24 +229,16 @@ impl Action for StateMigrateAction {
                         ))
                     })?;
 
-                let state_reader = get_merkle_state(
-                    in_database,
-                    &circuit_id,
-                    &service_id,
-                    &in_upgrade_stores,
-                    &lmdb_db_factory,
-                    false,
-                )?;
+                let state_reader = in_upgrade_stores
+                    .get_merkle_state(&circuit_id, &service_id, false)
+                    .map_err(|e| CliError::ActionError(e.to_string()))?;
 
                 // check if the tree already exists and error if so unless force is set
                 if !args.is_present("force")
-                    && database_exists(
-                        out_database,
-                        &circuit_id,
-                        &service_id,
-                        &out_upgrade_stores,
-                        &lmdb_db_factory,
-                    )?
+                    && out_upgrade_stores
+                        .new_state_tree_store()
+                        .has_tree(&circuit_id, &service_id)
+                        .map_err(|e| CliError::ActionError(e.to_string()))?
                 {
                     return Err(CliError::ActionError(format!(
                         "Merkle Tree for {}::{} in {} already exists",
@@ -242,12 +248,9 @@ impl Action for StateMigrateAction {
 
                 // If dry_run, do not actually attempt to move the data
                 if !args.is_present("dry_run") {
-                    let state_writer = get_merkle_state(
-                        out_database,
+                    let state_writer = out_upgrade_stores.get_merkle_state(
                         &circuit_id,
                         &service_id,
-                        &out_upgrade_stores,
-                        &lmdb_db_factory,
                         true,
                     )?;
 
@@ -367,173 +370,4 @@ fn copy_state(
     }
 
     Ok(())
-}
-
-/// Get a the state for the provide
-///
-/// # Arguments
-///
-/// * `database` - The database URI for the MerkleState
-/// * `circuit_id` - The circuit the Scabbard state belongs too
-/// * `service_id` - The service the Scabbard state belongs too
-/// * `upgrade_stores` - The UpgradeStores struct that should be used to get Postgres or Sqlite
-/// *   pool
-/// * `lmdb_db_factory` - The factory to create LMDB databases
-/// * `create_tree` - Whether the tree should be created if it does not exist
-fn get_merkle_state(
-    database: &str,
-    circuit_id: &str,
-    service_id: &str,
-    upgrade_stores: &Option<Box<dyn UpgradeStores>>,
-    lmdb_db_factory: &LmdbDatabaseFactory,
-    create_tree: bool,
-) -> Result<MerkleState, CliError> {
-    match database {
-        "lmdb" => {
-            if !create_tree {
-                let path = lmdb_db_factory
-                    .compute_path(circuit_id, service_id)
-                    .map_err(|e| CliError::ActionError(format!("{}", e)))?
-                    .with_extension("lmdb");
-
-                if !path.is_file() {
-                    return Err(CliError::ActionError(format!(
-                        "LMDB file for service {}::{} ({:?}) does not exist",
-                        circuit_id, service_id, path
-                    )));
-                }
-            }
-            let state = lmdb_db_factory
-                .get_database(circuit_id, service_id)
-                .map_err(|e| CliError::ActionError(format!("{}", e)))?;
-            let merkle_root = MerkleRadixTree::new(Box::new(state.clone()), None)
-                .map_err(|e| CliError::ActionError(format!("{}", e)))?
-                .get_merkle_root();
-            Ok(MerkleState::Lmdb {
-                state: TransactMerkleState::new(Box::new(state)),
-                merkle_root,
-                tree_id: (circuit_id.to_string(), service_id.to_string()),
-            })
-        }
-        _ => {
-            if let Some(upgrade_stores) = &upgrade_stores {
-                let connection_uri = ConnectionUri::from_str(database)
-                    .map_err(|e| CliError::ActionError(format!("{}", e)))?;
-                match connection_uri {
-                    #[cfg(feature = "postgres")]
-                    ConnectionUri::Postgres(_) => {
-                        let pool = upgrade_stores.get_postgres_pool();
-                        let backend = backend::PostgresBackend::from(pool);
-                        let mut builder = SqlMerkleStateBuilder::new()
-                            .with_backend(backend)
-                            .with_tree(format!("{}::{}", circuit_id, service_id));
-
-                        if create_tree {
-                            builder = builder.create_tree_if_necessary();
-                        }
-
-                        let state = builder.build().map_err(|e| {
-                            CliError::ActionError(format!(
-                                "Unable to get database for Merkle tree {}::{}: {}",
-                                circuit_id, service_id, e
-                            ))
-                        })?;
-                        Ok(MerkleState::Postgres { state })
-                    }
-                    #[cfg(feature = "sqlite")]
-                    ConnectionUri::Sqlite(_) => {
-                        let pool = upgrade_stores.get_sqlite_pool();
-                        let backend = backend::SqliteBackend::from(pool);
-                        let mut builder = SqlMerkleStateBuilder::new()
-                            .with_backend(backend)
-                            .with_tree(format!("{}::{}", circuit_id, service_id));
-
-                        if create_tree {
-                            builder = builder.create_tree_if_necessary();
-                        }
-
-                        let state = builder.build().map_err(|e| {
-                            CliError::ActionError(format!(
-                                "Unable to get database for Merkle tree {}::{}: {}",
-                                circuit_id, service_id, e
-                            ))
-                        })?;
-                        Ok(MerkleState::Sqlite { state })
-                    }
-                }
-            } else {
-                // this should never happen
-                Err(CliError::ActionError(
-                    "Upgrade store for database type is not configured".to_string(),
-                ))
-            }
-        }
-    }
-}
-
-/// Check if the database exists
-///
-/// # Arguments
-///
-/// * `database` - The database URI for the MerkleState
-/// * `circuit_id` - The circuit the Scabbard state belongs too
-/// * `service_id` - The service the Scabbard state belongs too
-/// * `upgrade_stores` - The UpgradeStores struct that should be used to get Postgres or Sqlite
-/// *   pool
-/// * `lmdb_db_factory` - The factory to check LMDB databases
-fn database_exists(
-    database: &str,
-    circuit_id: &str,
-    service_id: &str,
-    upgrade_stores: &Option<Box<dyn UpgradeStores>>,
-    lmdb_db_factory: &LmdbDatabaseFactory,
-) -> Result<bool, CliError> {
-    let tree_name = format!("{}::{}", circuit_id, service_id);
-    match database {
-        "lmdb" => {
-            let path = lmdb_db_factory
-                .compute_path(circuit_id, service_id)
-                .map_err(|e| CliError::ActionError(format!("{}", e)))?
-                .with_extension("lmdb");
-
-            Ok(path.is_file())
-        }
-        _ => {
-            if let Some(upgrade_stores) = &upgrade_stores {
-                let connection_uri = ConnectionUri::from_str(database)
-                    .map_err(|e| CliError::ActionError(format!("{}", e)))?;
-                match connection_uri {
-                    #[cfg(feature = "postgres")]
-                    ConnectionUri::Postgres(_) => {
-                        let pool = upgrade_stores.get_postgres_pool();
-                        merkle::postgres_list_available_trees(&pool)
-                            .map(|trees| Ok(trees.contains(&tree_name)))
-                            .map_err(|e| {
-                                CliError::ActionError(format!(
-                                    "Unable to read merkle state trees in postgres: {}",
-                                    e
-                                ))
-                            })?
-                    }
-                    #[cfg(feature = "sqlite")]
-                    ConnectionUri::Sqlite(_) => {
-                        let pool = upgrade_stores.get_sqlite_pool();
-                        merkle::sqlite_list_available_trees(&pool)
-                            .map(|trees| Ok(trees.contains(&tree_name)))
-                            .map_err(|e| {
-                                CliError::ActionError(format!(
-                                    "Unable to read merkle state trees in sqlite: {}",
-                                    e
-                                ))
-                            })?
-                    }
-                }
-            } else {
-                // this should never happen
-                Err(CliError::ActionError(
-                    "Upgrade store for database type is not configured".to_string(),
-                ))
-            }
-        }
-    }
 }
