@@ -32,14 +32,21 @@ use super::state::{LmdbStateTreeStore, MerkleState, StateTreeStore};
 use super::ConnectionUri;
 
 pub trait UpgradeStores {
-    fn new_admin_service_store(&self) -> Box<dyn AdminServiceStore>;
+    fn new_admin_service_store<'a>(&'a self) -> Box<dyn AdminServiceStore + 'a>;
 
-    fn new_node_id_store(&self) -> Box<dyn NodeIdStore>;
+    fn new_node_id_store<'a>(&'a self) -> Box<dyn NodeIdStore + 'a>;
 
-    fn new_commit_hash_store(&self, circuit_id: &str, service_id: &str)
-        -> Box<dyn CommitHashStore>;
+    fn new_commit_hash_store<'a>(
+        &'a self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> Box<dyn CommitHashStore + 'a>;
 
-    fn new_receipt_store(&self, circuit_id: &str, service_id: &str) -> Box<dyn ReceiptStore>;
+    fn new_receipt_store<'a>(
+        &'a self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> Box<dyn ReceiptStore + 'a>;
 
     fn get_merkle_state(
         &self,
@@ -48,8 +55,7 @@ pub trait UpgradeStores {
         create_tree: bool,
     ) -> Result<MerkleState, InternalError>;
 
-
-    fn new_state_tree_store(&self) -> Box<dyn StateTreeStore>;
+    fn new_state_tree_store<'a>(&'a self) -> Box<dyn StateTreeStore + 'a>;
 }
 
 pub fn new_upgrade_stores(
@@ -237,24 +243,28 @@ impl UpgradeStoresWithLmdb {
 }
 
 impl UpgradeStores for UpgradeStoresWithLmdb {
-    fn new_admin_service_store(&self) -> Box<dyn AdminServiceStore> {
+    fn new_admin_service_store<'a>(&'a self) -> Box<dyn AdminServiceStore + 'a> {
         self.upgrade_stores.new_admin_service_store()
     }
 
-    fn new_node_id_store(&self) -> Box<dyn NodeIdStore> {
+    fn new_node_id_store<'a>(&'a self) -> Box<dyn NodeIdStore + 'a> {
         self.upgrade_stores.new_node_id_store()
     }
 
-    fn new_commit_hash_store(
-        &self,
+    fn new_commit_hash_store<'a>(
+        &'a self,
         circuit_id: &str,
         service_id: &str,
-    ) -> Box<dyn CommitHashStore> {
+    ) -> Box<dyn CommitHashStore + 'a> {
         self.upgrade_stores
             .new_commit_hash_store(circuit_id, service_id)
     }
 
-    fn new_receipt_store(&self, circuit_id: &str, service_id: &str) -> Box<dyn ReceiptStore> {
+    fn new_receipt_store<'a>(
+        &'a self,
+        circuit_id: &str,
+        service_id: &str,
+    ) -> Box<dyn ReceiptStore + 'a> {
         self.upgrade_stores
             .new_receipt_store(circuit_id, service_id)
     }
