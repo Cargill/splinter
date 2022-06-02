@@ -34,7 +34,7 @@ use crate::action::database::{
 use super::{Action, CliError};
 
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
-pub use self::merkle::DieselStateTreeStore;
+pub use self::merkle::{DieselInTransactionStateTreeStore, DieselStateTreeStore};
 pub use self::merkle::{LmdbStateTreeStore, MerkleState};
 
 /// A source of available trees
