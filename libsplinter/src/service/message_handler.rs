@@ -42,7 +42,7 @@ pub trait MessageHandler {
         message: Self::Message,
     ) -> Result<(), InternalError>;
 
-    fn into_handler<C, R>(self, converter: C) -> IntoMessageHandler<Self, C, Self::Message, R>
+    fn into_handler<C, R>(self, converter: C) -> IntoMessageHandler<Self, C, R>
     where
         Self: Sized,
         C: MessageConverter<Self::Message, R>,
@@ -51,32 +51,30 @@ pub trait MessageHandler {
     }
 }
 
-pub struct IntoMessageHandler<H, C, L, R> {
+pub struct IntoMessageHandler<H, C, R> {
     inner: H,
     converter: C,
-    _left: std::marker::PhantomData<L>,
     _right: std::marker::PhantomData<R>,
 }
 
-impl<H, C, L, R> IntoMessageHandler<H, C, L, R>
+impl<H, C, R> IntoMessageHandler<H, C, R>
 where
-    H: MessageHandler<Message = L>,
-    C: MessageConverter<L, R>,
+    H: MessageHandler,
+    C: MessageConverter<<H as MessageHandler>::Message, R>,
 {
     fn new(inner: H, converter: C) -> Self {
         Self {
             inner,
             converter,
-            _left: std::marker::PhantomData,
             _right: std::marker::PhantomData,
         }
     }
 }
 
-impl<H, C, L, R> MessageHandler for IntoMessageHandler<H, C, L, R>
+impl<H, C, R> MessageHandler for IntoMessageHandler<H, C, R>
 where
-    H: MessageHandler<Message = L>,
-    C: MessageConverter<L, R>,
+    H: MessageHandler,
+    C: MessageConverter<<H as MessageHandler>::Message, R>,
 {
     type Message = R;
 
