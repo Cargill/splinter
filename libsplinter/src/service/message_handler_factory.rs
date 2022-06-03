@@ -95,12 +95,7 @@ where
         + 'static,
     R: 'static,
 {
-    type MessageHandler = IntoMessageHandler<
-        <F as MessageHandlerFactory>::MessageHandler,
-        C,
-        <<F as MessageHandlerFactory>::MessageHandler as MessageHandler>::Message,
-        R,
-    >;
+    type MessageHandler = IntoMessageHandler<<F as MessageHandlerFactory>::MessageHandler, C, R>;
 
     fn new_handler(&self) -> Self::MessageHandler {
         let handler = self.inner.new_handler();
