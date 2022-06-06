@@ -19,9 +19,13 @@ pub(crate) mod actix;
 #[cfg(feature = "authorization")]
 pub mod authorization;
 #[cfg(feature = "rest-api-actix-web-1")]
+mod authorization_header;
+#[cfg(feature = "rest-api-actix-web-1")]
 mod authorization_result;
 pub mod identity;
 
+#[cfg(feature = "rest-api-actix-web-1")]
+pub use authorization_header::AuthorizationHeader;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub use authorization_result::AuthorizationResult;
 
@@ -146,33 +150,6 @@ fn get_identity(
             None
         })
     })
-}
-
-/// A parsed authorization header
-#[derive(PartialEq)]
-pub enum AuthorizationHeader {
-    Bearer(BearerToken),
-    Custom(String),
-}
-
-/// Parses an authorization string. This implementation will attempt to parse the string in the
-/// format "<scheme> <value>" to a known scheme. If the string does not match this format or the
-/// scheme is unknown, the `AuthorizationHeader::Custom` variant will be returned with the whole
-/// authorization string.
-impl FromStr for AuthorizationHeader {
-    type Err = InvalidArgumentError;
-
-    fn from_str(str: &str) -> Result<Self, Self::Err> {
-        let mut parts = str.splitn(2, ' ');
-        match (parts.next(), parts.next()) {
-            (Some(auth_scheme), Some(value)) => match auth_scheme {
-                "Bearer" => Ok(AuthorizationHeader::Bearer(value.parse()?)),
-                _ => Ok(AuthorizationHeader::Custom(str.to_string())),
-            },
-            (Some(_), None) => Ok(AuthorizationHeader::Custom(str.to_string())),
-            _ => unreachable!(), // splitn always returns at least one item
-        }
-    }
 }
 
 /// A bearer token of a specific type
