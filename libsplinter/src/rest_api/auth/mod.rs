@@ -22,14 +22,14 @@ pub mod authorization;
 mod authorization_header;
 #[cfg(feature = "rest-api-actix-web-1")]
 mod authorization_result;
+mod bearer_token;
 pub mod identity;
 
 #[cfg(feature = "rest-api-actix-web-1")]
 pub use authorization_header::AuthorizationHeader;
 #[cfg(feature = "rest-api-actix-web-1")]
 pub use authorization_result::AuthorizationResult;
-
-use std::str::FromStr;
+pub use bearer_token::BearerToken;
 
 use crate::error::InvalidArgumentError;
 
@@ -150,50 +150,6 @@ fn get_identity(
             None
         })
     })
-}
-
-/// A bearer token of a specific type
-#[derive(PartialEq)]
-pub enum BearerToken {
-    #[cfg(feature = "biome-credentials")]
-    /// Contains a Biome JWT
-    Biome(String),
-    /// Contains a custom token, which is any bearer token that does not match one of the other
-    /// variants of this enum
-    Custom(String),
-    #[cfg(feature = "cylinder-jwt")]
-    /// Contains a Cylinder JWT
-    Cylinder(String),
-    #[cfg(feature = "oauth")]
-    /// Contains an OAuth2 token
-    OAuth2(String),
-}
-
-/// Parses a bearer token string. This implementation will attempt to parse the token in the format
-/// "<type>:<value>" to a know type. If the token does not match this format or the type is unknown,
-/// the `BearerToken::Custom` variant will be returned with the whole token value.
-impl FromStr for BearerToken {
-    type Err = InvalidArgumentError;
-
-    fn from_str(str: &str) -> Result<Self, Self::Err> {
-        let mut parts = str.splitn(2, ':');
-        match (parts.next(), parts.next()) {
-            // Allowing lint in case none of `biome-credentials`, `cylinder-jwt`, or `oauth` are
-            // used
-            #[allow(unused_variables, clippy::match_single_binding)]
-            (Some(token_type), Some(token)) => match token_type {
-                #[cfg(feature = "biome-credentials")]
-                "Biome" => Ok(BearerToken::Biome(token.to_string())),
-                #[cfg(feature = "cylinder-jwt")]
-                "Cylinder" => Ok(BearerToken::Cylinder(token.to_string())),
-                #[cfg(feature = "oauth")]
-                "OAuth2" => Ok(BearerToken::OAuth2(token.to_string())),
-                _ => Ok(BearerToken::Custom(str.to_string())),
-            },
-            (Some(_), None) => Ok(BearerToken::Custom(str.to_string())),
-            _ => unreachable!(), // splitn always returns at least one item
-        }
-    }
 }
 
 #[cfg(test)]
