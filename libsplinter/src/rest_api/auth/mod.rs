@@ -18,7 +18,12 @@
 pub(crate) mod actix;
 #[cfg(feature = "authorization")]
 pub mod authorization;
+#[cfg(feature = "rest-api-actix-web-1")]
+mod authorization_result;
 pub mod identity;
+
+#[cfg(feature = "rest-api-actix-web-1")]
+pub use authorization_result::AuthorizationResult;
 
 use std::str::FromStr;
 
@@ -31,25 +36,6 @@ use super::Method;
 use authorization::{AuthorizationHandler, AuthorizationHandlerResult, Permission, PermissionMap};
 #[cfg(feature = "rest-api-actix-web-1")]
 use identity::{Identity, IdentityProvider};
-
-/// The possible outcomes of attempting to authorize a client
-#[cfg(feature = "rest-api-actix-web-1")]
-enum AuthorizationResult {
-    /// The client was authorized to the given identity based on the authorization header
-    Authorized(Identity),
-    /// The requested endpoint does not require authorization
-    #[cfg(any(
-        feature = "authorization",
-        feature = "biome-credentials",
-        feature = "oauth"
-    ))]
-    NoAuthorizationNecessary,
-    /// The authorization header is empty or invalid
-    Unauthorized,
-    /// The request endpoint is not defined
-    #[cfg(feature = "authorization")]
-    UnknownEndpoint,
-}
 
 /// Uses the given identity providers to check authorization for the request. This function is
 /// backend-agnostic and intended as a helper for the backend REST API implementations.
