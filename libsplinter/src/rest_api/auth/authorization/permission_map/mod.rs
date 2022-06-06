@@ -12,20 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::rest_api::actix_web_1::Method as Actix1Method;
+#[cfg(test)]
+mod method;
+mod path_component;
+mod request_definition;
+
+use std::borrow::Borrow;
 
 use super::Permission;
 
+#[cfg(test)]
+pub use method::Method;
+
+use path_component::PathComponent;
+use request_definition::RequestDefinition;
+
 /// A map used to correlate requests with the permissions that guard them.
-#[derive(Default)]
-pub struct PermissionMap {
-    internal: Vec<(RequestDefinition, Permission)>,
+pub struct PermissionMap<M> {
+    internal: Vec<(RequestDefinition<M>, Permission)>,
 }
 
-impl PermissionMap {
+impl<M: PartialEq + Clone> Default for PermissionMap<M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<M: PartialEq + Clone> PermissionMap<M> {
     /// Creates a new permission map
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            internal: Vec::new(),
+        }
     }
 
     /// Gets a list of all permissions.
@@ -33,138 +51,37 @@ impl PermissionMap {
         self.internal.iter().map(|(_, perm)| *perm)
     }
 
+    /// Takes the contents of another `PermissionMap` and merges them into itself. This consumes the
+    /// contents of the other map.
+    pub fn append(&mut self, other: &mut PermissionMap<M>) {
+        self.internal.append(&mut other.internal)
+    }
+
     /// Sets the permission for the given (method, endpoint) pair. The endpoint may contain path
     /// variables surrounded by `{}`.
-    pub fn add_permission<M>(&mut self, method: M, endpoint: &str, permission: Permission)
-    where
-        M: Into<Method>,
-    {
+    pub fn add_permission(&mut self, method: M, endpoint: &str, permission: Permission) {
         self.internal
-            .push((RequestDefinition::new(method.into(), endpoint), permission));
+            .push((RequestDefinition::new(method, endpoint), permission));
     }
 
     /// Gets the permission for a request. This will attempt to match the method and endpoint to a
     /// known (method, endpoint) pair, considering path variables of known endpoints.
-    pub fn get_permission<M>(&self, method: M, endpoint: &str) -> Option<&Permission>
+    pub fn get_permission<O>(&self, method: &O, endpoint: &str) -> Option<&Permission>
     where
-        M: Into<Method> + Copy,
+        O: Borrow<M>,
     {
         self.internal
             .iter()
-            .find(|(req, _)| req.matches(&method.into(), endpoint))
+            .find(|(req, _)| req.matches(method.borrow(), endpoint))
             .map(|(_, perm)| perm)
-    }
-
-    /// Takes the contents of another `PermissionMap` and merges them into itself. This consumes the
-    /// contents of the other map.
-    pub fn append(&mut self, other: &mut PermissionMap) {
-        self.internal.append(&mut other.internal)
-    }
-}
-
-#[derive(PartialEq, Clone)]
-pub enum Method {
-    Get,
-    Post,
-    Put,
-    Patch,
-    Delete,
-    Head,
-    Options,
-    Connect,
-    Trace,
-    Extension(String),
-}
-
-impl From<&Actix1Method> for Method {
-    fn from(source: &Actix1Method) -> Self {
-        match source {
-            Actix1Method::Get => Method::Get,
-            Actix1Method::Post => Method::Post,
-            Actix1Method::Put => Method::Put,
-            Actix1Method::Patch => Method::Patch,
-            Actix1Method::Delete => Method::Delete,
-            Actix1Method::Head => Method::Head,
-        }
-    }
-}
-
-impl From<Actix1Method> for Method {
-    fn from(source: crate::rest_api::actix_web_1::Method) -> Self {
-        (&source).into()
-    }
-}
-
-/// A (method, endpoint) definition that will be used to match requests
-struct RequestDefinition {
-    method: Method,
-    path: Vec<PathComponent>,
-}
-
-impl RequestDefinition {
-    /// Creates a new request definition
-    pub fn new(method: Method, endpoint: &str) -> Self {
-        let path = endpoint
-            .strip_prefix('/')
-            .unwrap_or(endpoint)
-            .split('/')
-            .map(PathComponent::from)
-            .collect();
-
-        Self { method, path }
-    }
-
-    /// Checks if the given request matches this definition, considering any variable path
-    /// components.
-    pub fn matches(&self, method: &Method, endpoint: &str) -> bool {
-        let components = endpoint
-            .strip_prefix('/')
-            .unwrap_or(endpoint)
-            .split('/')
-            .collect::<Vec<_>>();
-
-        method == &self.method
-            && self.path.len() == components.len()
-            && components.iter().enumerate().all(|(idx, component)| {
-                self.path
-                    .get(idx)
-                    .map(|path_component| path_component == component)
-                    .unwrap_or(false)
-            })
-    }
-}
-
-/// A component of an endpoint path
-#[derive(PartialEq)]
-enum PathComponent {
-    /// A standard path component where matching is done on the internal string
-    Text(String),
-    /// A variable path component that matches any string
-    Variable,
-}
-
-impl From<&str> for PathComponent {
-    fn from(component: &str) -> Self {
-        if component.starts_with('{') && component.ends_with('}') {
-            PathComponent::Variable
-        } else {
-            PathComponent::Text(component.into())
-        }
-    }
-}
-
-impl PartialEq<&str> for PathComponent {
-    fn eq(&self, other: &&str) -> bool {
-        match self {
-            PathComponent::Variable => true,
-            PathComponent::Text(component) => other == component,
-        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::rest_api::actix_web_1::Method as Actix1Method;
 
     /// Verifies that a `PathComponent` is correctly parsed
     #[test]

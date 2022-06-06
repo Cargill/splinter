@@ -78,7 +78,7 @@ fn authorize(
     )))]
     _endpoint: &str,
     auth_header: Option<&str>,
-    #[cfg(feature = "authorization")] permission_map: &PermissionMap,
+    #[cfg(feature = "authorization")] permission_map: &PermissionMap<Method>,
     identity_providers: &[Box<dyn IdentityProvider>],
     #[cfg(feature = "authorization")] authorization_handlers: &[Box<dyn AuthorizationHandler>],
 ) -> AuthorizationResult {

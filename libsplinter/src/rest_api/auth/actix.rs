@@ -160,7 +160,7 @@ where
             };
 
         #[cfg(feature = "authorization")]
-        let permission_map = match req.app_data::<PermissionMap>() {
+        let permission_map = match req.app_data::<PermissionMap<Method>>() {
             Some(map) => map,
             None => {
                 error!("Missing REST API permission map");
@@ -287,7 +287,7 @@ mod tests {
 
         #[cfg(feature = "authorization")]
         let app = {
-            let mut permission_map = PermissionMap::default();
+            let mut permission_map = PermissionMap::<Method>::new();
             permission_map.add_permission(Method::Get, "/", Permission::AllowAuthenticated);
             app.data(permission_map)
         };
@@ -314,7 +314,7 @@ mod tests {
 
         #[cfg(feature = "authorization")]
         let app = {
-            let mut permission_map = PermissionMap::default();
+            let mut permission_map = PermissionMap::<Method>::new();
             permission_map.add_permission(Method::Get, "/", Permission::AllowAuthenticated);
             app.data(permission_map)
         };
@@ -354,7 +354,7 @@ mod tests {
 
         #[cfg(feature = "authorization")]
         let app = {
-            let mut permission_map = PermissionMap::default();
+            let mut permission_map = PermissionMap::<Method>::new();
             permission_map.add_permission(Method::Get, "/", Permission::AllowAuthenticated);
             app.data(permission_map)
         };
