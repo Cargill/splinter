@@ -14,6 +14,10 @@
 
 //! Authorization middleware for the Actix REST API
 
+mod transform;
+
+pub use transform::Authorization;
+
 use actix_web::dev::*;
 use actix_web::{
     http::{
@@ -22,10 +26,7 @@ use actix_web::{
     },
     Error as ActixError, HttpMessage, HttpResponse,
 };
-use futures::{
-    future::{ok, FutureResult},
-    Future, IntoFuture, Poll,
-};
+use futures::{Future, IntoFuture, Poll};
 
 use crate::rest_api::ErrorResponse;
 #[cfg(feature = "authorization")]
@@ -34,52 +35,6 @@ use crate::rest_api::Method;
 #[cfg(feature = "authorization")]
 use super::authorization::{AuthorizationHandler, PermissionMap};
 use super::{authorize, identity::IdentityProvider, AuthorizationResult};
-
-/// Wrapper for the authorization middleware
-#[derive(Clone)]
-pub struct Authorization {
-    identity_providers: Vec<Box<dyn IdentityProvider>>,
-    #[cfg(feature = "authorization")]
-    authorization_handlers: Vec<Box<dyn AuthorizationHandler>>,
-}
-
-impl Authorization {
-    pub fn new(
-        identity_providers: Vec<Box<dyn IdentityProvider>>,
-        #[cfg(feature = "authorization")] authorization_handlers: Vec<
-            Box<dyn AuthorizationHandler>,
-        >,
-    ) -> Self {
-        Self {
-            identity_providers,
-            #[cfg(feature = "authorization")]
-            authorization_handlers,
-        }
-    }
-}
-
-impl<S, B> Transform<S> for Authorization
-where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = ActixError>,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
-    type Error = S::Error;
-    type InitError = ();
-    type Transform = AuthorizationMiddleware<S>;
-    type Future = FutureResult<Self::Transform, Self::InitError>;
-
-    fn new_transform(&self, service: S) -> Self::Future {
-        ok(AuthorizationMiddleware {
-            identity_providers: self.identity_providers.clone(),
-            #[cfg(feature = "authorization")]
-            authorization_handlers: self.authorization_handlers.clone(),
-            service,
-        })
-    }
-}
 
 /// Authorization middleware for the Actix REST API
 pub struct AuthorizationMiddleware<S> {
