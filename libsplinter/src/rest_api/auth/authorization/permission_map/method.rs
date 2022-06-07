@@ -22,10 +22,6 @@ pub enum Method {
     Patch,
     Delete,
     Head,
-    Options,
-    Connect,
-    Trace,
-    Extension(String),
 }
 
 impl From<&Actix1Method> for Method {
