@@ -75,95 +75,141 @@ impl LifecycleDispatch for SyncLifecycleInterface {
             return Ok(());
         }
 
-        if self
+        let mut fetch_service = self
             .store
             .get_service(&service_id)
-            .map_err(|err| InternalError::from_source(Box::new(err)))?
-            .is_some()
-        {
-            trace!(
-                "Skip adding service: {}::{} ({}), already exists",
-                circuit_id,
-                service_id,
-                service_type,
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        // check if the service has already been prepared and finalized
+        if let Some(ref service) = fetch_service {
+            if service.command() == &LifecycleCommand::Finalize
+                && service.status() == &LifecycleStatus::Complete
+            {
+                trace!(
+                    "Skip adding service: {}::{} ({}), already exists",
+                    circuit_id,
+                    service_id,
+                    service_type,
+                );
+                return Ok(());
+            }
+        }
+
+        // check if the service is pending but is not completed
+        if let Some(ref service) = fetch_service {
+            if service.command() == &LifecycleCommand::Prepare
+                && service.status() == &LifecycleStatus::New
+            {
+                let mut prepare_service = service.clone();
+                // Wait for the service to be prepared
+                let instant = Instant::now();
+                while prepare_service.status() == &LifecycleStatus::New {
+                    if instant.elapsed() > self.time_to_wait {
+                        return Err(InternalError::with_message(format!(
+                            "Service {} was not prepared in time",
+                            service_id
+                        )));
+                    }
+
+                    thread::sleep(TIME_BETWEEN_DATABASE_CHECK);
+                    prepare_service = self
+                        .store
+                        .get_service(&service_id)
+                        .map_err(|err| InternalError::from_source(Box::new(err)))?
+                        .ok_or_else(|| {
+                            InternalError::with_message(format!(
+                                "Unable to get service {}",
+                                service_id
+                            ))
+                        })?;
+                }
+            }
+        } else {
+            debug!(
+                "Adding service: {}::{} ({})",
+                circuit_id, service_id, service_type,
             );
-            return Ok(());
-        }
 
-        debug!(
-            "Adding service: {}::{} ({})",
-            circuit_id, service_id, service_type,
-        );
+            let mut prepare_service = LifecycleServiceBuilder::new()
+                .with_service_id(&service_id)
+                .with_service_type(&service_type)
+                .with_arguments(&args)
+                .with_status(&LifecycleStatus::New)
+                .with_command(&LifecycleCommand::Prepare)
+                .build()
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        let mut service = LifecycleServiceBuilder::new()
-            .with_service_id(&service_id)
-            .with_service_type(&service_type)
-            .with_arguments(&args)
-            .with_status(&LifecycleStatus::New)
-            .with_command(&LifecycleCommand::Prepare)
-            .build()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            self.store
+                .add_service(prepare_service.clone())
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        self.store
-            .add_service(service.clone())
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            self.alarm
+                .wake_up(service_type.clone(), Some(service_id.clone()))?;
 
-        self.alarm
-            .wake_up(service_type.clone(), Some(service_id.clone()))?;
+            // Wait for the service to be prepared
+            let instant = Instant::now();
+            while prepare_service.status() == &LifecycleStatus::New {
+                if instant.elapsed() > self.time_to_wait {
+                    return Err(InternalError::with_message(format!(
+                        "Service {} was not prepared in time",
+                        service_id
+                    )));
+                }
 
-        // Wait for the service to be prepared
-        let instant = Instant::now();
-        while service.status() == &LifecycleStatus::New {
-            if instant.elapsed() > self.time_to_wait {
-                return Err(InternalError::with_message(format!(
-                    "Service {} was not prepared in time",
-                    service_id
-                )));
+                thread::sleep(TIME_BETWEEN_DATABASE_CHECK);
+                prepare_service = self
+                    .store
+                    .get_service(&service_id)
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?
+                    .ok_or_else(|| {
+                        InternalError::with_message(format!("Unable to get service {}", service_id))
+                    })?;
             }
 
-            thread::sleep(TIME_BETWEEN_DATABASE_CHECK);
-            service = self
-                .store
-                .get_service(&service_id)
-                .map_err(|err| InternalError::from_source(Box::new(err)))?
-                .ok_or_else(|| {
-                    InternalError::with_message(format!("Unable to get service {}", service_id))
-                })?;
+            fetch_service = Some(prepare_service)
         }
 
-        // Now that the service is prepared, finalize
-        service = service
-            .into_builder()
-            .with_status(&LifecycleStatus::New)
-            .with_command(&LifecycleCommand::Finalize)
-            .build()
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        if let Some(ref service) = fetch_service {
+            if service.command() == &LifecycleCommand::Prepare {
+                // Now that the service is prepared, finalize
+                let mut finalize_service = service
+                    .clone()
+                    .into_builder()
+                    .with_status(&LifecycleStatus::New)
+                    .with_command(&LifecycleCommand::Finalize)
+                    .build()
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        self.store
-            .update_service(service.clone())
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                self.store
+                    .update_service(finalize_service.clone())
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        self.alarm
-            .wake_up(service_type.clone(), Some(service_id.clone()))?;
+                self.alarm
+                    .wake_up(service_type.clone(), Some(service_id.clone()))?;
 
-        // Wait for the service to be prepared
-        let instant = Instant::now();
-        while service.status() == &LifecycleStatus::New {
-            if instant.elapsed() > self.time_to_wait {
-                return Err(InternalError::with_message(format!(
-                    "Service {} was not finalized in time",
-                    service_id
-                )));
+                // Wait for the service to be finalized
+                let instant = Instant::now();
+                while finalize_service.status() == &LifecycleStatus::New {
+                    if instant.elapsed() > self.time_to_wait {
+                        return Err(InternalError::with_message(format!(
+                            "Service {} was not finalized in time",
+                            service_id
+                        )));
+                    }
+
+                    thread::sleep(TIME_BETWEEN_DATABASE_CHECK);
+                    finalize_service = self
+                        .store
+                        .get_service(&service_id)
+                        .map_err(|err| InternalError::from_source(Box::new(err)))?
+                        .ok_or_else(|| {
+                            InternalError::with_message(format!(
+                                "Unable to get service {}",
+                                service_id
+                            ))
+                        })?;
+                }
             }
-
-            thread::sleep(TIME_BETWEEN_DATABASE_CHECK);
-            service = self
-                .store
-                .get_service(&service_id)
-                .map_err(|err| InternalError::from_source(Box::new(err)))?
-                .ok_or_else(|| {
-                    InternalError::with_message(format!("Unable to get service {}", service_id))
-                })?;
         }
 
         Ok(())
@@ -495,6 +541,58 @@ mod tests {
             vec!["test".to_string()],
             Duration::from_secs(10),
         );
+
+        interface
+            .add_service(
+                "ABCDE-12345",
+                "a000",
+                "test",
+                vec![("arg1".into(), "1".into()), ("arg2".into(), "2".into())],
+            )
+            .unwrap();
+
+        let service = store
+            .get_service(&FullyQualifiedServiceId::new_from_string("ABCDE-12345::a000").unwrap())
+            .expect("unable to get service")
+            .expect("service was none");
+
+        assert_eq!(service.command(), &LifecycleCommand::Finalize);
+        assert_eq!(service.status(), &LifecycleStatus::Complete);
+
+        executor.signal_shutdown();
+        executor.wait_for_shutdown().unwrap();
+    }
+
+    // Verify that the SyncLifecycleInterface will properly finalize a service that has already
+    // been preapred but not finalized
+    //
+    // 1. Setup the LifecycleExecutor
+    // 2. Add a service that has been prepared but not finalized
+    // 2. Call add_service and verify it returns Ok
+    // 3. Check that an associated service is in the LifecycleStore and that the service is
+    //    finalized.
+    #[test]
+    fn test_add_service_already_prepared() {
+        let (mut executor, store) = create_executor(Duration::from_secs(10));
+
+        let alarm = executor.alarm();
+        let interface = SyncLifecycleInterface::new(
+            store.clone_box(),
+            alarm,
+            vec!["test".to_string()],
+            Duration::from_secs(10),
+        );
+
+        let service = create_service();
+
+        let service = service
+            .into_builder()
+            .with_command(&LifecycleCommand::Prepare)
+            .with_status(&LifecycleStatus::Complete)
+            .build()
+            .unwrap();
+
+        store.add_service(service.clone()).unwrap();
 
         interface
             .add_service(
