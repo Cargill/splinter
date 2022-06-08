@@ -48,7 +48,7 @@ jobs:
 
       - name: Start EC2 runner
         id: start_buildx_cluster
-        uses: ./.github/actions/ec2-docker-buildx
+        uses: ./.github/actions/ec2-runners
         with:
           action: start
           amd_ami_id: ${{ secrets.AMD_AMI_ID }}
@@ -132,7 +132,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Destroy cluster
-        uses: ./.github/actions/ec2-docker-buildx
+        uses: ./.github/actions/ec2-runners
         with:
           action: stop
           label: ${{ needs.start_cluster.outputs.label }}
