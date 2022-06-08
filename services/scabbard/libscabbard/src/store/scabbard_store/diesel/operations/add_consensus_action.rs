@@ -116,7 +116,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         let action_alarm = get_timestamp(alarm)?;
 
                         let update_context_action = Consensus2pcUpdateContextActionModel::try_from(
-                            (&context, service_id, &action_id, &action_alarm),
+                            (&context, &action_id, &action_alarm),
                         )?;
 
                         insert_into(consensus_2pc_update_context_action::table)
@@ -129,10 +129,9 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                                 )
                             })?;
 
-                        let participants = UpdateContextActionParticipantList::try_from((
-                            &context, service_id, &action_id,
-                        ))?
-                        .inner;
+                        let participants =
+                            UpdateContextActionParticipantList::try_from((&context, &action_id))?
+                                .inner;
                         insert_into(consensus_2pc_update_context_action_participant::table)
                             .values(participants)
                             .execute(self.conn)
@@ -172,7 +171,6 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
                     let send_message_action = Consensus2pcSendMessageActionModel {
                         action_id,
-                        service_id: format!("{}", service_id),
                         epoch: i64::try_from(epoch)
                             .map_err(|err| InternalError::from_source(Box::new(err)))?,
                         receiver_service_id: format!("{}", receiving_process),
@@ -205,7 +203,6 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
                     let notification_action = Consensus2pcNotificationModel {
                         action_id,
-                        service_id: format!("{}", service_id),
                         notification_type,
                         dropped_message,
                         request_for_vote_value,
@@ -283,7 +280,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                         let action_alarm = get_timestamp(alarm)?;
 
                         let update_context_action = Consensus2pcUpdateContextActionModel::try_from(
-                            (&context, service_id, &action_id, &action_alarm),
+                            (&context, &action_id, &action_alarm),
                         )?;
 
                         insert_into(consensus_2pc_update_context_action::table)
@@ -296,10 +293,9 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                                 )
                             })?;
 
-                        let participants = UpdateContextActionParticipantList::try_from((
-                            &context, service_id, &action_id,
-                        ))?
-                        .inner;
+                        let participants =
+                            UpdateContextActionParticipantList::try_from((&context, &action_id))?
+                                .inner;
                         insert_into(consensus_2pc_update_context_action_participant::table)
                             .values(participants)
                             .execute(self.conn)
@@ -339,7 +335,6 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
 
                     let send_message_action = Consensus2pcSendMessageActionModel {
                         action_id,
-                        service_id: format!("{}", service_id),
                         epoch: i64::try_from(epoch)
                             .map_err(|err| InternalError::from_source(Box::new(err)))?,
                         receiver_service_id: format!("{}", receiving_process),
@@ -372,7 +367,6 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
 
                     let notification_action = Consensus2pcNotificationModel {
                         action_id,
-                        service_id: format!("{}", service_id),
                         notification_type,
                         dropped_message,
                         request_for_vote_value,

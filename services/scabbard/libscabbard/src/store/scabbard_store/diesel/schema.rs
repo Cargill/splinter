@@ -69,7 +69,6 @@ table! {
 table! {
     consensus_2pc_notification_action (action_id) {
         action_id -> Int8,
-        service_id -> Text,
         notification_type -> Text,
         dropped_message -> Nullable<Text>,
         request_for_vote_value -> Nullable<Binary>,
@@ -79,7 +78,6 @@ table! {
 table! {
     consensus_2pc_send_message_action (action_id) {
         action_id -> Int8,
-        service_id -> Text,
         epoch -> BigInt,
         receiver_service_id -> Text,
         message_type -> Text,
@@ -91,7 +89,6 @@ table! {
 table! {
     consensus_2pc_update_context_action (action_id) {
         action_id -> Int8,
-        service_id -> Text,
         coordinator -> Text,
         epoch -> BigInt,
         last_commit_epoch -> Nullable<BigInt>,
@@ -106,7 +103,6 @@ table! {
 table! {
     consensus_2pc_update_context_action_participant (action_id) {
         action_id -> Int8,
-        service_id -> Text,
         process -> Text,
         vote -> Nullable<Text>,
     }
@@ -136,7 +132,6 @@ table! {
 table! {
     consensus_2pc_deliver_event (event_id) {
         event_id -> Int8,
-        service_id -> Text,
         epoch -> BigInt,
         receiver_service_id -> Text,
         message_type -> Text,
@@ -148,7 +143,6 @@ table! {
 table! {
     consensus_2pc_start_event (event_id) {
         event_id -> Int8,
-        service_id -> Text,
         value -> Binary,
     }
 }
@@ -156,7 +150,6 @@ table! {
 table! {
     consensus_2pc_vote_event (event_id) {
         event_id -> Int8,
-        service_id -> Text,
         vote -> Text,
     }
 }
