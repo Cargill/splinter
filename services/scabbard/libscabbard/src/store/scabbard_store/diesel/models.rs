@@ -495,7 +495,6 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ContextParticipantList {
 #[primary_key(action_id)]
 pub struct Consensus2pcUpdateContextActionModel {
     pub action_id: i64,
-    pub service_id: String,
     pub coordinator: String,
     pub epoch: i64,
     pub last_commit_epoch: Option<i64>,
@@ -506,18 +505,11 @@ pub struct Consensus2pcUpdateContextActionModel {
     pub action_alarm: Option<i64>,
 }
 
-impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
-    for Consensus2pcUpdateContextActionModel
-{
+impl TryFrom<(&Context, &i64, &Option<i64>)> for Consensus2pcUpdateContextActionModel {
     type Error = InternalError;
 
     fn try_from(
-        (context, service_id, action_id, action_alarm): (
-            &Context,
-            &FullyQualifiedServiceId,
-            &i64,
-            &Option<i64>,
-        ),
+        (context, action_id, action_alarm): (&Context, &i64, &Option<i64>),
     ) -> Result<Self, Self::Error> {
         let epoch = i64::try_from(*context.epoch())
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
@@ -559,7 +551,6 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
         let state = String::from(context.state());
         Ok(Consensus2pcUpdateContextActionModel {
             action_id: *action_id,
-            service_id: format!("{}", service_id),
             coordinator: format!("{}", context.coordinator()),
             epoch,
             last_commit_epoch,
@@ -579,7 +570,6 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64, &Option<i64>)>
 #[primary_key(action_id, process)]
 pub struct Consensus2pcUpdateContextActionParticipantModel {
     pub action_id: i64,
-    pub service_id: String,
     pub process: String,
     pub vote: Option<String>,
 }
@@ -589,12 +579,10 @@ pub struct UpdateContextActionParticipantList {
     pub inner: Vec<Consensus2pcUpdateContextActionParticipantModel>,
 }
 
-impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)> for UpdateContextActionParticipantList {
+impl TryFrom<(&Context, &i64)> for UpdateContextActionParticipantList {
     type Error = InternalError;
 
-    fn try_from(
-        (context, service_id, action_id): (&Context, &FullyQualifiedServiceId, &i64),
-    ) -> Result<Self, Self::Error> {
+    fn try_from((context, action_id): (&Context, &i64)) -> Result<Self, Self::Error> {
         let mut participants = Vec::new();
         for participant in context.participants() {
             let vote = participant.vote.map(|vote| match vote {
@@ -603,7 +591,6 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)> for UpdateContextAction
             });
             participants.push(Consensus2pcUpdateContextActionParticipantModel {
                 action_id: *action_id,
-                service_id: format!("{}", service_id),
                 process: format!("{}", participant.process),
                 vote,
             })
@@ -620,7 +607,6 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId, &i64)> for UpdateContextAction
 #[primary_key(action_id)]
 pub struct Consensus2pcSendMessageActionModel {
     pub action_id: i64,
-    pub service_id: String,
     pub epoch: i64,
     pub receiver_service_id: String,
     pub message_type: String,
@@ -634,7 +620,6 @@ pub struct Consensus2pcSendMessageActionModel {
 #[primary_key(action_id)]
 pub struct Consensus2pcNotificationModel {
     pub action_id: i64,
-    pub service_id: String,
     pub notification_type: String,
     pub dropped_message: Option<String>,
     pub request_for_vote_value: Option<Vec<u8>>,
@@ -737,7 +722,6 @@ impl From<&Event> for String {
 #[primary_key(event_id)]
 pub struct Consensus2pcDeliverEventModel {
     pub event_id: i64,
-    pub service_id: String,
     pub epoch: i64,
     pub receiver_service_id: String,
     pub message_type: String,
@@ -751,7 +735,6 @@ pub struct Consensus2pcDeliverEventModel {
 #[primary_key(event_id)]
 pub struct Consensus2pcStartEventModel {
     pub event_id: i64,
-    pub service_id: String,
     pub value: Vec<u8>,
 }
 
@@ -761,7 +744,6 @@ pub struct Consensus2pcStartEventModel {
 #[primary_key(event_id)]
 pub struct Consensus2pcVoteEventModel {
     pub event_id: i64,
-    pub service_id: String,
     pub vote: String, // TRUE or FALSE
 }
 
