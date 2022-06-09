@@ -20,13 +20,10 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use scabbard::store::transact::factory::LmdbDatabaseFactory;
 use splinter::error::InternalError;
 use transact::state::{
-    merkle::{
-        kv::MerkleState as TransactMerkleState,
-        sql::{
-            backend,
-            store::{MerkleRadixStore, SqlMerkleRadixStore},
-            SqlMerkleState,
-        },
+    merkle::sql::{
+        backend,
+        store::{MerkleRadixStore, SqlMerkleRadixStore},
+        SqlMerkleState,
     },
     Committer, DryRunCommitter, Pruner, Reader, State, StateChange, StateError, ValueIter,
     ValueIterResult,
@@ -39,9 +36,7 @@ pub use lmdb::LazyLmdbMerkleState;
 
 pub enum MerkleState<'a> {
     Lmdb {
-        state: TransactMerkleState,
-        merkle_root: String,
-        tree_id: (String, String),
+        state: LazyLmdbMerkleState,
     },
     /// Configure scabbard storage using a shared Postgres connection pool.
     #[cfg(feature = "postgres")]
@@ -88,7 +83,7 @@ impl<'a> MerkleState<'a> {
     pub fn get_state_root(&self) -> Result<String, CliError> {
         match self {
             // lmdb provides current state root,
-            MerkleState::Lmdb { merkle_root, .. } => Ok(merkle_root.to_string()),
+            MerkleState::Lmdb { state } => Ok(state.get_state_root()),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state
                 .initial_state_root_hash()
@@ -108,16 +103,11 @@ impl<'a> MerkleState<'a> {
         }
     }
 
-    pub fn delete_tree(self, lmdb_db_factory: &LmdbDatabaseFactory) -> Result<(), CliError> {
+    pub fn delete_tree(self) -> Result<(), CliError> {
         match self {
-            MerkleState::Lmdb { tree_id, .. } => {
-                let (circuit_id, service_id) = tree_id;
-                lmdb_db_factory
-                    .get_database_purge_handle(&circuit_id, &service_id)
-                    .map_err(|e| CliError::ActionError(format!("{}", e)))?
-                    .purge()
-                    .map_err(|e| CliError::ActionError(format!("{}", e)))
-            }
+            MerkleState::Lmdb { state } => state
+                .delete()
+                .map_err(|e| CliError::ActionError(format!("{}", e))),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state
                 .delete_tree()
@@ -153,7 +143,7 @@ impl<'a> Committer for MerkleState<'a> {
         state_changes: &[Self::StateChange],
     ) -> Result<Self::StateId, StateError> {
         match self {
-            MerkleState::Lmdb { state, .. } => state.commit(state_id, state_changes),
+            MerkleState::Lmdb { state } => state.commit(state_id, state_changes),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.commit(state_id, state_changes),
             #[cfg(feature = "postgres")]
@@ -175,7 +165,7 @@ impl<'a> DryRunCommitter for MerkleState<'a> {
         state_changes: &[Self::StateChange],
     ) -> Result<Self::StateId, StateError> {
         match self {
-            MerkleState::Lmdb { state, .. } => state.dry_run_commit(state_id, state_changes),
+            MerkleState::Lmdb { state } => state.dry_run_commit(state_id, state_changes),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.dry_run_commit(state_id, state_changes),
             #[cfg(feature = "postgres")]
@@ -202,7 +192,7 @@ impl<'a> Reader for MerkleState<'a> {
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateError> {
         match self {
-            MerkleState::Lmdb { state, .. } => state.get(state_id, keys),
+            MerkleState::Lmdb { state } => state.get(state_id, keys),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.get(state_id, keys),
             #[cfg(feature = "postgres")]
@@ -220,7 +210,7 @@ impl<'a> Reader for MerkleState<'a> {
         filter: Option<&Self::Filter>,
     ) -> ValueIterResult<ValueIter<(Self::Key, Self::Value)>> {
         match self {
-            MerkleState::Lmdb { state, .. } => state.filter_iter(state_id, filter),
+            MerkleState::Lmdb { state } => state.filter_iter(state_id, filter),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.filter_iter(state_id, filter),
             #[cfg(feature = "postgres")]
@@ -236,7 +226,7 @@ impl<'a> Reader for MerkleState<'a> {
 impl<'a> Pruner for MerkleState<'a> {
     fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StateError> {
         match self {
-            MerkleState::Lmdb { state, .. } => state.prune(state_ids),
+            MerkleState::Lmdb { state } => state.prune(state_ids),
             #[cfg(feature = "postgres")]
             MerkleState::Postgres { state } => state.prune(state_ids),
             #[cfg(feature = "postgres")]

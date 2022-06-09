@@ -147,10 +147,7 @@ impl Action for StateMigrateAction {
                         e
                     ))
                 })?;
-                Box::new(UpgradeStoresWithLmdb::new(
-                    upgrade_stores,
-                    lmdb_db_factory.clone(),
-                ))
+                Box::new(UpgradeStoresWithLmdb::new(upgrade_stores, lmdb_db_factory))
             }
             _ => new_upgrade_stores(&ConnectionUri::from_str(out_database)?).map_err(|e| {
                 CliError::ActionError(format!(
@@ -260,7 +257,7 @@ impl Action for StateMigrateAction {
 
                             // delete the existing scabbard state
                             state_reader
-                                .delete_tree(&lmdb_db_factory)
+                                .delete_tree()
                                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
                             Ok(())
