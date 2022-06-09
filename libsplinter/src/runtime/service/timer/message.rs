@@ -23,5 +23,8 @@ pub enum TimerMessage {
         service_type: ServiceType<'static>,
         service_id: Option<FullyQualifiedServiceId>,
     },
+    Complete {
+        service_id: FullyQualifiedServiceId,
+    },
     Shutdown,
 }

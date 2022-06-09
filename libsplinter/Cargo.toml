@@ -206,6 +206,7 @@ service-message-sender-factory-peer = [
     "service-message-sender-factory"
 ]
 service-timer =[
+  "defered-send",
   "runtime-service",
   "service-message-sender-factory",
   "service-timer-filter",

@@ -100,18 +100,22 @@ impl ShutdownHandle for Timer {
 mod tests {
     use super::*;
 
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
     use crate::service::{
         FullyQualifiedServiceId, MessageSender, Routable, ServiceId, ServiceType, TimerHandler,
     };
 
-    struct TestTimerFilter {}
+    struct TestTimerFilter {
+        service_ids: Vec<FullyQualifiedServiceId>,
+    }
 
     impl TimerFilter for TestTimerFilter {
         fn filter(&self) -> Result<Vec<FullyQualifiedServiceId>, InternalError> {
-            Ok(vec![FullyQualifiedServiceId::new_from_string(
-                "abcde-12345::a000",
-            )
-            .unwrap()])
+            Ok(self.service_ids.to_vec())
         }
     }
 
@@ -140,6 +144,20 @@ mod tests {
         }
     }
 
+    struct PanicTestTimerHandler {}
+
+    impl TimerHandler for PanicTestTimerHandler {
+        type Message = Vec<u8>;
+
+        fn handle_timer(
+            &mut self,
+            _sender: &dyn MessageSender<Self::Message>,
+            _service: FullyQualifiedServiceId,
+        ) -> Result<(), InternalError> {
+            panic!()
+        }
+    }
+
     #[derive(Clone)]
     struct TestTimerHandlerFactory {}
 
@@ -150,6 +168,30 @@ mod tests {
             &self,
         ) -> Result<Box<dyn TimerHandler<Message = Self::Message>>, InternalError> {
             Ok(Box::new(TestTimerHandler {}))
+        }
+
+        fn clone_box(&self) -> Box<dyn TimerHandlerFactory<Message = Self::Message>> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// either return a handle that will panic or the good handler
+    #[derive(Clone)]
+    struct TestPanicTimerHandlerFactory {
+        return_panic: Arc<AtomicBool>,
+    }
+
+    impl TimerHandlerFactory for TestPanicTimerHandlerFactory {
+        type Message = Vec<u8>;
+
+        fn new_handler(
+            &self,
+        ) -> Result<Box<dyn TimerHandler<Message = Self::Message>>, InternalError> {
+            if self.return_panic.load(Ordering::Relaxed) {
+                Ok(Box::new(PanicTestTimerHandler {}))
+            } else {
+                Ok(Box::new(TestTimerHandler {}))
+            }
         }
 
         fn clone_box(&self) -> Box<dyn TimerHandlerFactory<Message = Self::Message>> {
@@ -203,7 +245,11 @@ mod tests {
         let (service_sender, service_recv) = channel();
         let message_sender_factory = Box::new(TestMessageSenderFactory { tx: service_sender });
         let filters: FilterCollection = vec![(
-            Box::new(TestTimerFilter {}),
+            Box::new(TestTimerFilter {
+                service_ids: vec![
+                    FullyQualifiedServiceId::new_from_string("abcde-12345::a000").unwrap(),
+                ],
+            }),
             Box::new(TestTimerHandlerFactory {}),
         )];
 
@@ -242,7 +288,11 @@ mod tests {
         let (service_sender, service_recv) = channel();
         let message_sender_factory = Box::new(TestMessageSenderFactory { tx: service_sender });
         let filters: FilterCollection = vec![(
-            Box::new(TestTimerFilter {}),
+            Box::new(TestTimerFilter {
+                service_ids: vec![
+                    FullyQualifiedServiceId::new_from_string("abcde-12345::a000").unwrap(),
+                ],
+            }),
             Box::new(TestTimerHandlerFactory {}),
         )];
 
@@ -278,7 +328,11 @@ mod tests {
         let (service_sender, service_recv) = channel();
         let message_sender_factory = Box::new(TestMessageSenderFactory { tx: service_sender });
         let filters: FilterCollection = vec![(
-            Box::new(TestTimerFilter {}),
+            Box::new(TestTimerFilter {
+                service_ids: vec![
+                    FullyQualifiedServiceId::new_from_string("abcde-12345::a000").unwrap(),
+                ],
+            }),
             Box::new(TestTimerHandlerFactory {}),
         )];
 
@@ -317,7 +371,11 @@ mod tests {
         let (service_sender, service_recv) = channel();
         let message_sender_factory = Box::new(TestMessageSenderFactory { tx: service_sender });
         let filters: FilterCollection = vec![(
-            Box::new(TestTimerFilter {}),
+            Box::new(TestTimerFilter {
+                service_ids: vec![
+                    FullyQualifiedServiceId::new_from_string("abcde-12345::a000").unwrap(),
+                ],
+            }),
             Box::new(TestTimerHandlerFactory {}),
         )];
 
@@ -359,7 +417,11 @@ mod tests {
         let (service_sender, service_recv) = channel();
         let message_sender_factory = Box::new(TestMessageSenderFactory { tx: service_sender });
         let filters: FilterCollection = vec![(
-            Box::new(TestTimerFilter {}),
+            Box::new(TestTimerFilter {
+                service_ids: vec![
+                    FullyQualifiedServiceId::new_from_string("abcde-12345::a000").unwrap(),
+                ],
+            }),
             Box::new(TestTimerHandlerFactory {}),
         )];
 
@@ -374,6 +436,114 @@ mod tests {
             )
             .unwrap();
 
+        if let Ok(_) = service_recv.recv_timeout(std::time::Duration::from_secs(2)) {
+            panic!("Should not have received a message")
+        }
+
+        timer.signal_shutdown();
+        timer.wait_for_shutdown().unwrap();
+    }
+
+    /// Verify that if the TimerFilter returns the same service id twice, only one thread will be
+    /// run.
+    /// 1. Create a Timer with a wake up interval of 1000, this will make sure the Timer does not
+    ///    trigger during this test.
+    /// 2. Get an alarm from the Timer
+    /// 3. Use the alarm to wake up all handlers, resulting in the same service ID be returned
+    ///    twice
+    /// 4. Verify that only one message is returned
+    /// 5. Shutdown the timer
+    #[test]
+    fn test_timer_wake_up_duplicate() {
+        let wake_up_interval = Duration::from_secs(1000);
+
+        let (service_sender, service_recv) = channel();
+        let message_sender_factory = Box::new(TestMessageSenderFactory { tx: service_sender });
+        let filters: FilterCollection = vec![(
+            Box::new(TestTimerFilter {
+                service_ids: vec![
+                    FullyQualifiedServiceId::new_from_string("abcde-12345::a000").unwrap(),
+                    FullyQualifiedServiceId::new_from_string("abcde-12345::a000").unwrap(),
+                ],
+            }),
+            Box::new(TestTimerHandlerFactory {}),
+        )];
+
+        let mut timer = Timer::new(filters, wake_up_interval, message_sender_factory).unwrap();
+
+        let alarm = timer.alarm();
+        alarm.wake_up_all().unwrap();
+
+        if let Ok((_, _, msg_bytes)) = service_recv.recv_timeout(std::time::Duration::from_secs(5))
+        {
+            assert_eq!(msg_bytes, b"woke-up".to_vec())
+        } else {
+            panic!("Test timed out, timer handler did not wake up the first time")
+        }
+
+        // verify we only receive one message
+        if let Ok(_) = service_recv.recv_timeout(std::time::Duration::from_secs(2)) {
+            panic!("Should not have received a message")
+        }
+
+        timer.signal_shutdown();
+        timer.wait_for_shutdown().unwrap();
+    }
+
+    /// Verify that if a TimerHandler for a service panics, the Timer will be properly notified
+    /// that the thread has shutdown and be able to start up a new thread for the same service in
+    /// the future
+    /// 1. Create a Timer with a wake up interval of 1000, this will make sure the Timer does not
+    ///    trigger during this test. The TimerHandlerFactory is configured to return a panicking
+    ///    TimerHandler.
+    /// 2. Get an alarm from the Timer
+    /// 3. Use the alarm to wake up all handlers
+    //  4. The first TimerHandler for the service should panic
+    /// 5. Update the TimerHandlerFactory to return a good TimerHandler
+    /// 4. Verify that one message is returned
+    /// 5. Shutdown the timer
+    #[test]
+    fn test_timer_wake_up_with_panics() {
+        let wake_up_interval = Duration::from_secs(1000);
+
+        let (service_sender, service_recv) = channel();
+        let to_panic = Arc::new(AtomicBool::new(true));
+        let message_sender_factory = Box::new(TestMessageSenderFactory { tx: service_sender });
+        let filters: FilterCollection = vec![(
+            Box::new(TestTimerFilter {
+                service_ids: vec![
+                    FullyQualifiedServiceId::new_from_string("abcde-12345::a000").unwrap(),
+                ],
+            }),
+            Box::new(TestPanicTimerHandlerFactory {
+                return_panic: to_panic.clone(),
+            }),
+        )];
+
+        let mut timer = Timer::new(filters, wake_up_interval, message_sender_factory).unwrap();
+
+        let alarm = timer.alarm();
+        alarm.wake_up_all().unwrap();
+
+        // wait for timer handler to panic
+        // we cannot receive here and wait for timeout because timer handler Receiver will panic
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        // Update TimerHandlerFactory to return a good TimreHandler
+        to_panic.store(false, Ordering::Relaxed);
+        // rewake up service
+        alarm.wake_up_all().unwrap();
+
+        // verify a message is returned. This means the Timer was properly updated that the
+        // previous thread for the service had shutdown so a new one should be started.
+        if let Ok((_, _, msg_bytes)) = service_recv.recv_timeout(std::time::Duration::from_secs(5))
+        {
+            assert_eq!(msg_bytes, b"woke-up".to_vec())
+        } else {
+            panic!("Test timed out, timer handler did not wake up the first time")
+        }
+
+        // verify we only receive one message
         if let Ok(_) = service_recv.recv_timeout(std::time::Duration::from_secs(2)) {
             panic!("Should not have received a message")
         }
