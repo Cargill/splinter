@@ -648,7 +648,6 @@ pub struct Consensus2pcActionModel {
     pub service_id: String,
     pub created_at: SystemTime,
     pub executed_at: Option<i64>,
-    pub position: i32,
 }
 
 #[derive(Debug, PartialEq, Insertable)]
@@ -656,7 +655,6 @@ pub struct Consensus2pcActionModel {
 pub struct InsertableConsensus2pcActionModel {
     pub service_id: String,
     pub executed_at: Option<i64>,
-    pub position: i32,
 }
 
 impl From<&Notification> for String {
@@ -692,7 +690,6 @@ pub struct Consensus2pcEventModel {
     pub service_id: String,
     pub created_at: SystemTime,
     pub executed_at: Option<i64>,
-    pub position: i32,
     pub event_type: String,
 }
 
@@ -701,7 +698,6 @@ pub struct Consensus2pcEventModel {
 pub struct InsertableConsensus2pcEventModel {
     pub service_id: String,
     pub executed_at: Option<i64>,
-    pub position: i32,
     pub event_type: String,
 }
 

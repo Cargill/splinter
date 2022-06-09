@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
 use std::time::Duration;
 use std::time::SystemTime;
 
@@ -77,25 +76,18 @@ where
                     )))
                 })?;
 
-            let all_actions = consensus_2pc_action::table
+            let action_ids = consensus_2pc_action::table
                 .filter(
                     consensus_2pc_action::service_id
                         .eq(format!("{}", service_id))
                         .and(consensus_2pc_action::executed_at.is_null()),
                 )
-                .order(consensus_2pc_action::position.desc())
-                .select((consensus_2pc_action::id, consensus_2pc_action::position))
-                .load::<(i64, i32)>(self.conn)
+                .order(consensus_2pc_action::id.desc())
+                .select(consensus_2pc_action::id)
+                .load::<i64>(self.conn)
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
                 })?;
-
-            let action_ids = all_actions
-                .clone()
-                .into_iter()
-                .map(|(id, _)| id)
-                .collect::<Vec<_>>();
-            let actions_map: HashMap<_, _> = all_actions.into_iter().collect();
 
             let mut all_actions = Vec::new();
 
@@ -121,12 +113,6 @@ where
                 })?;
 
             for update_context in update_context_actions {
-                let position = actions_map.get(&update_context.action_id).ok_or_else(|| {
-                    ScabbardStoreError::Internal(InternalError::with_message(
-                        "Failed to list consensus actions, error finding action ID".to_string(),
-                    ))
-                })?;
-
                 let participants = consensus_2pc_update_context_action_participant::table
                     .filter(
                         consensus_2pc_update_context_action_participant::action_id
@@ -257,14 +243,9 @@ where
                         action_alarm,
                     )),
                 };
-                all_actions.push((position, action));
+                all_actions.push(action);
             }
             for send_message in send_message_actions {
-                let position = actions_map.get(&send_message.action_id).ok_or_else(|| {
-                    ScabbardStoreError::Internal(InternalError::with_message(
-                        "Failed to list consensus actions, error finding action ID".to_string(),
-                    ))
-                })?;
                 let service_id =
                     ServiceId::new(send_message.receiver_service_id).map_err(|err| {
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
@@ -323,15 +304,10 @@ where
                         service_id, message,
                     )),
                 };
-                all_actions.push((position, action));
+                all_actions.push(action);
             }
 
             for notification in notification_actions {
-                let position = actions_map.get(&notification.action_id).ok_or_else(|| {
-                    ScabbardStoreError::Internal(InternalError::with_message(
-                        "Failed to list consensus actions, error finding action ID".to_string(),
-                    ))
-                })?;
                 let notification_action = match notification.notification_type.as_str() {
                     "REQUESTFORSTART" => Notification::RequestForStart(),
                     "COORDINATORREQUESTFORVOTE" => Notification::CoordinatorRequestForVote(),
@@ -365,12 +341,12 @@ where
                     id: notification.action_id,
                     record: ConsensusAction::TwoPhaseCommit(Action::Notify(notification_action)),
                 };
-                all_actions.push((position, action));
+                all_actions.push(action);
             }
 
-            all_actions.sort_by(|a, b| a.0.cmp(b.0));
+            all_actions.sort_by(|a, b| a.id.cmp(&b.id));
 
-            Ok(all_actions.into_iter().map(|(_, action)| action).collect())
+            Ok(all_actions)
         })
     }
 }
