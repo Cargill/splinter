@@ -25,10 +25,7 @@ use splinter::{
     error::InternalError,
     node_id::store::{diesel::DieselNodeIdStore, NodeIdStore},
 };
-use transact::state::merkle::{
-    kv::{MerkleRadixTree, MerkleState as TransactMerkleState},
-    sql::{backend, SqlMerkleStateBuilder},
-};
+use transact::state::merkle::sql::{backend, SqlMerkleStateBuilder};
 
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use super::state::{DieselInTransactionStateTreeStore, DieselStateTreeStore};
@@ -511,28 +508,12 @@ fn create_lmdb_merkle_state<'a>(
     service_id: &str,
     create_tree: bool,
 ) -> Result<MerkleState<'a>, InternalError> {
-    if !create_tree {
-        let path = lmdb_db_factory
-            .compute_path(circuit_id, service_id)
-            .map_err(|e| InternalError::with_message(format!("{}", e)))?
-            .with_extension("lmdb");
-
-        if !path.is_file() {
-            return Err(InternalError::with_message(format!(
-                "LMDB file for service {}::{} ({:?}) does not exist",
-                circuit_id, service_id, path
-            )));
-        }
-    }
-    let state = lmdb_db_factory
-        .get_database(circuit_id, service_id)
-        .map_err(|e| InternalError::with_message(format!("{}", e)))?;
-    let merkle_root = MerkleRadixTree::new(Box::new(state.clone()), None)
-        .map_err(|e| InternalError::with_message(format!("{}", e)))?
-        .get_merkle_root();
     Ok(MerkleState::Lmdb {
-        state: TransactMerkleState::new(Box::new(state)),
-        merkle_root,
-        tree_id: (circuit_id.to_string(), service_id.to_string()),
+        state: LazyLmdbMerkleState::new(
+            lmdb_db_factory.clone(),
+            circuit_id,
+            service_id,
+            create_tree,
+        )?,
     })
 }
