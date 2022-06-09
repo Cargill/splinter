@@ -32,7 +32,7 @@ use transact::state::merkle::{
 
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use super::state::{DieselInTransactionStateTreeStore, DieselStateTreeStore};
-use super::state::{LmdbStateTreeStore, MerkleState, StateTreeStore};
+use super::state::{LazyLmdbMerkleState, LmdbStateTreeStore, MerkleState, StateTreeStore};
 use super::ConnectionUri;
 
 pub trait UpgradeStores {

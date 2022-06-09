@@ -11,6 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+mod lmdb;
+
 use std::collections::HashMap;
 
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -31,6 +34,8 @@ use transact::state::{
 
 use super::CliError;
 use super::StateTreeStore;
+
+pub use lmdb::LazyLmdbMerkleState;
 
 pub enum MerkleState<'a> {
     Lmdb {
