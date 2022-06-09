@@ -16,6 +16,8 @@
 // that is used must have the following Receiver trait implemented, then the receiver end of the
 // channel can be passed to the NetworkMessageSender.
 mod crossbeam;
+#[cfg(feature = "defered-send")]
+mod defered;
 mod error;
 #[cfg(test)]
 pub mod mock;
@@ -24,6 +26,8 @@ mod mpsc;
 use std::time::Duration;
 
 pub use super::channel::error::{RecvError, RecvTimeoutError, SendError, TryRecvError};
+#[cfg(feature = "defered-send")]
+pub use defered::DeferedSend;
 
 pub trait Receiver<T>: Send {
     fn recv(&self) -> Result<T, RecvError>;
