@@ -15,33 +15,4 @@
 //! An alarm can be used to prematurely wake all or specific message handlers
 mod channel;
 
-use crate::error::InternalError;
-use crate::service::{FullyQualifiedServiceId, ServiceType};
-
-use super::message::TimerMessage;
-
 pub use channel::ChannelTimerAlarm;
-
-pub trait TimerAlarm {
-    /// Notify the `Timer` to check all `TimerFilters` for pending work
-    fn wake_up_all(&self) -> Result<(), InternalError>;
-
-    /// Notify the `Timer` to check a specific `TimerFilter` for pending work
-    ///
-    /// # Arguments
-    ///
-    /// * `service_type` - The service type of the the filter that will be checked
-    /// * `service_id` - An optional service ID
-    ///
-    /// If a service ID is provided, only the `TimerHandler` for that ID will be run. The serivce
-    /// ID must be returned from the `TimerFilter` to show there is pending work. If ther service
-    /// ID is not returned, no handlers will be run.
-    ///
-    /// If the service ID is not provided, the handlers for all service IDs returned from the
-    /// `TimerFilter` will be run.
-    fn wake_up(
-        &self,
-        service_type: ServiceType<'static>,
-        service_id: Option<FullyQualifiedServiceId>,
-    ) -> Result<(), InternalError>;
-}

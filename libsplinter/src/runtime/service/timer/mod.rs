@@ -23,14 +23,12 @@ use std::sync::mpsc::{channel, Sender};
 use std::time::Duration;
 
 use crate::error::InternalError;
-use crate::service::{MessageSenderFactory, TimerFilter, TimerHandlerFactory};
+use crate::service::{MessageSenderFactory, TimerAlarm, TimerFilter, TimerHandlerFactory};
 use crate::threading::{lifecycle::ShutdownHandle, pacemaker::Pacemaker};
 
 use self::alarm::ChannelTimerAlarm;
 use self::message::TimerMessage;
 use self::thread::TimerThread;
-
-pub use self::alarm::TimerAlarm;
 
 pub struct Timer {
     pacemaker: Pacemaker,

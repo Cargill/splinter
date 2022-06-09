@@ -61,4 +61,4 @@ pub use lifecycle_executor::{
 #[cfg(feature = "service-message-sender-factory-peer")]
 pub use network_sender_factory::NetworkMessageSenderFactory;
 #[cfg(feature = "service-timer")]
-pub use timer::{Timer, TimerAlarm};
+pub use timer::Timer;

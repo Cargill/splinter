@@ -55,6 +55,8 @@ mod message_sender_factory;
 pub mod rest_api;
 mod routable;
 mod service_type;
+#[cfg(feature = "service-timer-alarm")]
+mod timer_alarm;
 #[cfg(feature = "service-timer-filter")]
 mod timer_filter;
 #[cfg(feature = "service-timer-handler")]
@@ -84,6 +86,8 @@ pub use message_sender::MessageSender;
 pub use message_sender_factory::MessageSenderFactory;
 pub use routable::Routable;
 pub use service_type::ServiceType;
+#[cfg(feature = "service-timer-alarm")]
+pub use timer_alarm::TimerAlarm;
 #[cfg(feature = "service-timer-filter")]
 pub use timer_filter::TimerFilter;
 #[cfg(feature = "service-timer-handler")]
