@@ -18,9 +18,18 @@
 pub(crate) mod actix;
 #[cfg(feature = "authorization")]
 pub mod authorization;
+#[cfg(feature = "rest-api-actix-web-1")]
+mod authorization_header;
+#[cfg(feature = "rest-api-actix-web-1")]
+mod authorization_result;
+mod bearer_token;
 pub mod identity;
 
-use std::str::FromStr;
+#[cfg(feature = "rest-api-actix-web-1")]
+pub use authorization_header::AuthorizationHeader;
+#[cfg(feature = "rest-api-actix-web-1")]
+pub use authorization_result::AuthorizationResult;
+pub use bearer_token::BearerToken;
 
 use crate::error::InvalidArgumentError;
 
@@ -31,25 +40,6 @@ use super::Method;
 use authorization::{AuthorizationHandler, AuthorizationHandlerResult, Permission, PermissionMap};
 #[cfg(feature = "rest-api-actix-web-1")]
 use identity::{Identity, IdentityProvider};
-
-/// The possible outcomes of attempting to authorize a client
-#[cfg(feature = "rest-api-actix-web-1")]
-enum AuthorizationResult {
-    /// The client was authorized to the given identity based on the authorization header
-    Authorized(Identity),
-    /// The requested endpoint does not require authorization
-    #[cfg(any(
-        feature = "authorization",
-        feature = "biome-credentials",
-        feature = "oauth"
-    ))]
-    NoAuthorizationNecessary,
-    /// The authorization header is empty or invalid
-    Unauthorized,
-    /// The request endpoint is not defined
-    #[cfg(feature = "authorization")]
-    UnknownEndpoint,
-}
 
 /// Uses the given identity providers to check authorization for the request. This function is
 /// backend-agnostic and intended as a helper for the backend REST API implementations.
@@ -160,77 +150,6 @@ fn get_identity(
             None
         })
     })
-}
-
-/// A parsed authorization header
-#[derive(PartialEq)]
-pub enum AuthorizationHeader {
-    Bearer(BearerToken),
-    Custom(String),
-}
-
-/// Parses an authorization string. This implementation will attempt to parse the string in the
-/// format "<scheme> <value>" to a known scheme. If the string does not match this format or the
-/// scheme is unknown, the `AuthorizationHeader::Custom` variant will be returned with the whole
-/// authorization string.
-impl FromStr for AuthorizationHeader {
-    type Err = InvalidArgumentError;
-
-    fn from_str(str: &str) -> Result<Self, Self::Err> {
-        let mut parts = str.splitn(2, ' ');
-        match (parts.next(), parts.next()) {
-            (Some(auth_scheme), Some(value)) => match auth_scheme {
-                "Bearer" => Ok(AuthorizationHeader::Bearer(value.parse()?)),
-                _ => Ok(AuthorizationHeader::Custom(str.to_string())),
-            },
-            (Some(_), None) => Ok(AuthorizationHeader::Custom(str.to_string())),
-            _ => unreachable!(), // splitn always returns at least one item
-        }
-    }
-}
-
-/// A bearer token of a specific type
-#[derive(PartialEq)]
-pub enum BearerToken {
-    #[cfg(feature = "biome-credentials")]
-    /// Contains a Biome JWT
-    Biome(String),
-    /// Contains a custom token, which is any bearer token that does not match one of the other
-    /// variants of this enum
-    Custom(String),
-    #[cfg(feature = "cylinder-jwt")]
-    /// Contains a Cylinder JWT
-    Cylinder(String),
-    #[cfg(feature = "oauth")]
-    /// Contains an OAuth2 token
-    OAuth2(String),
-}
-
-/// Parses a bearer token string. This implementation will attempt to parse the token in the format
-/// "<type>:<value>" to a know type. If the token does not match this format or the type is unknown,
-/// the `BearerToken::Custom` variant will be returned with the whole token value.
-impl FromStr for BearerToken {
-    type Err = InvalidArgumentError;
-
-    fn from_str(str: &str) -> Result<Self, Self::Err> {
-        let mut parts = str.splitn(2, ':');
-        match (parts.next(), parts.next()) {
-            // Allowing lint in case none of `biome-credentials`, `cylinder-jwt`, or `oauth` are
-            // used
-            #[allow(unused_variables, clippy::match_single_binding)]
-            (Some(token_type), Some(token)) => match token_type {
-                #[cfg(feature = "biome-credentials")]
-                "Biome" => Ok(BearerToken::Biome(token.to_string())),
-                #[cfg(feature = "cylinder-jwt")]
-                "Cylinder" => Ok(BearerToken::Cylinder(token.to_string())),
-                #[cfg(feature = "oauth")]
-                "OAuth2" => Ok(BearerToken::OAuth2(token.to_string())),
-                _ => Ok(BearerToken::Custom(str.to_string())),
-            },
-            (Some(_), None) => Ok(BearerToken::Custom(str.to_string())),
-            _ => unreachable!(), // splitn always returns at least one item
-        }
-    }
 }
 
 #[cfg(test)]
