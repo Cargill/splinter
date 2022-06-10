@@ -138,6 +138,7 @@ experimental = [
     "service-message-sender-factory-peer",
     "service-timer",
     "service-timer-alarm",
+    "service-timer-alarm-factory",
     "service-timer-filter",
     "service-timer-handler",
     "service-timer-handler-factory",
@@ -216,6 +217,7 @@ service-timer =[
   "service-timer-handler-factory"
 ]
 service-timer-alarm = []
+service-timer-alarm-factory = ["service-timer-alarm"]
 service-timer-filter = ["service"]
 service-timer-handler = ["service", "service-message-converter", "service-message-sender"]
 service-message-handler-dispatch = [
