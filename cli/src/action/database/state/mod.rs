@@ -253,12 +253,22 @@ impl Action for StateMigrateAction {
                                 true,
                             )?;
 
-                            copy_state(&state_reader, commit_hash.to_string(), &state_writer)?;
-
-                            // delete the existing scabbard state
-                            state_reader
-                                .delete_tree()
-                                .map_err(|e| InternalError::from_source(Box::new(e)))?;
+                            match copy_state(&state_reader, commit_hash.to_string(), &state_writer)
+                            {
+                                Ok(()) => {
+                                    // delete the existing scabbard state
+                                    state_reader
+                                        .delete_tree()
+                                        .map_err(|e| InternalError::from_source(Box::new(e)))?;
+                                }
+                                Err(err) => {
+                                    // delete the target scabbard state, so that it doesn't exist.
+                                    state_writer
+                                        .delete_tree()
+                                        .map_err(|e| InternalError::from_source(Box::new(e)))?;
+                                    return Err(err);
+                                }
+                            }
 
                             Ok(())
                         }))
