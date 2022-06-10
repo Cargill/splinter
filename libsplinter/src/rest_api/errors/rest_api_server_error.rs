@@ -75,23 +75,6 @@ impl fmt::Display for RestApiServerError {
     }
 }
 
-#[derive(Debug)]
-pub enum RequestError {
-    MissingHeader(String),
-    InvalidHeaderValue(String),
-}
-
-impl Error for RequestError {}
-
-impl fmt::Display for RequestError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            RequestError::MissingHeader(msg) => f.write_str(msg),
-            RequestError::InvalidHeaderValue(msg) => f.write_str(msg),
-        }
-    }
-}
-
 #[cfg(feature = "https-bind")]
 impl From<openssl::error::ErrorStack> for RestApiServerError {
     fn from(err: openssl::error::ErrorStack) -> Self {
