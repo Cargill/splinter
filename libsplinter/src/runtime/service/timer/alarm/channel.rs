@@ -78,8 +78,8 @@ impl ChannelTimerAlarmFactory {
 /// Used to create new `TimerAlarm` instances.
 impl TimerAlarmFactory for ChannelTimerAlarmFactory {
     /// Returns a new `TimerAlarm`
-    fn new_alarm(&self) -> Result<Box<dyn TimerAlarm>, InternalError> {
-        Ok(Box::new(ChannelTimerAlarm::new(self.sender.clone())))
+    fn new_alarm(&self) -> Box<dyn TimerAlarm> {
+        Box::new(ChannelTimerAlarm::new(self.sender.clone()))
     }
 
     fn clone_box(&self) -> Box<dyn TimerAlarmFactory> {

@@ -15,4 +15,4 @@
 //! An alarm can be used to prematurely wake all or specific message handlers
 mod channel;
 
-pub use channel::ChannelTimerAlarm;
+pub use channel::{ChannelTimerAlarm, ChannelTimerAlarmFactory};
