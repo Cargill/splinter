@@ -211,7 +211,7 @@ service-timer =[
   "defered-send",
   "runtime-service",
   "service-message-sender-factory",
-  "service-timer-alarm",
+  "service-timer-alarm-factory",
   "service-timer-filter",
   "service-timer-handler",
   "service-timer-handler-factory"

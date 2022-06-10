@@ -18,7 +18,7 @@ use std::sync::mpsc::Sender;
 
 use crate::error::InternalError;
 use crate::runtime::service::timer::message::TimerMessage;
-use crate::service::{FullyQualifiedServiceId, ServiceType, TimerAlarm};
+use crate::service::{FullyQualifiedServiceId, ServiceType, TimerAlarm, TimerAlarmFactory};
 
 pub struct ChannelTimerAlarm {
     sender: Sender<TimerMessage>,
@@ -62,5 +62,27 @@ impl TimerAlarm for ChannelTimerAlarm {
                 service_id,
             })
             .map_err(|err| InternalError::from_source(Box::new(err)))
+    }
+}
+
+pub struct ChannelTimerAlarmFactory {
+    sender: Sender<TimerMessage>,
+}
+
+impl ChannelTimerAlarmFactory {
+    pub fn new(sender: Sender<TimerMessage>) -> Self {
+        ChannelTimerAlarmFactory { sender }
+    }
+}
+
+/// Used to create new `TimerAlarm` instances.
+impl TimerAlarmFactory for ChannelTimerAlarmFactory {
+    /// Returns a new `TimerAlarm`
+    fn new_alarm(&self) -> Result<Box<dyn TimerAlarm>, InternalError> {
+        Ok(Box::new(ChannelTimerAlarm::new(self.sender.clone())))
+    }
+
+    fn clone_box(&self) -> Box<dyn TimerAlarmFactory> {
+        Box::new(ChannelTimerAlarmFactory::new(self.sender.clone()))
     }
 }
