@@ -371,13 +371,32 @@ impl SplinterDaemon {
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
+        #[cfg(feature = "service2")]
+        let timer_filter_collection = timer::create_timer_handlers(
+            &connection_pool,
+            &node_id,
+            network_sender.clone(),
+            routing_reader.clone(),
+        )?;
+
+        #[cfg(feature = "service2")]
+        let mut timer = Timer::new(
+            timer_filter_collection,
+            self.service_timer_interval,
+            Box::new(NetworkMessageSenderFactory::new(
+                &node_id,
+                network_sender.clone(),
+                routing_reader.clone(),
+            )),
+        )?;
+
         #[cfg(feature = "scabbardv3")]
         let scabbard_store_factory = store::create_scabbard_store_factory(&connection_pool)?;
 
         #[cfg(feature = "service2")]
         let message_handlers: Vec<BoxedByteMessageHandlerFactory> = vec![
             #[cfg(feature = "scabbardv3")]
-            ScabbardMessageHandlerFactory::new(scabbard_store_factory)
+            ScabbardMessageHandlerFactory::new(scabbard_store_factory, timer.alarm_factory())
                 .into_factory(ScabbardMessageByteConverter {})
                 .into_boxed(),
         ];
@@ -420,7 +439,7 @@ impl SplinterDaemon {
         #[cfg(feature = "service2")]
         // Set up the Network dispatcher
         let network_dispatcher =
-            set_up_network_dispatcher(network_sender.clone(), &node_id, circuit_dispatch_sender);
+            set_up_network_dispatcher(network_sender, &node_id, circuit_dispatch_sender);
 
         let mut network_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(network_dispatcher)
@@ -493,14 +512,6 @@ impl SplinterDaemon {
             &connection_pool,
             store_factory.get_lifecycle_store(),
             self.lifecycle_executor_interval,
-        )?;
-
-        #[cfg(feature = "service2")]
-        let timer_filter_collection = timer::create_timer_handlers(
-            &connection_pool,
-            &node_id,
-            network_sender.clone(),
-            routing_reader.clone(),
         )?;
 
         let mut scabbard_factory_builder =
@@ -881,17 +892,6 @@ impl SplinterDaemon {
         let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api_builder.build()?.run()?;
 
         let mut admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
-
-        #[cfg(feature = "service2")]
-        let mut timer = Timer::new(
-            timer_filter_collection,
-            self.service_timer_interval,
-            Box::new(NetworkMessageSenderFactory::new(
-                &node_id,
-                network_sender,
-                routing_reader.clone(),
-            )),
-        )?;
 
         let (shutdown_tx, shutdown_rx) = channel();
         ctrlc::set_handler(move || {

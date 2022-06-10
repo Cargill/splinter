@@ -15,7 +15,7 @@
 use log::info;
 use splinter::{
     error::InternalError,
-    service::{FullyQualifiedServiceId, MessageHandler, MessageSender},
+    service::{FullyQualifiedServiceId, MessageHandler, MessageSender, ServiceType, TimerAlarm},
 };
 
 use crate::protocol::v3::{
@@ -27,13 +27,16 @@ use crate::protocol::v3::{
 use crate::protos::FromBytes as _;
 use crate::store::{ConsensusEvent, ConsensusType, Event, Message, ScabbardStore};
 
+const SCABBARD_SERVICE_TYPE: ServiceType<'static> = ServiceType::new_static("scabbard:v3");
+
 pub struct ScabbardMessageHandler {
     store: Box<dyn ScabbardStore>,
+    alarm: Box<dyn TimerAlarm>,
 }
 
 impl ScabbardMessageHandler {
-    pub fn new(store: Box<dyn ScabbardStore>) -> Self {
-        Self { store }
+    pub fn new(store: Box<dyn ScabbardStore>, alarm: Box<dyn TimerAlarm>) -> Self {
+        Self { store, alarm }
     }
 }
 
@@ -78,6 +81,10 @@ impl MessageHandler for ScabbardMessageHandler {
                             )),
                         )
                         .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+                    // wake up the timer for there received message
+                    self.alarm
+                        .wake_up(SCABBARD_SERVICE_TYPE, Some(to_service))?;
                 }
             },
         }
