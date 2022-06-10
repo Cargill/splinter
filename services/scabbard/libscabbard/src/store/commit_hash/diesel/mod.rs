@@ -93,14 +93,6 @@ impl CommitHashStore for DieselCommitHashStore<diesel::pg::PgConnection> {
             )
         })
     }
-
-    fn clone_boxed(&self) -> Box<dyn CommitHashStore> {
-        Box::new(Self {
-            pool: self.pool.clone(),
-            circuit_id: self.circuit_id.clone(),
-            service_id: self.service_id.clone(),
-        })
-    }
 }
 
 #[cfg(feature = "sqlite")]
@@ -121,13 +113,63 @@ impl CommitHashStore for DieselCommitHashStore<diesel::sqlite::SqliteConnection>
             )
         })
     }
+}
 
-    fn clone_boxed(&self) -> Box<dyn CommitHashStore> {
-        Box::new(Self {
-            pool: self.pool.clone(),
-            circuit_id: self.circuit_id.clone(),
-            service_id: self.service_id.clone(),
-        })
+/// Database backed [CommitHashStore] implementation.
+pub struct DieselInTransactionCommitHashStore<'a, C: diesel::Connection> {
+    conn: &'a C,
+    circuit_id: Arc<str>,
+    service_id: Arc<str>,
+}
+
+impl<'a, C: diesel::Connection> DieselInTransactionCommitHashStore<'a, C> {
+    /// Constructs new DieselCommitHashStore.
+    ///
+    /// # Arguments
+    ///
+    /// * `conn` - The connection reference associated with an ongoing transaction
+    /// * `circuit_id` - The circuit associated with the store
+    /// * `service_id` - The service associated with the store
+    pub fn new(conn: &'a C, circuit_id: &str, service_id: &str) -> Self {
+        Self {
+            conn,
+            circuit_id: circuit_id.into(),
+            service_id: service_id.into(),
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl<'a> CommitHashStore for DieselInTransactionCommitHashStore<'a, diesel::pg::PgConnection> {
+    fn get_current_commit_hash(&self) -> Result<Option<String>, CommitHashStoreError> {
+        CommitHashStoreOperations::new(self.conn)
+            .get_current_commit_hash(&*self.circuit_id, &*self.service_id)
+    }
+
+    fn set_current_commit_hash(&self, commit_hash: &str) -> Result<(), CommitHashStoreError> {
+        CommitHashStoreOperations::new(self.conn).set_current_commit_hash(
+            &*self.circuit_id,
+            &*self.service_id,
+            commit_hash,
+        )
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl<'a> CommitHashStore
+    for DieselInTransactionCommitHashStore<'a, diesel::sqlite::SqliteConnection>
+{
+    fn get_current_commit_hash(&self) -> Result<Option<String>, CommitHashStoreError> {
+        CommitHashStoreOperations::new(self.conn)
+            .get_current_commit_hash(&*self.circuit_id, &*self.service_id)
+    }
+
+    fn set_current_commit_hash(&self, commit_hash: &str) -> Result<(), CommitHashStoreError> {
+        CommitHashStoreOperations::new(self.conn).set_current_commit_hash(
+            &*self.circuit_id,
+            &*self.service_id,
+            commit_hash,
+        )
     }
 }
 

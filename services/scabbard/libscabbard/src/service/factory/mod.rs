@@ -716,45 +716,47 @@ impl ScabbardFactory {
             self.create_sql_merkle_state_purge_handle(circuit_id, &service_id),
         );
 
-        let (receipt_store, commit_hash_store): (Arc<dyn ReceiptStore>, Box<dyn CommitHashStore>) =
-            match &self.store_factory_config {
-                #[cfg(feature = "postgres")]
-                ScabbardFactoryStorageConfig::Postgres { pool } => (
-                    Arc::new(DieselReceiptStore::new(
-                        pool.clone(),
-                        Some(format!("{}::{}", circuit_id, service_id)),
-                    )),
-                    Box::new(DieselCommitHashStore::new(
-                        pool.clone(),
-                        circuit_id,
-                        &service_id,
-                    )),
-                ),
-                #[cfg(feature = "sqlite")]
-                ScabbardFactoryStorageConfig::Sqlite { pool } => (
-                    Arc::new(DieselReceiptStore::new(
-                        pool.clone(),
-                        Some(format!("{}::{}", circuit_id, service_id)),
-                    )),
-                    Box::new(DieselCommitHashStore::new(
-                        pool.clone(),
-                        circuit_id,
-                        &service_id,
-                    )),
-                ),
-                #[cfg(feature = "sqlite")]
-                ScabbardFactoryStorageConfig::SqliteExclusiveWrites { pool } => (
-                    Arc::new(DieselReceiptStore::new_with_write_exclusivity(
-                        pool.clone(),
-                        Some(format!("{}::{}", circuit_id, service_id)),
-                    )),
-                    Box::new(DieselCommitHashStore::new_with_write_exclusivity(
-                        pool.clone(),
-                        circuit_id,
-                        &service_id,
-                    )),
-                ),
-            };
+        let (receipt_store, commit_hash_store): (
+            Arc<dyn ReceiptStore>,
+            Arc<dyn CommitHashStore + Sync + Send>,
+        ) = match &self.store_factory_config {
+            #[cfg(feature = "postgres")]
+            ScabbardFactoryStorageConfig::Postgres { pool } => (
+                Arc::new(DieselReceiptStore::new(
+                    pool.clone(),
+                    Some(format!("{}::{}", circuit_id, service_id)),
+                )),
+                Arc::new(DieselCommitHashStore::new(
+                    pool.clone(),
+                    circuit_id,
+                    &service_id,
+                )),
+            ),
+            #[cfg(feature = "sqlite")]
+            ScabbardFactoryStorageConfig::Sqlite { pool } => (
+                Arc::new(DieselReceiptStore::new(
+                    pool.clone(),
+                    Some(format!("{}::{}", circuit_id, service_id)),
+                )),
+                Arc::new(DieselCommitHashStore::new(
+                    pool.clone(),
+                    circuit_id,
+                    &service_id,
+                )),
+            ),
+            #[cfg(feature = "sqlite")]
+            ScabbardFactoryStorageConfig::SqliteExclusiveWrites { pool } => (
+                Arc::new(DieselReceiptStore::new_with_write_exclusivity(
+                    pool.clone(),
+                    Some(format!("{}::{}", circuit_id, service_id)),
+                )),
+                Arc::new(DieselCommitHashStore::new_with_write_exclusivity(
+                    pool.clone(),
+                    circuit_id,
+                    &service_id,
+                )),
+            ),
+        };
 
         Scabbard::new(
             service_id,

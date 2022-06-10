@@ -118,7 +118,7 @@ impl Scabbard {
         // List of other scabbard services on the same circuit that this service shares state with
         peer_services: HashSet<String>,
         merkle_state: MerkleState,
-        commit_hash_store: Box<dyn CommitHashStore>,
+        commit_hash_store: Arc<dyn CommitHashStore + Sync + Send>,
         receipt_store: Arc<dyn ReceiptStore>,
         purge_handler: Box<dyn ScabbardStatePurgeHandler>,
         signature_verifier: Box<dyn SignatureVerifier>,
@@ -623,14 +623,14 @@ pub mod tests {
     }
 
     fn create_merkle_state_and_commit_hash_store(
-    ) -> (MerkleState, Box<dyn CommitHashStore + Send + Sync>) {
+    ) -> (MerkleState, Arc<dyn CommitHashStore + Send + Sync>) {
         let mut indexes = INDEXES.to_vec();
         indexes.push(CURRENT_STATE_ROOT_INDEX);
         let db = BTreeDatabase::new(&indexes);
         let merkle_state = MerkleState::new(MerkleStateConfig::key_value(db.clone_box()))
             .expect("Unable to create merkle state");
         let commit_hash_store = TransactCommitHashStore::new(db);
-        (merkle_state, Box::new(commit_hash_store))
+        (merkle_state, Arc::new(commit_hash_store))
     }
 
     #[derive(Debug)]
