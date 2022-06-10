@@ -121,6 +121,7 @@ experimental = [
     "biome-client",
     "biome-client-reqwest",
     "client-reqwest",
+    "defered-send",
     "https-bind",
     "registry-client",
     "registry-client-reqwest",
@@ -168,6 +169,7 @@ challenge-authorization = []
 circuit-template = ["admin-service", "glob"]
 client-reqwest = ["reqwest"]
 cylinder-jwt = ["cylinder/jwt", "rest-api"]
+defered-send = []
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
 memory = ["sqlite"]
@@ -204,6 +206,7 @@ service-message-sender-factory-peer = [
     "service-message-sender-factory"
 ]
 service-timer =[
+  "defered-send",
   "runtime-service",
   "service-message-sender-factory",
   "service-timer-filter",

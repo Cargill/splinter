@@ -14,9 +14,11 @@
 
 //! The internal thread used by the Timer
 
+use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 
+use crate::channel::DeferedSend;
 use crate::error::InternalError;
 use crate::service::{FullyQualifiedServiceId, MessageSenderFactory, ServiceType};
 use crate::threading::{
@@ -50,13 +52,20 @@ impl TimerThread {
 
         let executor = thread_pool.executor();
 
+        let mut active_services: HashSet<FullyQualifiedServiceId> = HashSet::new();
+        let timer_msg_sender = sender.clone();
+
         let join_handle = thread::Builder::new()
             .name("TimerMainThread".to_string())
             .spawn(move || loop {
                 match recv.recv() {
-                    Ok(TimerMessage::WakeUpAll) => {
-                        wake_up_all(&filters, &executor, &*message_sender_factory)
-                    }
+                    Ok(TimerMessage::WakeUpAll) => wake_up_all(
+                        &filters,
+                        &executor,
+                        &*message_sender_factory,
+                        &mut active_services,
+                        timer_msg_sender.clone(),
+                    ),
                     Ok(TimerMessage::WakeUp {
                         service_type,
                         service_id,
@@ -66,7 +75,20 @@ impl TimerThread {
                         &*message_sender_factory,
                         service_type,
                         service_id,
+                        &mut active_services,
+                        timer_msg_sender.clone(),
                     ),
+                    Ok(TimerMessage::Complete { service_id }) => {
+                        if active_services.remove(&service_id) {
+                            trace!("Service {} handler has completed", service_id);
+                        } else {
+                            warn!(
+                                "Received complete for service that was not running: {}",
+                                service_id
+                            );
+                        }
+                    }
+
                     Ok(TimerMessage::Shutdown) => {
                         debug!("Service timer received shutdown");
                         break;
@@ -115,6 +137,8 @@ fn wake_up_all(
     filters: &FilterCollection,
     executor: &JobExecutor,
     message_sender_factory: &(dyn MessageSenderFactory<Vec<u8>> + 'static),
+    active_services: &mut HashSet<FullyQualifiedServiceId>,
+    sender: Sender<TimerMessage>,
 ) {
     for (filter, handler_factory) in filters {
         let service_ids = match filter.filter() {
@@ -126,9 +150,25 @@ fn wake_up_all(
         };
 
         for service_id in service_ids.into_iter() {
+            if active_services.contains(&service_id) {
+                debug!("Thread already running for service: {}", service_id);
+                continue;
+            } else {
+                active_services.insert(service_id.clone());
+            }
+
             let new_handle_factory = handler_factory.clone_box();
             let msg_sender_factory = message_sender_factory.clone_boxed();
+            let callback_sender = sender.clone();
+            let callback_id = service_id.clone();
             executor.execute(move || {
+                // This message will be sent upon thread termination
+                let _defered_send = DeferedSend::new(
+                    callback_sender,
+                    TimerMessage::Complete {
+                        service_id: callback_id,
+                    },
+                );
                 let timer_sender = match msg_sender_factory.new_message_sender(&service_id) {
                     Ok(timer_sender) => timer_sender,
                     Err(err) => {
@@ -167,6 +207,8 @@ fn wake_up(
     message_sender_factory: &(dyn MessageSenderFactory<Vec<u8>> + 'static),
     service_type: ServiceType<'static>,
     service_id: Option<FullyQualifiedServiceId>,
+    active_services: &mut HashSet<FullyQualifiedServiceId>,
+    sender: Sender<TimerMessage>,
 ) {
     let (filter, handler_factory) = match filters
         .iter()
@@ -189,9 +231,23 @@ fn wake_up(
 
     if let Some(id) = service_id {
         if service_ids.contains(&id) {
+            if active_services.contains(&id) {
+                debug!("Thread already running for service: {}", id);
+                return;
+            } else {
+                active_services.insert(id.clone());
+            }
             let new_handle_factory = handler_factory.clone_box();
             let msg_sender_factory = message_sender_factory.clone_boxed();
+            let callback_id = id.clone();
             executor.execute(move || {
+                // This message will be sent upon thread termination
+                let _defered_send = DeferedSend::new(
+                    sender,
+                    TimerMessage::Complete {
+                        service_id: callback_id,
+                    },
+                );
                 let timer_sender = match msg_sender_factory.new_message_sender(&id) {
                     Ok(timer_sender) => timer_sender,
                     Err(err) => {
@@ -214,7 +270,7 @@ fn wake_up(
                     }
                 };
 
-                if let Err(err) = handler.handle_timer(&*timer_sender, id) {
+                if let Err(err) = handler.handle_timer(&*timer_sender, id.clone()) {
                     error!("{}", err);
                 }
             })
@@ -227,9 +283,25 @@ fn wake_up(
         }
     } else {
         for service_id in service_ids.into_iter() {
+            if active_services.contains(&service_id) {
+                debug!("Thread already running for service: {}", service_id);
+                continue;
+            } else {
+                active_services.insert(service_id.clone());
+            }
+
             let new_handle_factory = handler_factory.clone_box();
             let msg_sender_factory = message_sender_factory.clone_boxed();
+            let callback_sender = sender.clone();
+            let callback_id = service_id.clone();
             executor.execute(move || {
+                // This message will be sent upon thread termination
+                let _defered_send = DeferedSend::new(
+                    callback_sender,
+                    TimerMessage::Complete {
+                        service_id: callback_id,
+                    },
+                );
                 let timer_sender = match msg_sender_factory.new_message_sender(&service_id) {
                     Ok(timer_sender) => timer_sender,
                     Err(err) => {
@@ -252,7 +324,7 @@ fn wake_up(
                     }
                 };
 
-                if let Err(err) = handler.handle_timer(&*timer_sender, service_id) {
+                if let Err(err) = handler.handle_timer(&*timer_sender, service_id.clone()) {
                     error!("{}", err);
                 }
             })

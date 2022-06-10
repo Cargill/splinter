@@ -11,20 +11,28 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::sync::mpsc::Sender;
 
-//! The message used by the Timer to know when to execute service handler
+pub struct DeferedSend<M> {
+    sender: Sender<M>,
+    msg: Option<M>,
+}
 
-use crate::service::{FullyQualifiedServiceId, ServiceType};
+impl<M> DeferedSend<M> {
+    pub fn new(sender: Sender<M>, msg: M) -> Self {
+        DeferedSend {
+            sender,
+            msg: Some(msg),
+        }
+    }
+}
 
-#[derive(Clone, Debug)]
-pub enum TimerMessage {
-    WakeUpAll,
-    WakeUp {
-        service_type: ServiceType<'static>,
-        service_id: Option<FullyQualifiedServiceId>,
-    },
-    Complete {
-        service_id: FullyQualifiedServiceId,
-    },
-    Shutdown,
+impl<M> Drop for DeferedSend<M> {
+    fn drop(&mut self) {
+        if let Some(msg) = self.msg.take() {
+            if self.sender.send(msg).is_err() {
+                error!("Unable to send message for defered send")
+            }
+        }
+    }
 }
