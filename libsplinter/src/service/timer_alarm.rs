@@ -14,29 +14,12 @@
 
 //! An alarm can be used to prematurely wake all or specific message handlers
 
-use std::sync::mpsc::Sender;
-
 use crate::error::InternalError;
-use crate::runtime::service::timer::message::TimerMessage;
-use crate::service::{FullyQualifiedServiceId, ServiceType, TimerAlarm, TimerAlarmFactory};
+use crate::service::{FullyQualifiedServiceId, ServiceType};
 
-pub struct ChannelTimerAlarm {
-    sender: Sender<TimerMessage>,
-}
-
-impl ChannelTimerAlarm {
-    pub fn new(sender: Sender<TimerMessage>) -> Self {
-        ChannelTimerAlarm { sender }
-    }
-}
-
-impl TimerAlarm for ChannelTimerAlarm {
+pub trait TimerAlarm {
     /// Notify the `Timer` to check all `TimerFilters` for pending work
-    fn wake_up_all(&self) -> Result<(), InternalError> {
-        self.sender
-            .send(TimerMessage::WakeUpAll)
-            .map_err(|err| InternalError::from_source(Box::new(err)))
-    }
+    fn wake_up_all(&self) -> Result<(), InternalError>;
 
     /// Notify the `Timer` to check a specific `TimerFilter` for pending work
     ///
@@ -55,34 +38,5 @@ impl TimerAlarm for ChannelTimerAlarm {
         &self,
         service_type: ServiceType<'static>,
         service_id: Option<FullyQualifiedServiceId>,
-    ) -> Result<(), InternalError> {
-        self.sender
-            .send(TimerMessage::WakeUp {
-                service_type,
-                service_id,
-            })
-            .map_err(|err| InternalError::from_source(Box::new(err)))
-    }
-}
-
-pub struct ChannelTimerAlarmFactory {
-    sender: Sender<TimerMessage>,
-}
-
-impl ChannelTimerAlarmFactory {
-    pub fn new(sender: Sender<TimerMessage>) -> Self {
-        ChannelTimerAlarmFactory { sender }
-    }
-}
-
-/// Used to create new `TimerAlarm` instances.
-impl TimerAlarmFactory for ChannelTimerAlarmFactory {
-    /// Returns a new `TimerAlarm`
-    fn new_alarm(&self) -> Box<dyn TimerAlarm> {
-        Box::new(ChannelTimerAlarm::new(self.sender.clone()))
-    }
-
-    fn clone_box(&self) -> Box<dyn TimerAlarmFactory> {
-        Box::new(ChannelTimerAlarmFactory::new(self.sender.clone()))
-    }
+    ) -> Result<(), InternalError>;
 }

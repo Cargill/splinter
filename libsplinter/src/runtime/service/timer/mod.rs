@@ -23,14 +23,12 @@ use std::sync::mpsc::{channel, Sender};
 use std::time::Duration;
 
 use crate::error::InternalError;
-use crate::service::{MessageSenderFactory, TimerFilter, TimerHandlerFactory};
+use crate::service::{MessageSenderFactory, TimerAlarmFactory, TimerFilter, TimerHandlerFactory};
 use crate::threading::{lifecycle::ShutdownHandle, pacemaker::Pacemaker};
 
-use self::alarm::ChannelTimerAlarm;
+use self::alarm::ChannelTimerAlarmFactory;
 use self::message::TimerMessage;
 use self::thread::TimerThread;
-
-pub use self::alarm::TimerAlarm;
 
 pub struct Timer {
     pacemaker: Pacemaker,
@@ -75,9 +73,9 @@ impl Timer {
         })
     }
 
-    /// Get a `TimerAlarm` that can be use to prematurely wake up the `Timer`
-    pub fn alarm(&self) -> Box<dyn TimerAlarm> {
-        Box::new(ChannelTimerAlarm::new(self.sender.clone()))
+    /// Get a `TimerAlarmFactory` that can be use to get alarms to prematurely wake up the `Timer`
+    pub fn alarm_factory(&self) -> Box<dyn TimerAlarmFactory> {
+        Box::new(ChannelTimerAlarmFactory::new(self.sender.clone()))
     }
 }
 
@@ -298,7 +296,7 @@ mod tests {
 
         let mut timer = Timer::new(filters, wake_up_interval, message_sender_factory).unwrap();
 
-        let alarm = timer.alarm();
+        let alarm = timer.alarm_factory().new_alarm();
 
         alarm.wake_up_all().unwrap();
 
@@ -338,7 +336,7 @@ mod tests {
 
         let mut timer = Timer::new(filters, wake_up_interval, message_sender_factory).unwrap();
 
-        let alarm = timer.alarm();
+        let alarm = timer.alarm_factory().new_alarm();
 
         alarm
             .wake_up(ServiceType::new("test").unwrap(), None)
@@ -381,7 +379,7 @@ mod tests {
 
         let mut timer = Timer::new(filters, wake_up_interval, message_sender_factory).unwrap();
 
-        let alarm = timer.alarm();
+        let alarm = timer.alarm_factory().new_alarm();
 
         alarm
             .wake_up(
@@ -427,7 +425,7 @@ mod tests {
 
         let mut timer = Timer::new(filters, wake_up_interval, message_sender_factory).unwrap();
 
-        let alarm = timer.alarm();
+        let alarm = timer.alarm_factory().new_alarm();
 
         alarm
             .wake_up(
@@ -471,7 +469,7 @@ mod tests {
 
         let mut timer = Timer::new(filters, wake_up_interval, message_sender_factory).unwrap();
 
-        let alarm = timer.alarm();
+        let alarm = timer.alarm_factory().new_alarm();
         alarm.wake_up_all().unwrap();
 
         if let Ok((_, _, msg_bytes)) = service_recv.recv_timeout(std::time::Duration::from_secs(5))
@@ -522,7 +520,7 @@ mod tests {
 
         let mut timer = Timer::new(filters, wake_up_interval, message_sender_factory).unwrap();
 
-        let alarm = timer.alarm();
+        let alarm = timer.alarm_factory().new_alarm();
         alarm.wake_up_all().unwrap();
 
         // wait for timer handler to panic

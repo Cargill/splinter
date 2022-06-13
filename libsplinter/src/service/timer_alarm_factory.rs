@@ -12,7 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An alarm can be used to prematurely wake all or specific message handlers
-mod channel;
+//! Contains `TimerAlarmFactory` trait.
 
-pub use channel::{ChannelTimerAlarm, ChannelTimerAlarmFactory};
+use super::TimerAlarm;
+
+/// Used to create new `TimerAlarm` instances.
+pub trait TimerAlarmFactory: Send {
+    /// Returns a new `TimerAlarm`
+    fn new_alarm(&self) -> Box<dyn TimerAlarm>;
+
+    fn clone_box(&self) -> Box<dyn TimerAlarmFactory>;
+}
+
+impl Clone for Box<dyn TimerAlarmFactory> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}

@@ -13,7 +13,7 @@
 
 use std::sync::Arc;
 
-use splinter::service::{MessageHandlerFactory, Routable, ServiceType};
+use splinter::service::{MessageHandlerFactory, Routable, ServiceType, TimerAlarmFactory};
 
 use crate::store::PooledScabbardStoreFactory;
 
@@ -24,11 +24,18 @@ const SCABBARD_SERVICE_TYPES: &[ServiceType<'static>] = &[ServiceType::new_stati
 #[derive(Clone)]
 pub struct ScabbardMessageHandlerFactory {
     store_factory: Arc<dyn PooledScabbardStoreFactory>,
+    timer_alarm_factory: Box<dyn TimerAlarmFactory>,
 }
 
 impl ScabbardMessageHandlerFactory {
-    pub fn new(store_factory: Arc<dyn PooledScabbardStoreFactory>) -> Self {
-        Self { store_factory }
+    pub fn new(
+        store_factory: Arc<dyn PooledScabbardStoreFactory>,
+        timer_alarm_factory: Box<dyn TimerAlarmFactory>,
+    ) -> Self {
+        Self {
+            store_factory,
+            timer_alarm_factory,
+        }
     }
 }
 
@@ -36,7 +43,10 @@ impl MessageHandlerFactory for ScabbardMessageHandlerFactory {
     type MessageHandler = ScabbardMessageHandler;
 
     fn new_handler(&self) -> Self::MessageHandler {
-        ScabbardMessageHandler::new(self.store_factory.new_store())
+        ScabbardMessageHandler::new(
+            self.store_factory.new_store(),
+            self.timer_alarm_factory.new_alarm(),
+        )
     }
 
     fn clone_boxed(&self) -> Box<dyn MessageHandlerFactory<MessageHandler = Self::MessageHandler>> {
