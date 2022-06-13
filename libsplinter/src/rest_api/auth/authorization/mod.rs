@@ -18,6 +18,7 @@
 pub mod allow_keys;
 #[cfg(feature = "authorization-handler-maintenance")]
 pub mod maintenance;
+mod permission;
 mod permission_map;
 #[cfg(feature = "authorization-handler-rbac")]
 pub mod rbac;
@@ -27,31 +28,11 @@ use crate::error::InternalError;
 
 use super::identity::Identity;
 
+pub use permission::Permission;
 pub use permission_map::PermissionMap;
 
 #[cfg(test)]
 pub use permission_map::Method;
-
-/// A permission assigned to an endpoint
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Permission {
-    /// Check that the authenticated client has the specified permission.
-    Check {
-        /// The permission ID that's passed to [`AuthorizationHandler::has_permission`]
-        permission_id: &'static str,
-        /// The human-readable name for the permission
-        permission_display_name: &'static str,
-        /// A description for the permission
-        permission_description: &'static str,
-    },
-    /// Allow any request that has been authenticated (the client's identity has been determined).
-    /// This may be used by endpoints that need to know the client's identity but do not require a
-    /// special permission to be checked (the Biome key management and OAuth logout routes are an
-    /// example of this).
-    AllowAuthenticated,
-    /// Allow any request without checking for authorization.
-    AllowUnauthenticated,
-}
 
 /// An authorization handler's decision about whether to allow, deny, or pass on the request
 pub enum AuthorizationHandlerResult {
