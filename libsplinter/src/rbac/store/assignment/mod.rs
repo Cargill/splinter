@@ -50,6 +50,7 @@ impl Assignment {
         (self.identity, self.roles)
     }
 
+    #[cfg(feature = "diesel")]
     pub(super) fn new_unchecked(identity: Identity, roles: Vec<String>) -> Self {
         Self { identity, roles }
     }
