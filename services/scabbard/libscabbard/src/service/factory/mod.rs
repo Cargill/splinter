@@ -38,6 +38,8 @@ use sawtooth::receipt::store::ReceiptStore;
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 use splinter::error::InternalError;
 use splinter::error::{InvalidArgumentError, InvalidStateError};
+#[cfg(feature = "rest-api-actix-web-1")]
+use splinter::service::instance::EndpointFactory;
 use splinter::service::instance::{
     FactoryCreateError, ServiceArgValidator, ServiceFactory, ServiceInstance,
 };
@@ -582,8 +584,10 @@ impl ServiceFactory for ScabbardFactory {
         // As the factory cannot be created under these conditions, this function is not reachable.
         unreachable!()
     }
+}
 
-    #[cfg(feature = "rest-api")]
+#[cfg(feature = "rest-api")]
+impl EndpointFactory for ScabbardFactory {
     /// The `Scabbard` services created by the `ScabbardFactory` provide the following REST API
     /// endpoints as [`ServiceEndpoint`]s:
     ///

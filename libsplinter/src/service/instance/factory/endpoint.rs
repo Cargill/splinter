@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "rest-api-actix-web-1")]
-mod endpoint;
-mod service;
+use crate::service::rest_api::ServiceEndpointProvider;
 
-#[cfg(feature = "rest-api-actix-web-1")]
-pub use endpoint::EndpointFactory;
-pub use service::ServiceFactory;
+pub trait EndpointFactory {
+    /// Get the [`ServiceEndpoint`] definitions that represent the REST API resources provided by
+    /// the services that this factory can create.
+    ///
+    /// [`ServiceEndpoint`]: rest_api/struct.ServiceEndpoint.html
+    fn get_rest_endpoint_provider(&self) -> Box<dyn ServiceEndpointProvider>;
+}

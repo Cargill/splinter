@@ -15,8 +15,6 @@
 use std::collections::HashMap;
 
 use crate::service::instance::{FactoryCreateError, ServiceInstance};
-#[cfg(feature = "rest-api-actix-web-1")]
-use crate::service::rest_api::ServiceEndpointProvider;
 
 /// A `ServiceFactory` creates services.
 pub trait ServiceFactory: Send {
@@ -32,11 +30,4 @@ pub trait ServiceFactory: Send {
         circuit_id: &str,
         args: HashMap<String, String>,
     ) -> Result<Box<dyn ServiceInstance>, FactoryCreateError>;
-
-    #[cfg(feature = "rest-api-actix-web-1")]
-    /// Get the [`ServiceEndpoint`] definitions that represent the REST API resources provided by
-    /// the services that this factory can create.
-    ///
-    /// [`ServiceEndpoint`]: rest_api/struct.ServiceEndpoint.html
-    fn get_rest_endpoint_provider(&self) -> Box<dyn ServiceEndpointProvider>;
 }
