@@ -12,32 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
+mod service;
 
-#[cfg(feature = "rest-api-actix-web-1")]
-use crate::service::rest_api::ServiceEndpointProvider;
-
-use super::{FactoryCreateError, ServiceInstance};
-
-/// A `ServiceFactory` creates services.
-pub trait ServiceFactory: Send {
-    /// Return the available service types that this factory can create.
-    fn available_service_types(&self) -> &[String];
-
-    /// Create a ServiceInstance with the given ID, of the given type, the given circuit_id,
-    /// with the given arguments.
-    fn create(
-        &self,
-        service_id: String,
-        service_type: &str,
-        circuit_id: &str,
-        args: HashMap<String, String>,
-    ) -> Result<Box<dyn ServiceInstance>, FactoryCreateError>;
-
-    #[cfg(feature = "rest-api-actix-web-1")]
-    /// Get the [`ServiceEndpoint`] definitions that represent the REST API resources provided by
-    /// the services that this factory can create.
-    ///
-    /// [`ServiceEndpoint`]: rest_api/struct.ServiceEndpoint.html
-    fn get_rest_endpoint_provider(&self) -> Box<dyn ServiceEndpointProvider>;
-}
+pub use service::ServiceFactory;
