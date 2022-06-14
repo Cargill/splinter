@@ -237,12 +237,7 @@ where
                     .with_participants(final_participants)
                     .with_state(state)
                     .with_this_process(
-                        FullyQualifiedServiceId::new_from_string(update_context.service_id)
-                            .map_err(|err| {
-                                ScabbardStoreError::Internal(InternalError::from_source(Box::new(
-                                    err,
-                                )))
-                            })?
+                        service_id
                             .service_id(),
                     );
 

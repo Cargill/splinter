@@ -135,7 +135,6 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
                     let deliver_event = Consensus2pcDeliverEventModel {
                         event_id,
-                        service_id: format!("{}", service_id),
                         epoch: i64::try_from(epoch)
                             .map_err(|err| InternalError::from_source(Box::new(err)))?,
                         receiver_service_id: format!("{}", receiving_process),
@@ -155,11 +154,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     Ok(event_id)
                 }
                 Event::Start(value) => {
-                    let start_event = Consensus2pcStartEventModel {
-                        event_id,
-                        service_id: format!("{}", service_id),
-                        value,
-                    };
+                    let start_event = Consensus2pcStartEventModel { event_id, value };
                     insert_into(consensus_2pc_start_event::table)
                         .values(vec![start_event])
                         .execute(self.conn)
@@ -176,11 +171,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         true => String::from("TRUE"),
                         false => String::from("FALSE"),
                     };
-                    let vote_event = Consensus2pcVoteEventModel {
-                        event_id,
-                        service_id: format!("{}", service_id),
-                        vote,
-                    };
+                    let vote_event = Consensus2pcVoteEventModel { event_id, vote };
                     insert_into(consensus_2pc_vote_event::table)
                         .values(vec![vote_event])
                         .execute(self.conn)
@@ -276,7 +267,6 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
 
                     let deliver_event = Consensus2pcDeliverEventModel {
                         event_id,
-                        service_id: format!("{}", service_id),
                         epoch: i64::try_from(epoch)
                             .map_err(|err| InternalError::from_source(Box::new(err)))?,
                         receiver_service_id: format!("{}", receiving_process),
@@ -296,11 +286,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     Ok(event_id)
                 }
                 Event::Start(value) => {
-                    let start_event = Consensus2pcStartEventModel {
-                        event_id,
-                        service_id: format!("{}", service_id),
-                        value,
-                    };
+                    let start_event = Consensus2pcStartEventModel { event_id, value };
                     insert_into(consensus_2pc_start_event::table)
                         .values(vec![start_event])
                         .execute(self.conn)
@@ -317,11 +303,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                         true => String::from("TRUE"),
                         false => String::from("FALSE"),
                     };
-                    let vote_event = Consensus2pcVoteEventModel {
-                        event_id,
-                        service_id: format!("{}", service_id),
-                        vote,
-                    };
+                    let vote_event = Consensus2pcVoteEventModel { event_id, vote };
                     insert_into(consensus_2pc_vote_event::table)
                         .values(vec![vote_event])
                         .execute(self.conn)
