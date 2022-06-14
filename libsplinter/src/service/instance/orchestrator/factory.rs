@@ -14,10 +14,27 @@
 
 use std::collections::HashMap;
 
+#[cfg(feature = "rest-api-actix-web-1")]
+use crate::service::instance::EndpointFactory;
 use crate::service::instance::{FactoryCreateError, ServiceFactory};
 
 use super::OrchestratableService;
 
+#[cfg(feature = "rest-api-actix-web-1")]
+/// A service factory that produces orchestratable services.
+pub trait OrchestratableServiceFactory: ServiceFactory + EndpointFactory {
+    /// Create a Service instance with the given ID, of the given type, the given circuit_id,
+    /// with the given arguments.
+    fn create_orchestratable_service(
+        &self,
+        service_id: String,
+        service_type: &str,
+        circuit_id: &str,
+        args: HashMap<String, String>,
+    ) -> Result<Box<dyn OrchestratableService>, FactoryCreateError>;
+}
+
+#[cfg(not(feature = "rest-api-actix-web-1"))]
 /// A service factory that produces orchestratable services.
 pub trait OrchestratableServiceFactory: ServiceFactory {
     /// Create a Service instance with the given ID, of the given type, the given circuit_id,
