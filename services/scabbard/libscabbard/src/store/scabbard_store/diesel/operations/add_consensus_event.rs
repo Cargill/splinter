@@ -74,22 +74,9 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     )))
                 })?;
 
-            let position = consensus_2pc_event::table
-                .filter(consensus_2pc_event::service_id.eq(format!("{}", service_id)))
-                .order(consensus_2pc_event::position.desc())
-                .select(consensus_2pc_event::position)
-                .first::<i32>(self.conn)
-                .optional()
-                .map_err(|err| {
-                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
-                })?
-                .unwrap_or(0)
-                + 1;
-
             let insertable_event = InsertableConsensus2pcEventModel {
                 service_id: format!("{}", service_id),
                 executed_at: None,
-                position,
                 event_type: String::from(&event),
             };
 
@@ -212,22 +199,9 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     )))
                 })?;
 
-            let position = consensus_2pc_event::table
-                .filter(consensus_2pc_event::service_id.eq(format!("{}", service_id)))
-                .order(consensus_2pc_event::position.desc())
-                .select(consensus_2pc_event::position)
-                .first::<i32>(self.conn)
-                .optional()
-                .map_err(|err| {
-                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
-                })?
-                .unwrap_or(0)
-                + 1;
-
             let insertable_event = InsertableConsensus2pcEventModel {
                 service_id: format!("{}", service_id),
                 executed_at: None,
-                position,
                 event_type: String::from(&event),
             };
 

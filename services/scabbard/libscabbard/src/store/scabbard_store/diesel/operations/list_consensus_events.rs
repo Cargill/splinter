@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-
 use diesel::prelude::*;
 use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
@@ -81,13 +79,9 @@ where
                         .eq(format!("{}", service_id))
                         .and(consensus_2pc_event::executed_at.is_null()),
                 )
-                .order(consensus_2pc_event::position.desc())
-                .select((
-                    consensus_2pc_event::id,
-                    consensus_2pc_event::position,
-                    consensus_2pc_event::event_type,
-                ))
-                .load::<(i64, i32, String)>(self.conn)
+                .order(consensus_2pc_event::id.desc())
+                .select((consensus_2pc_event::id, consensus_2pc_event::event_type))
+                .load::<(i64, String)>(self.conn)
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
                 })?;
@@ -95,30 +89,21 @@ where
             let event_ids = consensus_events
                 .clone()
                 .into_iter()
-                .map(|(id, _, _)| id)
+                .map(|(id, _)| id)
                 .collect::<Vec<_>>();
-
-            let events_map: HashMap<_, _> = consensus_events
-                .clone()
-                .into_iter()
-                .map(|(id, position, _)| (id, position))
-                .collect();
 
             let mut all_events = Vec::new();
 
             let mut alarm_events = consensus_events
                 .into_iter()
-                .filter_map(|(id, position, event_type)| match event_type.as_str() {
-                    "ALARM" => Some((
-                        position,
-                        Identified {
-                            id,
-                            record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
-                        },
-                    )),
+                .filter_map(|(id, event_type)| match event_type.as_str() {
+                    "ALARM" => Some(Identified {
+                        id,
+                        record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
+                    }),
                     _ => None,
                 })
-                .collect::<Vec<(i32, Identified<ConsensusEvent>)>>();
+                .collect::<Vec<Identified<ConsensusEvent>>>();
 
             all_events.append(&mut alarm_events);
 
@@ -144,11 +129,6 @@ where
                 })?;
 
             for deliver in deliver_events {
-                let position = events_map.get(&deliver.event_id).ok_or_else(|| {
-                    ScabbardStoreError::Internal(InternalError::with_message(
-                        "Failed to list consensus events, invalid event ID".to_string(),
-                    ))
-                })?;
                 let process = ServiceId::new(deliver.receiver_service_id).map_err(|err| {
                     ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                 })?;
@@ -205,28 +185,18 @@ where
                     id: deliver.event_id,
                     record: ConsensusEvent::TwoPhaseCommit(Event::Deliver(process, message)),
                 };
-                all_events.push((*position, event));
+                all_events.push(event);
             }
 
             for start in start_events {
-                let position = events_map.get(&start.event_id).ok_or_else(|| {
-                    ScabbardStoreError::Internal(InternalError::with_message(
-                        "Failed to list consensus events, invalid event ID".to_string(),
-                    ))
-                })?;
                 let event = Identified {
                     id: start.event_id,
                     record: ConsensusEvent::TwoPhaseCommit(Event::Start(start.value)),
                 };
-                all_events.push((*position, event));
+                all_events.push(event);
             }
 
             for vote in vote_events {
-                let position = events_map.get(&vote.event_id).ok_or_else(|| {
-                    ScabbardStoreError::Internal(InternalError::with_message(
-                        "Failed to list consensus events, invalid event ID".to_string(),
-                    ))
-                })?;
                 let vote_decision = match vote.vote.as_str() {
                     "TRUE" => true,
                     "FALSE" => false,
@@ -242,12 +212,12 @@ where
                     id: vote.event_id,
                     record: ConsensusEvent::TwoPhaseCommit(Event::Vote(vote_decision)),
                 };
-                all_events.push((*position, event));
+                all_events.push(event);
             }
 
-            all_events.sort_by(|a, b| a.0.cmp(&b.0));
+            all_events.sort_by(|a, b| a.id.cmp(&b.id));
 
-            Ok(all_events.into_iter().map(|(_, event)| event).collect())
+            Ok(all_events)
         })
     }
 }
