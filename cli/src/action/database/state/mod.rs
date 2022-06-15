@@ -343,7 +343,6 @@ fn copy_state(
         .get_state_root()
         .map_err(|e| InternalError::from_source(Box::new(e)))?;
     let mut state_changes = vec![];
-    let mut to_prune = vec![];
     for state_change in state_changes_iter {
         match state_change {
             Ok((key, value)) => {
@@ -351,15 +350,9 @@ fn copy_state(
                 count += 1;
 
                 if count > 1000 {
-                    to_prune.push(last_state_id.to_string());
-                    last_state_id = state_writer
-                        .commit(&last_state_id, &state_changes)
-                        .map_err(|e| {
-                            InternalError::with_message(format!(
-                                "Unable to commit state changes {}",
-                                e
-                            ))
-                        })?;
+                    last_state_id =
+                        write_and_prune_with_cleanup(state_writer, &last_state_id, &state_changes)?;
+
                     count = 0;
                     state_changes.clear()
                 }
@@ -373,18 +366,9 @@ fn copy_state(
         }
     }
 
-    to_prune.push(last_state_id.to_string());
-    last_state_id = state_writer
-        .commit(&last_state_id, &state_changes)
-        .map_err(|e| {
-            InternalError::with_message(format!("Unable to commit state changes {}", e))
-        })?;
+    last_state_id = write_and_prune_with_cleanup(state_writer, &last_state_id, &state_changes)?;
 
-    if last_state_id == current_commit_hash {
-        state_writer.prune(to_prune).map_err(|e| {
-            InternalError::with_message(format!("Unable to purge old commit hashes {}", e))
-        })?;
-    } else {
+    if last_state_id != current_commit_hash {
         return Err(InternalError::with_message(format!(
             "Ending commit hash did not match expected {} != {}",
             last_state_id, current_commit_hash
@@ -392,4 +376,27 @@ fn copy_state(
     }
 
     Ok(())
+}
+
+fn write_and_prune_with_cleanup(
+    merkle_state: &MerkleState,
+    state_id: &str,
+    state_changes: &[StateChange],
+) -> Result<String, InternalError> {
+    let next_state_id = merkle_state
+        .commit(&state_id.to_string(), state_changes)
+        .map_err(|e| {
+            InternalError::with_message(format!("Unable to commit state changes {}", e))
+        })?;
+    merkle_state
+        .prune(vec![state_id.to_string()])
+        .map_err(|e| {
+            InternalError::with_message(format!("Unable to purge previous commit hash {}", e))
+        })?;
+
+    merkle_state.remove_pruned_entries().map_err(|e| {
+        InternalError::with_message(format!("Unable to remove pruned entries {}", e))
+    })?;
+
+    Ok(next_state_id)
 }
