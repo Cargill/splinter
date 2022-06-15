@@ -19,11 +19,12 @@ use diesel::pg::PgConnection;
 #[cfg(feature = "sqlite")]
 use diesel::sqlite::SqliteConnection;
 use diesel::{dsl::insert_into, prelude::*};
+use splinter::error::InvalidStateError;
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
-    models::{Consensus2pcContextModel, ContextParticipantList},
-    schema::{consensus_2pc_context, consensus_2pc_context_participant},
+    models::{Consensus2pcContextModel, ContextParticipantList, ScabbardServiceModel},
+    schema::{consensus_2pc_context, consensus_2pc_context_participant, scabbard_service},
 };
 use crate::store::scabbard_store::ConsensusContext;
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -50,6 +51,30 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, SqliteConnection> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
                 ConsensusContext::TwoPhaseCommit(context) => {
+                    // check to see if a service with the given service_id exists
+                    scabbard_service::table
+                        .filter(
+                            scabbard_service::circuit_id
+                                .eq(service_id.circuit_id().to_string())
+                                .and(
+                                    scabbard_service::service_id
+                                        .eq(service_id.service_id().to_string()),
+                                ),
+                        )
+                        .first::<ScabbardServiceModel>(self.conn)
+                        .optional()
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?
+                        .ok_or_else(|| {
+                            ScabbardStoreError::InvalidState(InvalidStateError::with_message(
+                                String::from("Service does not exist"),
+                            ))
+                        })?;
+
                     let new_context = Consensus2pcContextModel::try_from((&context, service_id))?;
                     let participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
@@ -90,6 +115,30 @@ impl<'a> AddContextOperation for ScabbardStoreOperations<'a, PgConnection> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
                 ConsensusContext::TwoPhaseCommit(context) => {
+                    // check to see if a service with the given service_id exists
+                    scabbard_service::table
+                        .filter(
+                            scabbard_service::circuit_id
+                                .eq(service_id.circuit_id().to_string())
+                                .and(
+                                    scabbard_service::service_id
+                                        .eq(service_id.service_id().to_string()),
+                                ),
+                        )
+                        .first::<ScabbardServiceModel>(self.conn)
+                        .optional()
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?
+                        .ok_or_else(|| {
+                            ScabbardStoreError::InvalidState(InvalidStateError::with_message(
+                                String::from("Service does not exist"),
+                            ))
+                        })?;
+
                     let new_context = Consensus2pcContextModel::try_from((&context, service_id))?;
                     let participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
