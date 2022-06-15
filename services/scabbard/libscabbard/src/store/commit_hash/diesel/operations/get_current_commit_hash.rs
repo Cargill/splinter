@@ -20,7 +20,7 @@ use crate::store::{diesel::schema::scabbard_commit_hash, CommitHashStoreError};
 
 use super::CommitHashStoreOperations;
 
-pub(in crate::store::diesel) trait CommitHashStoreGetCurrentCommitHashOperation {
+pub(in crate::store::commit_hash::diesel) trait CommitHashStoreGetCurrentCommitHashOperation {
     fn get_current_commit_hash(
         &self,
         circuit_id: &str,
