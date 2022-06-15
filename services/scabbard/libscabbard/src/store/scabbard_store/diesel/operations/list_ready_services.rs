@@ -40,69 +40,64 @@ where
 {
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            // get all services in the finalized state that have peers
-            let finalized_services: Vec<String> = scabbard_service::table
-                .filter(scabbard_service::status.eq("FINALIZED"))
-                .select(scabbard_service::service_id)
-                .load::<String>(self.conn)
-                .map_err(|err| {
-                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
-                })?
-                .into_iter()
-                .collect();
-
             let current_time = get_timestamp(SystemTime::now())?;
 
-            // get the service IDs of services with alarms which have passed
-            let mut ready_services = scabbard_alarm::table
+            let mut ready_services = scabbard_service::table
+                .filter(scabbard_service::status.eq("FINALIZED"))
+                .inner_join(
+                    scabbard_alarm::table.on(scabbard_service::circuit_id
+                        .eq(scabbard_alarm::circuit_id)
+                        .and(scabbard_service::service_id.eq(scabbard_alarm::service_id))),
+                )
                 .filter(
-                    scabbard_alarm::service_id
-                        .eq_any(&finalized_services)
-                        .and(
-                            scabbard_alarm::alarm_type.eq(String::from(&AlarmType::TwoPhaseCommit)),
-                        )
+                    scabbard_alarm::alarm_type
+                        .eq(String::from(&AlarmType::TwoPhaseCommit))
                         .and(scabbard_alarm::alarm.le(current_time)),
                 )
-                .select(scabbard_alarm::service_id)
-                .load::<String>(self.conn)
+                .select((scabbard_service::circuit_id, scabbard_service::service_id))
+                .load::<(String, String)>(self.conn)
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
-                })?
-                .into_iter()
-                .collect::<Vec<String>>();
+                })?;
 
-            // get the service IDs of any finalized services that have unexecuted actions
             ready_services.append(
-                &mut consensus_2pc_action::table
-                    .filter(consensus_2pc_action::service_id.eq_any(&finalized_services))
+                &mut scabbard_service::table
+                    .filter(scabbard_service::status.eq("FINALIZED"))
+                    .inner_join(
+                        consensus_2pc_action::table.on(scabbard_service::circuit_id
+                            .eq(consensus_2pc_action::circuit_id)
+                            .and(
+                                scabbard_service::service_id.eq(consensus_2pc_action::service_id),
+                            )),
+                    )
                     .filter(consensus_2pc_action::executed_at.is_null())
-                    .select(consensus_2pc_action::service_id)
-                    .load::<String>(self.conn)
+                    .select((scabbard_service::circuit_id, scabbard_service::service_id))
+                    .load::<(String, String)>(self.conn)
                     .map_err(|err| {
                         ScabbardStoreError::from_source_with_operation(
                             err,
                             OPERATION_NAME.to_string(),
                         )
-                    })?
-                    .into_iter()
-                    .collect::<Vec<String>>(),
+                    })?,
             );
 
-            // get the service IDs of any finalized services that have unexecuted events
             ready_services.append(
-                &mut consensus_2pc_event::table
-                    .filter(consensus_2pc_event::service_id.eq_any(&finalized_services))
+                &mut scabbard_service::table
+                    .filter(scabbard_service::status.eq("FINALIZED"))
+                    .inner_join(
+                        consensus_2pc_event::table.on(scabbard_service::circuit_id
+                            .eq(consensus_2pc_event::circuit_id)
+                            .and(scabbard_service::service_id.eq(consensus_2pc_event::service_id))),
+                    )
                     .filter(consensus_2pc_event::executed_at.is_null())
-                    .select(consensus_2pc_event::service_id)
-                    .load::<String>(self.conn)
+                    .select((scabbard_service::circuit_id, scabbard_service::service_id))
+                    .load::<(String, String)>(self.conn)
                     .map_err(|err| {
                         ScabbardStoreError::from_source_with_operation(
                             err,
                             OPERATION_NAME.to_string(),
                         )
-                    })?
-                    .into_iter()
-                    .collect::<Vec<String>>(),
+                    })?,
             );
 
             ready_services.sort();
@@ -110,7 +105,7 @@ where
 
             let all_ready_services = ready_services
                 .into_iter()
-                .map(FullyQualifiedServiceId::new_from_string)
+                .map(|(c, s)| FullyQualifiedServiceId::new_from_string(format!("{}::{}", c, s)))
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|err| {
                     ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))

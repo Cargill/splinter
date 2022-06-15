@@ -40,7 +40,14 @@ impl<'a> AddServiceOperation for ScabbardStoreOperations<'a, SqliteConnection> {
         self.conn.transaction::<_, _, _>(|| {
             // check to see if the service already exists
             if scabbard_service::table
-                .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service.service_id().circuit_id().to_string())
+                        .and(
+                            scabbard_service::service_id
+                                .eq(service.service_id().service_id().to_string()),
+                        ),
+                )
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -82,7 +89,14 @@ impl<'a> AddServiceOperation for ScabbardStoreOperations<'a, PgConnection> {
         self.conn.transaction::<_, _, _>(|| {
             // check to see if the service already exists
             if scabbard_service::table
-                .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service.service_id().circuit_id().to_string())
+                        .and(
+                            scabbard_service::service_id
+                                .eq(service.service_id().service_id().to_string()),
+                        ),
+                )
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {

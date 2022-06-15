@@ -65,7 +65,14 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
             // check to see if a context with the given service_id exists
             consensus_2pc_context::table
-                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
+                .filter(
+                    consensus_2pc_context::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(
+                            consensus_2pc_context::service_id
+                                .eq(service_id.service_id().to_string()),
+                        ),
+                )
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -79,7 +86,8 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 })?;
 
             let insertable_action = InsertableConsensus2pcActionModel {
-                service_id: format!("{}", service_id),
+                circuit_id: service_id.circuit_id().to_string(),
+                service_id: service_id.service_id().to_string(),
                 executed_at: None,
             };
 
@@ -222,7 +230,14 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
 
             // check to see if a context with the given service_id exists
             consensus_2pc_context::table
-                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
+                .filter(
+                    consensus_2pc_context::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(
+                            consensus_2pc_context::service_id
+                                .eq(service_id.service_id().to_string()),
+                        ),
+                )
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -236,7 +251,8 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 })?;
 
             let insertable_action = InsertableConsensus2pcActionModel {
-                service_id: format!("{}", service_id),
+                circuit_id: service_id.circuit_id().to_string(),
+                service_id: service_id.service_id().to_string(),
                 executed_at: None,
             };
 

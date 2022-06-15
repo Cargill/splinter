@@ -53,7 +53,14 @@ where
         self.conn.transaction::<_, _, _>(|| {
             // check to see if a context with the given service_id exists
             consensus_2pc_context::table
-                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
+                .filter(
+                    consensus_2pc_context::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(
+                            consensus_2pc_context::service_id
+                                .eq(service_id.service_id().to_string()),
+                        ),
+                )
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -80,9 +87,14 @@ where
 
             update(consensus_2pc_event::table)
                 .filter(
-                    consensus_2pc_event::id
-                        .eq(event_id)
-                        .and(consensus_2pc_event::service_id.eq(format!("{}", service_id))),
+                    consensus_2pc_event::id.eq(event_id).and(
+                        consensus_2pc_event::circuit_id
+                            .eq(service_id.circuit_id().to_string())
+                            .and(
+                                consensus_2pc_event::service_id
+                                    .eq(service_id.service_id().to_string()),
+                            ),
+                    ),
                 )
                 .set(consensus_2pc_event::executed_at.eq(Some(update_executed_at)))
                 .execute(self.conn)
