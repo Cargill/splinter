@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod igniter;
+mod reactor_message;
 mod reactor_shutdown_signaler;
 
 use std::sync::{
@@ -26,10 +27,11 @@ use crossbeam_channel::{bounded, RecvTimeoutError, Sender};
 use futures::Future;
 use tokio::runtime::Runtime;
 
-use crate::events::ws::{Listen, ShutdownHandle};
+use crate::events::ws::ShutdownHandle;
 use crate::events::{ReactorError, WebSocketError};
 
 pub use igniter::Igniter;
+use reactor_message::ReactorMessage;
 pub use reactor_shutdown_signaler::ReactorShutdownSignaler;
 
 /// Reactor
@@ -173,10 +175,4 @@ impl std::default::Default for Reactor {
     fn default() -> Self {
         Self::new()
     }
-}
-
-enum ReactorMessage {
-    Stop,
-    StartWs(Listen),
-    HttpRequest(Box<dyn Future<Item = (), Error = ()> + Send + 'static>),
 }
