@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod reactor_shutdown_signaler;
+
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -25,6 +27,8 @@ use tokio::runtime::Runtime;
 
 use crate::events::ws::{Context, Listen, ParseBytes, ShutdownHandle, WebSocketClient};
 use crate::events::{ReactorError, WebSocketError};
+
+pub use reactor_shutdown_signaler::ReactorShutdownSignaler;
 
 /// Reactor
 ///
@@ -166,18 +170,6 @@ impl Reactor {
 impl std::default::Default for Reactor {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-pub struct ReactorShutdownSignaler {
-    sender: Sender<ReactorMessage>,
-}
-
-impl ReactorShutdownSignaler {
-    pub fn signal_shutdown(&self) -> Result<(), ReactorError> {
-        self.sender.send(ReactorMessage::Stop).map_err(|_| {
-            ReactorError::ReactorShutdownError("Failed to send shutdown message".to_string())
-        })
     }
 }
 
