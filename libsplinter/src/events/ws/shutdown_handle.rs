@@ -21,7 +21,7 @@ use futures::sync::mpsc::Sender;
 
 use crate::events::WebSocketError;
 
-use super::WebSocketClientCmd;
+use super::web_socket_client_cmd::WebSocketClientCmd;
 
 #[derive(Clone)]
 pub struct ShutdownHandle {

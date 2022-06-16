@@ -54,6 +54,7 @@
 
 mod listen;
 mod shutdown_handle;
+mod web_socket_client_cmd;
 
 use std::collections::HashMap;
 use std::sync::{
@@ -77,7 +78,9 @@ use tokio::prelude::*;
 use crate::events::{Igniter, ParseError, WebSocketError};
 
 pub use listen::Listen;
+
 pub use shutdown_handle::ShutdownHandle;
+use web_socket_client_cmd::WebSocketClientCmd;
 
 type OnErrorHandle<T> =
     dyn Fn(WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static;
@@ -86,11 +89,6 @@ const MAX_FRAME_SIZE: usize = 10_000_000;
 const DEFAULT_RECONNECT: bool = false;
 const DEFAULT_RECONNECT_LIMIT: u64 = 10;
 const DEFAULT_TIMEOUT: u64 = 300; // default timeout if no message is received from server in seconds
-
-enum WebSocketClientCmd {
-    Frame(Frame),
-    Stop,
-}
 
 /// WebSocket client. Configures Websocket connection and produces `Listen` future.
 pub struct WebSocketClient<T: ParseBytes<T> + 'static = Vec<u8>> {

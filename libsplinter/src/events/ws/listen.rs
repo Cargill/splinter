@@ -18,8 +18,8 @@ use futures::{sync::mpsc::Sender, Future};
 
 use crate::events::WebSocketError;
 
+use super::web_socket_client_cmd::WebSocketClientCmd;
 use super::ShutdownHandle;
-use super::WebSocketClientCmd;
 
 /// Wrapper around future created by `WebSocketClient`. In order for
 /// the future to run it must be passed to `Igniter::start_ws`
