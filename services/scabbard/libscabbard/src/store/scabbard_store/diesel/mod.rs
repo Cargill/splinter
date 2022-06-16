@@ -815,6 +815,16 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&coordinator_fqsi)
+            .with_peers(&[participant_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        store.add_service(service).expect("failed to add service");
+
         let coordinator_context = ContextBuilder::default()
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
@@ -866,6 +876,16 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&coordinator_fqsi)
+            .with_peers(&[participant_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        store.add_service(service).expect("failed to add service");
+
         let coordinator_context = ContextBuilder::default()
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
@@ -906,6 +926,16 @@ pub mod tests {
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
         let participant_service_id = ServiceId::new_random();
+
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&coordinator_fqsi)
+            .with_peers(&[participant_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        store.add_service(service).expect("failed to add service");
 
         let coordinator_context = ContextBuilder::default()
             .with_coordinator(coordinator_fqsi.clone().service_id())
@@ -1015,6 +1045,16 @@ pub mod tests {
 
         let participant_service_id = ServiceId::new_random();
 
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&coordinator_fqsi)
+            .with_peers(&[participant_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        store.add_service(service).expect("failed to add service");
+
         let coordinator_context = ContextBuilder::default()
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
@@ -1079,6 +1119,16 @@ pub mod tests {
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
         let participant_service_id = ServiceId::new_random();
+
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&coordinator_fqsi)
+            .with_peers(&[participant_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        store.add_service(service).expect("failed to add service");
 
         let coordinator_context = ContextBuilder::default()
             .with_coordinator(coordinator_fqsi.clone().service_id())
@@ -1588,6 +1638,19 @@ pub mod tests {
         let participant_fqsi = FullyQualifiedServiceId::new_random();
         let participant2_fqsi = FullyQualifiedServiceId::new_random();
 
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&participant_fqsi)
+            .with_peers(&[
+                coordinator_fqsi.service_id().clone(),
+                participant2_fqsi.service_id().clone(),
+            ])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        store.add_service(service).expect("failed to add service");
+
         let participant_context = ContextBuilder::default()
             .with_coordinator(coordinator_fqsi.clone().service_id())
             .with_epoch(1)
@@ -1641,6 +1704,19 @@ pub mod tests {
 
         let participant_fqsi = FullyQualifiedServiceId::new_random();
         let participant2_fqsi = FullyQualifiedServiceId::new_random();
+
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&participant_fqsi)
+            .with_peers(&[
+                coordinator_fqsi.service_id().clone(),
+                participant2_fqsi.service_id().clone(),
+            ])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        store.add_service(service).expect("failed to add service");
 
         let participant_context = ContextBuilder::default()
             .with_coordinator(coordinator_fqsi.clone().service_id())
@@ -1698,6 +1774,19 @@ pub mod tests {
 
         let participant_fqsi = FullyQualifiedServiceId::new_random();
         let participant2_fqsi = FullyQualifiedServiceId::new_random();
+
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&participant_fqsi)
+            .with_peers(&[
+                coordinator_fqsi.service_id().clone(),
+                participant2_fqsi.service_id().clone(),
+            ])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        store.add_service(service).expect("failed to add service");
 
         let participant_context = ContextBuilder::default()
             .with_coordinator(coordinator_fqsi.clone().service_id())
