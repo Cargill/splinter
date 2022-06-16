@@ -14,7 +14,8 @@
 
 use crossbeam_channel::Sender;
 
-use super::ReactorError;
+use crate::events::ReactorError;
+
 use super::ReactorMessage;
 
 pub struct ReactorShutdownSignaler {
