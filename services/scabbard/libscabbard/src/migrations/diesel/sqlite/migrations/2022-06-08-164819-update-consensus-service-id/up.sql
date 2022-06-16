@@ -149,8 +149,7 @@ CREATE TABLE IF NOT EXISTS new_consensus_2pc_context_participant (
     process                   TEXT NOT NULL,
     vote                      TEXT
     CHECK ( vote IN ('TRUE' , 'FALSE') OR vote IS NULL ),
-    PRIMARY KEY (circuit_id, service_id, process),
-    FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
+    PRIMARY KEY (circuit_id, service_id, process)
 );
 
 INSERT INTO new_consensus_2pc_context_participant
@@ -178,8 +177,7 @@ CREATE TABLE IF NOT EXISTS new_consensus_2pc_action (
     circuit_id                TEXT NOT NULL,
     service_id                TEXT NOT NULL,
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    executed_at               BIGINT,
-    FOREIGN KEY (service_id) REFERENCES consensus_2pc_context(service_id) ON DELETE CASCADE
+    executed_at               BIGINT
 );
 
 INSERT INTO new_consensus_2pc_action

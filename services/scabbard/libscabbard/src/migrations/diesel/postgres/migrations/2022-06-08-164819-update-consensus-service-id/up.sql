@@ -275,13 +275,6 @@ ALTER TABLE scabbard_alarm ADD CONSTRAINT scabbard_alarm_service_id_fkey
 ALTER TABLE scabbard_peer ADD CONSTRAINT scabbard_peer_service_id_fkey
   FOREIGN KEY (circuit_id, service_id) REFERENCES scabbard_service(circuit_id, service_id);
 
-ALTER TABLE consensus_2pc_action
-  ADD CONSTRAINT consensus_2pc_action_service_id_fkey
-  FOREIGN KEY (circuit_id, service_id) REFERENCES consensus_2pc_context(circuit_id, service_id);
-ALTER TABLE consensus_2pc_context_participant
-  ADD CONSTRAINT consensus_2pc_context_participant_service_id_fkey
-  FOREIGN KEY (circuit_id, service_id) REFERENCES consensus_2pc_context(circuit_id, service_id);
-
 ALTER TABLE consensus_2pc_notification_action
   ADD CONSTRAINT consensus_2pc_notification_action_action_id_fkey
   FOREIGN KEY (action_id) REFERENCES consensus_2pc_action(id) ON DELETE CASCADE;
