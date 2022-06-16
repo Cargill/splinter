@@ -52,6 +52,8 @@
 //! reactor.shutdown().unwrap();
 //! ```
 
+mod listen;
+
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -73,6 +75,8 @@ use tokio::prelude::*;
 
 use crate::events::{Igniter, ParseError, WebSocketError};
 
+pub use listen::Listen;
+
 type OnErrorHandle<T> =
     dyn Fn(WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static;
 
@@ -80,31 +84,6 @@ const MAX_FRAME_SIZE: usize = 10_000_000;
 const DEFAULT_RECONNECT: bool = false;
 const DEFAULT_RECONNECT_LIMIT: u64 = 10;
 const DEFAULT_TIMEOUT: u64 = 300; // default timeout if no message is received from server in seconds
-
-/// Wrapper around future created by `WebSocketClient`. In order for
-/// the future to run it must be passed to `Igniter::start_ws`
-pub struct Listen {
-    future: Box<dyn Future<Item = (), Error = WebSocketError> + Send + 'static>,
-    sender: Sender<WebSocketClientCmd>,
-    running: Arc<AtomicBool>,
-}
-
-impl Listen {
-    pub fn into_shutdown_handle(
-        self,
-    ) -> (
-        Box<dyn Future<Item = (), Error = WebSocketError> + Send + 'static>,
-        ShutdownHandle,
-    ) {
-        (
-            self.future,
-            ShutdownHandle {
-                sender: self.sender,
-                running: self.running,
-            },
-        )
-    }
-}
 
 #[derive(Clone)]
 pub struct ShutdownHandle {
