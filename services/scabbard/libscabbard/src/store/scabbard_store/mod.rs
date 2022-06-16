@@ -24,6 +24,7 @@ mod event;
 mod factory;
 mod identified;
 mod service;
+mod supervisor;
 mod two_phase_commit;
 
 use splinter::service::FullyQualifiedServiceId;
@@ -40,6 +41,7 @@ pub use context::ConsensusContext;
 pub use event::ConsensusEvent;
 pub use identified::Identified;
 pub use service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus};
+pub use supervisor::{SupervisorNotification, SupervisorNotificationType};
 pub use two_phase_commit::{
     Action, Context, ContextBuilder, Event, Message, Notification, Participant, State,
 };
