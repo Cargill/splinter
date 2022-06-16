@@ -16,6 +16,7 @@ mod alarm;
 mod commit_entry;
 mod consensus;
 mod service;
+mod supervisor;
 
 pub use alarm::{AlarmTypeModel, AlarmTypeModelMapping, ScabbardAlarmModel};
 pub use commit_entry::{CommitEntryModel, DecisionTypeModel, DecisionTypeModelMapping};
@@ -33,4 +34,8 @@ pub use consensus::{
 pub use service::{
     ConsensusTypeModel, ConsensusTypeModelMapping, ScabbardPeerModel, ScabbardServiceModel,
     ServiceStatusTypeModel, ServiceStatusTypeModelMapping,
+};
+pub use supervisor::{
+    InsertableSupervisorNotificationModel, SupervisorNotificationModel,
+    SupervisorNotificationTypeModel, SupervisorNotificationTypeModelMapping,
 };
