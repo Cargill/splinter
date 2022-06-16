@@ -217,6 +217,15 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
         self.on_reconnect = Some(Arc::new(on_reconnect));
     }
 
+    pub fn get_on_reconnect(
+        &self,
+    ) -> Option<Arc<dyn Fn(&mut WebSocketClient<T>) + Send + Sync + 'static>> {
+        match &self.on_reconnect {
+            Some(arc) => Some(Arc::clone(arc)),
+            None => None,
+        }
+    }
+
     /// Returns `Listen` for WebSocket.
     pub fn listen(&self, mut context: Context<T>) -> Result<Listen, WebSocketError> {
         let url = self.url.clone();
