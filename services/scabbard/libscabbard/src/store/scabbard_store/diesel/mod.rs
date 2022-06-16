@@ -1990,7 +1990,7 @@ pub mod tests {
 
         store
             .update_consensus_context(&coordinator_fqsi, context3.clone())
-            .expect("failed to add context");
+            .expect("failed to update context");
 
         let current_context = store
             .get_current_consensus_context(&coordinator_fqsi)
