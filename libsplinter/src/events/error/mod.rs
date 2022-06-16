@@ -12,35 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod parse_error;
+
 use actix_http::ws;
 use crossbeam_channel::RecvError;
 use std::{error, fmt};
 use tokio::io;
 
-#[derive(Debug)]
-pub enum ParseError {
-    MalformedMessage(Box<dyn error::Error + Send + Sync + 'static>),
-    /// This type provides a sendable alternative to source errors that may not be Sync and Send.
-    MalformedReducedToString(String),
-}
-
-impl error::Error for ParseError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            ParseError::MalformedMessage(_) => None,
-            ParseError::MalformedReducedToString(_) => None,
-        }
-    }
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ParseError::MalformedMessage(err) => write!(f, "Malformed message {}", err),
-            ParseError::MalformedReducedToString(msg) => f.write_str(msg),
-        }
-    }
-}
+pub use parse_error::ParseError;
 
 #[derive(Debug)]
 pub enum ReactorError {
