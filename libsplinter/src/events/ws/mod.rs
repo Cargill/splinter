@@ -53,6 +53,7 @@
 //! ```
 
 mod listen;
+mod shutdown_handle;
 
 use std::collections::HashMap;
 use std::sync::{
@@ -66,7 +67,7 @@ use awc::ws::{CloseCode, CloseReason, Codec, Frame, Message};
 use futures::{
     future::{self, Either},
     sink::Wait,
-    sync::mpsc::{channel, Sender},
+    sync::mpsc::channel,
     Future,
 };
 use hyper::{self, header, upgrade::Upgraded, Body, Client, Request, StatusCode};
@@ -76,6 +77,7 @@ use tokio::prelude::*;
 use crate::events::{Igniter, ParseError, WebSocketError};
 
 pub use listen::Listen;
+pub use shutdown_handle::ShutdownHandle;
 
 type OnErrorHandle<T> =
     dyn Fn(WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static;
@@ -84,27 +86,6 @@ const MAX_FRAME_SIZE: usize = 10_000_000;
 const DEFAULT_RECONNECT: bool = false;
 const DEFAULT_RECONNECT_LIMIT: u64 = 10;
 const DEFAULT_TIMEOUT: u64 = 300; // default timeout if no message is received from server in seconds
-
-#[derive(Clone)]
-pub struct ShutdownHandle {
-    sender: Sender<WebSocketClientCmd>,
-    running: Arc<AtomicBool>,
-}
-
-impl ShutdownHandle {
-    /// Sends shutdown message to websocket
-    pub fn shutdown(mut self) -> Result<(), WebSocketError> {
-        if self.sender.try_send(WebSocketClientCmd::Stop).is_err() {
-            // ignore the error, as the connection may already be closed
-        }
-
-        Ok(())
-    }
-
-    pub fn running(&self) -> bool {
-        self.running.load(Ordering::SeqCst)
-    }
-}
 
 enum WebSocketClientCmd {
     Frame(Frame),
