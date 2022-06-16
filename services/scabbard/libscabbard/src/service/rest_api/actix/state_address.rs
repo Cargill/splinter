@@ -365,13 +365,14 @@ mod tests {
         pool
     }
 
-    fn create_merkle_state_and_commit_hash_store() -> (MerkleState, Box<dyn CommitHashStore>) {
+    fn create_merkle_state_and_commit_hash_store(
+    ) -> (MerkleState, Arc<dyn CommitHashStore + Sync + Send>) {
         let mut indexes = INDEXES.to_vec();
         indexes.push(CURRENT_STATE_ROOT_INDEX);
         let db = BTreeDatabase::new(&indexes);
         let merkle_state = MerkleState::new(MerkleStateConfig::key_value(db.clone_box()))
             .expect("Unable to create merkle state");
         let commit_hash_store = TransactCommitHashStore::new(db);
-        (merkle_state, Box::new(commit_hash_store))
+        (merkle_state, Arc::new(commit_hash_store))
     }
 }

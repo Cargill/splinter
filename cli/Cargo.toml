@@ -44,7 +44,7 @@ serde_json = "1.0"
 serde_yaml = "0.8"
 whoami = "0.7.0"
 users = "0.11"
-transact = { version = "0.4", features = ["state-merkle-sql"] }
+transact = { version = "0.4", features = ["state-merkle-sql", "state-merkle-sql-in-transaction"] }
 
 [dependencies.sawtooth]
 version = "0.7"

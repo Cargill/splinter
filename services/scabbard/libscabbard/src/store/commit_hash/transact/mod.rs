@@ -106,10 +106,6 @@ impl<D: Database + Clone> CommitHashStore for TransactCommitHashStore<D> {
 
         Ok(())
     }
-
-    fn clone_boxed(&self) -> Box<dyn CommitHashStore> {
-        Box::new(self.clone())
-    }
 }
 
 fn to_hex(bytes: &[u8]) -> String {
