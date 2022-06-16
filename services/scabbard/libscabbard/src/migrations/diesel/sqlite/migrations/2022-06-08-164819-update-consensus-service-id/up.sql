@@ -74,7 +74,8 @@ CREATE TABLE IF NOT EXISTS new_scabbard_v3_commit_history (
     value                     TEXT NOT NULL,
     decision                  TEXT,
     CHECK ( decision IN ('COMMIT', 'ABORT') ),
-    PRIMARY KEY (circuit_id, service_id, epoch)
+    PRIMARY KEY (circuit_id, service_id, epoch),
+    FOREIGN KEY (circuit_id, service_id) REFERENCES scabbard_service(circuit_id, service_id)
 );
 
 INSERT INTO new_scabbard_v3_commit_history
@@ -111,7 +112,8 @@ CREATE TABLE IF NOT EXISTS new_consensus_2pc_context (
     CHECK ( (vote IN ('TRUE' , 'FALSE')) OR ( state != 'VOTED') ),
     decision_timeout_start    BIGINT
     CHECK ( (decision_timeout_start IS NOT NULL) OR ( state != 'VOTED') ),
-    PRIMARY KEY (circuit_id, service_id)
+    PRIMARY KEY (circuit_id, service_id),
+    FOREIGN KEY (circuit_id, service_id) REFERENCES scabbard_service(circuit_id, service_id)
 );
 
 INSERT INTO new_consensus_2pc_context
@@ -149,7 +151,8 @@ CREATE TABLE IF NOT EXISTS new_consensus_2pc_context_participant (
     process                   TEXT NOT NULL,
     vote                      TEXT
     CHECK ( vote IN ('TRUE' , 'FALSE') OR vote IS NULL ),
-    PRIMARY KEY (circuit_id, service_id, process)
+    PRIMARY KEY (circuit_id, service_id, process),
+    FOREIGN KEY (circuit_id, service_id) REFERENCES scabbard_service(circuit_id, service_id)
 );
 
 INSERT INTO new_consensus_2pc_context_participant
@@ -177,7 +180,8 @@ CREATE TABLE IF NOT EXISTS new_consensus_2pc_action (
     circuit_id                TEXT NOT NULL,
     service_id                TEXT NOT NULL,
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    executed_at               BIGINT
+    executed_at               BIGINT,
+    FOREIGN KEY (circuit_id, service_id) REFERENCES scabbard_service(circuit_id, service_id)
 );
 
 INSERT INTO new_consensus_2pc_action
@@ -207,7 +211,8 @@ CREATE TABLE IF NOT EXISTS new_consensus_2pc_event (
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     executed_at               BIGINT,
     event_type                TEXT NOT NULL
-    CHECK ( event_type IN ('ALARM', 'DELIVER', 'START', 'VOTE') )
+    CHECK ( event_type IN ('ALARM', 'DELIVER', 'START', 'VOTE') ),
+    FOREIGN KEY (circuit_id, service_id) REFERENCES scabbard_service(circuit_id, service_id)
 );
 
 INSERT INTO new_consensus_2pc_event

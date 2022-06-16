@@ -40,6 +40,21 @@ ALTER TABLE consensus_2pc_start_event
 ALTER TABLE consensus_2pc_vote_event
   DROP CONSTRAINT consensus_2pc_vote_event_event_id_fkey;
 
+ALTER TABLE scabbard_peer
+  DROP CONSTRAINT scabbard_peer_circuit_id_service_id_fkey;
+ALTER TABLE scabbard_v3_commit_history
+  DROP CONSTRAINT scabbard_v3_commit_history_circuit_id_service_id_fkey;
+ALTER TABLE consensus_2pc_context
+  DROP CONSTRAINT consensus_2pc_context_circuit_id_service_id_fkey;
+ALTER TABLE consensus_2pc_context_participant
+  DROP CONSTRAINT consensus_2pc_context_participant_circuit_id_service_id_fkey;
+ALTER TABLE consensus_2pc_action
+  DROP CONSTRAINT consensus_2pc_action_circuit_id_service_id_fkey;
+ALTER TABLE consensus_2pc_event
+  DROP CONSTRAINT consensus_2pc_event_circuit_id_service_id_fkey;
+ALTER TABLE scabbard_alarm
+  DROP CONSTRAINT scabbard_alarm_circuit_id_service_id_fkey;
+
 -- Recreate the tables without the circuit_id columns
 CREATE TABLE IF NOT EXISTS new_scabbard_service (
     service_id                TEXT PRIMARY KEY,
