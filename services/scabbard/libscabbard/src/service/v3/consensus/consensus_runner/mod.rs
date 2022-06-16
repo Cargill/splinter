@@ -183,6 +183,7 @@ mod tests {
                 .with_participants(vec![Participant {
                     process: peer_service_id.clone(),
                     vote: None,
+                    decision_ack: false,
                 }])
                 .build()?,
         );

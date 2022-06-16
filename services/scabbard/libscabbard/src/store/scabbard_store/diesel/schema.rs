@@ -69,6 +69,7 @@ table! {
         epoch -> BigInt,
         process -> Text,
         vote -> Nullable<Text>,
+        decision_ack -> Bool,
     }
 }
 
@@ -111,6 +112,7 @@ table! {
         action_id -> Int8,
         process -> Text,
         vote -> Nullable<Text>,
+        decision_ack -> Bool,
     }
 }
 

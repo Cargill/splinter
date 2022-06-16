@@ -91,6 +91,7 @@ fn create_context(service: &ScabbardService) -> Result<Context, InternalError> {
                 .map(|participant| Participant {
                     process: participant.clone(),
                     vote: None,
+                    decision_ack: false,
                 })
                 .collect(),
         )

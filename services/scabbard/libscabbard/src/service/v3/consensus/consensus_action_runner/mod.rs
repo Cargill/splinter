@@ -282,6 +282,7 @@ mod tests {
                         .map(|participant| Participant {
                             process: participant.clone(),
                             vote: None,
+                            decision_ack: false,
                         })
                         .collect(),
                 )
@@ -300,6 +301,7 @@ mod tests {
                         .map(|participant| Participant {
                             process: participant.clone(),
                             vote: None,
+                            decision_ack: false,
                         })
                         .collect(),
                 )

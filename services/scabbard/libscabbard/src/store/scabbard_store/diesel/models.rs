@@ -431,6 +431,7 @@ pub struct Consensus2pcContextParticipantModel {
     pub epoch: i64,
     pub process: String,
     pub vote: Option<String>,
+    pub decision_ack: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -465,6 +466,7 @@ impl TryFrom<Vec<Consensus2pcContextParticipantModel>> for ParticipantList {
                 process: ServiceId::new(p.process)
                     .map_err(|e| InternalError::from_source(Box::new(e)))?,
                 vote,
+                decision_ack: p.decision_ack,
             });
         }
         Ok(ParticipantList {
@@ -498,6 +500,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ContextParticipantList {
                 epoch,
                 process: format!("{}", participant.process),
                 vote,
+                decision_ack: participant.decision_ack,
             })
         }
         Ok(ContextParticipantList {
@@ -589,6 +592,7 @@ pub struct Consensus2pcUpdateContextActionParticipantModel {
     pub action_id: i64,
     pub process: String,
     pub vote: Option<String>,
+    pub decision_ack: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -610,6 +614,7 @@ impl TryFrom<(&Context, &i64)> for UpdateContextActionParticipantList {
                 action_id: *action_id,
                 process: format!("{}", participant.process),
                 vote,
+                decision_ack: participant.decision_ack,
             })
         }
         Ok(UpdateContextActionParticipantList {

@@ -132,6 +132,7 @@ mod tests {
             .with_participants(vec![Participant {
                 process: peer_service1.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(fqsi.clone().service_id())
@@ -175,6 +176,7 @@ mod tests {
             .with_participants(vec![Participant {
                 process: peer_service1.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForVoteRequest)
             .with_this_process(fqsi2.clone().service_id())
