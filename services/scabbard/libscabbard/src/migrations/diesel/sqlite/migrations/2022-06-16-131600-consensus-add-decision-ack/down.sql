@@ -35,6 +35,32 @@ CREATE TABLE IF NOT EXISTS new_consensus_2pc_update_context_action_participant (
     FOREIGN KEY (action_id) REFERENCES consensus_2pc_update_context_action(action_id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS new_consensus_2pc_send_message_action (
+    action_id                 INTEGER PRIMARY KEY,
+    epoch                     BIGINT NOT NULL,
+    receiver_service_id       TEXT NOT NULL,
+    message_type              TEXT NOT NULL
+    CHECK ( message_type IN ('VOTERESPONSE', 'DECISIONREQUEST', 'VOTEREQUEST', 'COMMIT', 'ABORT') ),
+    vote_response             TEXT
+    CHECK ( (vote_response IN ('TRUE', 'FALSE')) OR (message_type != 'VOTERESPONSE') ),
+    vote_request              BINARY
+    CHECK ( (vote_request IS NOT NULL) OR (message_type != 'VOTEREQUEST') ),
+    FOREIGN KEY (action_id) REFERENCES consensus_2pc_action(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS new_consensus_2pc_deliver_event (
+    event_id                  INTEGER PRIMARY KEY,
+    epoch                     BIGINT NOT NULL,
+    receiver_service_id       TEXT NOT NULL,
+    message_type              TEXT NOT NULL
+    CHECK ( message_type IN ('VOTERESPONSE', 'DECISIONREQUEST', 'VOTEREQUEST', 'COMMIT', 'ABORT') ),
+    vote_response             TEXT
+    CHECK ( (vote_response IN ('TRUE', 'FALSE')) OR (message_type != 'VOTERESPONSE') ),
+    vote_request              BINARY
+    CHECK ( (vote_request IS NOT NULL) OR (message_type != 'VOTEREQUEST') ),
+    FOREIGN KEY (event_id) REFERENCES consensus_2pc_event(id) ON DELETE CASCADE
+);
+
 INSERT INTO new_consensus_2pc_context_participant
     (
         circuit_id,
@@ -63,12 +89,56 @@ INSERT INTO new_consensus_2pc_update_context_action_participant
         vote
     FROM consensus_2pc_update_context_action_participant;
 
+INSERT INTO new_consensus_2pc_send_message_action
+    (
+        action_id,
+        epoch,
+        alarm_type,
+        receiver_service_id,
+        message_type,
+        vote_response,
+        vote_request
+    )
+    SELECT
+        action_id,
+        epoch,
+        alarm_type,
+        receiver_service_id,
+        message_type,
+        vote_response,
+        vote_request
+    FROM consensus_2pc_send_message_action;
+
+INSERT INTO new_consensus_2pc_deliver_event
+    (
+        event_id,
+        epoch,
+        receiver_service_id,
+        message_type,
+        vote_response,
+        vote_request
+    )
+    SELECT
+        event_id,
+        epoch,
+        receiver_service_id,
+        message_type,
+        vote_response,
+        vote_request
+    FROM consensus_2pc_deliver_event;
+
 DROP TABLE consensus_2pc_context_participant;
 DROP TABLE consensus_2pc_update_context_action_participant;
+DROP TABLE consensus_2pc_send_message_action;
+DROP TABLE consensus_2pc_deliver_event;
 
 ALTER TABLE new_consensus_2pc_context_participant 
   RENAME TO consensus_2pc_context_participant;
 ALTER TABLE new_consensus_2pc_update_context_action_participant 
   RENAME TO consensus_2pc_update_context_action_participant;
+ALTER TABLE new_consensus_2pc_send_message_action
+  RENAME TO consensus_2pc_send_message_action;
+ALTER TABLE new_consensus_2pc_deliver_event
+  RENAME TO consensus_2pc_deliver_event;
 
 PRAGMA foreign_keys=on;

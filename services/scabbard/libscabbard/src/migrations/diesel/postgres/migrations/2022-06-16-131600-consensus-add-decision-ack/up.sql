@@ -18,3 +18,6 @@ ALTER TABLE consensus_2pc_context_participant
 
 ALTER TABLE consensus_2pc_update_context_action_participant
   ADD COLUMN decision_ack BOOLEAN NOT NULL Default FALSE;
+
+ALTER TYPE message_type ADD VALUE IF NOT EXISTS 'DECISION_ACK';
+ALTER TYPE deliver_event_message_type ADD VALUE IF NOT EXISTS 'DECISION_ACK';

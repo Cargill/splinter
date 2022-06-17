@@ -16,3 +16,21 @@
 ALTER TABLE consensus_2pc_context_participant DROP COLUMN decision_ack;
 
 ALTER TABLE consensus_2pc_update_context_action_participant DROP COLUMN decision_ack;
+
+
+CREATE TYPE new_message_type AS ENUM ('VOTERESPONSE', 'DECISIONREQUEST', 'VOTEREQUEST', 'COMMIT', 'ABORT');
+CREATE TYPE new_deliver_event_message_type AS ENUM ('VOTERESPONSE', 'DECISIONREQUEST', 'VOTEREQUEST', 'COMMIT', 'ABORT');
+
+DELETE FROM consensus_2pc_send_message_action WHERE message_type = 'DECISION_ACK';
+DELETE FROM consensus_2pc_deliver_event WHERE message_type = 'DECISION_ACK';
+
+ALTER TABLE consensus_2pc_send_message_action
+  ALTER COLUMN message_type TYPE new_message_type NOT NULL;
+ALTER TABLE consensus_2pc_deliver_event
+  ALTER COLUMN message_type TYPE new_deliver_event_message_type NOT NULL;
+
+DROP TYPE message_type;
+DROP TYPE deliver_event_message_type;
+
+ALTER TYPE new_message_type RENAME TO message_type;
+ALTER TYPE new_deliver_event_message_type RENAME TO deliver_event_message_type;
