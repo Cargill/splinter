@@ -58,6 +58,7 @@ mod parse_bytes;
 mod shutdown_handle;
 mod web_socket_client;
 mod web_socket_client_cmd;
+mod ws_respoonse;
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -78,6 +79,7 @@ pub use listen::Listen;
 pub use parse_bytes::ParseBytes;
 pub use shutdown_handle::ShutdownHandle;
 pub use web_socket_client::WebSocketClient;
+pub use ws_respoonse::WsResponse;
 
 type OnErrorHandle<T> =
     dyn Fn(WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static;
@@ -139,14 +141,4 @@ enum ConnectionStatus {
     Open,
     UnexpectedClose(WebSocketError),
     Close(Result<(), WebSocketError>),
-}
-
-/// Response object returned by `WebSocket` client callbacks.
-#[derive(Debug)]
-pub enum WsResponse {
-    Empty,
-    Close,
-    Pong(String),
-    Text(String),
-    Bytes(Vec<u8>),
 }
