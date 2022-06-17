@@ -34,3 +34,17 @@ DROP TYPE deliver_event_message_type;
 
 ALTER TYPE new_message_type RENAME TO message_type;
 ALTER TYPE new_deliver_event_message_type RENAME TO deliver_event_message_type;
+
+
+ALTER TABLE consensus_2pc_context DROP COLUMN ack_timeout_start;
+
+CREATE TYPE new_context_state AS ENUM ('WAITINGFORSTART', 'VOTING', 'WAITINGFORVOTE', 'ABORT', 'COMMIT', 'WAITINGFORVOTEREQUEST', 'VOTED');
+
+DELETE FROM consensus_2pc_context WHERE state = 'WAITING_FOR_DECISION_ACK';
+
+ALTER TABLE consensus_2pc_context
+  ALTER COLUMN state TYPE new_context_state NOT NULL;
+
+DROP TYPE context_state;
+
+ALTER TYPE new_context_state RENAME TO context_state;

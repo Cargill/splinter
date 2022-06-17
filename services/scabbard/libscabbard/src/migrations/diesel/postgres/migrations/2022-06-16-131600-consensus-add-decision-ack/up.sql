@@ -21,3 +21,12 @@ ALTER TABLE consensus_2pc_update_context_action_participant
 
 ALTER TYPE message_type ADD VALUE IF NOT EXISTS 'DECISION_ACK';
 ALTER TYPE deliver_event_message_type ADD VALUE IF NOT EXISTS 'DECISION_ACK';
+
+ALTER TYPE context_state ADD VALUE IF NOT EXISTS 'WAITING_FOR_DECISION_ACK';
+
+COMMIT;
+
+ALTER TABLE consensus_2pc_context ADD COLUMN ack_timeout_start BIGINT;
+
+ALTER TABLE consensus_2pc_context ADD CONSTRAINT ack_timeout_start_check
+  CHECK ( (ack_timeout_start IS NOT NULL) OR (state != 'WAITING_FOR_DECISION_ACK') );
