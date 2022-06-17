@@ -33,13 +33,16 @@ use crate::events::{ParseBytes, WebSocketError, WsResponse};
 
 use super::{
     connection_status::ConnectionStatus, do_shutdown, handle_response,
-    web_socket_client_cmd::WebSocketClientCmd, Context, Listen, OnErrorHandle,
+    web_socket_client_cmd::WebSocketClientCmd, Context, Listen,
 };
 
 const MAX_FRAME_SIZE: usize = 10_000_000;
 const DEFAULT_RECONNECT: bool = false;
 const DEFAULT_RECONNECT_LIMIT: u64 = 10;
 const DEFAULT_TIMEOUT: u64 = 300; // default timeout if no message is received from server in seconds
+
+type OnErrorHandle<T> =
+    dyn Fn(WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static;
 
 /// WebSocket client. Configures Websocket connection and produces `Listen` future.
 pub struct WebSocketClient<T: ParseBytes<T> + 'static = Vec<u8>> {

@@ -82,9 +82,6 @@ pub use shutdown_handle::ShutdownHandle;
 pub use web_socket_client::WebSocketClient;
 pub use ws_respoonse::WsResponse;
 
-type OnErrorHandle<T> =
-    dyn Fn(WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static;
-
 fn handle_response(
     wait_sink: &mut Wait<stream::SplitSink<Framed<Upgraded, Codec>>>,
     res: WsResponse,
