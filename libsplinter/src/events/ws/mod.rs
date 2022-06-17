@@ -53,6 +53,7 @@
 //! ```
 
 mod listen;
+mod parse_bytes;
 mod shutdown_handle;
 mod web_socket_client;
 mod web_socket_client_cmd;
@@ -70,10 +71,10 @@ use hyper::{self, upgrade::Upgraded};
 use tokio::codec::Framed;
 use tokio::prelude::*;
 
-use crate::events::{Igniter, ParseError, WebSocketError};
+use crate::events::{Igniter, WebSocketError};
 
 pub use listen::Listen;
-
+pub use parse_bytes::ParseBytes;
 pub use shutdown_handle::ShutdownHandle;
 pub use web_socket_client::WebSocketClient;
 
@@ -268,14 +269,4 @@ pub enum WsResponse {
     Pong(String),
     Text(String),
     Bytes(Vec<u8>),
-}
-
-pub trait ParseBytes<T: 'static>: Send + Sync + Clone {
-    fn from_bytes(bytes: &[u8]) -> Result<T, ParseError>;
-}
-
-impl ParseBytes<Vec<u8>> for Vec<u8> {
-    fn from_bytes(bytes: &[u8]) -> Result<Vec<u8>, ParseError> {
-        Ok(bytes.to_vec())
-    }
 }
