@@ -702,6 +702,7 @@ impl From<&Message> for String {
             Message::VoteResponse(..) => String::from("VOTERESPONSE"),
             Message::Commit(_) => String::from("COMMIT"),
             Message::Abort(_) => String::from("ABORT"),
+            Message::DecisionAck(_) => String::from("DECISION_ACK"),
         }
     }
 }

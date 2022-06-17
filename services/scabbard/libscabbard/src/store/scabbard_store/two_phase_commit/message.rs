@@ -22,7 +22,8 @@ use augrim::two_phase_commit::TwoPhaseCommitMessage as AugrimTwoPhaseCommitMessa
 use crate::protocol::v3::{
     message::ScabbardMessage,
     two_phase_commit::{
-        Abort, Commit, DecisionRequest, TwoPhaseCommitMessage, VoteRequest, VoteResponse,
+        Abort, Commit, DecisionAck, DecisionRequest, TwoPhaseCommitMessage, VoteRequest,
+        VoteResponse,
     },
 };
 use crate::protos::{scabbard_v3, IntoBytes, ProtoConversionError};
@@ -36,6 +37,7 @@ pub enum Message {
     Abort(u64),
     DecisionRequest(u64),
     VoteResponse(u64, bool),
+    DecisionAck(u64),
 }
 
 impl TryFrom<Message> for ScabbardMessage {
@@ -53,6 +55,9 @@ impl TryFrom<Message> for ScabbardMessage {
             }
             Message::VoteResponse(epoch, response) => {
                 TwoPhaseCommitMessage::VoteResponse(VoteResponse { epoch, response })
+            }
+            Message::DecisionAck(epoch) => {
+                TwoPhaseCommitMessage::DecisionAck(DecisionAck { epoch })
             }
         };
 
@@ -89,6 +94,7 @@ impl TryFrom<AugrimTwoPhaseCommitMessage<ScabbardValue>> for Message {
             AugrimTwoPhaseCommitMessage::VoteResponse(epoch, vote) => {
                 Self::VoteResponse(epoch, vote)
             }
+            AugrimTwoPhaseCommitMessage::DecisionAck(epoch) => Self::DecisionAck(epoch),
         })
     }
 }
@@ -104,6 +110,7 @@ impl TryFrom<Message> for AugrimTwoPhaseCommitMessage<ScabbardValue> {
             Message::Abort(epoch) => Self::Abort(epoch),
             Message::DecisionRequest(epoch) => Self::DecisionRequest(epoch),
             Message::VoteResponse(epoch, vote) => Self::VoteResponse(epoch, vote),
+            Message::DecisionAck(epoch) => Self::DecisionAck(epoch),
         })
     }
 }

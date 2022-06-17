@@ -158,6 +158,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         Message::VoteRequest(epoch, ref value) => {
                             (String::from(&message), None, Some(value.clone()), epoch)
                         }
+                        Message::DecisionAck(epoch) => (String::from(&message), None, None, epoch),
                     };
 
                     let send_message_action = Consensus2pcSendMessageActionModel {
@@ -313,6 +314,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                         Message::VoteRequest(epoch, ref value) => {
                             (String::from(&message), None, Some(value.clone()), epoch)
                         }
+                        Message::DecisionAck(epoch) => (String::from(&message), None, None, epoch),
                     };
 
                     let send_message_action = Consensus2pcSendMessageActionModel {

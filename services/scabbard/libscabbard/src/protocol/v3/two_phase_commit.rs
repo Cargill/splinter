@@ -22,6 +22,7 @@ pub enum TwoPhaseCommitMessage {
     Commit(Commit),
     Abort(Abort),
     DecisionRequest(DecisionRequest),
+    DecisionAck(DecisionAck),
 }
 
 impl TwoPhaseCommitMessage {
@@ -32,6 +33,7 @@ impl TwoPhaseCommitMessage {
             Self::Commit(Commit { epoch, .. }) => *epoch,
             Self::Abort(Abort { epoch, .. }) => *epoch,
             Self::DecisionRequest(DecisionRequest { epoch, .. }) => *epoch,
+            Self::DecisionAck(DecisionAck { epoch, .. }) => *epoch,
         }
     }
 }
@@ -60,6 +62,11 @@ pub struct Abort {
 
 #[derive(Debug)]
 pub struct DecisionRequest {
+    pub epoch: u64,
+}
+
+#[derive(Debug)]
+pub struct DecisionAck {
     pub epoch: u64,
 }
 
@@ -147,6 +154,22 @@ impl FromNative<DecisionRequest> for scabbard_v3::DecisionRequest {
     }
 }
 
+impl FromProto<scabbard_v3::DecisionAck> for DecisionAck {
+    fn from_proto(source: scabbard_v3::DecisionAck) -> Result<Self, ProtoConversionError> {
+        Ok(DecisionAck {
+            epoch: source.get_epoch(),
+        })
+    }
+}
+
+impl FromNative<DecisionAck> for scabbard_v3::DecisionAck {
+    fn from_native(source: DecisionAck) -> Result<Self, ProtoConversionError> {
+        let mut proto_msg = scabbard_v3::DecisionAck::new();
+        proto_msg.set_epoch(source.epoch);
+        Ok(proto_msg)
+    }
+}
+
 impl FromProto<scabbard_v3::TwoPhaseCommitMessage> for TwoPhaseCommitMessage {
     fn from_proto(
         mut source: scabbard_v3::TwoPhaseCommitMessage,
@@ -168,6 +191,9 @@ impl FromProto<scabbard_v3::TwoPhaseCommitMessage> for TwoPhaseCommitMessage {
             DECISION_REQUEST => Ok(TwoPhaseCommitMessage::DecisionRequest(
                 DecisionRequest::from_proto(source.take_decision_request())?,
             )),
+            DECISION_ACK => Ok(TwoPhaseCommitMessage::DecisionAck(DecisionAck::from_proto(
+                source.take_decision_ack(),
+            )?)),
             UNSET => Err(ProtoConversionError::InvalidTypeError(
                 "no message type was set".into(),
             )),
@@ -200,6 +226,10 @@ impl FromNative<TwoPhaseCommitMessage> for scabbard_v3::TwoPhaseCommitMessage {
             TwoPhaseCommitMessage::DecisionRequest(msg) => {
                 proto_msg.set_message_type(DECISION_REQUEST);
                 proto_msg.set_decision_request(scabbard_v3::DecisionRequest::from_native(msg)?)
+            }
+            TwoPhaseCommitMessage::DecisionAck(msg) => {
+                proto_msg.set_message_type(DECISION_ACK);
+                proto_msg.set_decision_ack(scabbard_v3::DecisionAck::from_native(msg)?)
             }
         }
 

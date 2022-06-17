@@ -300,7 +300,7 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                     ),
                     "COMMIT" => Message::Commit(send_message.epoch as u64),
                     "ABORT" => Message::Abort(send_message.epoch as u64),
-                    "DECISIONACK" => Message::DecisionAck(send_message.epoch as u64),
+                    "DECISION_ACK" => Message::DecisionAck(send_message.epoch as u64),
                     _ => {
                         return Err(ScabbardStoreError::InvalidState(
                             InvalidStateError::with_message(
@@ -603,6 +603,7 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                     ),
                     "COMMIT" => Message::Commit(send_message.epoch as u64),
                     "ABORT" => Message::Abort(send_message.epoch as u64),
+                    "DECISION_ACK" => Message::DecisionAck(send_message.epoch as u64),
                     _ => {
                         return Err(ScabbardStoreError::InvalidState(
                             InvalidStateError::with_message(
