@@ -52,6 +52,7 @@
 //! reactor.shutdown().unwrap();
 //! ```
 
+mod connection_status;
 mod context;
 mod listen;
 mod parse_bytes;
@@ -135,10 +136,4 @@ fn do_shutdown(
             blocking_sink.close()
         })
         .or_else(|_| blocking_sink.close())
-}
-
-enum ConnectionStatus {
-    Open,
-    UnexpectedClose(WebSocketError),
-    Close(Result<(), WebSocketError>),
 }

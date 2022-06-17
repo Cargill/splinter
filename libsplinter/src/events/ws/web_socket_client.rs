@@ -32,8 +32,8 @@ use tokio::prelude::*;
 use crate::events::{ParseBytes, WebSocketError, WsResponse};
 
 use super::{
-    do_shutdown, handle_response, web_socket_client_cmd::WebSocketClientCmd, ConnectionStatus,
-    Context, Listen, OnErrorHandle,
+    connection_status::ConnectionStatus, do_shutdown, handle_response,
+    web_socket_client_cmd::WebSocketClientCmd, Context, Listen, OnErrorHandle,
 };
 
 use super::DEFAULT_RECONNECT;
