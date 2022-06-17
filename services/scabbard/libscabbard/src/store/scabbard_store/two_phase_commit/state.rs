@@ -33,6 +33,9 @@ pub enum State {
     WaitingForStart,
     WaitingForVoteRequest,
     WaitingForVote,
+    WaitingForDecisionAck {
+        ack_timeout_start: SystemTime,
+    },
 }
 
 #[cfg(feature = "scabbardv3-consensus")]
@@ -54,6 +57,9 @@ impl TryFrom<State> for TwoPhaseCommitState<SystemTime> {
             State::WaitingForStart => Self::WaitingForStart,
             State::WaitingForVoteRequest => Self::WaitingForVoteRequest,
             State::WaitingForVote => Self::WaitingForVote,
+            State::WaitingForDecisionAck { ack_timeout_start } => {
+                Self::WaitingForDecisionAck { ack_timeout_start }
+            }
         })
     }
 }
@@ -79,6 +85,9 @@ impl TryFrom<TwoPhaseCommitState<SystemTime>> for State {
             TwoPhaseCommitState::WaitingForStart => Self::WaitingForStart,
             TwoPhaseCommitState::WaitingForVoteRequest => Self::WaitingForVoteRequest,
             TwoPhaseCommitState::WaitingForVote => Self::WaitingForVote,
+            TwoPhaseCommitState::WaitingForDecisionAck { ack_timeout_start } => {
+                Self::WaitingForDecisionAck { ack_timeout_start }
+            }
         })
     }
 }

@@ -657,6 +657,7 @@ impl From<&State> for String {
             State::Commit => String::from("COMMIT"),
             State::WaitingForVoteRequest => String::from("WAITINGFORVOTEREQUEST"),
             State::Voted { .. } => String::from("VOTED"),
+            State::WaitingForDecisionAck { .. } => String::from("WAITING_FOR_DECISION_ACK"),
         }
     }
 }
