@@ -204,6 +204,13 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
         self.on_error = Some(Arc::new(on_error));
     }
 
+    pub fn get_on_error(&self) -> Option<Arc<OnErrorHandle<T>>> {
+        match &self.on_error {
+            Some(arc) => Some(Arc::clone(arc)),
+            None => None,
+        }
+    }
+
     /// Adds optional `on_reconnect` closure. This closure will be called each time the websocket
     /// attempts to reconnect to the server. It's intended to allow the websocket client properties
     /// to be modified before attempting a reconnect or to allow additional checks to be performed
