@@ -36,10 +36,10 @@ use super::{
     web_socket_client_cmd::WebSocketClientCmd, Context, Listen, OnErrorHandle,
 };
 
-use super::DEFAULT_RECONNECT;
-use super::DEFAULT_RECONNECT_LIMIT;
-use super::DEFAULT_TIMEOUT;
-use super::MAX_FRAME_SIZE;
+const MAX_FRAME_SIZE: usize = 10_000_000;
+const DEFAULT_RECONNECT: bool = false;
+const DEFAULT_RECONNECT_LIMIT: u64 = 10;
+const DEFAULT_TIMEOUT: u64 = 300; // default timeout if no message is received from server in seconds
 
 /// WebSocket client. Configures Websocket connection and produces `Listen` future.
 pub struct WebSocketClient<T: ParseBytes<T> + 'static = Vec<u8>> {

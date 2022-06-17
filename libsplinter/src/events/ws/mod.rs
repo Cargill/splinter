@@ -85,11 +85,6 @@ pub use ws_respoonse::WsResponse;
 type OnErrorHandle<T> =
     dyn Fn(WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static;
 
-const MAX_FRAME_SIZE: usize = 10_000_000;
-const DEFAULT_RECONNECT: bool = false;
-const DEFAULT_RECONNECT_LIMIT: u64 = 10;
-const DEFAULT_TIMEOUT: u64 = 300; // default timeout if no message is received from server in seconds
-
 fn handle_response(
     wait_sink: &mut Wait<stream::SplitSink<Framed<Upgraded, Codec>>>,
     res: WsResponse,
