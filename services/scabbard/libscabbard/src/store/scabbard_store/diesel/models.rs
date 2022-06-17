@@ -237,6 +237,7 @@ pub struct Consensus2pcContextModel {
     pub vote_timeout_start: Option<i64>,
     pub vote: Option<String>,
     pub decision_timeout_start: Option<i64>,
+    pub ack_timeout_start: Option<i64>,
 }
 
 impl
@@ -333,6 +334,25 @@ impl
                     decision_timeout_start,
                 }
             }
+            "WAITING_FOR_DECISION_ACK" => {
+                let ack_timeout_start = if let Some(t) = context.ack_timeout_start {
+                    SystemTime::UNIX_EPOCH
+                        .checked_add(Duration::from_secs(t as u64))
+                        .ok_or_else(|| {
+                            InternalError::with_message(
+                                "Failed to convert ack timeout start timestamp to SystemTime"
+                                    .to_string(),
+                            )
+                        })?
+                } else {
+                    return Err(InternalError::with_message(
+                        "Failed to convert to ConsensusContext, context has state \
+                        'WaitingForDecisionAck' but 'decision_timeout_start' is unset"
+                            .to_string(),
+                    ));
+                };
+                State::WaitingForDecisionAck { ack_timeout_start }
+            }
             _ => {
                 return Err(InternalError::with_message(
                     "Failed to convert to ConsensusContext, invalid state value found".to_string(),
@@ -377,36 +397,47 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
             .map(i64::try_from)
             .transpose()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
-        let (vote_timeout_start, vote, decision_timeout_start) = match context.state() {
-            State::Voting { vote_timeout_start } => {
-                let time = i64::try_from(
-                    vote_timeout_start
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?
-                        .as_secs(),
-                )
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                (Some(time), None, None)
-            }
-            State::Voted {
-                vote,
-                decision_timeout_start,
-            } => {
-                let time = i64::try_from(
-                    decision_timeout_start
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?
-                        .as_secs(),
-                )
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let vote = match vote {
-                    true => "TRUE",
-                    false => "FALSE",
-                };
-                (None, Some(vote.to_string()), Some(time))
-            }
-            _ => (None, None, None),
-        };
+        let (vote_timeout_start, vote, decision_timeout_start, ack_timeout_start) =
+            match context.state() {
+                State::Voting { vote_timeout_start } => {
+                    let time = i64::try_from(
+                        vote_timeout_start
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .map_err(|err| InternalError::from_source(Box::new(err)))?
+                            .as_secs(),
+                    )
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                    (Some(time), None, None, None)
+                }
+                State::Voted {
+                    vote,
+                    decision_timeout_start,
+                } => {
+                    let time = i64::try_from(
+                        decision_timeout_start
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .map_err(|err| InternalError::from_source(Box::new(err)))?
+                            .as_secs(),
+                    )
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                    let vote = match vote {
+                        true => "TRUE",
+                        false => "FALSE",
+                    };
+                    (None, Some(vote.to_string()), Some(time), None)
+                }
+                State::WaitingForDecisionAck { ack_timeout_start } => {
+                    let time = i64::try_from(
+                        ack_timeout_start
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .map_err(|err| InternalError::from_source(Box::new(err)))?
+                            .as_secs(),
+                    )
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                    (None, None, None, Some(time))
+                }
+                _ => (None, None, None, None),
+            };
         let state = String::from(context.state());
         Ok(Consensus2pcContextModel {
             circuit_id: service_id.circuit_id().to_string(),
@@ -418,6 +449,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
             vote_timeout_start,
             vote,
             decision_timeout_start,
+            ack_timeout_start,
         })
     }
 }
@@ -523,6 +555,7 @@ pub struct Consensus2pcUpdateContextActionModel {
     pub vote: Option<String>,
     pub decision_timeout_start: Option<i64>,
     pub action_alarm: Option<i64>,
+    pub ack_timeout_start: Option<i64>,
 }
 
 impl TryFrom<(&Context, &i64, &Option<i64>)> for Consensus2pcUpdateContextActionModel {
@@ -538,36 +571,47 @@ impl TryFrom<(&Context, &i64, &Option<i64>)> for Consensus2pcUpdateContextAction
             .map(i64::try_from)
             .transpose()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
-        let (vote_timeout_start, vote, decision_timeout_start) = match context.state() {
-            State::Voting { vote_timeout_start } => {
-                let time = i64::try_from(
-                    vote_timeout_start
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?
-                        .as_secs(),
-                )
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                (Some(time), None, None)
-            }
-            State::Voted {
-                vote,
-                decision_timeout_start,
-            } => {
-                let time = i64::try_from(
-                    decision_timeout_start
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .map_err(|err| InternalError::from_source(Box::new(err)))?
-                        .as_secs(),
-                )
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                let vote = match vote {
-                    true => "TRUE",
-                    false => "FALSE",
-                };
-                (None, Some(vote.to_string()), Some(time))
-            }
-            _ => (None, None, None),
-        };
+        let (vote_timeout_start, vote, decision_timeout_start, ack_timeout_start) =
+            match context.state() {
+                State::Voting { vote_timeout_start } => {
+                    let time = i64::try_from(
+                        vote_timeout_start
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .map_err(|err| InternalError::from_source(Box::new(err)))?
+                            .as_secs(),
+                    )
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                    (Some(time), None, None, None)
+                }
+                State::Voted {
+                    vote,
+                    decision_timeout_start,
+                } => {
+                    let time = i64::try_from(
+                        decision_timeout_start
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .map_err(|err| InternalError::from_source(Box::new(err)))?
+                            .as_secs(),
+                    )
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                    let vote = match vote {
+                        true => "TRUE",
+                        false => "FALSE",
+                    };
+                    (None, Some(vote.to_string()), Some(time), None)
+                }
+                State::WaitingForDecisionAck { ack_timeout_start } => {
+                    let time = i64::try_from(
+                        ack_timeout_start
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .map_err(|err| InternalError::from_source(Box::new(err)))?
+                            .as_secs(),
+                    )
+                    .map_err(|err| InternalError::from_source(Box::new(err)))?;
+                    (None, None, None, Some(time))
+                }
+                _ => (None, None, None, None),
+            };
         let state = String::from(context.state());
         Ok(Consensus2pcUpdateContextActionModel {
             action_id: *action_id,
@@ -579,6 +623,7 @@ impl TryFrom<(&Context, &i64, &Option<i64>)> for Consensus2pcUpdateContextAction
             vote,
             decision_timeout_start,
             action_alarm: *action_alarm,
+            ack_timeout_start,
         })
     }
 }

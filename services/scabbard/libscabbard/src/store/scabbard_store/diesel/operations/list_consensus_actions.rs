@@ -209,7 +209,7 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                         }
                     }
                     "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
-                    "WAITINGFORDECISIONACK" => {
+                    "WAITING_FOR_DECISION_ACK" => {
                         let ack_timeout_start = get_system_time(update_context.ack_timeout_start)?
                             .ok_or_else(|| {
                                 ScabbardStoreError::Internal(InternalError::with_message(
@@ -523,6 +523,17 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                         }
                     }
                     "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
+                    "WAITING_FOR_DECISION_ACK" => {
+                        let ack_timeout_start = get_system_time(update_context.ack_timeout_start)?
+                            .ok_or_else(|| {
+                                ScabbardStoreError::Internal(InternalError::with_message(
+                                "Failed to list actions, context has state 'WaitingForDecisionAck' \
+                                but no ack timeout start time set"
+                                .to_string(),
+                            ))
+                            })?;
+                        State::WaitingForDecisionAck { ack_timeout_start }
+                    }
                     _ => {
                         return Err(ScabbardStoreError::Internal(InternalError::with_message(
                             "Failed to list actions, invalid state value found".to_string(),
