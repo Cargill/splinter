@@ -126,6 +126,29 @@ impl<'a> MerkleState<'a> {
                 .map_err(|e| CliError::ActionError(format!("{}", e))),
         }
     }
+
+    pub fn remove_pruned_entries(&self) -> Result<(), CliError> {
+        match self {
+            // No-op, as LMDB
+            MerkleState::Lmdb { .. } => Ok(()),
+            #[cfg(feature = "postgres")]
+            MerkleState::Postgres { state } => state
+                .remove_pruned_entries()
+                .map_err(|e| CliError::ActionError(format!("{}", e))),
+            #[cfg(feature = "postgres")]
+            MerkleState::InTransactionPostgres { state } => state
+                .remove_pruned_entries()
+                .map_err(|e| CliError::ActionError(format!("{}", e))),
+            #[cfg(feature = "sqlite")]
+            MerkleState::Sqlite { state } => state
+                .remove_pruned_entries()
+                .map_err(|e| CliError::ActionError(format!("{}", e))),
+            #[cfg(feature = "sqlite")]
+            MerkleState::InTransactionSqlite { state } => state
+                .remove_pruned_entries()
+                .map_err(|e| CliError::ActionError(format!("{}", e))),
+        }
+    }
 }
 
 impl<'a> State for MerkleState<'a> {
