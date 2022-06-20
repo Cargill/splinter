@@ -33,7 +33,7 @@ use crate::store::pool::ConnectionPool;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     AlarmType, CommitEntry, ConsensusAction, ConsensusContext, ConsensusEvent, Identified,
-    ScabbardService,
+    ScabbardService, SupervisorNotification,
 };
 
 use super::ScabbardStore;
@@ -43,6 +43,7 @@ use operations::add_consensus_action::AddActionOperation as _;
 use operations::add_consensus_context::AddContextOperation as _;
 use operations::add_consensus_event::AddEventOperation as _;
 use operations::add_service::AddServiceOperation as _;
+use operations::add_supervisor_notification::AddSupervisorNotficationOperation as _;
 use operations::get_alarm::GetAlarmOperation as _;
 use operations::get_current_consensus_context::GetCurrentContextAction as _;
 use operations::get_last_commit_entry::GetLastCommitEntryOperation as _;
@@ -50,6 +51,7 @@ use operations::get_service::GetServiceOperation as _;
 use operations::list_consensus_actions::ListActionsOperation as _;
 use operations::list_consensus_events::ListEventsOperation as _;
 use operations::list_ready_services::ListReadyServicesOperation as _;
+use operations::list_supervisor_notifications::ListSupervisorNotificationOperation as _;
 use operations::remove_service::RemoveServiceOperation as _;
 use operations::set_alarm::SetAlarmOperation as _;
 use operations::unset_alarm::UnsetAlarmOperation as _;
@@ -58,6 +60,7 @@ use operations::update_consensus_action::UpdateActionOperation as _;
 use operations::update_consensus_context::UpdateContextAction as _;
 use operations::update_consensus_event::UpdateEventOperation as _;
 use operations::update_service::UpdateServiceAction as _;
+use operations::update_supervisor_notification::UpdateSupervisorNotificationOperation as _;
 use operations::ScabbardStoreOperations;
 
 use splinter::service::FullyQualifiedServiceId;
@@ -270,6 +273,42 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
             ScabbardStoreOperations::new(conn).get_alarm(service_id, alarm_type)
         })
     }
+
+    // add a new supervisor notification
+    fn add_supervisor_notification(
+        &self,
+        notification: SupervisorNotification,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).add_supervisor_notification(notification)
+        })
+    }
+
+    // get the next supervisor notification that needs to be handled
+    fn list_supervisor_notifications(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Vec<Identified<SupervisorNotification>>, ScabbardStoreError> {
+        self.pool.execute_read(|conn| {
+            ScabbardStoreOperations::new(conn).list_supervisor_notifications(service_id)
+        })
+    }
+
+    // update an existing supervisor notification
+    fn update_supervisor_notification(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        notification_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).update_supervisor_notification(
+                service_id,
+                notification_id,
+                executed_at,
+            )
+        })
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -460,6 +499,42 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
             ScabbardStoreOperations::new(conn).get_alarm(service_id, alarm_type)
         })
     }
+
+    // add a new supervisor notification
+    fn add_supervisor_notification(
+        &self,
+        notification: SupervisorNotification,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).add_supervisor_notification(notification)
+        })
+    }
+
+    // get the next supervisor notification that needs to be handled
+    fn list_supervisor_notifications(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Vec<Identified<SupervisorNotification>>, ScabbardStoreError> {
+        self.pool.execute_read(|conn| {
+            ScabbardStoreOperations::new(conn).list_supervisor_notifications(service_id)
+        })
+    }
+
+    // update an existing supervisor notification
+    fn update_supervisor_notification(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        notification_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        self.pool.execute_write(|conn| {
+            ScabbardStoreOperations::new(conn).update_supervisor_notification(
+                service_id,
+                notification_id,
+                executed_at,
+            )
+        })
+    }
 }
 
 pub struct DieselConnectionScabbardStore<'a, C>
@@ -634,6 +709,36 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
     ) -> Result<Option<SystemTime>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).get_alarm(service_id, alarm_type)
     }
+
+    // add a new supervisor notification
+    fn add_supervisor_notification(
+        &self,
+        notification: SupervisorNotification,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).add_supervisor_notification(notification)
+    }
+
+    // get the next supervisor notification that needs to be handled
+    fn list_supervisor_notifications(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Vec<Identified<SupervisorNotification>>, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).list_supervisor_notifications(service_id)
+    }
+
+    // update an existing supervisor notification
+    fn update_supervisor_notification(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        notification_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).update_supervisor_notification(
+            service_id,
+            notification_id,
+            executed_at,
+        )
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -789,6 +894,36 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     ) -> Result<Option<SystemTime>, ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).get_alarm(service_id, alarm_type)
     }
+
+    // add a new supervisor notification
+    fn add_supervisor_notification(
+        &self,
+        notification: SupervisorNotification,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).add_supervisor_notification(notification)
+    }
+
+    // get the next supervisor notification that needs to be handled
+    fn list_supervisor_notifications(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Vec<Identified<SupervisorNotification>>, ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).list_supervisor_notifications(service_id)
+    }
+
+    // update an existing supervisor notification
+    fn update_supervisor_notification(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        notification_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        ScabbardStoreOperations::new(self.connection).update_supervisor_notification(
+            service_id,
+            notification_id,
+            executed_at,
+        )
+    }
 }
 
 #[cfg(test)]
@@ -808,7 +943,8 @@ pub mod tests {
         two_phase_commit::{
             Action, ContextBuilder, Event, Message, Notification, Participant, State,
         },
-        CommitEntryBuilder, ConsensusDecision,
+        CommitEntryBuilder, ConsensusDecision, SupervisorNotificationBuilder,
+        SupervisorNotificationType,
     };
 
     #[cfg(feature = "diesel-postgres-tests")]
@@ -2735,6 +2871,157 @@ pub mod tests {
             let pool = create_postgres_pool(url)?;
             let store = DieselScabbardStore::new(pool);
             scabbard_store_get_alarm(&store);
+
+            Ok(())
+        })
+    }
+
+    /// Test that the scabbard store `supervisor_notification` operations are successful.
+    ///
+    /// 1. Add a service to the database
+    /// 2. Add a context to the database for the service
+    /// 3. Add a RequestForStart action
+    /// 4. Add a supervisor notification for RequestForStart
+    /// 5. Verify that 1 notification is returned
+    /// 6. Add an Abort action
+    /// 7. Add a supervisor notification for Abort
+    /// 8. Verify that both notifications are returned, with Abort coming after RequestForStart
+    /// 9. Update RequestForStart notification to be executed
+    /// 10. Verify that only the Abort notfication is returned
+    fn scabbard_store_get_supervisor_notification(store: &dyn ScabbardStore) {
+        let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
+            .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
+
+        let peer_service_id = ServiceId::new_random();
+
+        // service with finalized status
+        let service = ScabbardServiceBuilder::default()
+            .with_service_id(&service_fqsi)
+            .with_peers(&[peer_service_id.clone()])
+            .with_consensus(&ConsensusType::TwoPC)
+            .with_status(&ServiceStatus::Finalized)
+            .build()
+            .expect("failed to build service");
+
+        assert!(store.add_service(service.clone()).is_ok());
+
+        let coordinator_context = ContextBuilder::default()
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(1)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+                decision_ack: false,
+            }])
+            .with_state(State::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let context = ConsensusContext::TwoPhaseCommit(coordinator_context);
+
+        store
+            .add_consensus_context(&service_fqsi, context)
+            .expect("failed to add context");
+
+        let event = ConsensusEvent::TwoPhaseCommit(Event::Alarm());
+
+        let event_id = store
+            .add_consensus_event(&service_fqsi, event.clone())
+            .expect("unable to add event");
+
+        let notification = Notification::RequestForStart();
+        let action1 = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
+        let action_id1 = store
+            .add_consensus_action(action1, &service_fqsi, event_id)
+            .expect("failed to add actions");
+
+        let supervisor_notification = SupervisorNotificationBuilder::default()
+            .with_service_id(&service_fqsi)
+            .with_action_id(action_id1)
+            .with_notification_type(&SupervisorNotificationType::RequestForStart)
+            .build()
+            .expect("failed to build supervisor action");
+
+        store
+            .add_supervisor_notification(supervisor_notification.clone())
+            .expect("failed to add context");
+
+        let notifications = store
+            .list_supervisor_notifications(&service_fqsi)
+            .expect("failed to list notifications");
+
+        assert_eq!(notifications.len(), 1);
+        assert_eq!(
+            notifications[0].record.notification_type(),
+            &SupervisorNotificationType::RequestForStart
+        );
+
+        let event = ConsensusEvent::TwoPhaseCommit(Event::Alarm());
+
+        let event_id = store
+            .add_consensus_event(&service_fqsi, event.clone())
+            .expect("unable to add event");
+
+        let notification = Notification::Abort();
+        let action2 = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
+        let action_id2 = store
+            .add_consensus_action(action2, &service_fqsi, event_id)
+            .expect("failed to add actions");
+
+        let supervisor_notification = SupervisorNotificationBuilder::default()
+            .with_service_id(&service_fqsi)
+            .with_action_id(action_id2)
+            .with_notification_type(&SupervisorNotificationType::Abort)
+            .build()
+            .expect("failed to build supervisor action");
+
+        store
+            .add_supervisor_notification(supervisor_notification)
+            .expect("failed to add supervisor notification");
+
+        let notifications = store
+            .list_supervisor_notifications(&service_fqsi)
+            .expect("failed to list notifications");
+
+        assert_eq!(notifications.len(), 2);
+        assert_eq!(
+            notifications[1].record.notification_type(),
+            &SupervisorNotificationType::Abort
+        );
+
+        store
+            .update_supervisor_notification(&service_fqsi, notifications[0].id, SystemTime::now())
+            .expect("failed to add context");
+
+        let notifications = store
+            .list_supervisor_notifications(&service_fqsi)
+            .expect("failed to list notifications");
+
+        assert_eq!(notifications.len(), 1);
+        assert_eq!(
+            notifications[0].record.notification_type(),
+            &SupervisorNotificationType::Abort
+        );
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_sscabbard_store_get_supervisor_notification() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_get_supervisor_notification(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_get_supervisor_notification(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_get_supervisor_notification(&store);
 
             Ok(())
         })

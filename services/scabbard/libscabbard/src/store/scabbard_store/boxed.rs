@@ -19,7 +19,7 @@ use splinter::service::FullyQualifiedServiceId;
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::scabbard_store::{
     AlarmType, CommitEntry, ConsensusAction, ConsensusContext, ConsensusEvent, Identified,
-    ScabbardService,
+    ScabbardService, SupervisorNotification,
 };
 
 use super::ScabbardStore;
@@ -284,5 +284,31 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         alarm_type: &AlarmType,
     ) -> Result<Option<SystemTime>, ScabbardStoreError> {
         (&**self).get_alarm(service_id, alarm_type)
+    }
+
+    // add a new supervisor notification
+    fn add_supervisor_notification(
+        &self,
+        notification: SupervisorNotification,
+    ) -> Result<(), ScabbardStoreError> {
+        (&**self).add_supervisor_notification(notification)
+    }
+
+    // get the next supervisor notification that needs to be handled
+    fn list_supervisor_notifications(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Vec<Identified<SupervisorNotification>>, ScabbardStoreError> {
+        (&**self).list_supervisor_notifications(service_id)
+    }
+
+    // update an existing supervisor notification
+    fn update_supervisor_notification(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        notification_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError> {
+        (&**self).update_supervisor_notification(service_id, notification_id, executed_at)
     }
 }
