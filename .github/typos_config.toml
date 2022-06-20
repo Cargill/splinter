@@ -17,3 +17,7 @@ OTU = "OTU"
 # workaround for false positive in splinterd/api/static/openapi.yaml
 # https://github.com/crate-ci/typos/issues/484
 
+[default.extend-identifiers]
+ERRORs = "ERRORs"
+# workaround for false positive in tests/migrations/bin/test_psql_migrations
+# https://github.com/crate-ci/typos/issues/399

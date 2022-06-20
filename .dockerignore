@@ -39,6 +39,7 @@
 /tests/Cargo.lock
 /tests/target
 /tests/migrations/keys
+/tests/migrations/test-psql-migrations.log
 
 /target
 /Cargo.lock
