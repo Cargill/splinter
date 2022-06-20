@@ -375,7 +375,7 @@ mod tests {
     use super::*;
 
     use std::fmt::Debug;
-    use std::sync::mpsc::channel;
+    use std::sync::{mpsc::channel, Arc, Barrier};
     use std::thread;
 
     use crate::transport::{
@@ -397,13 +397,21 @@ mod tests {
         let mut listener = assert_ok(transport.listen(bind));
         let endpoint = listener.endpoint();
 
+        let ready = Arc::new(Barrier::new(2));
+        let received = Arc::new(Barrier::new(2));
+
+        let client_ready = Arc::clone(&ready);
+        let client_received = Arc::clone(&received);
         let handle = thread::spawn(move || {
             let client = assert_ok(transport.connect(&endpoint));
 
             let mut mesh = Mesh::new(1, 1);
             assert_ok(mesh.add(client, "client".to_string()));
+            client_ready.wait();
 
             assert_ok(mesh.send(Envelope::new("client".to_string(), b"hello".to_vec())));
+
+            client_received.wait();
 
             mesh.signal_shutdown();
             mesh.wait_for_shutdown().unwrap();
@@ -412,11 +420,14 @@ mod tests {
         let mut mesh = Mesh::new(1, 1);
         let server = assert_ok(listener.accept());
         assert_ok(mesh.add(server, "server".to_string()));
+        ready.wait();
 
         let envelope = assert_ok(mesh.recv());
 
         assert_eq!(b"hello", envelope.payload());
         assert_eq!("server", envelope.id());
+
+        received.wait();
 
         handle.join().unwrap();
 
