@@ -138,6 +138,7 @@ mod tests {
         let expected_state_root = {
             let mut state = ScabbardState::new(
                 merkle_state.clone(),
+                false,
                 commit_hash_store.clone(),
                 receipt_store.clone(),
                 #[cfg(feature = "metrics")]
