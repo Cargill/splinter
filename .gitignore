@@ -38,6 +38,7 @@
 
 /tests/Cargo.lock
 /tests/target
+/tests/migrations/keys
 
 /target
 /Cargo.lock

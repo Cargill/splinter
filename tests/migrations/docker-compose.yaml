@@ -1,0 +1,150 @@
+# Copyright 2018-2022 Cargill Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ------------------------------------------------------------------------------
+
+version: "3.7"
+
+services:
+
+  splinterd-alpha:
+    build:
+      context: ../../
+      dockerfile: splinterd/Dockerfile-installed-${DISTRO}
+      args:
+      - CARGO_ARGS=${CARGO_ARGS}
+      - REPO_VERSION=${REPO_VERSION}
+    image: ${NAMESPACE}splinterd:${ISOLATION_ID}
+    container_name: splinterd-alpha
+    volumes:
+      - ./:/config/
+    command: |
+        bash -c "
+          until PGPASSWORD=admin psql -h splinterd-db-alpha -U admin -d splinter -c '\q'; do
+            >&2 echo \"Database is unavailable - sleeping\"
+            sleep 1
+          done
+          splinter database migrate -C postgres://admin:admin@splinterd-db-alpha:5432/splinter
+          splinter cert generate --skip
+          splinter keygen alpha --key-dir /config/keys --skip
+          splinter keygen beta --key-dir /config/keys --skip
+          splinter keygen workload --key-dir /config/keys --skip
+          mkdir -p /etc/splinter/keys
+          cp /config/keys/alpha.priv /etc/splinter/keys/splinterd.pub
+          cp /config/keys/alpha.priv /etc/splinter/keys/splinterd.priv
+          echo $$(cat /config/keys/alpha.pub) > /etc/splinter/allow_keys
+          echo $$(cat /config/keys/workload.pub) >> /etc/splinter/allow_keys
+          cp /config/registry.yaml /etc/splinter/registry.yaml
+          sed -i s/%ALPHA%/$$(cat /config/keys/alpha.pub)/ /etc/splinter/registry.yaml
+          sed -i s/%BETA%/$$(cat /config/keys/beta.pub)/ /etc/splinter/registry.yaml
+          splinterd -vv \
+              --node-id splinterd-alpha \
+              --database postgres://admin:admin@splinterd-db-alpha:5432/splinter \
+              --network-endpoints tcps://0.0.0.0:8044 \
+              --advertised-endpoints tcps://splinterd-node-alpha:8044 \
+              --rest-api-endpoint http://0.0.0.0:8080 \
+              --registries file:///etc/splinter/registry.yaml \
+              --tls-insecure
+        "
+
+  splinterd-db-alpha:
+    image: postgres
+    container_name: splinterd-db-alpha
+    volumes:
+      - ./:/config/
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: splinter
+
+  splinterd-beta:
+    build:
+      context: ../../
+      dockerfile: splinterd/Dockerfile-installed-${DISTRO}
+      args:
+      - CARGO_ARGS=${CARGO_ARGS}
+      - REPO_VERSION=${REPO_VERSION}
+    image: ${NAMESPACE}splinterd:${ISOLATION_ID}
+    container_name: splinterd-beta
+    volumes:
+      - ./:/config/
+    command: |
+        bash -c "
+          until PGPASSWORD=admin psql -h splinterd-db-beta -U admin -d splinter -c '\q'; do
+            >&2 echo \"Database is unavailable - sleeping\"
+            sleep 1
+          done && \
+          splinter database migrate -C postgres://admin:admin@splinterd-db-beta:5432/splinter
+          splinter cert generate --skip
+          mkdir -p /etc/splinter/keys
+          end=$$((SECONDS+10))
+          echo $$SECONDS
+          echo $$END
+          while [ ! -f /config/keys/beta.pub ]; do
+            sleep 1
+            if [ $$SECONDS -gt $$end ];
+            then
+              echo \"Unable to find public key after 10 seconds\"
+              exit 1
+            fi
+          done
+          while [ ! -f /config/keys/beta.priv ]; do
+            sleep 1
+            if [ $$SECONDS -gt $$end ];
+            then
+              echo \"Unable to find private key after 10 seconds\"
+              exit 1
+            fi
+          done
+          cp /config/keys/beta.priv /etc/splinter/keys/splinterd.priv
+          cp /config/keys/beta.pub /etc/splinter/keys/splinterd.pub
+          echo $$(cat /config/keys/beta.pub) > /etc/splinter/allow_keys
+          echo $$(cat /config/keys/workload.pub) >> /etc/splinter/allow_keys
+          cp /config/registry.yaml /etc/splinter/registry.yaml
+          sed -i s/%ALPHA%/$$(cat /config/keys/alpha.pub)/ /etc/splinter/registry.yaml
+          sed -i s/%BETA%/$$(cat /config/keys/beta.pub)/ /etc/splinter/registry.yaml
+          splinterd -vv \
+              --node-id splinterd-beta \
+              --database postgres://admin:admin@splinterd-db-beta:5432/splinter \
+              --network-endpoints tcps://0.0.0.0:8044 \
+              --advertised-endpoints tcps://splinterd-node-beta:8044 \
+              --rest-api-endpoint http://0.0.0.0:8080 \
+              --registries file:///etc/splinter/registry.yaml \
+              --tls-insecure
+        "
+
+  splinterd-db-beta:
+    image: postgres
+    container_name: splinterd-db-beta
+    volumes:
+      - ./:/config/
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: splinter
+
+  workload:
+    platform: "linux/amd64"
+    build:
+      context: .
+      dockerfile: docker/workload.dockerfile
+    container_name: workload
+    image: workload
+    volumes:
+      - ./:/config/
+    command: |
+        bash -c "
+          tail -f /dev/null
+        "
