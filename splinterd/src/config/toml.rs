@@ -205,6 +205,8 @@ struct TomlConfig {
     appenders: Option<HashMap<String, TomlUnnamedAppenderConfig>>,
     loggers: Option<HashMap<String, TomlUnnamedLoggerConfig>>,
     scabbard_state: Option<ScabbardStateToml>,
+    #[cfg(feature = "disable-scabbard-autocleanup")]
+    scabbard_enable_autocleanup: Option<bool>,
     config_dir: Option<String>,
     state_dir: Option<String>,
 
@@ -291,6 +293,12 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_config_dir(self.toml_config.config_dir)
             .with_state_dir(self.toml_config.state_dir)
             .with_scabbard_state(self.toml_config.scabbard_state.map(|inner| inner.into()));
+
+        #[cfg(feature = "disable-scabbard-autocleanup")]
+        {
+            partial_config = partial_config
+                .with_scabbard_autocleanup(self.toml_config.scabbard_enable_autocleanup);
+        }
 
         #[cfg(feature = "https-bind")]
         {

@@ -64,6 +64,9 @@ FLAGS
 `--enable-biome-credentials`
 : Enables Biome credentials for REST API authentication.
 
+`--disable-scabbard-autocleanup`
+: Disable autocleanup of pruned scabbard merkle state.
+
 `-h`, `--help`
 : Prints help information.
 

@@ -431,6 +431,11 @@ impl ConfigBuilder {
                 .iter()
                 .find_map(|p| p.scabbard_state().map(|v| (v, p.source())))
                 .ok_or_else(|| ConfigError::MissingValue("scabbard_state".to_string()))?,
+            scabbard_autocleanup: self
+                .partial_configs
+                .iter()
+                .find_map(|p| p.scabbard_autocleanup().map(|v| (v, p.source())))
+                .ok_or_else(|| ConfigError::MissingValue("scabbard_autocleanup".to_string()))?,
         })
     }
 }
