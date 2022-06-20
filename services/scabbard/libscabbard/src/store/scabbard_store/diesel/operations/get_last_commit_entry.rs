@@ -47,7 +47,14 @@ where
     ) -> Result<Option<CommitEntry>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             scabbard_v3_commit_history::table
-                .filter(scabbard_v3_commit_history::service_id.eq(format!("{}", service_id)))
+                .filter(
+                    scabbard_v3_commit_history::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(
+                            scabbard_v3_commit_history::service_id
+                                .eq(service_id.service_id().to_string()),
+                        ),
+                )
                 .order(scabbard_v3_commit_history::epoch.desc())
                 .first::<CommitEntryModel>(self.conn)
                 .optional()

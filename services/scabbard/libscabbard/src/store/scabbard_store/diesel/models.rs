@@ -38,8 +38,9 @@ use super::schema::{
 /// Database model representation of `ScabbardService`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "scabbard_service"]
-#[primary_key(service_id)]
+#[primary_key(circuit_id, service_id)]
 pub struct ScabbardServiceModel {
+    pub circuit_id: String,
     pub service_id: String,
     pub consensus: String,
     pub status: String,
@@ -48,7 +49,8 @@ pub struct ScabbardServiceModel {
 impl From<&ScabbardService> for ScabbardServiceModel {
     fn from(service: &ScabbardService) -> Self {
         ScabbardServiceModel {
-            service_id: service.service_id().to_string(),
+            circuit_id: service.service_id().circuit_id().to_string(),
+            service_id: service.service_id().service_id().to_string(),
             consensus: service.consensus().into(),
             status: service.status().into(),
         }
@@ -58,8 +60,9 @@ impl From<&ScabbardService> for ScabbardServiceModel {
 /// Database model representation of `ScabbardService` peer
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "scabbard_peer"]
-#[primary_key(service_id, peer_service_id)]
+#[primary_key(circuit_id, service_id, peer_service_id)]
 pub struct ScabbardPeerModel {
+    pub circuit_id: String,
     pub service_id: String,
     pub peer_service_id: String,
 }
@@ -70,7 +73,8 @@ impl From<&ScabbardService> for Vec<ScabbardPeerModel> {
             .peers()
             .iter()
             .map(|service_id| ScabbardPeerModel {
-                service_id: service.service_id().to_string(),
+                circuit_id: service.service_id().circuit_id().to_string(),
+                service_id: service.service_id().service_id().to_string(),
                 peer_service_id: service_id.to_string(),
             })
             .collect::<Vec<ScabbardPeerModel>>()
@@ -80,8 +84,9 @@ impl From<&ScabbardService> for Vec<ScabbardPeerModel> {
 /// Database model representation of `ScabbardService` commit entry
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "scabbard_v3_commit_history"]
-#[primary_key(service_id, epoch)]
+#[primary_key(circuit_id, service_id, epoch)]
 pub struct CommitEntryModel {
+    pub circuit_id: String,
     pub service_id: String,
     pub epoch: i64,
     pub value: String,
@@ -93,7 +98,8 @@ impl TryFrom<&CommitEntry> for CommitEntryModel {
 
     fn try_from(entry: &CommitEntry) -> Result<Self, Self::Error> {
         Ok(CommitEntryModel {
-            service_id: entry.service_id().to_string(),
+            circuit_id: entry.service_id().circuit_id().to_string(),
+            service_id: entry.service_id().service_id().to_string(),
             epoch: i64::try_from(entry.epoch().ok_or_else(|| {
                 InternalError::with_message("Epoch is not set on commit entry".to_string())
             })?)
@@ -111,8 +117,11 @@ impl TryFrom<CommitEntryModel> for CommitEntry {
     type Error = InternalError;
 
     fn try_from(entry: CommitEntryModel) -> Result<Self, Self::Error> {
-        let service_id = FullyQualifiedServiceId::new_from_string(entry.service_id)
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let service_id = FullyQualifiedServiceId::new_from_string(format!(
+            "{}::{}",
+            entry.circuit_id, entry.service_id
+        ))
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         let mut builder = CommitEntryBuilder::default()
             .with_service_id(&service_id)
@@ -207,8 +216,9 @@ impl From<&ConsensusDecision> for String {
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "scabbard_alarm"]
-#[primary_key(service_id, alarm_type)]
+#[primary_key(circuit_id, service_id, alarm_type)]
 pub struct ScabbardAlarmModel {
+    pub circuit_id: String,
     pub service_id: String,
     pub alarm_type: String,
     pub alarm: i64, // timestamp, when to wake up
@@ -216,8 +226,9 @@ pub struct ScabbardAlarmModel {
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_context"]
-#[primary_key(service_id)]
+#[primary_key(circuit_id, service_id)]
 pub struct Consensus2pcContextModel {
+    pub circuit_id: String,
     pub service_id: String,
     pub coordinator: String,
     pub epoch: i64,
@@ -335,9 +346,12 @@ impl
             .with_state(state)
             .with_participants(participants)
             .with_this_process(
-                FullyQualifiedServiceId::new_from_string(&context.service_id)
-                    .map_err(|err| InternalError::from_source(Box::new(err)))?
-                    .service_id(),
+                FullyQualifiedServiceId::new_from_string(format!(
+                    "{}::{}",
+                    &context.circuit_id, &context.service_id
+                ))
+                .map_err(|err| InternalError::from_source(Box::new(err)))?
+                .service_id(),
             );
 
         if let Some(last_commit_epoch) = last_commit_epoch {
@@ -395,7 +409,8 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
         };
         let state = String::from(context.state());
         Ok(Consensus2pcContextModel {
-            service_id: format!("{}", service_id),
+            circuit_id: service_id.circuit_id().to_string(),
+            service_id: service_id.service_id().to_string(),
             coordinator: format!("{}", context.coordinator()),
             epoch,
             last_commit_epoch,
@@ -409,8 +424,9 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_context_participant"]
-#[primary_key(service_id, process)]
+#[primary_key(circuit_id, service_id, process)]
 pub struct Consensus2pcContextParticipantModel {
+    pub circuit_id: String,
     pub service_id: String,
     pub epoch: i64,
     pub process: String,
@@ -477,7 +493,8 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ContextParticipantList {
                 false => "FALSE".to_string(),
             });
             participants.push(Consensus2pcContextParticipantModel {
-                service_id: format!("{}", service_id),
+                circuit_id: service_id.circuit_id().to_string(),
+                service_id: service_id.service_id().to_string(),
                 epoch,
                 process: format!("{}", participant.process),
                 vote,
@@ -645,6 +662,7 @@ impl From<&State> for String {
 #[primary_key(id)]
 pub struct Consensus2pcActionModel {
     pub id: i64,
+    pub circuit_id: String,
     pub service_id: String,
     pub created_at: SystemTime,
     pub executed_at: Option<i64>,
@@ -653,6 +671,7 @@ pub struct Consensus2pcActionModel {
 #[derive(Debug, PartialEq, Insertable)]
 #[table_name = "consensus_2pc_action"]
 pub struct InsertableConsensus2pcActionModel {
+    pub circuit_id: String,
     pub service_id: String,
     pub executed_at: Option<i64>,
 }
@@ -687,6 +706,7 @@ impl From<&Message> for String {
 #[primary_key(id)]
 pub struct Consensus2pcEventModel {
     pub id: i64,
+    pub circuit_id: String,
     pub service_id: String,
     pub created_at: SystemTime,
     pub executed_at: Option<i64>,
@@ -696,6 +716,7 @@ pub struct Consensus2pcEventModel {
 #[derive(Debug, PartialEq, Insertable)]
 #[table_name = "consensus_2pc_event"]
 pub struct InsertableConsensus2pcEventModel {
+    pub circuit_id: String,
     pub service_id: String,
     pub executed_at: Option<i64>,
     pub event_type: String,

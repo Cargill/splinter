@@ -46,7 +46,14 @@ where
     ) -> Result<Option<ConsensusContext>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let context = consensus_2pc_context::table
-                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
+                .filter(
+                    consensus_2pc_context::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(
+                            consensus_2pc_context::service_id
+                                .eq(service_id.service_id().to_string()),
+                        ),
+                )
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -57,8 +64,12 @@ where
                 let participants: Vec<Consensus2pcContextParticipantModel> =
                     consensus_2pc_context_participant::table
                         .filter(
-                            consensus_2pc_context_participant::service_id
-                                .eq(format!("{}", service_id)),
+                            consensus_2pc_context_participant::circuit_id
+                                .eq(service_id.circuit_id().to_string())
+                                .and(
+                                    consensus_2pc_context_participant::service_id
+                                        .eq(service_id.service_id().to_string()),
+                                ),
                         )
                         .load::<Consensus2pcContextParticipantModel>(self.conn)
                         .map_err(|err| {

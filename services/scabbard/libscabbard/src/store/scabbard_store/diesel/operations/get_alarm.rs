@@ -51,7 +51,11 @@ impl<'a> GetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
         self.conn.transaction::<_, _, _>(|| {
             // check to see if a service with the given service_id exists
             scabbard_service::table
-                .filter(scabbard_service::service_id.eq(format!("{}", service_id)))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(scabbard_service::service_id.eq(service_id.service_id().to_string())),
+                )
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -65,8 +69,9 @@ impl<'a> GetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
 
             scabbard_alarm::table
                 .filter(
-                    scabbard_alarm::service_id
-                        .eq(format!("{}", service_id))
+                    scabbard_alarm::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(scabbard_alarm::service_id.eq(service_id.service_id().to_string()))
                         .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
                 )
                 .select(scabbard_alarm::alarm)
@@ -100,7 +105,11 @@ impl<'a> GetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
         self.conn.transaction::<_, _, _>(|| {
             // check to see if a service with the given service_id exists
             scabbard_service::table
-                .filter(scabbard_service::service_id.eq(format!("{}", service_id)))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(scabbard_service::service_id.eq(service_id.service_id().to_string())),
+                )
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -114,8 +123,9 @@ impl<'a> GetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
 
             scabbard_alarm::table
                 .filter(
-                    scabbard_alarm::service_id
-                        .eq(format!("{}", service_id))
+                    scabbard_alarm::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(scabbard_alarm::service_id.eq(service_id.service_id().to_string()))
                         .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
                 )
                 .select(scabbard_alarm::alarm)

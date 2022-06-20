@@ -43,8 +43,12 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnec
             // check to see if a commit entry with the given service_id and epoch exists
             scabbard_v3_commit_history::table
                 .filter(
-                    scabbard_v3_commit_history::service_id
-                        .eq(format!("{}", commit_entry.service_id()))
+                    scabbard_v3_commit_history::circuit_id
+                        .eq(commit_entry.service_id().circuit_id().to_string())
+                        .and(
+                            scabbard_v3_commit_history::service_id
+                                .eq(commit_entry.service_id().service_id().to_string()),
+                        )
                         .and(scabbard_v3_commit_history::epoch.eq(epoch)),
                 )
                 .first::<CommitEntryModel>(self.conn)
@@ -58,10 +62,11 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnec
                     )))
                 })?;
 
-            delete(
-                scabbard_v3_commit_history::table
-                    .find((format!("{}", commit_entry.service_id()), epoch)),
-            )
+            delete(scabbard_v3_commit_history::table.find((
+                commit_entry.service_id().circuit_id().to_string(),
+                commit_entry.service_id().service_id().to_string(),
+                epoch,
+            )))
             .execute(self.conn)
             .map_err(|err| {
                 ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
@@ -92,8 +97,12 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection
             // check to see if a commit entry with the given service_id and epoch exists
             scabbard_v3_commit_history::table
                 .filter(
-                    scabbard_v3_commit_history::service_id
-                        .eq(format!("{}", commit_entry.service_id()))
+                    scabbard_v3_commit_history::circuit_id
+                        .eq(commit_entry.service_id().circuit_id().to_string())
+                        .and(
+                            scabbard_v3_commit_history::service_id
+                                .eq(commit_entry.service_id().service_id().to_string()),
+                        )
                         .and(scabbard_v3_commit_history::epoch.eq(epoch)),
                 )
                 .first::<CommitEntryModel>(self.conn)
@@ -107,10 +116,11 @@ impl<'a> UpdateCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection
                     )))
                 })?;
 
-            delete(
-                scabbard_v3_commit_history::table
-                    .find((format!("{}", commit_entry.service_id()), epoch)),
-            )
+            delete(scabbard_v3_commit_history::table.find((
+                commit_entry.service_id().circuit_id().to_string(),
+                commit_entry.service_id().service_id().to_string(),
+                epoch,
+            )))
             .execute(self.conn)
             .map_err(|err| {
                 ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())

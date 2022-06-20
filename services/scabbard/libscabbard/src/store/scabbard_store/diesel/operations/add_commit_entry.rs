@@ -42,7 +42,14 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnectio
         self.conn.transaction::<_, _, _>(|| {
             // check to see if a service with the given service_id exists
             scabbard_service::table
-                .filter(scabbard_service::service_id.eq(format!("{}", commit_entry.service_id())))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(commit_entry.service_id().circuit_id().to_string())
+                        .and(
+                            scabbard_service::service_id
+                                .eq(commit_entry.service_id().service_id().to_string()),
+                        ),
+                )
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -57,7 +64,12 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, SqliteConnectio
             // check to see if a context with the given service_id exists
             let context = consensus_2pc_context::table
                 .filter(
-                    consensus_2pc_context::service_id.eq(format!("{}", commit_entry.service_id())),
+                    consensus_2pc_context::circuit_id
+                        .eq(commit_entry.service_id().circuit_id().to_string())
+                        .and(
+                            consensus_2pc_context::service_id
+                                .eq(commit_entry.service_id().service_id().to_string()),
+                        ),
                 )
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()
@@ -98,7 +110,14 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection> {
         self.conn.transaction::<_, _, _>(|| {
             // check to see if a service with the given epoch and service_id exists
             scabbard_service::table
-                .filter(scabbard_service::service_id.eq(format!("{}", commit_entry.service_id())))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(commit_entry.service_id().circuit_id().to_string())
+                        .and(
+                            scabbard_service::service_id
+                                .eq(commit_entry.service_id().service_id().to_string()),
+                        ),
+                )
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -113,7 +132,12 @@ impl<'a> AddCommitEntryOperation for ScabbardStoreOperations<'a, PgConnection> {
             // check to see if a context with the given service_id exists
             let context = consensus_2pc_context::table
                 .filter(
-                    consensus_2pc_context::service_id.eq(format!("{}", commit_entry.service_id())),
+                    consensus_2pc_context::circuit_id
+                        .eq(commit_entry.service_id().circuit_id().to_string())
+                        .and(
+                            consensus_2pc_context::service_id
+                                .eq(commit_entry.service_id().service_id().to_string()),
+                        ),
                 )
                 .first::<Consensus2pcContextModel>(self.conn)
                 .optional()

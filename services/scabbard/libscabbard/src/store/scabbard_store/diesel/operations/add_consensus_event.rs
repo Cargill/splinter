@@ -24,12 +24,12 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        Consensus2pcContextModel, Consensus2pcDeliverEventModel, Consensus2pcStartEventModel,
-        Consensus2pcVoteEventModel, InsertableConsensus2pcEventModel,
+        Consensus2pcDeliverEventModel, Consensus2pcStartEventModel, Consensus2pcVoteEventModel,
+        InsertableConsensus2pcEventModel, ScabbardServiceModel,
     },
     schema::{
-        consensus_2pc_context, consensus_2pc_deliver_event, consensus_2pc_event,
-        consensus_2pc_start_event, consensus_2pc_vote_event,
+        consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_start_event,
+        consensus_2pc_vote_event, scabbard_service,
     },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -59,23 +59,27 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let ConsensusEvent::TwoPhaseCommit(event) = event;
-            // check to see if a context with the given service_id exists
-            consensus_2pc_context::table
-                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
-                .first::<Consensus2pcContextModel>(self.conn)
+            // check to see if a service with the given service_id exists
+            scabbard_service::table
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(scabbard_service::service_id.eq(service_id.service_id().to_string())),
+                )
+                .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
                 })?
                 .ok_or_else(|| {
-                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Cannot add consensus event, context with service ID {} does not exist",
-                        service_id,
+                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
+                        "Service does not exist",
                     )))
                 })?;
 
             let insertable_event = InsertableConsensus2pcEventModel {
-                service_id: format!("{}", service_id),
+                circuit_id: service_id.circuit_id().to_string(),
+                service_id: service_id.service_id().to_string(),
                 executed_at: None,
                 event_type: String::from(&event),
             };
@@ -184,23 +188,27 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let ConsensusEvent::TwoPhaseCommit(event) = event;
-            // check to see if a context with the given service_id exists
-            consensus_2pc_context::table
-                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
-                .first::<Consensus2pcContextModel>(self.conn)
+            // check to see if a service with the given service_id exists
+            scabbard_service::table
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(scabbard_service::service_id.eq(service_id.service_id().to_string())),
+                )
+                .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
                 })?
                 .ok_or_else(|| {
-                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Cannot add consensus event, context with service ID {} does not exist",
-                        service_id,
+                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
+                        "Service does not exist",
                     )))
                 })?;
 
             let insertable_event = InsertableConsensus2pcEventModel {
-                service_id: format!("{}", service_id),
+                circuit_id: service_id.circuit_id().to_string(),
+                service_id: service_id.service_id().to_string(),
                 executed_at: None,
                 event_type: String::from(&event),
             };

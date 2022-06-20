@@ -23,8 +23,8 @@ use splinter::error::InvalidStateError;
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
-    models::{Consensus2pcContextModel, ContextParticipantList},
-    schema::{consensus_2pc_context, consensus_2pc_context_participant},
+    models::{Consensus2pcContextModel, ContextParticipantList, ScabbardServiceModel},
+    schema::{consensus_2pc_context, consensus_2pc_context_participant, scabbard_service},
 };
 use crate::store::scabbard_store::ConsensusContext;
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -51,10 +51,17 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
                 ConsensusContext::TwoPhaseCommit(context) => {
-                    // check to see if a context with the given service_id exists
-                    consensus_2pc_context::table
-                        .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
-                        .first::<Consensus2pcContextModel>(self.conn)
+                    // check to see if a service with the given service_id exists
+                    scabbard_service::table
+                        .filter(
+                            scabbard_service::circuit_id
+                                .eq(service_id.circuit_id().to_string())
+                                .and(
+                                    scabbard_service::service_id
+                                        .eq(service_id.service_id().to_string()),
+                                ),
+                        )
+                        .first::<ScabbardServiceModel>(self.conn)
                         .optional()
                         .map_err(|err| {
                             ScabbardStoreError::from_source_with_operation(
@@ -64,11 +71,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                         })?
                         .ok_or_else(|| {
                             ScabbardStoreError::InvalidState(InvalidStateError::with_message(
-                                format!(
-                                    "Cannot update context, context with service ID {} does \
-                                 not exist",
-                                    service_id
-                                ),
+                                String::from("Service does not exist"),
                             ))
                         })?;
 
@@ -76,7 +79,14 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                         Consensus2pcContextModel::try_from((&context, service_id))?;
 
                     update(consensus_2pc_context::table)
-                        .filter(consensus_2pc_context::service_id.eq(service_id.to_string()))
+                        .filter(
+                            consensus_2pc_context::circuit_id
+                                .eq(service_id.circuit_id().to_string())
+                                .and(
+                                    consensus_2pc_context::service_id
+                                        .eq(service_id.service_id().to_string()),
+                                ),
+                        )
                         .set((
                             consensus_2pc_context::coordinator.eq(update_context.coordinator),
                             consensus_2pc_context::epoch.eq(update_context.epoch),
@@ -100,9 +110,16 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                     let updated_participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
 
-                    delete(consensus_2pc_context_participant::table.filter(
-                        consensus_2pc_context_participant::service_id.eq(format!("{}", service_id)),
-                    ))
+                    delete(
+                        consensus_2pc_context_participant::table.filter(
+                            consensus_2pc_context_participant::circuit_id
+                                .eq(service_id.circuit_id().to_string())
+                                .and(
+                                    consensus_2pc_context_participant::service_id
+                                        .eq(service_id.service_id().to_string()),
+                                ),
+                        ),
+                    )
                     .execute(self.conn)
                     .map_err(|err| {
                         ScabbardStoreError::from_source_with_operation(
@@ -138,10 +155,17 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
         self.conn.transaction::<_, _, _>(|| {
             match context {
                 ConsensusContext::TwoPhaseCommit(context) => {
-                    // check to see if a context with the given service_id exists
-                    consensus_2pc_context::table
-                        .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
-                        .first::<Consensus2pcContextModel>(self.conn)
+                    // check to see if a service with the given service_id exists
+                    scabbard_service::table
+                        .filter(
+                            scabbard_service::circuit_id
+                                .eq(service_id.circuit_id().to_string())
+                                .and(
+                                    scabbard_service::service_id
+                                        .eq(service_id.service_id().to_string()),
+                                ),
+                        )
+                        .first::<ScabbardServiceModel>(self.conn)
                         .optional()
                         .map_err(|err| {
                             ScabbardStoreError::from_source_with_operation(
@@ -151,11 +175,7 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                         })?
                         .ok_or_else(|| {
                             ScabbardStoreError::InvalidState(InvalidStateError::with_message(
-                                format!(
-                                    "Cannot update context, context with service ID {} does \
-                                 not exist",
-                                    service_id,
-                                ),
+                                String::from("Service does not exist"),
                             ))
                         })?;
 
@@ -163,7 +183,14 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                         Consensus2pcContextModel::try_from((&context, service_id))?;
 
                     update(consensus_2pc_context::table)
-                        .filter(consensus_2pc_context::service_id.eq(service_id.to_string()))
+                        .filter(
+                            consensus_2pc_context::circuit_id
+                                .eq(service_id.circuit_id().to_string())
+                                .and(
+                                    consensus_2pc_context::service_id
+                                        .eq(service_id.service_id().to_string()),
+                                ),
+                        )
                         .set((
                             consensus_2pc_context::coordinator.eq(update_context.coordinator),
                             consensus_2pc_context::epoch.eq(update_context.epoch),
@@ -187,9 +214,16 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                     let updated_participants =
                         ContextParticipantList::try_from((&context, service_id))?.inner;
 
-                    delete(consensus_2pc_context_participant::table.filter(
-                        consensus_2pc_context_participant::service_id.eq(format!("{}", service_id)),
-                    ))
+                    delete(
+                        consensus_2pc_context_participant::table.filter(
+                            consensus_2pc_context_participant::circuit_id
+                                .eq(service_id.circuit_id().to_string())
+                                .and(
+                                    consensus_2pc_context_participant::service_id
+                                        .eq(service_id.service_id().to_string()),
+                                ),
+                        ),
+                    )
                     .execute(self.conn)
                     .map_err(|err| {
                         ScabbardStoreError::from_source_with_operation(

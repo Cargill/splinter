@@ -13,7 +13,8 @@
 // limitations under the License.
 
 table! {
-    scabbard_service (service_id) {
+    scabbard_service (circuit_id, service_id) {
+        circuit_id  -> Text,
         service_id  -> Text,
         consensus -> Text,
         status -> Text,
@@ -21,14 +22,16 @@ table! {
 }
 
 table! {
-    scabbard_peer (service_id, peer_service_id) {
+    scabbard_peer (circuit_id, service_id, peer_service_id) {
+        circuit_id  -> Text,
         service_id  -> Text,
         peer_service_id  -> Text,
     }
 }
 
 table! {
-    scabbard_v3_commit_history (service_id, epoch) {
+    scabbard_v3_commit_history (circuit_id, service_id, epoch) {
+        circuit_id  -> Text,
         service_id  -> Text,
         epoch -> BigInt,
         value -> VarChar,
@@ -37,7 +40,8 @@ table! {
 }
 
 table! {
-    scabbard_alarm (service_id, alarm_type) {
+    scabbard_alarm (circuit_id, service_id, alarm_type) {
+        circuit_id  -> Text,
         service_id -> Text,
         alarm_type -> Text,
         alarm -> BigInt,
@@ -45,7 +49,8 @@ table! {
 }
 
 table! {
-    consensus_2pc_context (service_id) {
+    consensus_2pc_context (circuit_id, service_id) {
+        circuit_id  -> Text,
         service_id -> Text,
         coordinator -> Text,
         epoch -> BigInt,
@@ -58,7 +63,8 @@ table! {
 }
 
 table! {
-    consensus_2pc_context_participant (service_id, process) {
+    consensus_2pc_context_participant (circuit_id, service_id, process) {
+        circuit_id  -> Text,
         service_id -> Text,
         epoch -> BigInt,
         process -> Text,
@@ -111,6 +117,7 @@ table! {
 table! {
     consensus_2pc_action (id) {
         id -> Int8,
+        circuit_id  -> Text,
         service_id -> Text,
         created_at -> Timestamp,
         executed_at -> Nullable<BigInt>,
@@ -121,6 +128,7 @@ table! {
 table! {
     consensus_2pc_event (id) {
         id -> Int8,
+        circuit_id  -> Text,
         service_id -> Text,
         created_at -> Timestamp,
         executed_at -> Nullable<BigInt>,
@@ -165,6 +173,10 @@ joinable!(consensus_2pc_start_event -> consensus_2pc_event(event_id));
 joinable!(consensus_2pc_vote_event -> consensus_2pc_event(event_id));
 
 allow_tables_to_appear_in_same_query!(
+    scabbard_peer,
+    scabbard_service,
+    scabbard_v3_commit_history,
+    scabbard_alarm,
     consensus_2pc_context,
     consensus_2pc_context_participant,
     consensus_2pc_action,
@@ -176,11 +188,4 @@ allow_tables_to_appear_in_same_query!(
     consensus_2pc_deliver_event,
     consensus_2pc_start_event,
     consensus_2pc_vote_event,
-);
-
-allow_tables_to_appear_in_same_query!(
-    scabbard_peer,
-    scabbard_service,
-    scabbard_v3_commit_history,
-    scabbard_alarm
 );

@@ -40,7 +40,14 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, SqliteConnection> {
         self.conn.transaction::<_, ScabbardStoreError, _>(|| {
             // check to see if the service exists
             scabbard_service::table
-                .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service.service_id().circuit_id().to_string())
+                        .and(
+                            scabbard_service::service_id
+                                .eq(service.service_id().service_id().to_string()),
+                        ),
+                )
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -53,7 +60,14 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, SqliteConnection> {
                 })?;
 
             update(scabbard_service::table)
-                .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service.service_id().circuit_id().to_string())
+                        .and(
+                            scabbard_service::service_id
+                                .eq(service.service_id().service_id().to_string()),
+                        ),
+                )
                 .set(scabbard_service::status.eq(String::from(service.status())))
                 .execute(self.conn)
                 .map_err(|err| {
@@ -62,8 +76,14 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, SqliteConnection> {
 
             if !service.peers().is_empty() {
                 delete(
-                    scabbard_peer::table
-                        .filter(scabbard_peer::service_id.eq(format!("{}", service.service_id()))),
+                    scabbard_peer::table.filter(
+                        scabbard_peer::circuit_id
+                            .eq(service.service_id().circuit_id().to_string())
+                            .and(
+                                scabbard_peer::service_id
+                                    .eq(service.service_id().service_id().to_string()),
+                            ),
+                    ),
                 )
                 .execute(self.conn)
                 .map_err(|err| {
@@ -91,7 +111,14 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, PgConnection> {
         self.conn.transaction::<_, _, _>(|| {
             // check to see if the service exists
             scabbard_service::table
-                .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service.service_id().circuit_id().to_string())
+                        .and(
+                            scabbard_service::service_id
+                                .eq(service.service_id().service_id().to_string()),
+                        ),
+                )
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -104,7 +131,14 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, PgConnection> {
                 })?;
 
             update(scabbard_service::table)
-                .filter(scabbard_service::service_id.eq(format!("{}", service.service_id())))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service.service_id().circuit_id().to_string())
+                        .and(
+                            scabbard_service::service_id
+                                .eq(service.service_id().service_id().to_string()),
+                        ),
+                )
                 .set(scabbard_service::status.eq(String::from(service.status())))
                 .execute(self.conn)
                 .map_err(|err| {
@@ -113,8 +147,14 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, PgConnection> {
 
             if !service.peers().is_empty() {
                 delete(
-                    scabbard_peer::table
-                        .filter(scabbard_peer::service_id.eq(format!("{}", service.service_id()))),
+                    scabbard_peer::table.filter(
+                        scabbard_peer::circuit_id
+                            .eq(service.service_id().circuit_id().to_string())
+                            .and(
+                                scabbard_peer::service_id
+                                    .eq(service.service_id().service_id().to_string()),
+                            ),
+                    ),
                 )
                 .execute(self.conn)
                 .map_err(|err| {

@@ -47,7 +47,11 @@ where
     ) -> Result<Option<ScabbardService>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let service_model: ScabbardServiceModel = match scabbard_service::table
-                .filter(scabbard_service::service_id.eq(&service_id.to_string()))
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(&service_id.circuit_id().to_string())
+                        .and(scabbard_service::service_id.eq(&service_id.service_id().to_string())),
+                )
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -58,7 +62,11 @@ where
             };
 
             let service_peers: Vec<ServiceId> = scabbard_peer::table
-                .filter(scabbard_peer::service_id.eq(&service_id.to_string()))
+                .filter(
+                    scabbard_peer::circuit_id
+                        .eq(&service_id.circuit_id().to_string())
+                        .and(scabbard_peer::service_id.eq(&service_id.service_id().to_string())),
+                )
                 .order(scabbard_peer::peer_service_id.asc())
                 .load(self.conn)
                 .map_err(|err| {

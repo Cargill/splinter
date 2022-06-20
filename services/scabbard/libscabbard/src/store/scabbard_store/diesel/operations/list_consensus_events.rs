@@ -19,12 +19,12 @@ use splinter::service::ServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        Consensus2pcContextModel, Consensus2pcDeliverEventModel, Consensus2pcStartEventModel,
-        Consensus2pcVoteEventModel,
+        Consensus2pcDeliverEventModel, Consensus2pcStartEventModel, Consensus2pcVoteEventModel,
+        ScabbardServiceModel,
     },
     schema::{
-        consensus_2pc_context, consensus_2pc_deliver_event, consensus_2pc_event,
-        consensus_2pc_start_event, consensus_2pc_vote_event,
+        consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_start_event,
+        consensus_2pc_vote_event, scabbard_service,
     },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -58,26 +58,33 @@ where
         service_id: &FullyQualifiedServiceId,
     ) -> Result<Vec<Identified<ConsensusEvent>>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            // check to see if a context with the given service_id exists
-            consensus_2pc_context::table
-                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
-                .first::<Consensus2pcContextModel>(self.conn)
+            // check to see if a service with the given service_id exists
+            scabbard_service::table
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(scabbard_service::service_id.eq(service_id.service_id().to_string())),
+                )
+                .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
                 })?
                 .ok_or_else(|| {
-                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Cannot list consensus events, context with service ID {} does not exist",
-                        service_id,
+                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
+                        "Service does not exist",
                     )))
                 })?;
 
             let consensus_events = consensus_2pc_event::table
                 .filter(
-                    consensus_2pc_event::service_id
-                        .eq(format!("{}", service_id))
-                        .and(consensus_2pc_event::executed_at.is_null()),
+                    consensus_2pc_event::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(
+                            consensus_2pc_event::service_id
+                                .eq(service_id.service_id().to_string())
+                                .and(consensus_2pc_event::executed_at.is_null()),
+                        ),
                 )
                 .order(consensus_2pc_event::id.desc())
                 .select((consensus_2pc_event::id, consensus_2pc_event::event_type))

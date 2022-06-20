@@ -22,13 +22,13 @@ use splinter::service::ServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        Consensus2pcContextModel, Consensus2pcNotificationModel,
-        Consensus2pcSendMessageActionModel, Consensus2pcUpdateContextActionModel,
+        Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel,
+        Consensus2pcUpdateContextActionModel, ScabbardServiceModel,
     },
     schema::{
-        consensus_2pc_action, consensus_2pc_context, consensus_2pc_notification_action,
-        consensus_2pc_send_message_action, consensus_2pc_update_context_action,
-        consensus_2pc_update_context_action_participant,
+        consensus_2pc_action, consensus_2pc_notification_action, consensus_2pc_send_message_action,
+        consensus_2pc_update_context_action, consensus_2pc_update_context_action_participant,
+        scabbard_service,
     },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -61,26 +61,33 @@ where
         service_id: &FullyQualifiedServiceId,
     ) -> Result<Vec<Identified<ConsensusAction>>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
-            // check to see if a context with the given service_id exists
-            consensus_2pc_context::table
-                .filter(consensus_2pc_context::service_id.eq(format!("{}", service_id)))
-                .first::<Consensus2pcContextModel>(self.conn)
+            // check to see if a service with the given service_id exists
+            scabbard_service::table
+                .filter(
+                    scabbard_service::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(scabbard_service::service_id.eq(service_id.service_id().to_string())),
+                )
+                .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
                 })?
                 .ok_or_else(|| {
-                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(format!(
-                        "Cannot list consensus actions, context with service ID {} and does not exist",
-                        service_id,
+                    ScabbardStoreError::InvalidState(InvalidStateError::with_message(String::from(
+                        "Service does not exist",
                     )))
                 })?;
 
             let action_ids = consensus_2pc_action::table
                 .filter(
-                    consensus_2pc_action::service_id
-                        .eq(format!("{}", service_id))
-                        .and(consensus_2pc_action::executed_at.is_null()),
+                    consensus_2pc_action::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(
+                            consensus_2pc_action::service_id
+                                .eq(service_id.service_id().to_string())
+                                .and(consensus_2pc_action::executed_at.is_null()),
+                        ),
                 )
                 .order(consensus_2pc_action::id.desc())
                 .select(consensus_2pc_action::id)
@@ -222,10 +229,7 @@ where
                     .with_epoch(update_context.epoch as u64)
                     .with_participants(final_participants)
                     .with_state(state)
-                    .with_this_process(
-                        service_id
-                            .service_id(),
-                    );
+                    .with_this_process(service_id.service_id());
 
                 if let Some(last_commit_epoch) = update_context.last_commit_epoch {
                     context = context.with_last_commit_epoch(last_commit_epoch as u64)
