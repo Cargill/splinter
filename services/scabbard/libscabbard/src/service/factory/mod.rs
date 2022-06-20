@@ -158,6 +158,7 @@ pub struct ScabbardFactoryBuilder {
     state_storage_configuration: Option<ScabbardLmdbStateConfiguration>,
     storage_configuration: Option<ScabbardStorageConfiguration>,
     signature_verifier_factory: Option<Arc<Mutex<Box<dyn VerifierFactory>>>>,
+    enable_state_autocleanup: Option<bool>,
 }
 
 impl ScabbardFactoryBuilder {
@@ -216,6 +217,11 @@ impl ScabbardFactoryBuilder {
                 config
             });
 
+        self
+    }
+
+    pub fn with_state_autocleanup_enabled(mut self, enable: bool) -> Self {
+        self.enable_state_autocleanup = Some(enable);
         self
     }
 
@@ -305,12 +311,15 @@ impl ScabbardFactoryBuilder {
             state_storage_configuration.db_size,
         );
 
+        let state_autocleanup_enabled = self.enable_state_autocleanup.unwrap_or_default();
+
         Ok(ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
             #[cfg(feature = "lmdb")]
             state_store_factory,
             #[cfg(feature = "lmdb")]
             enable_lmdb_state: state_storage_configuration.enable_lmdb,
+            state_autocleanup_enabled,
             store_factory_config,
             signature_verifier_factory,
         })
@@ -480,6 +489,8 @@ pub struct ScabbardFactory {
     store_factory_config: ScabbardFactoryStorageConfig,
     #[cfg(any(feature = "postgres", feature = "sqlite"))]
     signature_verifier_factory: Arc<Mutex<Box<dyn VerifierFactory>>>,
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
+    state_autocleanup_enabled: bool,
 }
 
 pub struct ScabbardArgValidator;
@@ -783,7 +794,7 @@ impl ScabbardFactory {
             version,
             peer_services,
             merkle_state,
-            false,
+            self.state_autocleanup_enabled,
             commit_hash_store,
             receipt_store,
             state_purge,
@@ -1153,6 +1164,7 @@ mod tests {
                 None,
             ),
             enable_lmdb_state: false,
+            state_autocleanup_enabled: false,
             store_factory_config,
             signature_verifier_factory: Arc::new(Mutex::new(Box::new(Secp256k1Context::new()))),
         }
