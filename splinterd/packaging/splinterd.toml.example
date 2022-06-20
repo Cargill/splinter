@@ -31,6 +31,10 @@ version = "1"
 # files will be created in the Splinter state_dir.
 #scabbard_state = "database"
 
+# Enable Auto-cleanup of Scabbard state.
+# This setting is experimental.
+#scabbard_enable_autocleanup = true
+
 # Identifier for this node. Must be unique on the network. This value will be
 # used to initialize a "node_id" file in the Splinter state directory. Once
 # node_id is created, the value in the configuration below must match the

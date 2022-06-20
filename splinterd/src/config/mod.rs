@@ -109,6 +109,7 @@ pub struct Config {
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: (String, ConfigSource),
     scabbard_state: (ScabbardState, ConfigSource),
+    scabbard_autocleanup: (bool, ConfigSource),
 }
 
 impl Config {
@@ -622,6 +623,14 @@ impl Config {
         &self.scabbard_state.1
     }
 
+    pub fn scabbard_autocleanup(&self) -> bool {
+        self.scabbard_autocleanup.0
+    }
+
+    pub fn scabbard_autocleanup_source(&self) -> &ConfigSource {
+        &self.scabbard_autocleanup.1
+    }
+
     #[allow(clippy::cognitive_complexity)]
     /// Displays the configuration value along with where the value was sourced from.
     pub fn log_as_debug(&self) {
@@ -887,6 +896,12 @@ impl Config {
             "Config: scabbard_state: {:?}, (source: {:?})",
             self.scabbard_state(),
             self.scabbard_state_source()
+        );
+
+        debug!(
+            "Config: scabbard_autocleanup: {:?}, (source: {:?})",
+            self.scabbard_autocleanup(),
+            self.scabbard_autocleanup_source()
         );
     }
 

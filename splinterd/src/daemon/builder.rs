@@ -66,6 +66,7 @@ pub struct SplinterDaemonBuilder {
     signers: Option<Vec<Box<dyn Signer>>>,
     peering_token: Option<PeerAuthorizationToken>,
     enable_lmdb_state: bool,
+    enable_state_autocleanup: bool,
 }
 
 impl SplinterDaemonBuilder {
@@ -236,6 +237,11 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    pub fn with_state_autocleanup_enabled(mut self) -> Self {
+        self.enable_state_autocleanup = true;
+        self
+    }
+
     pub fn build(self) -> Result<SplinterDaemon, CreateError> {
         let heartbeat = self.heartbeat.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
@@ -383,6 +389,7 @@ impl SplinterDaemonBuilder {
             signers,
             peering_token,
             enable_lmdb_state: self.enable_lmdb_state,
+            enable_state_autocleanup: self.enable_state_autocleanup,
         })
     }
 }
