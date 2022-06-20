@@ -375,7 +375,7 @@ mod tests {
     use super::*;
 
     use std::fmt::Debug;
-    use std::sync::mpsc::channel;
+    use std::sync::{mpsc::channel, Arc, Barrier};
     use std::thread;
 
     use crate::transport::{
@@ -397,25 +397,42 @@ mod tests {
         let mut listener = assert_ok(transport.listen(bind));
         let endpoint = listener.endpoint();
 
+        let ready = Arc::new(Barrier::new(2));
+        let received = Arc::new(Barrier::new(2));
+
+        let client_ready = Arc::clone(&ready);
+        let client_received = Arc::clone(&received);
         let handle = thread::spawn(move || {
             let client = assert_ok(transport.connect(&endpoint));
 
-            let mesh = Mesh::new(1, 1);
+            let mut mesh = Mesh::new(1, 1);
             assert_ok(mesh.add(client, "client".to_string()));
+            client_ready.wait();
 
             assert_ok(mesh.send(Envelope::new("client".to_string(), b"hello".to_vec())));
+
+            client_received.wait();
+
+            mesh.signal_shutdown();
+            mesh.wait_for_shutdown().unwrap();
         });
 
-        let mesh = Mesh::new(1, 1);
+        let mut mesh = Mesh::new(1, 1);
         let server = assert_ok(listener.accept());
         assert_ok(mesh.add(server, "server".to_string()));
+        ready.wait();
 
         let envelope = assert_ok(mesh.recv());
 
         assert_eq!(b"hello", envelope.payload());
         assert_eq!("server", envelope.id());
 
+        received.wait();
+
         handle.join().unwrap();
+
+        mesh.signal_shutdown();
+        mesh.wait_for_shutdown().unwrap();
     }
 
     // Test that connections can be added and removed from a Mesh
@@ -423,7 +440,7 @@ mod tests {
         let mut listener = assert_ok(transport.listen(bind));
         let endpoint = listener.endpoint();
 
-        let mesh = Mesh::new(0, 0);
+        let mut mesh = Mesh::new(0, 0);
 
         let mut ids = Vec::new();
 
@@ -455,6 +472,9 @@ mod tests {
         for id in &ids {
             assert_ok(mesh.remove(id));
         }
+
+        mesh.signal_shutdown();
+        mesh.wait_for_shutdown().unwrap();
     }
 
     // Test that many connections can be added to a Mesh and sent and received from
@@ -464,7 +484,7 @@ mod tests {
         let mut listener = assert_ok(transport.listen(bind));
         let endpoint = listener.endpoint();
 
-        let mesh = Mesh::new(CONNECTIONS, CONNECTIONS);
+        let mut mesh = Mesh::new(CONNECTIONS, CONNECTIONS);
 
         let (client_ready_tx, client_ready_rx) = channel();
         let (server_ready_tx, server_ready_rx) = channel();
@@ -519,6 +539,9 @@ mod tests {
         }
 
         handle.join().unwrap();
+
+        mesh.signal_shutdown();
+        mesh.wait_for_shutdown().unwrap();
     }
 
     #[test]
