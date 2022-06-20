@@ -141,6 +141,7 @@ impl Scabbard {
 
         let state = ScabbardState::new(
             merkle_state,
+            false,
             commit_hash_store,
             receipt_store,
             #[cfg(feature = "metrics")]

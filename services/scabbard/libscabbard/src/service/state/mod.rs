@@ -62,6 +62,7 @@ pub type StateIter = Box<dyn Iterator<Item = Result<(String, Vec<u8>), ScabbardS
 
 pub struct ScabbardState {
     merkle_state: merkle_state::MerkleState,
+    state_autocleanup_enabled: bool,
     commit_hash_store: Arc<dyn CommitHashStore + Sync + Send>,
     context_manager: ContextManager,
     executor: Option<Executor>,
@@ -79,6 +80,7 @@ pub struct ScabbardState {
 impl ScabbardState {
     pub fn new(
         merkle_state: merkle_state::MerkleState,
+        state_autocleanup_enabled: bool,
         commit_hash_store: Arc<dyn CommitHashStore + Sync + Send>,
         receipt_store: Arc<dyn ReceiptStore>,
         #[cfg(feature = "metrics")] service_id: String,
@@ -136,6 +138,7 @@ impl ScabbardState {
 
         Ok(ScabbardState {
             merkle_state,
+            state_autocleanup_enabled,
             commit_hash_store,
             context_manager,
             executor: None,
@@ -346,6 +349,15 @@ impl ScabbardState {
                                 previous_state_root, err
                             ))
                         })?;
+
+                    if self.state_autocleanup_enabled {
+                        self.merkle_state.remove_pruned_entries().map_err(|err| {
+                            ScabbardStateError(format!(
+                                "failed to cleanup pruned state entries {}: {}",
+                                previous_state_root, err
+                            ))
+                        })?;
+                    }
                 }
 
                 Ok(())
@@ -1149,6 +1161,7 @@ mod tests {
 
         let mut state = ScabbardState::new(
             merkle_state,
+            true,
             Arc::new(commit_hash_store),
             receipt_store,
             #[cfg(feature = "metrics")]
@@ -1226,6 +1239,7 @@ mod tests {
 
         let mut state = ScabbardState::new(
             merkle_state,
+            true,
             Arc::new(commit_hash_store),
             receipt_store,
             #[cfg(feature = "metrics")]
