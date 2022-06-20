@@ -216,6 +216,11 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 }
             }));
 
+        #[cfg(feature = "disable-scabbard-autocleanup")]
+        if self.matches.is_present("disable_scabbard_autocleanup") {
+            partial_config = partial_config.with_scabbard_autocleanup(Some(false));
+        }
+
         Ok(partial_config)
     }
 }

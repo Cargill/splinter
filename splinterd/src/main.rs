@@ -522,6 +522,13 @@ fn main() {
             .takes_value(true),
     );
 
+    #[cfg(feature = "disable-scabbard-autocleanup")]
+    let app = app.arg(
+        Arg::with_name("disable_scabbard_autocleanup")
+            .long("disable-scabbard-autocleanup")
+            .long_help("Disable autocleanup of pruned scabbard merkle state."),
+    );
+
     let matches = app.get_matches();
 
     let log_handle = log4rs::init_config(default_log_settings());
@@ -723,6 +730,9 @@ fn start_daemon(matches: ArgMatches, log_handle: Handle) -> Result<(), UserError
     {
         if config.scabbard_state() == &config::ScabbardState::Lmdb {
             daemon_builder = daemon_builder.with_lmdb_state_enabled();
+        }
+        if config.scabbard_autocleanup() {
+            daemon_builder = daemon_builder.with_state_autocleanup_enabled();
         }
     }
 
