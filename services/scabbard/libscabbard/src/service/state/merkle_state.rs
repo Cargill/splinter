@@ -188,6 +188,20 @@ impl MerkleState {
                 .map_err(|err| InternalError::from_source(Box::new(err))),
         }
     }
+
+    pub fn remove_pruned_entries(&self) -> Result<(), InternalError> {
+        match self {
+            MerkleState::KeyValue { .. } => Ok(()),
+            #[cfg(feature = "postgres")]
+            MerkleState::SqlPostgres { state } => state
+                .remove_pruned_entries()
+                .map_err(|err| InternalError::from_source(Box::new(err))),
+            #[cfg(feature = "sqlite")]
+            MerkleState::SqlSqlite { state } => state
+                .remove_pruned_entries()
+                .map_err(|err| InternalError::from_source(Box::new(err))),
+        }
+    }
 }
 
 impl Read for MerkleState {
