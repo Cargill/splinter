@@ -96,6 +96,8 @@ ci-test:
 
     docker-compose -f tests/test-splinter.yaml up --abort-on-container-exit unit-test-splinter
 
+ci-test-migrations: test-migrations
+
 clean:
     cargo clean
 
@@ -228,3 +230,8 @@ test:
         done
     done
     echo "\n\033[92mTest Success\033[0m\n"
+
+test-migrations:
+    #!/usr/bin/env sh
+    set -e
+    ./tests/migrations/bin/test_psql_migrations
