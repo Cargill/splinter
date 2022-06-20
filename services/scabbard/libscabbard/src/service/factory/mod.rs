@@ -768,6 +768,7 @@ impl ScabbardFactory {
             version,
             peer_services,
             merkle_state,
+            false,
             commit_hash_store,
             receipt_store,
             state_purge,
