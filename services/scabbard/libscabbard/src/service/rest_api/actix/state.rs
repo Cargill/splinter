@@ -221,6 +221,7 @@ mod tests {
             ScabbardVersion::V1,
             Default::default(),
             merkle_state,
+            false,
             commit_hash_store,
             receipt_store,
             Box::new(NoOpScabbardStatePurgeHandlerHandler),

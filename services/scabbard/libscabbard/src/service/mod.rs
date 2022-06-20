@@ -117,6 +117,7 @@ impl Scabbard {
         // List of other scabbard services on the same circuit that this service shares state with
         peer_services: HashSet<String>,
         merkle_state: MerkleState,
+        state_autocleanup_enabled: bool,
         commit_hash_store: Arc<dyn CommitHashStore + Sync + Send>,
         receipt_store: Arc<dyn ReceiptStore>,
         purge_handler: Box<dyn ScabbardStatePurgeHandler>,
@@ -140,7 +141,7 @@ impl Scabbard {
 
         let state = ScabbardState::new(
             merkle_state,
-            false,
+            state_autocleanup_enabled,
             commit_hash_store,
             receipt_store,
             #[cfg(feature = "metrics")]
@@ -564,6 +565,7 @@ pub mod tests {
             ScabbardVersion::V1,
             HashSet::new(),
             merkle_state,
+            false,
             commit_hash_store,
             Arc::new(MockReceiptStore),
             Box::new(NoOpScabbardStatePurgeHandler),
@@ -588,6 +590,7 @@ pub mod tests {
             ScabbardVersion::V1,
             HashSet::new(),
             merkle_state,
+            false,
             commit_hash_store,
             Arc::new(MockReceiptStore),
             Box::new(NoOpScabbardStatePurgeHandler),
@@ -611,6 +614,7 @@ pub mod tests {
             ScabbardVersion::V1,
             HashSet::new(),
             merkle_state,
+            false,
             commit_hash_store,
             Arc::new(MockReceiptStore),
             Box::new(NoOpScabbardStatePurgeHandler),
