@@ -44,7 +44,8 @@ pub use scabbard_store::{
     Action, AlarmType, CommitEntry, CommitEntryBuilder, ConsensusAction, ConsensusContext,
     ConsensusDecision, ConsensusEvent, ConsensusType, Context, ContextBuilder, Event, Identified,
     Message, Notification, Participant, ScabbardService, ScabbardServiceBuilder, ScabbardStore,
-    ScabbardStoreFactory, ServiceStatus, State,
+    ScabbardStoreFactory, ServiceStatus, State, SupervisorNotification,
+    SupervisorNotificationBuilder, SupervisorNotificationType,
 };
 #[cfg(all(feature = "scabbardv3-store", feature = "postgres"))]
 pub use scabbard_store::{PgScabbardStoreFactory, PooledPgScabbardStoreFactory};

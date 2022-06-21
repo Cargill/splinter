@@ -20,6 +20,8 @@ mod lifecycle;
 mod message_converter;
 mod message_handler;
 mod message_handler_factory;
+#[cfg(feature = "scabbardv3-supervisor")]
+mod supervisor;
 mod timer_filter;
 mod timer_handler;
 mod timer_handler_factory;
@@ -39,6 +41,10 @@ pub use lifecycle::ScabbardLifecycle;
 pub use message_converter::ScabbardMessageByteConverter;
 pub use message_handler::ScabbardMessageHandler;
 pub use message_handler_factory::ScabbardMessageHandlerFactory;
+#[cfg(feature = "scabbardv3-supervisor")]
+pub use supervisor::{
+    Supervisor, SupervisorBuilder, SupervisorNotifierFactory, SupervisorNotifyObserver,
+};
 pub use timer_filter::ScabbardTimerFilter;
 pub use timer_handler::ScabbardTimerHandler;
 pub use timer_handler_factory::{ScabbardTimerHandlerFactory, ScabbardTimerHandlerFactoryBuilder};
