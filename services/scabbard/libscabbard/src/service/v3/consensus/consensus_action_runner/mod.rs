@@ -128,10 +128,11 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     )));
                 }
                 ConsensusAction::TwoPhaseCommit(Action::Notify(notification)) => {
-                    commands.extend(
-                        self.notify_observer
-                            .notify(notification.clone(), service_id)?,
-                    );
+                    commands.extend(self.notify_observer.notify(
+                        notification.clone(),
+                        service_id,
+                        action.id,
+                    )?);
 
                     // add command to mark the action as executed
                     commands.push(Box::new(ExecuteActionCommand::new(

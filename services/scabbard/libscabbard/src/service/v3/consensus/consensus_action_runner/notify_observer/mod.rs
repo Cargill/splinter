@@ -39,5 +39,6 @@ pub trait NotifyObserver<C> {
         &self,
         notification: Notification,
         service_id: &FullyQualifiedServiceId,
+        action_id: i64,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError>;
 }

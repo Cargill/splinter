@@ -65,6 +65,7 @@ impl<C: 'static> NotifyObserver<C> for CommandNotifyObserver<C> {
         &self,
         notification: Notification,
         service_id: &FullyQualifiedServiceId,
+        _action_id: i64,
     ) -> Result<Vec<Box<dyn StoreCommand<Context = C>>>, InternalError> {
         let mut commands: Vec<Box<dyn StoreCommand<Context = C>>> = Vec::new();
         match notification {
