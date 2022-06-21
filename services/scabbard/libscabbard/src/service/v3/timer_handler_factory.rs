@@ -22,7 +22,7 @@ use crate::store::{PooledScabbardStoreFactory, ScabbardStoreFactory};
 
 use super::ScabbardMessageByteConverter;
 use super::ScabbardTimerHandler;
-use super::{CommandNotifyObserver, ConsensusRunnerBuilder};
+use super::{ConsensusRunnerBuilder, SupervisorNotifierFactory, SupervisorNotifyObserver};
 
 #[derive(Clone)]
 pub struct ScabbardTimerHandlerFactory<E>
@@ -33,6 +33,7 @@ where
     store_factory: Arc<dyn ScabbardStoreFactory<<E as StoreCommandExecutor>::Context>>,
     message_sender_factory: Box<dyn MessageSenderFactory<Vec<u8>>>,
     store_command_executor: Arc<E>,
+    supervisor_notifier_factory: SupervisorNotifierFactory,
 }
 
 impl<E: StoreCommandExecutor + 'static> ScabbardTimerHandlerFactory<E> {
@@ -50,15 +51,17 @@ impl<E: StoreCommandExecutor + 'static> TimerHandlerFactory for ScabbardTimerHan
             .with_scabbard_store_factory(self.store_factory.clone())
             .with_pooled_scabbard_store_factory(self.pooled_store_factory.clone().into())
             .with_message_sender_factory(self.message_sender_factory.clone())
-            .with_notify_observer(Box::new(CommandNotifyObserver::new(
+            .with_notify_observer(Box::new(SupervisorNotifyObserver::new(
                 self.store_factory.clone(),
-                self.pooled_store_factory.new_store(),
             )))
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        let timer_handler =
-            ScabbardTimerHandler::new(consensus_runner, self.pooled_store_factory.new_store());
+        let timer_handler = ScabbardTimerHandler::new(
+            consensus_runner,
+            self.pooled_store_factory.new_store(),
+            self.supervisor_notifier_factory.new_notifier(),
+        );
         Ok(Box::new(
             timer_handler.into_handler(ScabbardMessageByteConverter {}),
         ))
@@ -71,6 +74,7 @@ impl<E: StoreCommandExecutor + 'static> TimerHandlerFactory for ScabbardTimerHan
                 store_factory: self.store_factory.clone(),
                 message_sender_factory: self.message_sender_factory.clone(),
                 store_command_executor: self.store_command_executor.clone(),
+                supervisor_notifier_factory: self.supervisor_notifier_factory.clone(),
             }
         })
     }
@@ -85,6 +89,7 @@ where
     store_factory: Option<Arc<dyn ScabbardStoreFactory<<E as StoreCommandExecutor>::Context>>>,
     message_sender_factory: Option<Box<dyn MessageSenderFactory<Vec<u8>>>>,
     store_command_executor: Option<Arc<E>>,
+    supervisor_notifier_factory: Option<SupervisorNotifierFactory>,
 }
 
 impl<E: StoreCommandExecutor + 'static> ScabbardTimerHandlerFactoryBuilder<E> {
@@ -94,6 +99,7 @@ impl<E: StoreCommandExecutor + 'static> ScabbardTimerHandlerFactoryBuilder<E> {
             store_factory: None,
             message_sender_factory: None,
             store_command_executor: None,
+            supervisor_notifier_factory: None,
         }
     }
 
@@ -126,6 +132,14 @@ impl<E: StoreCommandExecutor + 'static> ScabbardTimerHandlerFactoryBuilder<E> {
         self
     }
 
+    pub fn with_supervisor_notifier_factory(
+        mut self,
+        supervisor_notifier_factory: SupervisorNotifierFactory,
+    ) -> Self {
+        self.supervisor_notifier_factory = Some(supervisor_notifier_factory);
+        self
+    }
+
     pub fn build(self) -> Result<ScabbardTimerHandlerFactory<E>, InvalidArgumentError> {
         let pooled_store_factory = self
             .pooled_store_factory
@@ -143,11 +157,16 @@ impl<E: StoreCommandExecutor + 'static> ScabbardTimerHandlerFactoryBuilder<E> {
             .store_command_executor
             .ok_or_else(|| InvalidArgumentError::new("store_command_executor", "must be set"))?;
 
+        let supervisor_notifier_factory = self.supervisor_notifier_factory.ok_or_else(|| {
+            InvalidArgumentError::new("supervisor_notifier_factory", "must be set")
+        })?;
+
         Ok(ScabbardTimerHandlerFactory {
             pooled_store_factory,
             store_factory,
             message_sender_factory,
             store_command_executor,
+            supervisor_notifier_factory,
         })
     }
 }

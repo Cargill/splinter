@@ -96,7 +96,7 @@ use splinter::runtime::service::instance::{
 #[cfg(feature = "service2")]
 use splinter::runtime::service::{
     MessageHandlerTaskPoolBuilder, MessageHandlerTaskRunner, NetworkMessageSenderFactory,
-    RoutingTableServiceTypeResolver, ServiceDispatcher, Timer,
+    RoutingTableServiceTypeResolver, ServiceDispatcher,
 };
 use splinter::service::instance::ServiceArgValidator;
 #[cfg(feature = "scabbardv3")]
@@ -373,22 +373,12 @@ impl SplinterDaemon {
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         #[cfg(feature = "service2")]
-        let timer_filter_collection = timer::create_timer_handlers(
+        let (mut timer, mut supervisor) = timer::create_timer_and_supervisor(
             &connection_pool,
             &node_id,
             network_sender.clone(),
             routing_reader.clone(),
-        )?;
-
-        #[cfg(feature = "service2")]
-        let mut timer = Timer::new(
-            timer_filter_collection,
-            self.service_timer_interval,
-            Box::new(NetworkMessageSenderFactory::new(
-                &node_id,
-                network_sender.clone(),
-                routing_reader.clone(),
-            )),
+            &self.service_timer_interval,
         )?;
 
         #[cfg(feature = "scabbardv3")]
@@ -985,6 +975,11 @@ impl SplinterDaemon {
                     "Unable to cleanly shut down message handler task pool: {}",
                     err
                 );
+            }
+
+            supervisor.signal_shutdown();
+            if let Err(err) = supervisor.wait_for_shutdown() {
+                error!("Unable to cleanly shut down scabbard supervisor: {}", err);
             }
         }
         Ok(())

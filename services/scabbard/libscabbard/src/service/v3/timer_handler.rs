@@ -19,6 +19,7 @@ use splinter::{
 };
 
 use crate::protocol::v3::message::ScabbardMessage;
+use crate::service::v3::supervisor::SupervisorNotifier;
 use crate::store::{AlarmType, ConsensusEvent, Event, ScabbardStore};
 
 use super::ConsensusRunner;
@@ -29,13 +30,19 @@ where
 {
     consensus_runner: ConsensusRunner<E>,
     store: Box<dyn ScabbardStore>,
+    supervisor_notifier: SupervisorNotifier,
 }
 
 impl<E: StoreCommandExecutor + 'static> ScabbardTimerHandler<E> {
-    pub fn new(consensus_runner: ConsensusRunner<E>, store: Box<dyn ScabbardStore>) -> Self {
+    pub fn new(
+        consensus_runner: ConsensusRunner<E>,
+        store: Box<dyn ScabbardStore>,
+        supervisor_notifier: SupervisorNotifier,
+    ) -> Self {
         Self {
             consensus_runner,
             store,
+            supervisor_notifier,
         }
     }
 }
@@ -67,6 +74,7 @@ impl<E: StoreCommandExecutor + 'static> TimerHandler for ScabbardTimerHandler<E>
         }
 
         // always run the consensus runner, there is some pending work
-        self.consensus_runner.run(&service)
+        self.consensus_runner.run(&service)?;
+        self.supervisor_notifier.notify(&service)
     }
 }
