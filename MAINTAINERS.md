@@ -3,6 +3,7 @@
 ### Active Maintainers
 | Name | GitHub |
 | --- | --- |
+| Amelia Bradley | ameliabradley |
 | Andi Gunderson | agunde406 |
 | Caleb Hill | Caleb-Hill |
 | Darian Plumb | dplumb94 |
@@ -10,7 +11,6 @@
 | Davey Newhall | dnewh |
 | Isabel Tomb | isabeltomb |
 | James Mitchell | jsmitchell |
-| Lee Bradley | leebradley |
 | Logan Seeley | ltseeley |
 | Peter Schwarz | peterschwarz |
 | Ryan Banks | RyanLassigBanks |
