@@ -15,87 +15,8 @@
 use actix_http::ws;
 use crossbeam_channel::RecvError;
 use std::{error, fmt};
-use tokio::io;
 
-#[derive(Debug)]
-pub enum ParseError {
-    MalformedMessage(Box<dyn error::Error + Send + Sync + 'static>),
-    /// This type provides a sendable alternative to source errors that may not be Sync and Send.
-    MalformedReducedToString(String),
-}
-
-impl error::Error for ParseError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            ParseError::MalformedMessage(_) => None,
-            ParseError::MalformedReducedToString(_) => None,
-        }
-    }
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ParseError::MalformedMessage(err) => write!(f, "Malformed message {}", err),
-            ParseError::MalformedReducedToString(msg) => f.write_str(msg),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum ReactorError {
-    WsStartError(String),
-    ListenError(WebSocketError),
-    RequestSendError(String),
-    ReactorShutdownError(String),
-    ShutdownHandleErrors(Vec<WebSocketError>),
-    IoError(io::Error),
-}
-
-impl error::Error for ReactorError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            ReactorError::ListenError(err) => Some(err),
-            ReactorError::WsStartError(_) => None,
-            ReactorError::RequestSendError(_) => None,
-            ReactorError::ReactorShutdownError(_) => None,
-            ReactorError::ShutdownHandleErrors(_) => None,
-            ReactorError::IoError(err) => Some(err),
-        }
-    }
-}
-
-impl fmt::Display for ReactorError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ReactorError::ListenError(err) => write!(f, "{}", err),
-            ReactorError::WsStartError(err) => write!(f, "{}", err),
-            ReactorError::RequestSendError(err) => write!(f, "{}", err),
-            ReactorError::ReactorShutdownError(err) => write!(f, "{}", err),
-            ReactorError::ShutdownHandleErrors(err) => {
-                let err_message = err
-                    .iter()
-                    .map(|err| format!("{}", err))
-                    .collect::<Vec<String>>()
-                    .join(", ");
-                write!(f, "Websockets did not shut down correctly: {}", err_message)
-            }
-            ReactorError::IoError(err) => write!(f, "IO Error: {}", err),
-        }
-    }
-}
-
-impl From<io::Error> for ReactorError {
-    fn from(err: io::Error) -> Self {
-        ReactorError::IoError(err)
-    }
-}
-
-impl From<WebSocketError> for ReactorError {
-    fn from(err: WebSocketError) -> Self {
-        ReactorError::ListenError(err)
-    }
-}
+use super::ParseError;
 
 #[derive(Debug)]
 pub enum WebSocketError {

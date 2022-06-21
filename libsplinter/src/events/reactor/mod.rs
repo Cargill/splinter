@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod igniter;
+mod reactor_message;
+mod reactor_shutdown_signaler;
+
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -23,8 +27,12 @@ use crossbeam_channel::{bounded, RecvTimeoutError, Sender};
 use futures::Future;
 use tokio::runtime::Runtime;
 
-use crate::events::ws::{Context, Listen, ParseBytes, ShutdownHandle, WebSocketClient};
+use crate::events::ws::ShutdownHandle;
 use crate::events::{ReactorError, WebSocketError};
+
+pub use igniter::Igniter;
+use reactor_message::ReactorMessage;
+pub use reactor_shutdown_signaler::ReactorShutdownSignaler;
 
 /// Reactor
 ///
@@ -167,64 +175,4 @@ impl std::default::Default for Reactor {
     fn default() -> Self {
         Self::new()
     }
-}
-
-pub struct ReactorShutdownSignaler {
-    sender: Sender<ReactorMessage>,
-}
-
-impl ReactorShutdownSignaler {
-    pub fn signal_shutdown(&self) -> Result<(), ReactorError> {
-        self.sender.send(ReactorMessage::Stop).map_err(|_| {
-            ReactorError::ReactorShutdownError("Failed to send shutdown message".to_string())
-        })
-    }
-}
-
-/// The Igniter is a channel that allows for communication with a Reactor runtime
-#[derive(Clone)]
-pub struct Igniter {
-    sender: Sender<ReactorMessage>,
-    reactor_running: Arc<AtomicBool>,
-}
-
-impl Igniter {
-    pub fn start_ws<T: ParseBytes<T>>(
-        &self,
-        ws: &WebSocketClient<T>,
-    ) -> Result<(), WebSocketError> {
-        let context = Context::new(self.clone(), ws.clone());
-        self.sender
-            .send(ReactorMessage::StartWs(ws.listen(context)?))
-            .map_err(|err| {
-                WebSocketError::ListenError(format!("Failed to start ws {}: {}", ws.url(), err))
-            })
-    }
-
-    pub fn send(
-        &self,
-        req: Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
-    ) -> Result<(), ReactorError> {
-        self.sender
-            .send(ReactorMessage::HttpRequest(req))
-            .map_err(|err| {
-                ReactorError::RequestSendError(format!("Failed to send request to reactor {}", err))
-            })
-    }
-
-    pub fn start_ws_with_listen(&self, listen: Listen) -> Result<(), WebSocketError> {
-        self.sender
-            .send(ReactorMessage::StartWs(listen))
-            .map_err(|err| WebSocketError::ListenError(format!("Failed to start ws {}", err)))
-    }
-
-    pub fn is_reactor_running(&self) -> bool {
-        self.reactor_running.load(Ordering::SeqCst)
-    }
-}
-
-enum ReactorMessage {
-    Stop,
-    StartWs(Listen),
-    HttpRequest(Box<dyn Future<Item = (), Error = ()> + Send + 'static>),
 }
