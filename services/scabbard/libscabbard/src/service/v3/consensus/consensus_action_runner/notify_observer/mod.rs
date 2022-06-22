@@ -17,15 +17,11 @@
 //! The notification will need to be handled by another part of the system, but the
 //! `ConsensusActionRunner` makes no assumptions about how the notifications are delivered.
 
-mod command;
-
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 use splinter::store::command::StoreCommand;
 
 use crate::store::Notification;
-
-pub use command::CommandNotifyObserver;
 
 /// Handles notifications from the consensus algorithm to be provided to other components
 pub trait NotifyObserver<C> {

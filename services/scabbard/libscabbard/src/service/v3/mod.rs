@@ -30,8 +30,7 @@ pub use arguments::{ScabbardArguments, ScabbardArgumentsBuilder};
 pub use arguments_converter::ScabbardArgumentsVecConverter;
 #[cfg(feature = "scabbardv3-consensus-action-runner")]
 pub use consensus::consensus_action_runner::{
-    CommandNotifyObserver, ConsensusActionRunner, ContextUpdater, NotifyObserver,
-    ScabbardStoreContextUpdater,
+    ConsensusActionRunner, ContextUpdater, NotifyObserver, ScabbardStoreContextUpdater,
 };
 #[cfg(feature = "scabbardv3-consensus-runner")]
 pub use consensus::{ConsensusRunner, ConsensusRunnerBuilder};
@@ -43,7 +42,8 @@ pub use message_handler::ScabbardMessageHandler;
 pub use message_handler_factory::ScabbardMessageHandlerFactory;
 #[cfg(feature = "scabbardv3-supervisor")]
 pub use supervisor::{
-    Supervisor, SupervisorBuilder, SupervisorNotifierFactory, SupervisorNotifyObserver,
+    Supervisor, SupervisorBuilder, SupervisorMessage, SupervisorNotifierFactory,
+    SupervisorNotifyObserver,
 };
 pub use timer_filter::ScabbardTimerFilter;
 pub use timer_handler::ScabbardTimerHandler;

@@ -140,7 +140,7 @@ mod tests {
     use splinter::store::command::StoreCommand;
 
     use crate::migrations::run_sqlite_migrations;
-    use crate::service::v3::CommandNotifyObserver;
+    use crate::service::v3::SupervisorNotifyObserver;
     use crate::store::pool::ConnectionPool;
     use crate::store::{
         AlarmType, ConsensusContext, ConsensusType, ContextBuilder, Event, Participant,
@@ -212,10 +212,7 @@ mod tests {
         let message_sender_factory = Box::new(test_messsage_factory.clone());
         let store_factory = Arc::new(SqliteScabbardStoreFactory);
 
-        let notify_observer = Box::new(CommandNotifyObserver::new(
-            store_factory.clone(),
-            pooled_scabbard_store_factory.new_store(),
-        ));
+        let notify_observer = Box::new(SupervisorNotifyObserver::new(store_factory.clone()));
 
         let runner = ConsensusRunnerBuilder::new()
             .with_pooled_scabbard_store_factory(pooled_scabbard_store_factory)
