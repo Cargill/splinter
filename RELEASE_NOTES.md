@@ -23,12 +23,12 @@
 
 ### Highlights
 
-* Stabilized the `"scabbard/database-support", `"cli/scabbard-migrations"`, and
-  `"splinterd/scabbard-database-support"` features. These features now allow all
-  scabbard state, including merkle state, to be stored in the database instead
-  of being spread across multiple LMDB files. LMDB may be enabled for merkle
-  state storage with the optional flag `--scabbard-state lmdb` or by its
-  analogous setting in the TOML config file.
+* Stabilized the `"scabbard/database-support"`, `"cli/scabbard-migrations"`,
+  and `"splinterd/scabbard-database-support"` features. These features now
+  allow all scabbard state, including merkle state, to be stored in the
+  database instead of being spread across multiple LMDB files. LMDB may be
+  enabled for merkle state storage with the optional flag `--scabbard-state
+  lmdb` or by its analogous setting in the TOML config file.
 
 ### libsplinter
 
