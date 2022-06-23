@@ -104,6 +104,7 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization-handler-maintenance",
+    "disable-scabbard-autocleanup",
     "https-bind",
     "lifecycle-executor-interval",
     "node",
@@ -132,6 +133,7 @@ biome-profile = ["splinter/biome-profile"]
 config-allow-keys = ["authorization-handler-allow-keys"]
 database-postgres = ["diesel", "diesel/postgres", "scabbard/postgres", "splinter/postgres"]
 database-sqlite = ["diesel", "diesel/sqlite", "scabbard/sqlite", "splinter/sqlite"]
+disable-scabbard-autocleanup = []
 https-bind = ["splinter/https-bind"]
 lifecycle-executor-interval = []
 tap = [

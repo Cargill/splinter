@@ -109,6 +109,7 @@ pub struct Config {
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: (String, ConfigSource),
     scabbard_state: (ScabbardState, ConfigSource),
+    scabbard_autocleanup: (bool, ConfigSource),
     #[cfg(feature = "service2")]
     service_timer_interval: (Duration, ConfigSource),
     #[cfg(feature = "service2")]
@@ -636,6 +637,14 @@ impl Config {
         &self.scabbard_state.1
     }
 
+    pub fn scabbard_autocleanup(&self) -> bool {
+        self.scabbard_autocleanup.0
+    }
+
+    pub fn scabbard_autocleanup_source(&self) -> &ConfigSource {
+        &self.scabbard_autocleanup.1
+    }
+
     #[cfg(feature = "service2")]
     pub fn service_timer_interval_source(&self) -> &ConfigSource {
         &self.service_timer_interval.1
@@ -911,6 +920,12 @@ impl Config {
             "Config: scabbard_state: {:?}, (source: {:?})",
             self.scabbard_state(),
             self.scabbard_state_source()
+        );
+
+        debug!(
+            "Config: scabbard_autocleanup: {:?}, (source: {:?})",
+            self.scabbard_autocleanup(),
+            self.scabbard_autocleanup_source()
         );
 
         #[cfg(feature = "service2")]

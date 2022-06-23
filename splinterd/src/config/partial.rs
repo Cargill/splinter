@@ -100,6 +100,7 @@ pub struct PartialConfig {
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: Option<String>,
     scabbard_state: Option<ScabbardState>,
+    scabbard_autocleanup: Option<bool>,
     #[cfg(feature = "service2")]
     service_timer_interval: Option<Duration>,
     #[cfg(feature = "service2")]
@@ -174,6 +175,7 @@ impl PartialConfig {
             #[cfg(feature = "config-allow-keys")]
             allow_keys_file: None,
             scabbard_state: None,
+            scabbard_autocleanup: None,
             #[cfg(feature = "service2")]
             service_timer_interval: None,
             #[cfg(feature = "service2")]
@@ -384,6 +386,10 @@ impl PartialConfig {
 
     pub fn scabbard_state(&self) -> Option<ScabbardState> {
         self.scabbard_state
+    }
+
+    pub fn scabbard_autocleanup(&self) -> Option<bool> {
+        self.scabbard_autocleanup
     }
 
     #[cfg(feature = "service2")]
@@ -928,6 +934,17 @@ impl PartialConfig {
     ///
     pub fn with_scabbard_state(mut self, scabbard_state: Option<ScabbardState>) -> Self {
         self.scabbard_state = scabbard_state;
+        self
+    }
+
+    /// Adds a `scabbard_autocleanup` value to the  `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `scabbard_autocleanup` - Option of bool value to enable autocleanup of pruned state.
+    ///
+    pub fn with_scabbard_autocleanup(mut self, scabbard_autocleanup: Option<bool>) -> Self {
+        self.scabbard_autocleanup = scabbard_autocleanup;
         self
     }
 

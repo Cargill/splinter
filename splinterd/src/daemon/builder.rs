@@ -66,6 +66,7 @@ pub struct SplinterDaemonBuilder {
     signers: Option<Vec<Box<dyn Signer>>>,
     peering_token: Option<PeerAuthorizationToken>,
     enable_lmdb_state: bool,
+    enable_state_autocleanup: bool,
     #[cfg(feature = "service2")]
     service_timer_interval: Option<Duration>,
     #[cfg(feature = "service2")]
@@ -248,6 +249,11 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    pub fn with_state_autocleanup_enabled(mut self) -> Self {
+        self.enable_state_autocleanup = true;
+        self
+    }
+
     #[cfg(feature = "service2")]
     pub fn with_service_timer_interval(mut self, service_timer_interval: Duration) -> Self {
         self.service_timer_interval = Some(service_timer_interval);
@@ -422,6 +428,7 @@ impl SplinterDaemonBuilder {
             signers,
             peering_token,
             enable_lmdb_state: self.enable_lmdb_state,
+            enable_state_autocleanup: self.enable_state_autocleanup,
             #[cfg(feature = "service2")]
             service_timer_interval,
             #[cfg(feature = "service2")]

@@ -176,6 +176,7 @@ pub struct SplinterDaemon {
     #[cfg(feature = "config-allow-keys")]
     allow_keys_file: String,
     enable_lmdb_state: bool,
+    enable_state_autocleanup: bool,
     #[cfg(feature = "service2")]
     service_timer_interval: Duration,
     #[cfg(feature = "service2")]
@@ -536,7 +537,8 @@ impl SplinterDaemon {
 
         scabbard_factory_builder = scabbard_factory_builder
             .with_lmdb_state_db_dir(self.state_dir.to_string())
-            .with_lmdb_state_enabled(self.enable_lmdb_state);
+            .with_lmdb_state_enabled(self.enable_lmdb_state)
+            .with_state_autocleanup_enabled(self.enable_state_autocleanup);
 
         let scabbard_factory = scabbard_factory_builder
             .build()
