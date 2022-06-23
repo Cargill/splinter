@@ -26,7 +26,7 @@ use splinter::futures::{future::IntoFuture, stream::Stream, Future};
 use splinter::registry::{MetadataPredicate, Node, RegistryReader, RegistryWriter, RwRegistry};
 use splinter::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    paging::{PagingBuilder, DEFAULT_LIMIT, DEFAULT_OFFSET},
     percent_encode_filter_query, ErrorResponse,
 };
 use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
@@ -186,9 +186,20 @@ fn query_list_nodes(
     .then(
         |res: Result<_, BlockingError<RegistryRestApiError>>| match res {
             Ok((nodes, link, limit, offset, total_count)) => {
+                let paging = PagingBuilder::new(link, total_count);
+                let paging = if let Some(limit) = limit {
+                    paging.with_limit(limit)
+                } else {
+                    paging
+                };
+                let paging = if let Some(offset) = offset {
+                    paging.with_offset(offset)
+                } else {
+                    paging
+                };
                 Ok(HttpResponse::Ok().json(ListNodesResponse {
                     data: nodes.iter().map(NodeResponse::from).collect(),
-                    paging: get_response_paging_info(limit, offset, &link, total_count),
+                    paging: paging.build(),
                 }))
             }
             Err(err) => {
