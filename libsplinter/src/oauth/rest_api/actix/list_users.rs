@@ -20,7 +20,7 @@ use crate::oauth::rest_api::{
 };
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    paging::get_response_paging_info,
+    paging::PagingBuilder,
     ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 use futures::future::IntoFuture;
@@ -55,16 +55,15 @@ pub fn make_oauth_list_users_resource(
                         .skip(paging_query.offset)
                         .take(paging_query.limit)
                         .collect::<Vec<_>>();
+                    let paging = PagingBuilder::new(link, total)
+                        .with_limit(paging_query.limit)
+                        .with_offset(paging_query.offset)
+                        .build();
 
                     HttpResponse::Ok()
                         .json(ListOAuthUserResponse {
                             data: oauth_users.iter().map(OAuthUserResponse::from).collect(),
-                            paging: get_response_paging_info(
-                                Some(paging_query.limit),
-                                Some(paging_query.offset),
-                                &link,
-                                total,
-                            ),
+                            paging,
                         })
                         .into_future()
                 }
@@ -100,14 +99,13 @@ pub fn make_oauth_list_users_resource(
                         .skip(paging_query.offset)
                         .take(paging_query.limit)
                         .collect::<Vec<_>>();
+                    let paging = PagingBuilder::new(lint, total)
+                        .with_limit(paging_query.limit)
+                        .with_offset(paging_query.offset)
+                        .build();
                     Ok(HttpResponse::Ok().json(ListOAuthUserResponse {
                         data: oauth_users.iter().map(OAuthUserResponse::from).collect(),
-                        paging: get_response_paging_info(
-                            Some(paging_query.limit),
-                            Some(paging_query.offset),
-                            &link,
-                            total,
-                        ),
+                        paging,
                     }))
                 }
                 Err(err) => {

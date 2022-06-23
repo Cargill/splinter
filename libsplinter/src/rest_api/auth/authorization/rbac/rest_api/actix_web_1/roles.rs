@@ -31,7 +31,7 @@ use crate::rest_api::{
         },
         RBAC_READ_PERMISSION, RBAC_WRITE_PERMISSION,
     },
-    paging::get_response_paging_info,
+    paging::PagingBuilder,
     ErrorResponse, SPLINTER_PROTOCOL_VERSION,
 };
 
@@ -117,12 +117,10 @@ fn list_roles(
                 Ok((roles, link, paging_query, total)) => {
                     Ok(HttpResponse::Ok().json(ListRoleResponse {
                         data: roles.iter().map(RoleResponse::from).collect(),
-                        paging: get_response_paging_info(
-                            Some(paging_query.limit),
-                            Some(paging_query.offset),
-                            &link,
-                            total,
-                        ),
+                        paging: PagingBuilder::new(link, total)
+                            .with_limit(paging_query.limit)
+                            .with_offset(paging_query.offset)
+                            .build(),
                     }))
                 }
                 Err(err) => {
