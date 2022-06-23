@@ -98,6 +98,8 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
                             consensus_2pc_context::vote.eq(update_context.vote),
                             consensus_2pc_context::decision_timeout_start
                                 .eq(update_context.decision_timeout_start),
+                            consensus_2pc_context::ack_timeout_start
+                                .eq(update_context.ack_timeout_start),
                         ))
                         .execute(self.conn)
                         .map_err(|err| {
@@ -202,6 +204,8 @@ impl<'a> UpdateContextAction for ScabbardStoreOperations<'a, PgConnection> {
                             consensus_2pc_context::vote.eq(update_context.vote),
                             consensus_2pc_context::decision_timeout_start
                                 .eq(update_context.decision_timeout_start),
+                            consensus_2pc_context::ack_timeout_start
+                                .eq(update_context.ack_timeout_start),
                         ))
                         .execute(self.conn)
                         .map_err(|err| {

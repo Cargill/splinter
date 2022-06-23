@@ -171,6 +171,7 @@ impl ContextBuilder {
 pub struct Participant {
     pub process: ServiceId,
     pub vote: Option<bool>,
+    pub decision_ack: bool,
 }
 
 #[cfg(feature = "scabbardv3-consensus")]
@@ -198,6 +199,7 @@ impl TryFrom<TwoPhaseCommitContext<ScabbardProcess, SystemTime>> for Context {
                     .map(|p| Participant {
                         process: p.process.into(),
                         vote: p.vote,
+                        decision_ack: p.decision_ack,
                     })
                     .collect(),
             );
@@ -211,6 +213,7 @@ impl TryFrom<TwoPhaseCommitContext<ScabbardProcess, SystemTime>> for Context {
                     .map(|p| Participant {
                         process: p.into(),
                         vote: None,
+                        decision_ack: false,
                     })
                     .collect(),
             );
@@ -246,6 +249,7 @@ impl TryFrom<Context> for TwoPhaseCommitContext<ScabbardProcess, SystemTime> {
                     .map(|p| AugrimParticipant {
                         process: p.process.into(),
                         vote: p.vote,
+                        decision_ack: p.decision_ack,
                     })
                     .collect(),
             );

@@ -34,6 +34,7 @@ message TwoPhaseCommitMessage {
         COMMIT = 3;
         ABORT = 4;
         DECISION_REQUEST = 5;
+        DECISION_ACK = 6;
     }
 
     Type message_type = 1;
@@ -43,6 +44,7 @@ message TwoPhaseCommitMessage {
     Commit commit = 4;
     Abort abort = 5;
     DecisionRequest decision_request = 6;
+    DecisionAck decision_ack = 7;
 }
 
 message VoteRequest {
@@ -64,5 +66,9 @@ message Abort {
 }
 
 message DecisionRequest {
+    uint64 epoch = 1;
+}
+
+message DecisionAck {
     uint64 epoch = 1;
 }

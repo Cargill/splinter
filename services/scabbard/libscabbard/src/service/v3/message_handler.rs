@@ -21,7 +21,8 @@ use splinter::{
 use crate::protocol::v3::{
     message::ScabbardMessage,
     two_phase_commit::{
-        Abort, Commit, DecisionRequest, TwoPhaseCommitMessage, VoteRequest, VoteResponse,
+        Abort, Commit, DecisionAck, DecisionRequest, TwoPhaseCommitMessage, VoteRequest,
+        VoteResponse,
     },
 };
 use crate::protos::FromBytes as _;
@@ -106,5 +107,6 @@ fn into_store_msg(msg: TwoPhaseCommitMessage) -> Message {
         TwoPhaseCommitMessage::DecisionRequest(DecisionRequest { epoch }) => {
             Message::DecisionRequest(epoch)
         }
+        TwoPhaseCommitMessage::DecisionAck(DecisionAck { epoch }) => Message::DecisionAck(epoch),
     }
 }

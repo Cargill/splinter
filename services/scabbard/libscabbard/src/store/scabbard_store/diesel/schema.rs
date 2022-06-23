@@ -59,6 +59,7 @@ table! {
         vote_timeout_start -> Nullable<BigInt>,
         vote -> Nullable<Text>,
         decision_timeout_start -> Nullable<BigInt>,
+        ack_timeout_start -> Nullable<BigInt>,
     }
 }
 
@@ -69,6 +70,7 @@ table! {
         epoch -> BigInt,
         process -> Text,
         vote -> Nullable<Text>,
+        decision_ack -> Bool,
     }
 }
 
@@ -103,6 +105,7 @@ table! {
         vote -> Nullable<Text>,
         decision_timeout_start -> Nullable<BigInt>,
         action_alarm -> Nullable<BigInt>,
+        ack_timeout_start -> Nullable<BigInt>,
     }
 }
 
@@ -111,6 +114,7 @@ table! {
         action_id -> Int8,
         process -> Text,
         vote -> Nullable<Text>,
+        decision_ack -> Bool,
     }
 }
 

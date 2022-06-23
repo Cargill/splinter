@@ -831,6 +831,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -848,6 +849,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -892,6 +894,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -943,6 +946,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -974,6 +978,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::Voting { vote_timeout_start })
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -1002,6 +1007,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::Voting { vote_timeout_start })
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -1061,6 +1067,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -1089,6 +1096,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::Voting { vote_timeout_start })
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -1136,6 +1144,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -1164,6 +1173,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::Voting { vote_timeout_start })
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -1260,6 +1270,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: peer_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())
@@ -1357,6 +1368,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: peer_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())
@@ -1433,6 +1445,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: peer_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())
@@ -1505,6 +1518,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: peer_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())
@@ -1582,6 +1596,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: peer_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())
@@ -1658,10 +1673,12 @@ pub mod tests {
                 Participant {
                     process: participant_fqsi.service_id().clone(),
                     vote: None,
+                    decision_ack: false,
                 },
                 Participant {
                     process: participant2_fqsi.service_id().clone(),
                     vote: None,
+                    decision_ack: false,
                 },
             ])
             .with_state(State::WaitingForVoteRequest)
@@ -1725,10 +1742,12 @@ pub mod tests {
                 Participant {
                     process: participant_fqsi.service_id().clone(),
                     vote: None,
+                    decision_ack: false,
                 },
                 Participant {
                     process: participant2_fqsi.service_id().clone(),
                     vote: None,
+                    decision_ack: false,
                 },
             ])
             .with_state(State::WaitingForVoteRequest)
@@ -1795,10 +1814,12 @@ pub mod tests {
                 Participant {
                     process: participant_fqsi.service_id().clone(),
                     vote: None,
+                    decision_ack: false,
                 },
                 Participant {
                     process: participant2_fqsi.service_id().clone(),
                     vote: None,
+                    decision_ack: false,
                 },
             ])
             .with_state(State::WaitingForVoteRequest)
@@ -1935,6 +1956,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.service_id().clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -1952,6 +1974,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.service_id().clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForVoteRequest)
             .with_this_process(participant_service_id.clone().service_id())
@@ -1981,6 +2004,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.service_id().clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -2004,6 +2028,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: coordinator_fqsi.service_id().clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForVoteRequest)
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -2058,6 +2083,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: participant_service_id.service_id().clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(coordinator_fqsi.clone().service_id())
@@ -2140,6 +2166,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: peer_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())
@@ -2210,6 +2237,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: peer_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())
@@ -2291,6 +2319,7 @@ pub mod tests {
             .with_participants(vec![Participant {
                 process: peer_service_id.clone(),
                 vote: None,
+                decision_ack: false,
             }])
             .with_state(State::WaitingForStart)
             .with_this_process(service_fqsi.clone().service_id())

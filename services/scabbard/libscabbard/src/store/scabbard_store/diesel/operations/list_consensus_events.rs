@@ -179,6 +179,7 @@ where
                         ),
                         "COMMIT" => Message::Commit(deliver.epoch as u64),
                         "ABORT" => Message::Abort(deliver.epoch as u64),
+                        "DECISION_ACK" => Message::DecisionAck(deliver.epoch as u64),
                         _ => return Err(ScabbardStoreError::InvalidState(
                             InvalidStateError::with_message(
                                 "Failed to list events, invalid message type found for deliver \

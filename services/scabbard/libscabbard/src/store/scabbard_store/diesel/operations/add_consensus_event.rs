@@ -122,6 +122,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         Message::VoteRequest(epoch, ref value) => {
                             (String::from(&message), None, Some(value.clone()), epoch)
                         }
+                        Message::DecisionAck(epoch) => (String::from(&message), None, None, epoch),
                     };
 
                     let deliver_event = Consensus2pcDeliverEventModel {
@@ -245,6 +246,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                         Message::VoteRequest(epoch, ref value) => {
                             (String::from(&message), None, Some(value.clone()), epoch)
                         }
+                        Message::DecisionAck(epoch) => (String::from(&message), None, None, epoch),
                     };
 
                     let deliver_event = Consensus2pcDeliverEventModel {

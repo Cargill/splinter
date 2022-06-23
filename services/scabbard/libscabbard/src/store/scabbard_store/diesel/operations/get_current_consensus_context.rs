@@ -34,12 +34,57 @@ pub(in crate::store::scabbard_store::diesel) trait GetCurrentContextAction {
     ) -> Result<Option<ConsensusContext>, ScabbardStoreError>;
 }
 
-impl<'a, C> GetCurrentContextAction for ScabbardStoreOperations<'a, C>
-where
-    C: diesel::Connection,
-    i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
-{
+#[cfg(feature = "sqlite")]
+impl<'a> GetCurrentContextAction for ScabbardStoreOperations<'a, SqliteConnection> {
+    fn get_current_consensus_context(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Option<ConsensusContext>, ScabbardStoreError> {
+        self.conn.transaction::<_, _, _>(|| {
+            let context = consensus_2pc_context::table
+                .filter(
+                    consensus_2pc_context::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(
+                            consensus_2pc_context::service_id
+                                .eq(service_id.service_id().to_string()),
+                        ),
+                )
+                .first::<Consensus2pcContextModel>(self.conn)
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
+
+            if let Some(context) = context {
+                let participants: Vec<Consensus2pcContextParticipantModel> =
+                    consensus_2pc_context_participant::table
+                        .filter(
+                            consensus_2pc_context_participant::circuit_id
+                                .eq(service_id.circuit_id().to_string())
+                                .and(
+                                    consensus_2pc_context_participant::service_id
+                                        .eq(service_id.service_id().to_string()),
+                                ),
+                        )
+                        .load::<Consensus2pcContextParticipantModel>(self.conn)
+                        .map_err(|err| {
+                            ScabbardStoreError::from_source_with_operation(
+                                err,
+                                OPERATION_NAME.to_string(),
+                            )
+                        })?;
+
+                Ok(Some(ConsensusContext::try_from((&context, participants))?))
+            } else {
+                Ok(None)
+            }
+        })
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl<'a> GetCurrentContextAction for ScabbardStoreOperations<'a, PgConnection> {
     fn get_current_consensus_context(
         &self,
         service_id: &FullyQualifiedServiceId,
