@@ -81,6 +81,90 @@ pub fn get_response_paging_info(
     }
 }
 
+pub struct PagingBuilder {
+    link: String,
+    limit: Option<usize>,
+    offset: Option<usize>,
+    query_count: usize,
+}
+
+impl PagingBuilder {
+    pub fn new(link: String, query_count: usize) -> PagingBuilder {
+        PagingBuilder {
+            link,
+            limit: None,
+            offset: None,
+            query_count,
+        }
+    }
+}
+
+impl PagingBuilder {
+    pub fn with_limit(self, limit: usize) -> Self {
+        Self {
+            limit: Some(limit),
+            ..self
+        }
+    }
+
+    pub fn with_offset(self, offset: usize) -> Self {
+        Self {
+            offset: Some(offset),
+            ..self
+        }
+    }
+
+    pub fn build(self) -> Paging {
+        let limit = self.limit.unwrap_or(DEFAULT_LIMIT);
+        let offset = self.offset.unwrap_or(DEFAULT_OFFSET);
+        let link = self.link;
+
+        let base_link = {
+            // if the link does not already contain ? add it to the end
+            if !link.contains('?') {
+                format!("{}?limit={}&", link, limit)
+            } else {
+                format!("{}limit={}&", link, limit)
+            }
+        };
+
+        let current_link = format!("{}offset={}", base_link, offset);
+
+        let first_link = format!("{}offset=0", base_link);
+
+        let previous_offset = if offset > limit { offset - limit } else { 0 };
+
+        let previous_link = format!("{}offset={}", base_link, previous_offset);
+
+        let query_count = self.query_count;
+        let last_offset = if query_count > 0 {
+            ((query_count - 1) / limit) * limit
+        } else {
+            0
+        };
+        let last_link = format!("{}offset={}", base_link, last_offset);
+
+        let next_offset = if offset + limit > last_offset {
+            last_offset
+        } else {
+            offset + limit
+        };
+
+        let next_link = format!("{}offset={}", base_link, next_offset);
+
+        Paging {
+            current: current_link,
+            offset,
+            limit,
+            total: query_count,
+            first: first_link,
+            prev: previous_link,
+            next: next_link,
+            last: last_link,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
