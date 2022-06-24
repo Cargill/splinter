@@ -44,10 +44,18 @@ pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
                 }
             };
 
-            let address = request
-                .match_info()
-                .get("address")
-                .expect("address should not be none");
+            let address = match request.match_info().get("address") {
+                Some(address) => address,
+                None => {
+                    // All of this should be unreachable if actix routing is working.
+                    error!("address can not be none");
+                    return Box::new(
+                        HttpResponse::BadRequest()
+                            .json(ErrorResponse::bad_request("address must be set"))
+                            .into_future(),
+                    );
+                }
+            };
 
             Box::new(match scabbard.get_state_at_address(address) {
                 Ok(Some(value)) => HttpResponse::Ok().json(value).into_future(),
