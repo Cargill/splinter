@@ -138,7 +138,7 @@ table! {
         created_at -> Timestamp,
         executed_at -> Nullable<BigInt>,
         position -> Integer,
-        event_type -> Text,
+        event_type -> crate::store::scabbard_store::diesel::models::EventTypeModelMapping,
     }
 }
 

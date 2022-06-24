@@ -24,8 +24,9 @@ pub use consensus::{
     Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel, Consensus2pcStartEventModel,
     Consensus2pcUpdateContextActionModel, Consensus2pcUpdateContextActionParticipantModel,
     Consensus2pcVoteEventModel, ContextParticipantList, ContextStateModel,
-    ContextStateModelMapping, InsertableConsensus2pcActionModel, InsertableConsensus2pcEventModel,
-    MessageTypeModel, MessageTypeModelMapping, NotificationTypeModel, NotificationTypeModelMapping,
+    ContextStateModelMapping, EventTypeModel, EventTypeModelMapping,
+    InsertableConsensus2pcActionModel, InsertableConsensus2pcEventModel, MessageTypeModel,
+    MessageTypeModelMapping, NotificationTypeModel, NotificationTypeModelMapping,
     UpdateContextActionParticipantList,
 };
 pub use service::{

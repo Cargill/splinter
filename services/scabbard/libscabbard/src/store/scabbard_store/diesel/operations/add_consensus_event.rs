@@ -25,7 +25,7 @@ use splinter::service::FullyQualifiedServiceId;
 use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcDeliverEventModel, Consensus2pcStartEventModel, Consensus2pcVoteEventModel,
-        InsertableConsensus2pcEventModel, MessageTypeModel, ScabbardServiceModel,
+        EventTypeModel, InsertableConsensus2pcEventModel, MessageTypeModel, ScabbardServiceModel,
     },
     schema::{
         consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_start_event,
@@ -81,7 +81,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 circuit_id: service_id.circuit_id().to_string(),
                 service_id: service_id.service_id().to_string(),
                 executed_at: None,
-                event_type: String::from(&event),
+                event_type: EventTypeModel::from(&event),
             };
 
             insert_into(consensus_2pc_event::table)
@@ -220,7 +220,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                 circuit_id: service_id.circuit_id().to_string(),
                 service_id: service_id.service_id().to_string(),
                 executed_at: None,
-                event_type: String::from(&event),
+                event_type: EventTypeModel::from(&event),
             };
 
             let event_id: i64 = insert_into(consensus_2pc_event::table)

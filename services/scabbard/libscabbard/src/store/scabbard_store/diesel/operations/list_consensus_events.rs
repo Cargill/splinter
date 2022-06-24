@@ -20,8 +20,9 @@ use splinter::service::ServiceId;
 use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcDeliverEventModel, Consensus2pcStartEventModel, Consensus2pcVoteEventModel,
-        ConsensusTypeModel, ConsensusTypeModelMapping, MessageTypeModel, MessageTypeModelMapping,
-        ScabbardServiceModel, ServiceStatusTypeModel, ServiceStatusTypeModelMapping,
+        ConsensusTypeModel, ConsensusTypeModelMapping, EventTypeModel, EventTypeModelMapping,
+        MessageTypeModel, MessageTypeModelMapping, ScabbardServiceModel, ServiceStatusTypeModel,
+        ServiceStatusTypeModelMapping,
     },
     schema::{
         consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_start_event,
@@ -59,6 +60,8 @@ where
     ServiceStatusTypeModel: diesel::deserialize::FromSql<ServiceStatusTypeModelMapping, C::Backend>,
     <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ConsensusTypeModelMapping>,
     ConsensusTypeModel: diesel::deserialize::FromSql<ConsensusTypeModelMapping, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<EventTypeModelMapping>,
+    EventTypeModel: diesel::deserialize::FromSql<EventTypeModelMapping, C::Backend>,
 {
     fn list_consensus_events(
         &self,
@@ -95,7 +98,7 @@ where
                 )
                 .order(consensus_2pc_event::id.desc())
                 .select((consensus_2pc_event::id, consensus_2pc_event::event_type))
-                .load::<(i64, String)>(self.conn)
+                .load::<(i64, EventTypeModel)>(self.conn)
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
                 })?;
@@ -110,8 +113,8 @@ where
 
             let mut alarm_events = consensus_events
                 .into_iter()
-                .filter_map(|(id, event_type)| match event_type.as_str() {
-                    "ALARM" => Some(Identified {
+                .filter_map(|(id, event_type)| match event_type {
+                    EventTypeModel::Alarm => Some(Identified {
                         id,
                         record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
                     }),

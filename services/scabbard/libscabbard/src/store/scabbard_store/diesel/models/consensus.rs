@@ -1155,7 +1155,7 @@ pub struct Consensus2pcEventModel {
     pub service_id: String,
     pub created_at: SystemTime,
     pub executed_at: Option<i64>,
-    pub event_type: String,
+    pub event_type: EventTypeModel,
 }
 
 #[derive(Debug, PartialEq, Insertable)]
@@ -1164,17 +1164,177 @@ pub struct InsertableConsensus2pcEventModel {
     pub circuit_id: String,
     pub service_id: String,
     pub executed_at: Option<i64>,
-    pub event_type: String,
+    pub event_type: EventTypeModel,
 }
 
-impl From<&Event> for String {
+impl From<&Event> for EventTypeModel {
     fn from(event: &Event) -> Self {
         match *event {
-            Event::Alarm() => "ALARM".into(),
-            Event::Deliver(..) => "DELIVER".into(),
-            Event::Start(..) => "START".into(),
-            Event::Vote(..) => "VOTE".into(),
+            Event::Alarm() => EventTypeModel::Alarm,
+            Event::Deliver(..) => EventTypeModel::Deliver,
+            Event::Start(..) => EventTypeModel::Start,
+            Event::Vote(..) => EventTypeModel::Vote,
         }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum EventTypeModel {
+    Alarm,
+    Deliver,
+    Start,
+    Vote,
+}
+
+// This has to be pub, due to its use in the table macro execution for IdentityModel
+pub struct EventTypeModelMapping;
+
+impl QueryId for EventTypeModelMapping {
+    type QueryId = EventTypeModelMapping;
+    const HAS_STATIC_QUERY_ID: bool = true;
+}
+
+impl NotNull for EventTypeModelMapping {}
+
+impl SingleValue for EventTypeModelMapping {}
+
+impl AsExpression<EventTypeModelMapping> for EventTypeModel {
+    type Expression = Bound<EventTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl AsExpression<Nullable<EventTypeModelMapping>> for EventTypeModel {
+    type Expression = Bound<Nullable<EventTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<EventTypeModelMapping> for &'a EventTypeModel {
+    type Expression = Bound<EventTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<Nullable<EventTypeModelMapping>> for &'a EventTypeModel {
+    type Expression = Bound<Nullable<EventTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<EventTypeModelMapping> for &'a &'b EventTypeModel {
+    type Expression = Bound<EventTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<Nullable<EventTypeModelMapping>> for &'a &'b EventTypeModel {
+    type Expression = Bound<Nullable<EventTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<DB: Backend> ToSql<EventTypeModelMapping, DB> for EventTypeModel {
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        match self {
+            EventTypeModel::Alarm => out.write_all(b"ALARM")?,
+            EventTypeModel::Deliver => out.write_all(b"DELIVER")?,
+            EventTypeModel::Start => out.write_all(b"START")?,
+            EventTypeModel::Vote => out.write_all(b"VOTE")?,
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl<DB> ToSql<Nullable<EventTypeModelMapping>, DB> for EventTypeModel
+where
+    DB: Backend,
+    Self: ToSql<EventTypeModelMapping, DB>,
+{
+    fn to_sql<W: ::std::io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        ToSql::<EventTypeModelMapping, DB>::to_sql(self, out)
+    }
+}
+
+impl<DB> Queryable<EventTypeModelMapping, DB> for EventTypeModel
+where
+    DB: Backend + HasSqlType<EventTypeModelMapping>,
+    EventTypeModel: FromSql<EventTypeModelMapping, DB>,
+{
+    type Row = Self;
+
+    fn build(row: Self::Row) -> Self {
+        row
+    }
+}
+
+impl<DB> FromSqlRow<EventTypeModelMapping, DB> for EventTypeModel
+where
+    DB: Backend,
+    EventTypeModel: FromSql<EventTypeModelMapping, DB>,
+{
+    fn build_from_row<T: Row<DB>>(row: &mut T) -> deserialize::Result<Self> {
+        FromSql::<EventTypeModelMapping, DB>::from_sql(row.take())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl FromSql<EventTypeModelMapping, Pg> for EventTypeModel {
+    fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes {
+            Some(b"ALARM") => Ok(EventTypeModel::Alarm),
+            Some(b"DELIVER") => Ok(EventTypeModel::Deliver),
+            Some(b"START") => Ok(EventTypeModel::Start),
+            Some(b"VOTE") => Ok(EventTypeModel::Vote),
+            Some(v) => Err(format!(
+                "Unrecognized enum variant: '{}'",
+                String::from_utf8_lossy(v)
+            )
+            .into()),
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl HasSqlType<EventTypeModelMapping> for Pg {
+    fn metadata(lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        lookup.lookup_type("event_type")
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl FromSql<EventTypeModelMapping, Sqlite> for EventTypeModel {
+    fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes.map(|v| v.read_blob()) {
+            Some(b"ALARM") => Ok(EventTypeModel::Alarm),
+            Some(b"DELIVER") => Ok(EventTypeModel::Deliver),
+            Some(b"START") => Ok(EventTypeModel::Start),
+            Some(b"VOTE") => Ok(EventTypeModel::Vote),
+            Some(blob) => {
+                Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
+            }
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl HasSqlType<EventTypeModelMapping> for Sqlite {
+    fn metadata(_lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        diesel::sqlite::SqliteType::Text
     }
 }
 
