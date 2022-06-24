@@ -16,7 +16,7 @@ table! {
     scabbard_service (circuit_id, service_id) {
         circuit_id  -> Text,
         service_id  -> Text,
-        consensus -> Text,
+        consensus -> crate::store::scabbard_store::diesel::models::ConsensusTypeModelMapping,
         status -> crate::store::scabbard_store::diesel::models::ServiceStatusTypeModelMapping,
     }
 }
