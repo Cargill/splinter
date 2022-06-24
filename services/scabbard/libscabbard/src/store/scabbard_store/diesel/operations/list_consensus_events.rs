@@ -20,9 +20,9 @@ use splinter::service::ServiceId;
 use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcDeliverEventModel, Consensus2pcStartEventModel, Consensus2pcVoteEventModel,
-        ConsensusTypeModel, ConsensusTypeModelMapping, EventTypeModel, EventTypeModelMapping,
-        MessageTypeModel, MessageTypeModelMapping, ScabbardServiceModel, ServiceStatusTypeModel,
-        ServiceStatusTypeModelMapping,
+        ConsensusTypeModel, ConsensusTypeModelMapping, DeliverMessageTypeModel,
+        DeliverMessageTypeModelMapping, EventTypeModel, EventTypeModelMapping,
+        ScabbardServiceModel, ServiceStatusTypeModel, ServiceStatusTypeModelMapping,
     },
     schema::{
         consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_start_event,
@@ -54,8 +54,9 @@ where
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     Vec<u8>: diesel::deserialize::FromSql<diesel::sql_types::Binary, C::Backend>,
-    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<MessageTypeModelMapping>,
-    MessageTypeModel: diesel::deserialize::FromSql<MessageTypeModelMapping, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<DeliverMessageTypeModelMapping>,
+    DeliverMessageTypeModel:
+        diesel::deserialize::FromSql<DeliverMessageTypeModelMapping, C::Backend>,
     <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ServiceStatusTypeModelMapping>,
     ServiceStatusTypeModel: diesel::deserialize::FromSql<ServiceStatusTypeModelMapping, C::Backend>,
     <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ConsensusTypeModelMapping>,
@@ -151,7 +152,7 @@ where
                 })?;
 
                 let message = match deliver.message_type {
-                    MessageTypeModel::VoteResponse => {
+                    DeliverMessageTypeModel::VoteResponse => {
                         let vote_response = deliver
                             .vote_response
                             .map(|v| match v.as_str() {
@@ -175,10 +176,10 @@ where
                             })?;
                         Message::VoteResponse(deliver.epoch as u64, vote_response)
                     }
-                    MessageTypeModel::DecisionRequest => {
+                    DeliverMessageTypeModel::DecisionRequest => {
                         Message::DecisionRequest(deliver.epoch as u64)
                     }
-                    MessageTypeModel::VoteRequest => Message::VoteRequest(
+                    DeliverMessageTypeModel::VoteRequest => Message::VoteRequest(
                         deliver.epoch as u64,
                         deliver.vote_request.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
@@ -188,9 +189,11 @@ where
                             ))
                         })?,
                     ),
-                    MessageTypeModel::Commit => Message::Commit(deliver.epoch as u64),
-                    MessageTypeModel::Abort => Message::Abort(deliver.epoch as u64),
-                    MessageTypeModel::DecisionAck => Message::DecisionAck(deliver.epoch as u64),
+                    DeliverMessageTypeModel::Commit => Message::Commit(deliver.epoch as u64),
+                    DeliverMessageTypeModel::Abort => Message::Abort(deliver.epoch as u64),
+                    DeliverMessageTypeModel::DecisionAck => {
+                        Message::DecisionAck(deliver.epoch as u64)
+                    }
                 };
 
                 let event = Identified {

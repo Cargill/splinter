@@ -25,7 +25,8 @@ use splinter::service::FullyQualifiedServiceId;
 use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcDeliverEventModel, Consensus2pcStartEventModel, Consensus2pcVoteEventModel,
-        EventTypeModel, InsertableConsensus2pcEventModel, MessageTypeModel, ScabbardServiceModel,
+        DeliverMessageTypeModel, EventTypeModel, InsertableConsensus2pcEventModel,
+        ScabbardServiceModel,
     },
     schema::{
         consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_start_event,
@@ -103,34 +104,34 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 Event::Deliver(receiving_process, message) => {
                     let (message_type, vote_response, vote_request, epoch) = match message {
                         Message::DecisionRequest(epoch) => {
-                            (MessageTypeModel::from(&message), None, None, epoch)
+                            (DeliverMessageTypeModel::from(&message), None, None, epoch)
                         }
                         Message::VoteResponse(epoch, true) => (
-                            MessageTypeModel::from(&message),
+                            DeliverMessageTypeModel::from(&message),
                             Some("TRUE".to_string()),
                             None,
                             epoch,
                         ),
                         Message::VoteResponse(epoch, false) => (
-                            MessageTypeModel::from(&message),
+                            DeliverMessageTypeModel::from(&message),
                             Some("FALSE".to_string()),
                             None,
                             epoch,
                         ),
                         Message::Commit(epoch) => {
-                            (MessageTypeModel::from(&message), None, None, epoch)
+                            (DeliverMessageTypeModel::from(&message), None, None, epoch)
                         }
                         Message::Abort(epoch) => {
-                            (MessageTypeModel::from(&message), None, None, epoch)
+                            (DeliverMessageTypeModel::from(&message), None, None, epoch)
                         }
                         Message::VoteRequest(epoch, ref value) => (
-                            MessageTypeModel::from(&message),
+                            DeliverMessageTypeModel::from(&message),
                             None,
                             Some(value.clone()),
                             epoch,
                         ),
                         Message::DecisionAck(epoch) => {
-                            (MessageTypeModel::from(&message), None, None, epoch)
+                            (DeliverMessageTypeModel::from(&message), None, None, epoch)
                         }
                     };
 
@@ -236,34 +237,34 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                 Event::Deliver(receiving_process, message) => {
                     let (message_type, vote_response, vote_request, epoch) = match message {
                         Message::DecisionRequest(epoch) => {
-                            (MessageTypeModel::from(&message), None, None, epoch)
+                            (DeliverMessageTypeModel::from(&message), None, None, epoch)
                         }
                         Message::VoteResponse(epoch, true) => (
-                            MessageTypeModel::from(&message),
+                            DeliverMessageTypeModel::from(&message),
                             Some("TRUE".to_string()),
                             None,
                             epoch,
                         ),
                         Message::VoteResponse(epoch, false) => (
-                            MessageTypeModel::from(&message),
+                            DeliverMessageTypeModel::from(&message),
                             Some("FALSE".to_string()),
                             None,
                             epoch,
                         ),
                         Message::Commit(epoch) => {
-                            (MessageTypeModel::from(&message), None, None, epoch)
+                            (DeliverMessageTypeModel::from(&message), None, None, epoch)
                         }
                         Message::Abort(epoch) => {
-                            (MessageTypeModel::from(&message), None, None, epoch)
+                            (DeliverMessageTypeModel::from(&message), None, None, epoch)
                         }
                         Message::VoteRequest(epoch, ref value) => (
-                            MessageTypeModel::from(&message),
+                            DeliverMessageTypeModel::from(&message),
                             None,
                             Some(value.clone()),
                             epoch,
                         ),
                         Message::DecisionAck(epoch) => {
-                            (MessageTypeModel::from(&message), None, None, epoch)
+                            (DeliverMessageTypeModel::from(&message), None, None, epoch)
                         }
                     };
 

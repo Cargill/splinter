@@ -1346,9 +1346,191 @@ pub struct Consensus2pcDeliverEventModel {
     pub event_id: i64,
     pub epoch: i64,
     pub receiver_service_id: String,
-    pub message_type: MessageTypeModel,
+    pub message_type: DeliverMessageTypeModel,
     pub vote_response: Option<String>,
     pub vote_request: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum DeliverMessageTypeModel {
+    VoteResponse,
+    DecisionRequest,
+    VoteRequest,
+    Commit,
+    Abort,
+    DecisionAck,
+}
+
+pub struct DeliverMessageTypeModelMapping;
+
+impl QueryId for DeliverMessageTypeModelMapping {
+    type QueryId = DeliverMessageTypeModelMapping;
+    const HAS_STATIC_QUERY_ID: bool = true;
+}
+
+impl NotNull for DeliverMessageTypeModelMapping {}
+
+impl SingleValue for DeliverMessageTypeModelMapping {}
+
+impl AsExpression<DeliverMessageTypeModelMapping> for DeliverMessageTypeModel {
+    type Expression = Bound<DeliverMessageTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl AsExpression<Nullable<DeliverMessageTypeModelMapping>> for DeliverMessageTypeModel {
+    type Expression = Bound<Nullable<DeliverMessageTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<DeliverMessageTypeModelMapping> for &'a DeliverMessageTypeModel {
+    type Expression = Bound<DeliverMessageTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<Nullable<DeliverMessageTypeModelMapping>> for &'a DeliverMessageTypeModel {
+    type Expression = Bound<Nullable<DeliverMessageTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<DeliverMessageTypeModelMapping> for &'a &'b DeliverMessageTypeModel {
+    type Expression = Bound<DeliverMessageTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<Nullable<DeliverMessageTypeModelMapping>>
+    for &'a &'b DeliverMessageTypeModel
+{
+    type Expression = Bound<Nullable<DeliverMessageTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<DB: Backend> ToSql<DeliverMessageTypeModelMapping, DB> for DeliverMessageTypeModel {
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        match self {
+            DeliverMessageTypeModel::VoteResponse => out.write_all(b"VOTERESPONSE")?,
+            DeliverMessageTypeModel::DecisionRequest => out.write_all(b"DECISIONREQUEST")?,
+            DeliverMessageTypeModel::VoteRequest => out.write_all(b"VOTEREQUEST")?,
+            DeliverMessageTypeModel::Commit => out.write_all(b"COMMIT")?,
+            DeliverMessageTypeModel::Abort => out.write_all(b"ABORT")?,
+            DeliverMessageTypeModel::DecisionAck => out.write_all(b"DECISION_ACK")?,
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl<DB> ToSql<Nullable<DeliverMessageTypeModelMapping>, DB> for DeliverMessageTypeModel
+where
+    DB: Backend,
+    Self: ToSql<DeliverMessageTypeModelMapping, DB>,
+{
+    fn to_sql<W: ::std::io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        ToSql::<DeliverMessageTypeModelMapping, DB>::to_sql(self, out)
+    }
+}
+
+impl<DB> Queryable<DeliverMessageTypeModelMapping, DB> for DeliverMessageTypeModel
+where
+    DB: Backend + HasSqlType<DeliverMessageTypeModelMapping>,
+    DeliverMessageTypeModel: FromSql<DeliverMessageTypeModelMapping, DB>,
+{
+    type Row = Self;
+
+    fn build(row: Self::Row) -> Self {
+        row
+    }
+}
+
+impl<DB> FromSqlRow<DeliverMessageTypeModelMapping, DB> for DeliverMessageTypeModel
+where
+    DB: Backend,
+    DeliverMessageTypeModel: FromSql<DeliverMessageTypeModelMapping, DB>,
+{
+    fn build_from_row<T: Row<DB>>(row: &mut T) -> deserialize::Result<Self> {
+        FromSql::<DeliverMessageTypeModelMapping, DB>::from_sql(row.take())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl FromSql<DeliverMessageTypeModelMapping, Pg> for DeliverMessageTypeModel {
+    fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes {
+            Some(b"VOTERESPONSE") => Ok(DeliverMessageTypeModel::VoteResponse),
+            Some(b"DECISIONREQUEST") => Ok(DeliverMessageTypeModel::DecisionRequest),
+            Some(b"VOTEREQUEST") => Ok(DeliverMessageTypeModel::VoteRequest),
+            Some(b"COMMIT") => Ok(DeliverMessageTypeModel::Commit),
+            Some(b"ABORT") => Ok(DeliverMessageTypeModel::Abort),
+            Some(b"DECISION_ACK") => Ok(DeliverMessageTypeModel::DecisionAck),
+            Some(v) => Err(format!(
+                "Unrecognized enum variant: '{}'",
+                String::from_utf8_lossy(v)
+            )
+            .into()),
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl HasSqlType<DeliverMessageTypeModelMapping> for Pg {
+    fn metadata(lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        lookup.lookup_type("deliver_event_message_typ")
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl FromSql<DeliverMessageTypeModelMapping, Sqlite> for DeliverMessageTypeModel {
+    fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes.map(|v| v.read_blob()) {
+            Some(b"VOTERESPONSE") => Ok(DeliverMessageTypeModel::VoteResponse),
+            Some(b"DECISIONREQUEST") => Ok(DeliverMessageTypeModel::DecisionRequest),
+            Some(b"VOTEREQUEST") => Ok(DeliverMessageTypeModel::VoteRequest),
+            Some(b"COMMIT") => Ok(DeliverMessageTypeModel::Commit),
+            Some(b"ABORT") => Ok(DeliverMessageTypeModel::Abort),
+            Some(b"DECISION_ACK") => Ok(DeliverMessageTypeModel::DecisionAck),
+            Some(blob) => {
+                Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
+            }
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl HasSqlType<DeliverMessageTypeModelMapping> for Sqlite {
+    fn metadata(_lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        diesel::sqlite::SqliteType::Text
+    }
+}
+
+impl From<&Message> for DeliverMessageTypeModel {
+    fn from(message: &Message) -> Self {
+        match *message {
+            Message::VoteRequest(..) => DeliverMessageTypeModel::VoteRequest,
+            Message::DecisionRequest(_) => DeliverMessageTypeModel::DecisionRequest,
+            Message::VoteResponse(..) => DeliverMessageTypeModel::VoteResponse,
+            Message::Commit(_) => DeliverMessageTypeModel::Commit,
+            Message::Abort(_) => DeliverMessageTypeModel::Abort,
+            Message::DecisionAck(_) => DeliverMessageTypeModel::DecisionAck,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
