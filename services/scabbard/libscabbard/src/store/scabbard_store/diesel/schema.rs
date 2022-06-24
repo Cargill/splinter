@@ -88,7 +88,7 @@ table! {
         action_id -> Int8,
         epoch -> BigInt,
         receiver_service_id -> Text,
-        message_type -> Text,
+        message_type -> crate::store::scabbard_store::diesel::models::MessageTypeModelMapping,
         vote_response -> Nullable<Text>,
         vote_request -> Nullable<Binary>,
     }
@@ -146,7 +146,7 @@ table! {
         event_id -> Int8,
         epoch -> BigInt,
         receiver_service_id -> Text,
-        message_type -> Text,
+        message_type -> crate::store::scabbard_store::diesel::models::MessageTypeModelMapping,
         vote_response -> Nullable<Text>,
         vote_request -> Nullable<Binary>,
     }

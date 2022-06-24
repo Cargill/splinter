@@ -869,9 +869,176 @@ pub struct Consensus2pcSendMessageActionModel {
     pub action_id: i64,
     pub epoch: i64,
     pub receiver_service_id: String,
-    pub message_type: String,
+    pub message_type: MessageTypeModel,
     pub vote_response: Option<String>,
     pub vote_request: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum MessageTypeModel {
+    VoteResponse,
+    DecisionRequest,
+    VoteRequest,
+    Commit,
+    Abort,
+    DecisionAck,
+}
+
+pub struct MessageTypeModelMapping;
+
+impl QueryId for MessageTypeModelMapping {
+    type QueryId = MessageTypeModelMapping;
+    const HAS_STATIC_QUERY_ID: bool = true;
+}
+
+impl NotNull for MessageTypeModelMapping {}
+
+impl SingleValue for MessageTypeModelMapping {}
+
+impl AsExpression<MessageTypeModelMapping> for MessageTypeModel {
+    type Expression = Bound<MessageTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl AsExpression<Nullable<MessageTypeModelMapping>> for MessageTypeModel {
+    type Expression = Bound<Nullable<MessageTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<MessageTypeModelMapping> for &'a MessageTypeModel {
+    type Expression = Bound<MessageTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<Nullable<MessageTypeModelMapping>> for &'a MessageTypeModel {
+    type Expression = Bound<Nullable<MessageTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<MessageTypeModelMapping> for &'a &'b MessageTypeModel {
+    type Expression = Bound<MessageTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<Nullable<MessageTypeModelMapping>> for &'a &'b MessageTypeModel {
+    type Expression = Bound<Nullable<MessageTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<DB: Backend> ToSql<MessageTypeModelMapping, DB> for MessageTypeModel {
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        match self {
+            MessageTypeModel::VoteResponse => out.write_all(b"VOTERESPONSE")?,
+            MessageTypeModel::DecisionRequest => out.write_all(b"DECISIONREQUEST")?,
+            MessageTypeModel::VoteRequest => out.write_all(b"VOTEREQUEST")?,
+            MessageTypeModel::Commit => out.write_all(b"COMMIT")?,
+            MessageTypeModel::Abort => out.write_all(b"ABORT")?,
+            MessageTypeModel::DecisionAck => out.write_all(b"DECISIONACK")?,
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl<DB> ToSql<Nullable<MessageTypeModelMapping>, DB> for MessageTypeModel
+where
+    DB: Backend,
+    Self: ToSql<MessageTypeModelMapping, DB>,
+{
+    fn to_sql<W: ::std::io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        ToSql::<MessageTypeModelMapping, DB>::to_sql(self, out)
+    }
+}
+
+impl<DB> Queryable<MessageTypeModelMapping, DB> for MessageTypeModel
+where
+    DB: Backend + HasSqlType<MessageTypeModelMapping>,
+    MessageTypeModel: FromSql<MessageTypeModelMapping, DB>,
+{
+    type Row = Self;
+
+    fn build(row: Self::Row) -> Self {
+        row
+    }
+}
+
+impl<DB> FromSqlRow<MessageTypeModelMapping, DB> for MessageTypeModel
+where
+    DB: Backend,
+    MessageTypeModel: FromSql<MessageTypeModelMapping, DB>,
+{
+    fn build_from_row<T: Row<DB>>(row: &mut T) -> deserialize::Result<Self> {
+        FromSql::<MessageTypeModelMapping, DB>::from_sql(row.take())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl FromSql<MessageTypeModelMapping, Pg> for MessageTypeModel {
+    fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes {
+            Some(b"VOTERESPONSE") => Ok(MessageTypeModel::VoteResponse),
+            Some(b"DECISIONREQUEST") => Ok(MessageTypeModel::DecisionRequest),
+            Some(b"VOTEREQUEST") => Ok(MessageTypeModel::VoteRequest),
+            Some(b"COMMIT") => Ok(MessageTypeModel::Commit),
+            Some(b"ABORT") => Ok(MessageTypeModel::Abort),
+            Some(b"DECISIONACK") => Ok(MessageTypeModel::DecisionAck),
+            Some(v) => Err(format!(
+                "Unrecognized enum variant: '{}'",
+                String::from_utf8_lossy(v)
+            )
+            .into()),
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl HasSqlType<MessageTypeModelMapping> for Pg {
+    fn metadata(lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        lookup.lookup_type("message_type")
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl FromSql<MessageTypeModelMapping, Sqlite> for MessageTypeModel {
+    fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes.map(|v| v.read_blob()) {
+            Some(b"VOTERESPONSE") => Ok(MessageTypeModel::VoteResponse),
+            Some(b"DECISIONREQUEST") => Ok(MessageTypeModel::DecisionRequest),
+            Some(b"VOTEREQUEST") => Ok(MessageTypeModel::VoteRequest),
+            Some(b"COMMIT") => Ok(MessageTypeModel::Commit),
+            Some(b"ABORT") => Ok(MessageTypeModel::Abort),
+            Some(b"DECISIONACK") => Ok(MessageTypeModel::DecisionAck),
+            Some(blob) => {
+                Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
+            }
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl HasSqlType<MessageTypeModelMapping> for Sqlite {
+    fn metadata(_lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        diesel::sqlite::SqliteType::Text
+    }
 }
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
@@ -961,6 +1128,19 @@ impl From<&Message> for String {
     }
 }
 
+impl From<&Message> for MessageTypeModel {
+    fn from(message: &Message) -> Self {
+        match *message {
+            Message::VoteRequest(..) => MessageTypeModel::VoteRequest,
+            Message::DecisionRequest(_) => MessageTypeModel::DecisionRequest,
+            Message::VoteResponse(..) => MessageTypeModel::VoteResponse,
+            Message::Commit(_) => MessageTypeModel::Commit,
+            Message::Abort(_) => MessageTypeModel::Abort,
+            Message::DecisionAck(_) => MessageTypeModel::DecisionAck,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_event"]
 #[primary_key(id)]
@@ -1001,7 +1181,7 @@ pub struct Consensus2pcDeliverEventModel {
     pub event_id: i64,
     pub epoch: i64,
     pub receiver_service_id: String,
-    pub message_type: String,
+    pub message_type: MessageTypeModel,
     pub vote_response: Option<String>,
     pub vote_request: Option<Vec<u8>>,
 }

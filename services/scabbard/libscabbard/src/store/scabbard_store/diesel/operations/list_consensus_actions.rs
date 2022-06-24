@@ -24,7 +24,7 @@ use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel,
         Consensus2pcUpdateContextActionModel, Consensus2pcUpdateContextActionParticipantModel,
-        ContextStateModel, ScabbardServiceModel,
+        ContextStateModel, MessageTypeModel, ScabbardServiceModel,
     },
     schema::{
         consensus_2pc_action, consensus_2pc_notification_action, consensus_2pc_send_message_action,
@@ -257,8 +257,8 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                     })?;
 
-                let message = match send_message.message_type.as_str() {
-                    "VOTERESPONSE" => {
+                let message = match send_message.message_type {
+                    MessageTypeModel::VoteResponse => {
                         let vote_response = send_message
                             .vote_response
                             .map(|v| match v.as_str() {
@@ -282,8 +282,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                             })?;
                         Message::VoteResponse(send_message.epoch as u64, vote_response)
                     }
-                    "DECISIONREQUEST" => Message::DecisionRequest(send_message.epoch as u64),
-                    "VOTEREQUEST" => Message::VoteRequest(
+                    MessageTypeModel::DecisionRequest => {
+                        Message::DecisionRequest(send_message.epoch as u64)
+                    }
+                    MessageTypeModel::VoteRequest => Message::VoteRequest(
                         send_message.epoch as u64,
                         send_message.vote_request.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
@@ -293,15 +295,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                             ))
                         })?,
                     ),
-                    "COMMIT" => Message::Commit(send_message.epoch as u64),
-                    "ABORT" => Message::Abort(send_message.epoch as u64),
-                    "DECISION_ACK" => Message::DecisionAck(send_message.epoch as u64),
-                    _ => {
-                        return Err(ScabbardStoreError::InvalidState(
-                            InvalidStateError::with_message(
-                                "Failed to list actions, invalid message type found".to_string(),
-                            ),
-                        ))
+                    MessageTypeModel::Commit => Message::Commit(send_message.epoch as u64),
+                    MessageTypeModel::Abort => Message::Abort(send_message.epoch as u64),
+                    MessageTypeModel::DecisionAck => {
+                        Message::DecisionAck(send_message.epoch as u64)
                     }
                 };
 
@@ -566,8 +563,8 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                     })?;
 
-                let message = match send_message.message_type.as_str() {
-                    "VOTERESPONSE" => {
+                let message = match send_message.message_type {
+                    MessageTypeModel::VoteResponse => {
                         let vote_response = send_message
                             .vote_response
                             .map(|v| match v.as_str() {
@@ -591,8 +588,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                             })?;
                         Message::VoteResponse(send_message.epoch as u64, vote_response)
                     }
-                    "DECISIONREQUEST" => Message::DecisionRequest(send_message.epoch as u64),
-                    "VOTEREQUEST" => Message::VoteRequest(
+                    MessageTypeModel::DecisionRequest => {
+                        Message::DecisionRequest(send_message.epoch as u64)
+                    }
+                    MessageTypeModel::VoteRequest => Message::VoteRequest(
                         send_message.epoch as u64,
                         send_message.vote_request.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
@@ -602,15 +601,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                             ))
                         })?,
                     ),
-                    "COMMIT" => Message::Commit(send_message.epoch as u64),
-                    "ABORT" => Message::Abort(send_message.epoch as u64),
-                    "DECISION_ACK" => Message::DecisionAck(send_message.epoch as u64),
-                    _ => {
-                        return Err(ScabbardStoreError::InvalidState(
-                            InvalidStateError::with_message(
-                                "Failed to list actions, invalid message type found".to_string(),
-                            ),
-                        ))
+                    MessageTypeModel::Commit => Message::Commit(send_message.epoch as u64),
+                    MessageTypeModel::Abort => Message::Abort(send_message.epoch as u64),
+                    MessageTypeModel::DecisionAck => {
+                        Message::DecisionAck(send_message.epoch as u64)
                     }
                 };
 
