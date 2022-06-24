@@ -27,7 +27,7 @@ use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel,
         Consensus2pcUpdateContextActionModel, InsertableConsensus2pcActionModel, MessageTypeModel,
-        ScabbardServiceModel, UpdateContextActionParticipantList,
+        NotificationTypeModel, ScabbardServiceModel, UpdateContextActionParticipantList,
     },
     schema::{
         consensus_2pc_action, consensus_2pc_notification_action, consensus_2pc_send_message_action,
@@ -193,13 +193,17 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 Action::Notify(notification) => {
                     let (notification_type, dropped_message, request_for_vote_value) =
                         match &notification {
-                            Notification::MessageDropped(message) => {
-                                (String::from(&notification), Some(message.clone()), None)
-                            }
-                            Notification::ParticipantRequestForVote(value) => {
-                                (String::from(&notification), None, Some(value.clone()))
-                            }
-                            _ => (String::from(&notification), None, None),
+                            Notification::MessageDropped(message) => (
+                                NotificationTypeModel::from(&notification),
+                                Some(message.clone()),
+                                None,
+                            ),
+                            Notification::ParticipantRequestForVote(value) => (
+                                NotificationTypeModel::from(&notification),
+                                None,
+                                Some(value.clone()),
+                            ),
+                            _ => (NotificationTypeModel::from(&notification), None, None),
                         };
 
                     let notification_action = Consensus2pcNotificationModel {
@@ -358,13 +362,17 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 Action::Notify(notification) => {
                     let (notification_type, dropped_message, request_for_vote_value) =
                         match &notification {
-                            Notification::MessageDropped(message) => {
-                                (String::from(&notification), Some(message.clone()), None)
-                            }
-                            Notification::ParticipantRequestForVote(value) => {
-                                (String::from(&notification), None, Some(value.clone()))
-                            }
-                            _ => (String::from(&notification), None, None),
+                            Notification::MessageDropped(message) => (
+                                NotificationTypeModel::from(&notification),
+                                Some(message.clone()),
+                                None,
+                            ),
+                            Notification::ParticipantRequestForVote(value) => (
+                                NotificationTypeModel::from(&notification),
+                                None,
+                                Some(value.clone()),
+                            ),
+                            _ => (NotificationTypeModel::from(&notification), None, None),
                         };
 
                     let notification_action = Consensus2pcNotificationModel {

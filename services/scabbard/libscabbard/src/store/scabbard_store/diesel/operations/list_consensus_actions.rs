@@ -24,7 +24,7 @@ use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel,
         Consensus2pcUpdateContextActionModel, Consensus2pcUpdateContextActionParticipantModel,
-        ContextStateModel, MessageTypeModel, ScabbardServiceModel,
+        ContextStateModel, MessageTypeModel, NotificationTypeModel, ScabbardServiceModel,
     },
     schema::{
         consensus_2pc_action, consensus_2pc_notification_action, consensus_2pc_send_message_action,
@@ -312,21 +312,25 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
             }
 
             for notification in notification_actions {
-                let notification_action = match notification.notification_type.as_str() {
-                    "REQUESTFORSTART" => Notification::RequestForStart(),
-                    "COORDINATORREQUESTFORVOTE" => Notification::CoordinatorRequestForVote(),
-                    "PARTICIPANTREQUESTFORVOTE" => Notification::ParticipantRequestForVote(
-                        notification.request_for_vote_value.ok_or_else(|| {
-                            ScabbardStoreError::Internal(InternalError::with_message(
-                                "Failed to get 'request for vote' notification action, no \
+                let notification_action = match notification.notification_type {
+                    NotificationTypeModel::RequestForStart => Notification::RequestForStart(),
+                    NotificationTypeModel::CoordinatorRequestForVote => {
+                        Notification::CoordinatorRequestForVote()
+                    }
+                    NotificationTypeModel::ParticipantRequestForVote => {
+                        Notification::ParticipantRequestForVote(
+                            notification.request_for_vote_value.ok_or_else(|| {
+                                ScabbardStoreError::Internal(InternalError::with_message(
+                                    "Failed to get 'request for vote' notification action, no \
                                     associated value"
-                                    .to_string(),
-                            ))
-                        })?,
-                    ),
-                    "COMMIT" => Notification::Commit(),
-                    "ABORT" => Notification::Abort(),
-                    "MESSAGEDROPPED" => Notification::MessageDropped(
+                                        .to_string(),
+                                ))
+                            })?,
+                        )
+                    }
+                    NotificationTypeModel::Commit => Notification::Commit(),
+                    NotificationTypeModel::Abort => Notification::Abort(),
+                    NotificationTypeModel::MessageDropped => Notification::MessageDropped(
                         notification.dropped_message.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
                                 "Failed to get 'message dropped' notification action, no \
@@ -335,11 +339,6 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                             ))
                         })?,
                     ),
-                    _ => {
-                        return Err(ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list actions, invalid notification type found".to_string(),
-                        )))
-                    }
                 };
                 let action = Identified {
                     id: notification.action_id,
@@ -618,21 +617,25 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
             }
 
             for notification in notification_actions {
-                let notification_action = match notification.notification_type.as_str() {
-                    "REQUESTFORSTART" => Notification::RequestForStart(),
-                    "COORDINATORREQUESTFORVOTE" => Notification::CoordinatorRequestForVote(),
-                    "PARTICIPANTREQUESTFORVOTE" => Notification::ParticipantRequestForVote(
-                        notification.request_for_vote_value.ok_or_else(|| {
-                            ScabbardStoreError::Internal(InternalError::with_message(
-                                "Failed to get 'request for vote' notification action, no \
+                let notification_action = match notification.notification_type {
+                    NotificationTypeModel::RequestForStart => Notification::RequestForStart(),
+                    NotificationTypeModel::CoordinatorRequestForVote => {
+                        Notification::CoordinatorRequestForVote()
+                    }
+                    NotificationTypeModel::ParticipantRequestForVote => {
+                        Notification::ParticipantRequestForVote(
+                            notification.request_for_vote_value.ok_or_else(|| {
+                                ScabbardStoreError::Internal(InternalError::with_message(
+                                    "Failed to get 'request for vote' notification action, no \
                                     associated value"
-                                    .to_string(),
-                            ))
-                        })?,
-                    ),
-                    "COMMIT" => Notification::Commit(),
-                    "ABORT" => Notification::Abort(),
-                    "MESSAGEDROPPED" => Notification::MessageDropped(
+                                        .to_string(),
+                                ))
+                            })?,
+                        )
+                    }
+                    NotificationTypeModel::Commit => Notification::Commit(),
+                    NotificationTypeModel::Abort => Notification::Abort(),
+                    NotificationTypeModel::MessageDropped => Notification::MessageDropped(
                         notification.dropped_message.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
                                 "Failed to get 'message dropped' notification action, no \
@@ -641,11 +644,6 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                             ))
                         })?,
                     ),
-                    _ => {
-                        return Err(ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list actions, invalid notification type found".to_string(),
-                        )))
-                    }
                 };
                 let action = Identified {
                     id: notification.action_id,

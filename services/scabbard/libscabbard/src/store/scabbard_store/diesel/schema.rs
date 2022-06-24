@@ -77,7 +77,7 @@ table! {
 table! {
     consensus_2pc_notification_action (action_id) {
         action_id -> Int8,
-        notification_type -> Text,
+        notification_type -> crate::store::scabbard_store::diesel::models::NotificationTypeModelMapping,
         dropped_message -> Nullable<Text>,
         request_for_vote_value -> Nullable<Binary>,
     }

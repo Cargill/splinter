@@ -1047,9 +1047,190 @@ impl HasSqlType<MessageTypeModelMapping> for Sqlite {
 #[primary_key(action_id)]
 pub struct Consensus2pcNotificationModel {
     pub action_id: i64,
-    pub notification_type: String,
+    pub notification_type: NotificationTypeModel,
     pub dropped_message: Option<String>,
     pub request_for_vote_value: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum NotificationTypeModel {
+    RequestForStart,
+    CoordinatorRequestForVote,
+    ParticipantRequestForVote,
+    Commit,
+    Abort,
+    MessageDropped,
+}
+
+pub struct NotificationTypeModelMapping;
+
+impl QueryId for NotificationTypeModelMapping {
+    type QueryId = NotificationTypeModelMapping;
+    const HAS_STATIC_QUERY_ID: bool = true;
+}
+
+impl NotNull for NotificationTypeModelMapping {}
+
+impl SingleValue for NotificationTypeModelMapping {}
+
+impl AsExpression<NotificationTypeModelMapping> for NotificationTypeModel {
+    type Expression = Bound<NotificationTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl AsExpression<Nullable<NotificationTypeModelMapping>> for NotificationTypeModel {
+    type Expression = Bound<Nullable<NotificationTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<NotificationTypeModelMapping> for &'a NotificationTypeModel {
+    type Expression = Bound<NotificationTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<Nullable<NotificationTypeModelMapping>> for &'a NotificationTypeModel {
+    type Expression = Bound<Nullable<NotificationTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<NotificationTypeModelMapping> for &'a &'b NotificationTypeModel {
+    type Expression = Bound<NotificationTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<Nullable<NotificationTypeModelMapping>>
+    for &'a &'b NotificationTypeModel
+{
+    type Expression = Bound<Nullable<NotificationTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<DB: Backend> ToSql<NotificationTypeModelMapping, DB> for NotificationTypeModel {
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        match self {
+            NotificationTypeModel::RequestForStart => out.write_all(b"REQUESTFORSTART")?,
+            NotificationTypeModel::CoordinatorRequestForVote => {
+                out.write_all(b"COORDINATORREQUESTFORVOTE")?
+            }
+            NotificationTypeModel::ParticipantRequestForVote => {
+                out.write_all(b"PARTICIPANTREQUESTFORVOTE")?
+            }
+            NotificationTypeModel::Commit => out.write_all(b"COMMIT")?,
+            NotificationTypeModel::Abort => out.write_all(b"ABORT")?,
+            NotificationTypeModel::MessageDropped => out.write_all(b"MESSAGEDROPPED")?,
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl<DB> ToSql<Nullable<NotificationTypeModelMapping>, DB> for NotificationTypeModel
+where
+    DB: Backend,
+    Self: ToSql<NotificationTypeModelMapping, DB>,
+{
+    fn to_sql<W: ::std::io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        ToSql::<NotificationTypeModelMapping, DB>::to_sql(self, out)
+    }
+}
+
+impl<DB> Queryable<NotificationTypeModelMapping, DB> for NotificationTypeModel
+where
+    DB: Backend + HasSqlType<NotificationTypeModelMapping>,
+    NotificationTypeModel: FromSql<NotificationTypeModelMapping, DB>,
+{
+    type Row = Self;
+
+    fn build(row: Self::Row) -> Self {
+        row
+    }
+}
+
+impl<DB> FromSqlRow<NotificationTypeModelMapping, DB> for NotificationTypeModel
+where
+    DB: Backend,
+    NotificationTypeModel: FromSql<NotificationTypeModelMapping, DB>,
+{
+    fn build_from_row<T: Row<DB>>(row: &mut T) -> deserialize::Result<Self> {
+        FromSql::<NotificationTypeModelMapping, DB>::from_sql(row.take())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl FromSql<NotificationTypeModelMapping, Pg> for NotificationTypeModel {
+    fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes {
+            Some(b"REQUESTFORSTART") => Ok(NotificationTypeModel::RequestForStart),
+            Some(b"COORDINATORREQUESTFORVOTE") => {
+                Ok(NotificationTypeModel::CoordinatorRequestForVote)
+            }
+            Some(b"PARTICIPANTREQUESTFORVOTE") => {
+                Ok(NotificationTypeModel::ParticipantRequestForVote)
+            }
+            Some(b"COMMIT") => Ok(NotificationTypeModel::Commit),
+            Some(b"ABORT") => Ok(NotificationTypeModel::Abort),
+            Some(b"MESSAGEDROPPED") => Ok(NotificationTypeModel::MessageDropped),
+            Some(v) => Err(format!(
+                "Unrecognized enum variant: '{}'",
+                String::from_utf8_lossy(v)
+            )
+            .into()),
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl HasSqlType<NotificationTypeModelMapping> for Pg {
+    fn metadata(lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        lookup.lookup_type("notification_type")
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl FromSql<NotificationTypeModelMapping, Sqlite> for NotificationTypeModel {
+    fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes.map(|v| v.read_blob()) {
+            Some(b"REQUESTFORSTART") => Ok(NotificationTypeModel::RequestForStart),
+            Some(b"COORDINATORREQUESTFORVOTE") => {
+                Ok(NotificationTypeModel::CoordinatorRequestForVote)
+            }
+            Some(b"PARTICIPANTREQUESTFORVOTE") => {
+                Ok(NotificationTypeModel::ParticipantRequestForVote)
+            }
+            Some(b"COMMIT") => Ok(NotificationTypeModel::Commit),
+            Some(b"ABORT") => Ok(NotificationTypeModel::Abort),
+            Some(b"MESSAGEDROPPED") => Ok(NotificationTypeModel::MessageDropped),
+            Some(blob) => {
+                Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
+            }
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl HasSqlType<NotificationTypeModelMapping> for Sqlite {
+    fn metadata(_lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        diesel::sqlite::SqliteType::Text
+    }
 }
 
 impl From<&State> for String {
@@ -1111,6 +1292,23 @@ impl From<&Notification> for String {
             Notification::Commit() => String::from("COMMIT"),
             Notification::Abort() => String::from("ABORT"),
             Notification::MessageDropped(_) => String::from("MESSAGEDROPPED"),
+        }
+    }
+}
+
+impl From<&Notification> for NotificationTypeModel {
+    fn from(notification: &Notification) -> Self {
+        match *notification {
+            Notification::RequestForStart() => NotificationTypeModel::RequestForStart,
+            Notification::CoordinatorRequestForVote() => {
+                NotificationTypeModel::CoordinatorRequestForVote
+            }
+            Notification::ParticipantRequestForVote(_) => {
+                NotificationTypeModel::ParticipantRequestForVote
+            }
+            Notification::Commit() => NotificationTypeModel::Commit,
+            Notification::Abort() => NotificationTypeModel::Abort,
+            Notification::MessageDropped(_) => NotificationTypeModel::MessageDropped,
         }
     }
 }
