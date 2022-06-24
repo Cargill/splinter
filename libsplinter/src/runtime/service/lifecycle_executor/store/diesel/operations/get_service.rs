@@ -14,15 +14,16 @@
 
 //! Provides the "get service" operation for the `DieselLifecycleStore`.
 
-use std::convert::TryFrom;
-
 use diesel::prelude::*;
 
 use super::LifecycleStoreOperations;
 use crate::runtime::service::{
     lifecycle_executor::store::{
         diesel::{
-            models::{ServiceLifecycleArgumentModel, ServiceLifecycleStatusModel},
+            models::{
+                CommandTypeModel, CommandTypeModelMapping, ServiceLifecycleArgumentModel,
+                ServiceLifecycleStatusModel, StatusTypeModel, StatusTypeModelMapping,
+            },
             schema::{service_lifecycle_argument, service_lifecycle_status},
         },
         error::LifecycleStoreError,
@@ -45,6 +46,10 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<StatusTypeModelMapping>,
+    StatusTypeModel: diesel::deserialize::FromSql<StatusTypeModelMapping, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<CommandTypeModelMapping>,
+    CommandTypeModel: diesel::deserialize::FromSql<CommandTypeModelMapping, C::Backend>,
 {
     fn get_service(
         &self,
@@ -78,8 +83,8 @@ where
                 .with_service_id(service_id)
                 .with_service_type(&ServiceType::new(service.service_type)?)
                 .with_arguments(&arguments)
-                .with_command(&LifecycleCommand::try_from(service.command.as_str())?)
-                .with_status(&LifecycleStatus::try_from(service.status.as_str())?)
+                .with_command(&LifecycleCommand::from(service.command))
+                .with_status(&LifecycleStatus::from(service.status))
                 .build()
                 .map_err(LifecycleStoreError::InvalidState)?;
 
