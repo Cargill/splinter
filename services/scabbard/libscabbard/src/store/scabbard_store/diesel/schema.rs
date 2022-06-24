@@ -17,7 +17,7 @@ table! {
         circuit_id  -> Text,
         service_id  -> Text,
         consensus -> Text,
-        status -> Text,
+        status -> crate::store::scabbard_store::diesel::models::ServiceStatusTypeModelMapping,
     }
 }
 

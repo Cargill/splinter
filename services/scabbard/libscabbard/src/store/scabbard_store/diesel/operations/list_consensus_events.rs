@@ -20,7 +20,8 @@ use splinter::service::ServiceId;
 use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcDeliverEventModel, Consensus2pcStartEventModel, Consensus2pcVoteEventModel,
-        MessageTypeModel, MessageTypeModelMapping, ScabbardServiceModel,
+        MessageTypeModel, MessageTypeModelMapping, ScabbardServiceModel, ServiceStatusTypeModel,
+        ServiceStatusTypeModelMapping,
     },
     schema::{
         consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_start_event,
@@ -54,6 +55,8 @@ where
     Vec<u8>: diesel::deserialize::FromSql<diesel::sql_types::Binary, C::Backend>,
     <C as diesel::Connection>::Backend: diesel::types::HasSqlType<MessageTypeModelMapping>,
     MessageTypeModel: diesel::deserialize::FromSql<MessageTypeModelMapping, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ServiceStatusTypeModelMapping>,
+    ServiceStatusTypeModel: diesel::deserialize::FromSql<ServiceStatusTypeModelMapping, C::Backend>,
 {
     fn list_consensus_events(
         &self,

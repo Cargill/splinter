@@ -64,7 +64,165 @@ pub struct ScabbardServiceModel {
     pub circuit_id: String,
     pub service_id: String,
     pub consensus: String,
-    pub status: String,
+    pub status: ServiceStatusTypeModel,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ServiceStatusTypeModel {
+    Prepared,
+    Finalized,
+    Retired,
+}
+
+// This has to be pub, due to its use in the table macro execution for IdentityModel
+pub struct ServiceStatusTypeModelMapping;
+
+impl QueryId for ServiceStatusTypeModelMapping {
+    type QueryId = ServiceStatusTypeModelMapping;
+    const HAS_STATIC_QUERY_ID: bool = true;
+}
+
+impl NotNull for ServiceStatusTypeModelMapping {}
+
+impl SingleValue for ServiceStatusTypeModelMapping {}
+
+impl AsExpression<ServiceStatusTypeModelMapping> for ServiceStatusTypeModel {
+    type Expression = Bound<ServiceStatusTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl AsExpression<Nullable<ServiceStatusTypeModelMapping>> for ServiceStatusTypeModel {
+    type Expression = Bound<Nullable<ServiceStatusTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<ServiceStatusTypeModelMapping> for &'a ServiceStatusTypeModel {
+    type Expression = Bound<ServiceStatusTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<Nullable<ServiceStatusTypeModelMapping>> for &'a ServiceStatusTypeModel {
+    type Expression = Bound<Nullable<ServiceStatusTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<ServiceStatusTypeModelMapping> for &'a &'b ServiceStatusTypeModel {
+    type Expression = Bound<ServiceStatusTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<Nullable<ServiceStatusTypeModelMapping>>
+    for &'a &'b ServiceStatusTypeModel
+{
+    type Expression = Bound<Nullable<ServiceStatusTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<DB: Backend> ToSql<ServiceStatusTypeModelMapping, DB> for ServiceStatusTypeModel {
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        match self {
+            ServiceStatusTypeModel::Prepared => out.write_all(b"PREPARED")?,
+            ServiceStatusTypeModel::Finalized => out.write_all(b"FINALIZED")?,
+            ServiceStatusTypeModel::Retired => out.write_all(b"RETIRED")?,
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl<DB> ToSql<Nullable<ServiceStatusTypeModelMapping>, DB> for ServiceStatusTypeModel
+where
+    DB: Backend,
+    Self: ToSql<ServiceStatusTypeModelMapping, DB>,
+{
+    fn to_sql<W: ::std::io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        ToSql::<ServiceStatusTypeModelMapping, DB>::to_sql(self, out)
+    }
+}
+
+impl<DB> Queryable<ServiceStatusTypeModelMapping, DB> for ServiceStatusTypeModel
+where
+    DB: Backend + HasSqlType<ServiceStatusTypeModelMapping>,
+    ServiceStatusTypeModel: FromSql<ServiceStatusTypeModelMapping, DB>,
+{
+    type Row = Self;
+
+    fn build(row: Self::Row) -> Self {
+        row
+    }
+}
+
+impl<DB> FromSqlRow<ServiceStatusTypeModelMapping, DB> for ServiceStatusTypeModel
+where
+    DB: Backend,
+    ServiceStatusTypeModel: FromSql<ServiceStatusTypeModelMapping, DB>,
+{
+    fn build_from_row<T: Row<DB>>(row: &mut T) -> deserialize::Result<Self> {
+        FromSql::<ServiceStatusTypeModelMapping, DB>::from_sql(row.take())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl FromSql<ServiceStatusTypeModelMapping, Pg> for ServiceStatusTypeModel {
+    fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes {
+            Some(b"PREPARED") => Ok(ServiceStatusTypeModel::Prepared),
+            Some(b"FINALIZED") => Ok(ServiceStatusTypeModel::Finalized),
+            Some(b"RETIRED") => Ok(ServiceStatusTypeModel::Retired),
+            Some(v) => Err(format!(
+                "Unrecognized enum variant: '{}'",
+                String::from_utf8_lossy(v)
+            )
+            .into()),
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl HasSqlType<ServiceStatusTypeModelMapping> for Pg {
+    fn metadata(lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        lookup.lookup_type("scabbard_service_status_type")
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl FromSql<ServiceStatusTypeModelMapping, Sqlite> for ServiceStatusTypeModel {
+    fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes.map(|v| v.read_blob()) {
+            Some(b"PREPARED") => Ok(ServiceStatusTypeModel::Prepared),
+            Some(b"FINALIZED") => Ok(ServiceStatusTypeModel::Finalized),
+            Some(b"RETIRED") => Ok(ServiceStatusTypeModel::Retired),
+            Some(blob) => {
+                Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
+            }
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl HasSqlType<ServiceStatusTypeModelMapping> for Sqlite {
+    fn metadata(_lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        diesel::sqlite::SqliteType::Text
+    }
 }
 
 impl From<&ScabbardService> for ScabbardServiceModel {
@@ -336,6 +494,26 @@ impl From<&ServiceStatus> for String {
             ServiceStatus::Prepared => "PREPARED".into(),
             ServiceStatus::Finalized => "FINALIZED".into(),
             ServiceStatus::Retired => "RETIRED".into(),
+        }
+    }
+}
+
+impl From<&ServiceStatusTypeModel> for ServiceStatus {
+    fn from(status: &ServiceStatusTypeModel) -> Self {
+        match status {
+            ServiceStatusTypeModel::Prepared => ServiceStatus::Prepared,
+            ServiceStatusTypeModel::Finalized => ServiceStatus::Finalized,
+            ServiceStatusTypeModel::Retired => ServiceStatus::Retired,
+        }
+    }
+}
+
+impl From<&ServiceStatus> for ServiceStatusTypeModel {
+    fn from(status: &ServiceStatus) -> Self {
+        match *status {
+            ServiceStatus::Prepared => ServiceStatusTypeModel::Prepared,
+            ServiceStatus::Finalized => ServiceStatusTypeModel::Finalized,
+            ServiceStatus::Retired => ServiceStatusTypeModel::Retired,
         }
     }
 }

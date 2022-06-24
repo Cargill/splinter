@@ -20,7 +20,7 @@ use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
-    models::ScabbardServiceModel,
+    models::{ScabbardServiceModel, ServiceStatusTypeModel, ServiceStatusTypeModelMapping},
     schema::{consensus_2pc_action, scabbard_service},
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -43,6 +43,8 @@ where
     C: diesel::Connection,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ServiceStatusTypeModelMapping>,
+    ServiceStatusTypeModel: diesel::deserialize::FromSql<ServiceStatusTypeModelMapping, C::Backend>,
 {
     fn update_consensus_action(
         &self,
