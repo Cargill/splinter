@@ -35,7 +35,8 @@ table! {
         service_id  -> Text,
         epoch -> BigInt,
         value -> VarChar,
-        decision -> Nullable<Text>,
+        decision ->
+            Nullable<crate::store::scabbard_store::diesel::models::DecisionTypeModelMapping>,
     }
 }
 

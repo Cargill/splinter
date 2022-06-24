@@ -111,7 +111,159 @@ pub struct CommitEntryModel {
     pub service_id: String,
     pub epoch: i64,
     pub value: String,
-    pub decision: Option<String>,
+    pub decision: Option<DecisionTypeModel>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum DecisionTypeModel {
+    Commit,
+    Abort,
+}
+
+// This has to be pub, due to its use in the table macro execution for Decision
+pub struct DecisionTypeModelMapping;
+
+impl QueryId for DecisionTypeModelMapping {
+    type QueryId = DecisionTypeModelMapping;
+    const HAS_STATIC_QUERY_ID: bool = true;
+}
+
+impl NotNull for DecisionTypeModelMapping {}
+
+impl SingleValue for DecisionTypeModelMapping {}
+
+impl AsExpression<DecisionTypeModelMapping> for DecisionTypeModel {
+    type Expression = Bound<DecisionTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl AsExpression<Nullable<DecisionTypeModelMapping>> for DecisionTypeModel {
+    type Expression = Bound<Nullable<DecisionTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<DecisionTypeModelMapping> for &'a DecisionTypeModel {
+    type Expression = Bound<DecisionTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<Nullable<DecisionTypeModelMapping>> for &'a DecisionTypeModel {
+    type Expression = Bound<Nullable<DecisionTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<DecisionTypeModelMapping> for &'a &'b DecisionTypeModel {
+    type Expression = Bound<DecisionTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<Nullable<DecisionTypeModelMapping>> for &'a &'b DecisionTypeModel {
+    type Expression = Bound<Nullable<DecisionTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<DB: Backend> ToSql<DecisionTypeModelMapping, DB> for DecisionTypeModel {
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        match self {
+            DecisionTypeModel::Commit => out.write_all(b"COMMIT")?,
+            DecisionTypeModel::Abort => out.write_all(b"ABORT")?,
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl<DB> ToSql<Nullable<DecisionTypeModelMapping>, DB> for DecisionTypeModel
+where
+    DB: Backend,
+    Self: ToSql<DecisionTypeModelMapping, DB>,
+{
+    fn to_sql<W: ::std::io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        ToSql::<DecisionTypeModelMapping, DB>::to_sql(self, out)
+    }
+}
+
+impl<DB> Queryable<DecisionTypeModelMapping, DB> for DecisionTypeModel
+where
+    DB: Backend + HasSqlType<DecisionTypeModelMapping>,
+    DecisionTypeModel: FromSql<DecisionTypeModelMapping, DB>,
+{
+    type Row = Self;
+
+    fn build(row: Self::Row) -> Self {
+        row
+    }
+}
+
+impl<DB> FromSqlRow<DecisionTypeModelMapping, DB> for DecisionTypeModel
+where
+    DB: Backend,
+    DecisionTypeModel: FromSql<DecisionTypeModelMapping, DB>,
+{
+    fn build_from_row<T: Row<DB>>(row: &mut T) -> deserialize::Result<Self> {
+        FromSql::<DecisionTypeModelMapping, DB>::from_sql(row.take())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl FromSql<DecisionTypeModelMapping, Pg> for DecisionTypeModel {
+    fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes {
+            Some(b"COMMIT") => Ok(DecisionTypeModel::Commit),
+            Some(b"ABORT") => Ok(DecisionTypeModel::Abort),
+            Some(v) => Err(format!(
+                "Unrecognized enum variant: '{}'",
+                String::from_utf8_lossy(v)
+            )
+            .into()),
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl HasSqlType<DecisionTypeModelMapping> for Pg {
+    fn metadata(lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        lookup.lookup_type("decision_type")
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl FromSql<DecisionTypeModelMapping, Sqlite> for DecisionTypeModel {
+    fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes.map(|v| v.read_blob()) {
+            Some(b"COMMIT") => Ok(DecisionTypeModel::Commit),
+            Some(b"ABORT") => Ok(DecisionTypeModel::Abort),
+            Some(blob) => {
+                Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
+            }
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl HasSqlType<DecisionTypeModelMapping> for Sqlite {
+    fn metadata(_lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        diesel::sqlite::SqliteType::Text
+    }
 }
 
 impl TryFrom<&CommitEntry> for CommitEntryModel {
@@ -129,7 +281,7 @@ impl TryFrom<&CommitEntry> for CommitEntryModel {
             decision: entry
                 .decision()
                 .clone()
-                .map(|decision| String::from(&decision)),
+                .map(|decision| DecisionTypeModel::from(&decision)),
         })
     }
 }
@@ -153,8 +305,7 @@ impl TryFrom<CommitEntryModel> for CommitEntry {
             .with_value(&entry.value);
 
         if let Some(d) = entry.decision {
-            let decision = ConsensusDecision::try_from(d.as_str())?;
-            builder = builder.with_decision(&decision);
+            builder = builder.with_decision(&ConsensusDecision::from(&d));
         }
 
         builder
@@ -231,6 +382,24 @@ impl From<&ConsensusDecision> for String {
         match *status {
             ConsensusDecision::Abort => "ABORT".into(),
             ConsensusDecision::Commit => "COMMIT".into(),
+        }
+    }
+}
+
+impl From<&DecisionTypeModel> for ConsensusDecision {
+    fn from(status: &DecisionTypeModel) -> Self {
+        match status {
+            DecisionTypeModel::Abort => ConsensusDecision::Abort,
+            DecisionTypeModel::Commit => ConsensusDecision::Commit,
+        }
+    }
+}
+
+impl From<&ConsensusDecision> for DecisionTypeModel {
+    fn from(status: &ConsensusDecision) -> Self {
+        match *status {
+            ConsensusDecision::Abort => DecisionTypeModel::Abort,
+            ConsensusDecision::Commit => DecisionTypeModel::Commit,
         }
     }
 }
