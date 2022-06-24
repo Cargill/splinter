@@ -13,7 +13,28 @@
 // limitations under the License.
 
 use std::convert::TryFrom;
+use std::io::Write;
 use std::time::{Duration, SystemTime};
+
+use diesel::{
+    backend::Backend,
+    deserialize::FromSqlRow,
+    expression::{bound::Bound, AsExpression},
+    query_builder::QueryId,
+    serialize::{self, IsNull, Output, ToSql},
+    sql_types::{HasSqlType, NotNull, Nullable, SingleValue},
+    Queryable,
+};
+#[cfg(feature = "diesel")]
+use diesel::{
+    deserialize::{self, FromSql},
+    row::Row,
+};
+
+#[cfg(feature = "postgres")]
+use diesel::pg::Pg;
+#[cfg(feature = "sqlite")]
+use diesel::sqlite::Sqlite;
 
 use splinter::error::InternalError;
 use splinter::service::{FullyQualifiedServiceId, ServiceId};
@@ -233,11 +254,188 @@ pub struct Consensus2pcContextModel {
     pub coordinator: String,
     pub epoch: i64,
     pub last_commit_epoch: Option<i64>,
-    pub state: String,
+    pub state: ContextStateModel,
     pub vote_timeout_start: Option<i64>,
     pub vote: Option<String>,
     pub decision_timeout_start: Option<i64>,
     pub ack_timeout_start: Option<i64>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ContextStateModel {
+    Abort,
+    Commit,
+    Voted,
+    Voting,
+    WaitingForStart,
+    WaitingForVoteRequest,
+    WaitingForVote,
+    WaitingForDecisionAck,
+}
+
+pub struct ContextStateModelMapping;
+
+impl QueryId for ContextStateModelMapping {
+    type QueryId = ContextStateModelMapping;
+    const HAS_STATIC_QUERY_ID: bool = true;
+}
+
+impl NotNull for ContextStateModelMapping {}
+
+impl SingleValue for ContextStateModelMapping {}
+
+impl AsExpression<ContextStateModelMapping> for ContextStateModel {
+    type Expression = Bound<ContextStateModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl AsExpression<Nullable<ContextStateModelMapping>> for ContextStateModel {
+    type Expression = Bound<Nullable<ContextStateModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<ContextStateModelMapping> for &'a ContextStateModel {
+    type Expression = Bound<ContextStateModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<Nullable<ContextStateModelMapping>> for &'a ContextStateModel {
+    type Expression = Bound<Nullable<ContextStateModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<ContextStateModelMapping> for &'a &'b ContextStateModel {
+    type Expression = Bound<ContextStateModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<Nullable<ContextStateModelMapping>> for &'a &'b ContextStateModel {
+    type Expression = Bound<Nullable<ContextStateModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<DB: Backend> ToSql<ContextStateModelMapping, DB> for ContextStateModel {
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        match self {
+            ContextStateModel::Abort => out.write_all(b"ABORT")?,
+            ContextStateModel::Commit => out.write_all(b"COMMIT")?,
+            ContextStateModel::Voted => out.write_all(b"VOTED")?,
+            ContextStateModel::Voting => out.write_all(b"VOTING")?,
+            ContextStateModel::WaitingForStart => out.write_all(b"WAITINGFORSTART")?,
+            ContextStateModel::WaitingForVoteRequest => out.write_all(b"WAITINGFORVOTEREQUEST")?,
+            ContextStateModel::WaitingForVote => out.write_all(b"WAITINGFORVOTE")?,
+            ContextStateModel::WaitingForDecisionAck => {
+                out.write_all(b"WAITING_FOR_DECISION_ACK")?
+            }
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl<DB> ToSql<Nullable<ContextStateModelMapping>, DB> for ContextStateModel
+where
+    DB: Backend,
+    Self: ToSql<ContextStateModelMapping, DB>,
+{
+    fn to_sql<W: ::std::io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        ToSql::<ContextStateModelMapping, DB>::to_sql(self, out)
+    }
+}
+
+impl<DB> Queryable<ContextStateModelMapping, DB> for ContextStateModel
+where
+    DB: Backend + HasSqlType<ContextStateModelMapping>,
+    ContextStateModel: FromSql<ContextStateModelMapping, DB>,
+{
+    type Row = Self;
+
+    fn build(row: Self::Row) -> Self {
+        row
+    }
+}
+
+impl<DB> FromSqlRow<ContextStateModelMapping, DB> for ContextStateModel
+where
+    DB: Backend,
+    ContextStateModel: FromSql<ContextStateModelMapping, DB>,
+{
+    fn build_from_row<T: Row<DB>>(row: &mut T) -> deserialize::Result<Self> {
+        FromSql::<ContextStateModelMapping, DB>::from_sql(row.take())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl FromSql<ContextStateModelMapping, Pg> for ContextStateModel {
+    fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes {
+            Some(b"ABORT") => Ok(ContextStateModel::Abort),
+            Some(b"COMMIT") => Ok(ContextStateModel::Commit),
+            Some(b"VOTED") => Ok(ContextStateModel::Voted),
+            Some(b"VOTING") => Ok(ContextStateModel::Voting),
+            Some(b"WAITINGFORSTART") => Ok(ContextStateModel::WaitingForStart),
+            Some(b"WAITINGFORVOTEREQUEST") => Ok(ContextStateModel::WaitingForVoteRequest),
+            Some(b"WAITINGFORVOTE") => Ok(ContextStateModel::WaitingForVote),
+            Some(b"WAITING_FOR_DECISION_ACK") => Ok(ContextStateModel::WaitingForDecisionAck),
+            Some(v) => Err(format!(
+                "Unrecognized enum variant: '{}'",
+                String::from_utf8_lossy(v)
+            )
+            .into()),
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl HasSqlType<ContextStateModelMapping> for Pg {
+    fn metadata(lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        lookup.lookup_type("context_state")
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl FromSql<ContextStateModelMapping, Sqlite> for ContextStateModel {
+    fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes.map(|v| v.read_blob()) {
+            Some(b"ABORT") => Ok(ContextStateModel::Abort),
+            Some(b"COMMIT") => Ok(ContextStateModel::Commit),
+            Some(b"VOTED") => Ok(ContextStateModel::Voted),
+            Some(b"VOTING") => Ok(ContextStateModel::Voting),
+            Some(b"WAITINGFORSTART") => Ok(ContextStateModel::WaitingForStart),
+            Some(b"WAITINGFORVOTEREQUEST") => Ok(ContextStateModel::WaitingForVoteRequest),
+            Some(b"WAITINGFORVOTE") => Ok(ContextStateModel::WaitingForVote),
+            Some(b"WAITING_FOR_DECISION_ACK") => Ok(ContextStateModel::WaitingForDecisionAck),
+            Some(blob) => {
+                Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
+            }
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl HasSqlType<ContextStateModelMapping> for Sqlite {
+    fn metadata(_lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        diesel::sqlite::SqliteType::Text
+    }
 }
 
 impl
@@ -265,9 +463,9 @@ impl
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
         let participants = ParticipantList::try_from(participants)?.inner;
 
-        let state = match context.state.as_str() {
-            "WAITINGFORSTART" => State::WaitingForStart,
-            "VOTING" => {
+        let state = match context.state {
+            ContextStateModel::WaitingForStart => State::WaitingForStart,
+            ContextStateModel::Voting => {
                 let vote_timeout_start = if let Some(t) = context.vote_timeout_start {
                     SystemTime::UNIX_EPOCH
                         .checked_add(Duration::from_secs(t as u64))
@@ -286,11 +484,11 @@ impl
                 };
                 State::Voting { vote_timeout_start }
             }
-            "WAITINGFORVOTE" => State::WaitingForVote,
-            "ABORT" => State::Abort,
-            "COMMIT" => State::Commit,
-            "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
-            "VOTED" => {
+            ContextStateModel::WaitingForVote => State::WaitingForVote,
+            ContextStateModel::Abort => State::Abort,
+            ContextStateModel::Commit => State::Commit,
+            ContextStateModel::WaitingForVoteRequest => State::WaitingForVoteRequest,
+            ContextStateModel::Voted => {
                 let vote = context
                     .vote
                     .as_ref()
@@ -334,7 +532,7 @@ impl
                     decision_timeout_start,
                 }
             }
-            "WAITING_FOR_DECISION_ACK" => {
+            ContextStateModel::WaitingForDecisionAck => {
                 let ack_timeout_start = if let Some(t) = context.ack_timeout_start {
                     SystemTime::UNIX_EPOCH
                         .checked_add(Duration::from_secs(t as u64))
@@ -352,11 +550,6 @@ impl
                     ));
                 };
                 State::WaitingForDecisionAck { ack_timeout_start }
-            }
-            _ => {
-                return Err(InternalError::with_message(
-                    "Failed to convert to ConsensusContext, invalid state value found".to_string(),
-                ))
             }
         };
 
@@ -438,7 +631,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
                 }
                 _ => (None, None, None, None),
             };
-        let state = String::from(context.state());
+        let state = ContextStateModel::from(context.state());
         Ok(Consensus2pcContextModel {
             circuit_id: service_id.circuit_id().to_string(),
             service_id: service_id.service_id().to_string(),
@@ -550,7 +743,7 @@ pub struct Consensus2pcUpdateContextActionModel {
     pub coordinator: String,
     pub epoch: i64,
     pub last_commit_epoch: Option<i64>,
-    pub state: String,
+    pub state: ContextStateModel,
     pub vote_timeout_start: Option<i64>,
     pub vote: Option<String>,
     pub decision_timeout_start: Option<i64>,
@@ -612,7 +805,7 @@ impl TryFrom<(&Context, &i64, &Option<i64>)> for Consensus2pcUpdateContextAction
                 }
                 _ => (None, None, None, None),
             };
-        let state = String::from(context.state());
+        let state = ContextStateModel::from(context.state());
         Ok(Consensus2pcUpdateContextActionModel {
             action_id: *action_id,
             coordinator: format!("{}", context.coordinator()),
@@ -703,6 +896,21 @@ impl From<&State> for String {
             State::WaitingForVoteRequest => String::from("WAITINGFORVOTEREQUEST"),
             State::Voted { .. } => String::from("VOTED"),
             State::WaitingForDecisionAck { .. } => String::from("WAITING_FOR_DECISION_ACK"),
+        }
+    }
+}
+
+impl From<&State> for ContextStateModel {
+    fn from(state: &State) -> Self {
+        match *state {
+            State::WaitingForStart => ContextStateModel::WaitingForStart,
+            State::Voting { .. } => ContextStateModel::Voting,
+            State::WaitingForVote => ContextStateModel::WaitingForVote,
+            State::Abort => ContextStateModel::Abort,
+            State::Commit => ContextStateModel::Commit,
+            State::WaitingForVoteRequest => ContextStateModel::WaitingForVoteRequest,
+            State::Voted { .. } => ContextStateModel::Voted,
+            State::WaitingForDecisionAck { .. } => ContextStateModel::WaitingForDecisionAck,
         }
     }
 }

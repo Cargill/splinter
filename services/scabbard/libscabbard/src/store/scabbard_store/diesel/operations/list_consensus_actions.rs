@@ -24,7 +24,7 @@ use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel,
         Consensus2pcUpdateContextActionModel, Consensus2pcUpdateContextActionParticipantModel,
-        ScabbardServiceModel,
+        ContextStateModel, ScabbardServiceModel,
     },
     schema::{
         consensus_2pc_action, consensus_2pc_notification_action, consensus_2pc_send_message_action,
@@ -153,9 +153,9 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                     });
                 }
 
-                let state = match update_context.state.as_str() {
-                    "WAITINGFORSTART" => State::WaitingForStart,
-                    "VOTING" => {
+                let state = match update_context.state {
+                    ContextStateModel::WaitingForStart => State::WaitingForStart,
+                    ContextStateModel::Voting => {
                         let vote_timeout_start = get_system_time(
                             update_context.vote_timeout_start,
                         )?
@@ -168,10 +168,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                         })?;
                         State::Voting { vote_timeout_start }
                     }
-                    "WAITINGFORVOTE" => State::WaitingForVote,
-                    "ABORT" => State::Abort,
-                    "COMMIT" => State::Commit,
-                    "VOTED" => {
+                    ContextStateModel::WaitingForVote => State::WaitingForVote,
+                    ContextStateModel::Abort => State::Abort,
+                    ContextStateModel::Commit => State::Commit,
+                    ContextStateModel::Voted => {
                         let decision_timeout_start = get_system_time(
                             update_context.decision_timeout_start,
                         )?
@@ -208,8 +208,8 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                             decision_timeout_start,
                         }
                     }
-                    "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
-                    "WAITING_FOR_DECISION_ACK" => {
+                    ContextStateModel::WaitingForVoteRequest => State::WaitingForVoteRequest,
+                    ContextStateModel::WaitingForDecisionAck => {
                         let ack_timeout_start = get_system_time(update_context.ack_timeout_start)?
                             .ok_or_else(|| {
                                 ScabbardStoreError::Internal(InternalError::with_message(
@@ -219,11 +219,6 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                             ))
                             })?;
                         State::WaitingForDecisionAck { ack_timeout_start }
-                    }
-                    _ => {
-                        return Err(ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list actions, invalid state value found".to_string(),
-                        )))
                     }
                 };
 
@@ -467,9 +462,9 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                     });
                 }
 
-                let state = match update_context.state.as_str() {
-                    "WAITINGFORSTART" => State::WaitingForStart,
-                    "VOTING" => {
+                let state = match update_context.state {
+                    ContextStateModel::WaitingForStart => State::WaitingForStart,
+                    ContextStateModel::Voting => {
                         let vote_timeout_start = get_system_time(
                             update_context.vote_timeout_start,
                         )?
@@ -482,10 +477,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                         })?;
                         State::Voting { vote_timeout_start }
                     }
-                    "WAITINGFORVOTE" => State::WaitingForVote,
-                    "ABORT" => State::Abort,
-                    "COMMIT" => State::Commit,
-                    "VOTED" => {
+                    ContextStateModel::WaitingForVote => State::WaitingForVote,
+                    ContextStateModel::Abort => State::Abort,
+                    ContextStateModel::Commit => State::Commit,
+                    ContextStateModel::Voted => {
                         let decision_timeout_start = get_system_time(
                             update_context.decision_timeout_start,
                         )?
@@ -522,8 +517,8 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                             decision_timeout_start,
                         }
                     }
-                    "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
-                    "WAITING_FOR_DECISION_ACK" => {
+                    ContextStateModel::WaitingForVoteRequest => State::WaitingForVoteRequest,
+                    ContextStateModel::WaitingForDecisionAck => {
                         let ack_timeout_start = get_system_time(update_context.ack_timeout_start)?
                             .ok_or_else(|| {
                                 ScabbardStoreError::Internal(InternalError::with_message(
@@ -533,11 +528,6 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                             ))
                             })?;
                         State::WaitingForDecisionAck { ack_timeout_start }
-                    }
-                    _ => {
-                        return Err(ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list actions, invalid state value found".to_string(),
-                        )))
                     }
                 };
 
