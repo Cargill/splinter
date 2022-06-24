@@ -24,7 +24,7 @@ use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
-    models::{ScabbardAlarmModel, ScabbardServiceModel},
+    models::{AlarmTypeModel, ScabbardAlarmModel, ScabbardServiceModel},
     schema::{scabbard_alarm, scabbard_service},
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -75,7 +75,7 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     scabbard_alarm::circuit_id
                         .eq(service_id.circuit_id().to_string())
                         .and(scabbard_alarm::service_id.eq(service_id.service_id().to_string()))
-                        .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
+                        .and(scabbard_alarm::alarm_type.eq(AlarmTypeModel::from(alarm_type))),
                 )
                 .first::<ScabbardAlarmModel>(self.conn)
                 .optional()
@@ -86,7 +86,7 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
             let new_alarm = ScabbardAlarmModel {
                 circuit_id: service_id.circuit_id().to_string(),
                 service_id: service_id.service_id().to_string(),
-                alarm_type: String::from(alarm_type),
+                alarm_type: AlarmTypeModel::from(alarm_type),
                 alarm: get_timestamp(alarm)?,
             };
 
@@ -97,7 +97,7 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         scabbard_alarm::circuit_id
                             .eq(service_id.circuit_id().to_string())
                             .and(scabbard_alarm::service_id.eq(service_id.service_id().to_string()))
-                            .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
+                            .and(scabbard_alarm::alarm_type.eq(AlarmTypeModel::from(alarm_type))),
                     ),
                 )
                 .execute(self.conn)
@@ -150,7 +150,7 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
                     scabbard_alarm::circuit_id
                         .eq(service_id.circuit_id().to_string())
                         .and(scabbard_alarm::service_id.eq(service_id.service_id().to_string()))
-                        .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
+                        .and(scabbard_alarm::alarm_type.eq(AlarmTypeModel::from(alarm_type))),
                 )
                 .first::<ScabbardAlarmModel>(self.conn)
                 .optional()
@@ -161,7 +161,7 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
             let new_alarm = ScabbardAlarmModel {
                 circuit_id: service_id.circuit_id().to_string(),
                 service_id: service_id.service_id().to_string(),
-                alarm_type: String::from(alarm_type),
+                alarm_type: AlarmTypeModel::from(alarm_type),
                 alarm: get_timestamp(alarm)?,
             };
 
@@ -172,7 +172,7 @@ impl<'a> SetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
                         scabbard_alarm::circuit_id
                             .eq(service_id.circuit_id().to_string())
                             .and(scabbard_alarm::service_id.eq(service_id.service_id().to_string()))
-                            .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
+                            .and(scabbard_alarm::alarm_type.eq(AlarmTypeModel::from(alarm_type))),
                     ),
                 )
                 .execute(self.conn)

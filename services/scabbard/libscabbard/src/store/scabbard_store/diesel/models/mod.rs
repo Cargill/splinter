@@ -17,7 +17,7 @@ mod commit_entry;
 mod consensus;
 mod service;
 
-pub use alarm::ScabbardAlarmModel;
+pub use alarm::{AlarmTypeModel, AlarmTypeModelMapping, ScabbardAlarmModel};
 pub use commit_entry::{CommitEntryModel, DecisionTypeModel, DecisionTypeModelMapping};
 pub use consensus::{
     Consensus2pcContextModel, Consensus2pcContextParticipantModel, Consensus2pcDeliverEventModel,

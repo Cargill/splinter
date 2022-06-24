@@ -23,7 +23,7 @@ use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
-    models::ScabbardServiceModel,
+    models::{AlarmTypeModel, ScabbardServiceModel},
     schema::{scabbard_alarm, scabbard_service},
 };
 use crate::store::scabbard_store::ScabbardStoreError;
@@ -72,7 +72,7 @@ impl<'a> GetAlarmOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     scabbard_alarm::circuit_id
                         .eq(service_id.circuit_id().to_string())
                         .and(scabbard_alarm::service_id.eq(service_id.service_id().to_string()))
-                        .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
+                        .and(scabbard_alarm::alarm_type.eq(AlarmTypeModel::from(alarm_type))),
                 )
                 .select(scabbard_alarm::alarm)
                 .first::<i64>(self.conn)
@@ -126,7 +126,7 @@ impl<'a> GetAlarmOperation for ScabbardStoreOperations<'a, PgConnection> {
                     scabbard_alarm::circuit_id
                         .eq(service_id.circuit_id().to_string())
                         .and(scabbard_alarm::service_id.eq(service_id.service_id().to_string()))
-                        .and(scabbard_alarm::alarm_type.eq(String::from(alarm_type))),
+                        .and(scabbard_alarm::alarm_type.eq(AlarmTypeModel::from(alarm_type))),
                 )
                 .select(scabbard_alarm::alarm)
                 .first::<i64>(self.conn)

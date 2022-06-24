@@ -44,7 +44,7 @@ table! {
     scabbard_alarm (circuit_id, service_id, alarm_type) {
         circuit_id  -> Text,
         service_id -> Text,
-        alarm_type -> Text,
+        alarm_type -> crate::store::scabbard_store::diesel::models::AlarmTypeModelMapping,
         alarm -> BigInt,
     }
 }
