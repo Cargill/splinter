@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod alarm;
 mod commit_entry;
 mod service;
 
@@ -43,7 +44,6 @@ use splinter::error::InternalError;
 use splinter::service::{FullyQualifiedServiceId, ServiceId};
 
 use crate::store::scabbard_store::{
-    alarm::AlarmType,
     two_phase_commit::{Context, ContextBuilder, Event, Message, Notification, Participant, State},
     ConsensusContext,
 };
@@ -53,24 +53,15 @@ use super::schema::{
     consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_notification_action,
     consensus_2pc_send_message_action, consensus_2pc_start_event,
     consensus_2pc_update_context_action, consensus_2pc_update_context_action_participant,
-    consensus_2pc_vote_event, scabbard_alarm,
+    consensus_2pc_vote_event,
 };
 
+pub use alarm::ScabbardAlarmModel;
 pub use commit_entry::{CommitEntryModel, DecisionTypeModel, DecisionTypeModelMapping};
 pub use service::{
     ConsensusTypeModel, ConsensusTypeModelMapping, ScabbardPeerModel, ScabbardServiceModel,
     ServiceStatusTypeModel, ServiceStatusTypeModelMapping,
 };
-
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "scabbard_alarm"]
-#[primary_key(circuit_id, service_id, alarm_type)]
-pub struct ScabbardAlarmModel {
-    pub circuit_id: String,
-    pub service_id: String,
-    pub alarm_type: String,
-    pub alarm: i64, // timestamp, when to wake up
-}
 
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "consensus_2pc_context"]
@@ -1227,12 +1218,4 @@ pub struct Consensus2pcStartEventModel {
 pub struct Consensus2pcVoteEventModel {
     pub event_id: i64,
     pub vote: String, // TRUE or FALSE
-}
-
-impl From<&AlarmType> for String {
-    fn from(status: &AlarmType) -> Self {
-        match *status {
-            AlarmType::TwoPhaseCommit => "TWOPHASECOMMIT".into(),
-        }
-    }
 }
