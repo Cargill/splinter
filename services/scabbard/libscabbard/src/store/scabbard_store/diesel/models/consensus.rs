@@ -758,7 +758,7 @@ impl<DB: Backend> ToSql<MessageTypeModelMapping, DB> for MessageTypeModel {
             MessageTypeModel::VoteRequest => out.write_all(b"VOTEREQUEST")?,
             MessageTypeModel::Commit => out.write_all(b"COMMIT")?,
             MessageTypeModel::Abort => out.write_all(b"ABORT")?,
-            MessageTypeModel::DecisionAck => out.write_all(b"DECISIONACK")?,
+            MessageTypeModel::DecisionAck => out.write_all(b"DECISION_ACK")?,
         }
         Ok(IsNull::No)
     }
@@ -805,7 +805,7 @@ impl FromSql<MessageTypeModelMapping, Pg> for MessageTypeModel {
             Some(b"VOTEREQUEST") => Ok(MessageTypeModel::VoteRequest),
             Some(b"COMMIT") => Ok(MessageTypeModel::Commit),
             Some(b"ABORT") => Ok(MessageTypeModel::Abort),
-            Some(b"DECISIONACK") => Ok(MessageTypeModel::DecisionAck),
+            Some(b"DECISION_ACK") => Ok(MessageTypeModel::DecisionAck),
             Some(v) => Err(format!(
                 "Unrecognized enum variant: '{}'",
                 String::from_utf8_lossy(v)
@@ -832,7 +832,7 @@ impl FromSql<MessageTypeModelMapping, Sqlite> for MessageTypeModel {
             Some(b"VOTEREQUEST") => Ok(MessageTypeModel::VoteRequest),
             Some(b"COMMIT") => Ok(MessageTypeModel::Commit),
             Some(b"ABORT") => Ok(MessageTypeModel::Abort),
-            Some(b"DECISIONACK") => Ok(MessageTypeModel::DecisionAck),
+            Some(b"DECISION_ACK") => Ok(MessageTypeModel::DecisionAck),
             Some(blob) => {
                 Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
             }
