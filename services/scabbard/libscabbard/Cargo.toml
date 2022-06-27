@@ -108,7 +108,6 @@ scabbardv3 = [
     "scabbardv3-store",
     "splinter/service-arguments-converter",
     "splinter/service-lifecycle",
-    "splinter/service-message-converter",
     "splinter/service-message-handler",
     "splinter/service-message-handler-factory",
     "splinter/service-message-sender",

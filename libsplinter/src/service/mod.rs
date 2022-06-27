@@ -41,7 +41,6 @@ mod id;
 pub mod instance;
 #[cfg(feature = "service-lifecycle")]
 mod lifecycle;
-#[cfg(feature = "service-message-converter")]
 mod message_converter;
 #[cfg(feature = "service-message-handler")]
 mod message_handler;
@@ -71,7 +70,6 @@ pub use arguments_converter::ArgumentsConverter;
 pub use id::{CircuitId, FullyQualifiedServiceId, ServiceId};
 #[cfg(feature = "service-lifecycle")]
 pub use lifecycle::Lifecycle;
-#[cfg(feature = "service-message-converter")]
 pub use message_converter::MessageConverter;
 #[cfg(feature = "service-message-handler")]
 pub use message_handler::MessageHandler;
