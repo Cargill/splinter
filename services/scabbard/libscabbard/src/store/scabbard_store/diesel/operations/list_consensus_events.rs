@@ -20,7 +20,9 @@ use splinter::service::ServiceId;
 use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcDeliverEventModel, Consensus2pcStartEventModel, Consensus2pcVoteEventModel,
-        ScabbardServiceModel,
+        ConsensusTypeModel, ConsensusTypeModelMapping, DeliverMessageTypeModel,
+        DeliverMessageTypeModelMapping, EventTypeModel, EventTypeModelMapping,
+        ScabbardServiceModel, ServiceStatusTypeModel, ServiceStatusTypeModelMapping,
     },
     schema::{
         consensus_2pc_deliver_event, consensus_2pc_event, consensus_2pc_start_event,
@@ -52,6 +54,15 @@ where
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     Vec<u8>: diesel::deserialize::FromSql<diesel::sql_types::Binary, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<DeliverMessageTypeModelMapping>,
+    DeliverMessageTypeModel:
+        diesel::deserialize::FromSql<DeliverMessageTypeModelMapping, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ServiceStatusTypeModelMapping>,
+    ServiceStatusTypeModel: diesel::deserialize::FromSql<ServiceStatusTypeModelMapping, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ConsensusTypeModelMapping>,
+    ConsensusTypeModel: diesel::deserialize::FromSql<ConsensusTypeModelMapping, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<EventTypeModelMapping>,
+    EventTypeModel: diesel::deserialize::FromSql<EventTypeModelMapping, C::Backend>,
 {
     fn list_consensus_events(
         &self,
@@ -88,7 +99,7 @@ where
                 )
                 .order(consensus_2pc_event::id.desc())
                 .select((consensus_2pc_event::id, consensus_2pc_event::event_type))
-                .load::<(i64, String)>(self.conn)
+                .load::<(i64, EventTypeModel)>(self.conn)
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
                 })?;
@@ -103,8 +114,8 @@ where
 
             let mut alarm_events = consensus_events
                 .into_iter()
-                .filter_map(|(id, event_type)| match event_type.as_str() {
-                    "ALARM" => Some(Identified {
+                .filter_map(|(id, event_type)| match event_type {
+                    EventTypeModel::Alarm => Some(Identified {
                         id,
                         record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
                     }),
@@ -140,54 +151,50 @@ where
                     ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                 })?;
 
-                let message =
-                    match deliver.message_type.as_str() {
-                        "VOTERESPONSE" => {
-                            let vote_response = deliver
-                                .vote_response
-                                .map(|v| match v.as_str() {
-                                    "TRUE" => Some(true),
-                                    "FALSE" => Some(false),
-                                    _ => None,
-                                })
-                                .ok_or_else(|| {
-                                    ScabbardStoreError::Internal(InternalError::with_message(
-                                        "Failed to get vote response for message in 'deliver' \
+                let message = match deliver.message_type {
+                    DeliverMessageTypeModel::VoteResponse => {
+                        let vote_response = deliver
+                            .vote_response
+                            .map(|v| match v.as_str() {
+                                "TRUE" => Some(true),
+                                "FALSE" => Some(false),
+                                _ => None,
+                            })
+                            .ok_or_else(|| {
+                                ScabbardStoreError::Internal(InternalError::with_message(
+                                    "Failed to get vote response for message in 'deliver' \
                                     event, no associated vote response found"
-                                            .to_string(),
-                                    ))
-                                })?
-                                .ok_or_else(|| {
-                                    ScabbardStoreError::Internal(InternalError::with_message(
+                                        .to_string(),
+                                ))
+                            })?
+                            .ok_or_else(|| {
+                                ScabbardStoreError::Internal(InternalError::with_message(
                                     "Failed to get 'vote response' for message in 'deliver' event, \
                                     invalid vote response found"
                                     .to_string(),
                                 ))
-                                })?;
-                            Message::VoteResponse(deliver.epoch as u64, vote_response)
-                        }
-                        "DECISIONREQUEST" => Message::DecisionRequest(deliver.epoch as u64),
-                        "VOTEREQUEST" => Message::VoteRequest(
-                            deliver.epoch as u64,
-                            deliver.vote_request.ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to list events, deliver event has message type 'vote \
+                            })?;
+                        Message::VoteResponse(deliver.epoch as u64, vote_response)
+                    }
+                    DeliverMessageTypeModel::DecisionRequest => {
+                        Message::DecisionRequest(deliver.epoch as u64)
+                    }
+                    DeliverMessageTypeModel::VoteRequest => Message::VoteRequest(
+                        deliver.epoch as u64,
+                        deliver.vote_request.ok_or_else(|| {
+                            ScabbardStoreError::Internal(InternalError::with_message(
+                                "Failed to list events, deliver event has message type 'vote \
                                 request' but no associated value"
-                                        .to_string(),
-                                ))
-                            })?,
-                        ),
-                        "COMMIT" => Message::Commit(deliver.epoch as u64),
-                        "ABORT" => Message::Abort(deliver.epoch as u64),
-                        "DECISION_ACK" => Message::DecisionAck(deliver.epoch as u64),
-                        _ => return Err(ScabbardStoreError::InvalidState(
-                            InvalidStateError::with_message(
-                                "Failed to list events, invalid message type found for deliver \
-                                event"
                                     .to_string(),
-                            ),
-                        )),
-                    };
+                            ))
+                        })?,
+                    ),
+                    DeliverMessageTypeModel::Commit => Message::Commit(deliver.epoch as u64),
+                    DeliverMessageTypeModel::Abort => Message::Abort(deliver.epoch as u64),
+                    DeliverMessageTypeModel::DecisionAck => {
+                        Message::DecisionAck(deliver.epoch as u64)
+                    }
+                };
 
                 let event = Identified {
                     id: deliver.event_id,

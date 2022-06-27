@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::convert::TryFrom;
-
 use diesel::prelude::*;
 use splinter::error::{InternalError, InvalidArgumentError};
 use splinter::service::{FullyQualifiedServiceId, ServiceId};
 
 use crate::store::scabbard_store::diesel::models::{ScabbardPeerModel, ScabbardServiceModel};
-use crate::store::scabbard_store::diesel::schema::{scabbard_peer, scabbard_service};
+use crate::store::scabbard_store::diesel::{
+    models::{
+        ConsensusTypeModel, ConsensusTypeModelMapping, ServiceStatusTypeModel,
+        ServiceStatusTypeModelMapping,
+    },
+    schema::{scabbard_peer, scabbard_service},
+};
 use crate::store::scabbard_store::{
     service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
     ScabbardService, ScabbardStoreError,
@@ -40,6 +44,10 @@ impl<'a, C> GetServiceOperation for ScabbardStoreOperations<'a, C>
 where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ServiceStatusTypeModelMapping>,
+    ServiceStatusTypeModel: diesel::deserialize::FromSql<ServiceStatusTypeModelMapping, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ConsensusTypeModelMapping>,
+    ConsensusTypeModel: diesel::deserialize::FromSql<ConsensusTypeModelMapping, C::Backend>,
 {
     fn get_service(
         &self,
@@ -79,8 +87,8 @@ where
 
             let service = ScabbardServiceBuilder::default()
                 .with_service_id(service_id)
-                .with_consensus(&ConsensusType::try_from(service_model.consensus.as_str())?)
-                .with_status(&ServiceStatus::try_from(service_model.status.as_str())?)
+                .with_consensus(&ConsensusType::from(&service_model.consensus))
+                .with_status(&ServiceStatus::from(&service_model.status))
                 .with_peers(service_peers.as_slice())
                 .build()
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;

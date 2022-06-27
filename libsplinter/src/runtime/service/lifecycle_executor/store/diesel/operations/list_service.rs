@@ -13,14 +13,16 @@
 // limitations under the License.
 
 //! Provides the "list service" operation for the `DieselLifecycleStore`.
-use std::convert::TryFrom;
 
 use diesel::prelude::*;
 
 use crate::runtime::service::{
     lifecycle_executor::store::{
         diesel::{
-            models::{ServiceLifecycleArgumentModel, ServiceLifecycleStatusModel},
+            models::{
+                CommandTypeModel, CommandTypeModelMapping, ServiceLifecycleArgumentModel,
+                ServiceLifecycleStatusModel, StatusTypeModel, StatusTypeModelMapping,
+            },
             schema::{service_lifecycle_argument, service_lifecycle_status},
         },
         error::LifecycleStoreError,
@@ -45,6 +47,10 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<StatusTypeModelMapping>,
+    StatusTypeModel: diesel::deserialize::FromSql<StatusTypeModelMapping, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<CommandTypeModelMapping>,
+    CommandTypeModel: diesel::deserialize::FromSql<CommandTypeModelMapping, C::Backend>,
 {
     fn list_service(
         &self,
@@ -54,7 +60,7 @@ where
             // Fetch the `service` entry with the matching `service_id`.
             // return None if the `service` does not exist
             let services: Vec<ServiceLifecycleStatusModel> = service_lifecycle_status::table
-                .filter(service_lifecycle_status::status.eq(&String::from(status)))
+                .filter(service_lifecycle_status::status.eq(StatusTypeModel::from(status)))
                 .load::<ServiceLifecycleStatusModel>(self.conn)?;
 
             let mut return_services = Vec::new();
@@ -77,8 +83,8 @@ where
                     ))
                     .with_service_type(&ServiceType::new(service.service_type)?)
                     .with_arguments(&arguments)
-                    .with_command(&LifecycleCommand::try_from(service.command.as_str())?)
-                    .with_status(&LifecycleStatus::try_from(service.status.as_str())?)
+                    .with_command(&LifecycleCommand::from(service.command))
+                    .with_status(&LifecycleStatus::from(service.status))
                     .build()
                     .map_err(LifecycleStoreError::InvalidState)?;
 

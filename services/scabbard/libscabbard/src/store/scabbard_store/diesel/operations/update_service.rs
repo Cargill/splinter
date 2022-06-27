@@ -20,7 +20,7 @@ use diesel::{delete, dsl::insert_into, prelude::*, update};
 use splinter::error::InvalidStateError;
 
 use crate::store::scabbard_store::diesel::{
-    models::{ScabbardPeerModel, ScabbardServiceModel},
+    models::{ScabbardPeerModel, ScabbardServiceModel, ServiceStatusTypeModel},
     schema::{scabbard_peer, scabbard_service},
 };
 use crate::store::scabbard_store::service::ScabbardService;
@@ -68,7 +68,7 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, SqliteConnection> {
                                 .eq(service.service_id().service_id().to_string()),
                         ),
                 )
-                .set(scabbard_service::status.eq(String::from(service.status())))
+                .set(scabbard_service::status.eq(ServiceStatusTypeModel::from(service.status())))
                 .execute(self.conn)
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
@@ -139,7 +139,7 @@ impl<'a> UpdateServiceAction for ScabbardStoreOperations<'a, PgConnection> {
                                 .eq(service.service_id().service_id().to_string()),
                         ),
                 )
-                .set(scabbard_service::status.eq(String::from(service.status())))
+                .set(scabbard_service::status.eq(ServiceStatusTypeModel::from(service.status())))
                 .execute(self.conn)
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())

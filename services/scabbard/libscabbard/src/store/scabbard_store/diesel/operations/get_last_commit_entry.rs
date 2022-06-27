@@ -20,7 +20,8 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::commit::CommitEntry;
 use crate::store::scabbard_store::diesel::{
-    models::CommitEntryModel, schema::scabbard_v3_commit_history,
+    models::{CommitEntryModel, DecisionTypeModel, DecisionTypeModelMapping},
+    schema::scabbard_v3_commit_history,
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 
@@ -40,6 +41,8 @@ where
     C: diesel::Connection,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<DecisionTypeModelMapping>,
+    DecisionTypeModel: diesel::deserialize::FromSql<DecisionTypeModelMapping, C::Backend>,
 {
     fn get_last_commit_entry(
         &self,

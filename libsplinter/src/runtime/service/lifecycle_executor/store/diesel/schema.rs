@@ -17,8 +17,10 @@ table! {
         circuit_id -> Text,
         service_id -> Text,
         service_type -> Text,
-        command -> Text,
-        status -> Text,
+        command ->
+            crate::runtime::service::lifecycle_executor::store::diesel::models::CommandTypeModelMapping,
+        status ->
+            crate::runtime::service::lifecycle_executor::store::diesel::models::StatusTypeModelMapping,
     }
 }
 

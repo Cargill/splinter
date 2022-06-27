@@ -16,8 +16,8 @@ table! {
     scabbard_service (circuit_id, service_id) {
         circuit_id  -> Text,
         service_id  -> Text,
-        consensus -> Text,
-        status -> Text,
+        consensus -> crate::store::scabbard_store::diesel::models::ConsensusTypeModelMapping,
+        status -> crate::store::scabbard_store::diesel::models::ServiceStatusTypeModelMapping,
     }
 }
 
@@ -35,7 +35,8 @@ table! {
         service_id  -> Text,
         epoch -> BigInt,
         value -> VarChar,
-        decision -> Nullable<Text>,
+        decision ->
+            Nullable<crate::store::scabbard_store::diesel::models::DecisionTypeModelMapping>,
     }
 }
 
@@ -43,7 +44,7 @@ table! {
     scabbard_alarm (circuit_id, service_id, alarm_type) {
         circuit_id  -> Text,
         service_id -> Text,
-        alarm_type -> Text,
+        alarm_type -> crate::store::scabbard_store::diesel::models::AlarmTypeModelMapping,
         alarm -> BigInt,
     }
 }
@@ -55,7 +56,7 @@ table! {
         coordinator -> Text,
         epoch -> BigInt,
         last_commit_epoch -> Nullable<BigInt>,
-        state -> Text,
+        state -> crate::store::scabbard_store::diesel::models::ContextStateModelMapping,
         vote_timeout_start -> Nullable<BigInt>,
         vote -> Nullable<Text>,
         decision_timeout_start -> Nullable<BigInt>,
@@ -77,7 +78,7 @@ table! {
 table! {
     consensus_2pc_notification_action (action_id) {
         action_id -> Int8,
-        notification_type -> Text,
+        notification_type -> crate::store::scabbard_store::diesel::models::NotificationTypeModelMapping,
         dropped_message -> Nullable<Text>,
         request_for_vote_value -> Nullable<Binary>,
     }
@@ -88,7 +89,7 @@ table! {
         action_id -> Int8,
         epoch -> BigInt,
         receiver_service_id -> Text,
-        message_type -> Text,
+        message_type -> crate::store::scabbard_store::diesel::models::MessageTypeModelMapping,
         vote_response -> Nullable<Text>,
         vote_request -> Nullable<Binary>,
     }
@@ -100,7 +101,7 @@ table! {
         coordinator -> Text,
         epoch -> BigInt,
         last_commit_epoch -> Nullable<BigInt>,
-        state -> Text,
+        state -> crate::store::scabbard_store::diesel::models::ContextStateModelMapping,
         vote_timeout_start -> Nullable<BigInt>,
         vote -> Nullable<Text>,
         decision_timeout_start -> Nullable<BigInt>,
@@ -137,7 +138,7 @@ table! {
         created_at -> Timestamp,
         executed_at -> Nullable<BigInt>,
         position -> Integer,
-        event_type -> Text,
+        event_type -> crate::store::scabbard_store::diesel::models::EventTypeModelMapping,
     }
 }
 
@@ -146,7 +147,7 @@ table! {
         event_id -> Int8,
         epoch -> BigInt,
         receiver_service_id -> Text,
-        message_type -> Text,
+        message_type -> crate::store::scabbard_store::diesel::models::DeliverMessageTypeModelMapping,
         vote_response -> Nullable<Text>,
         vote_request -> Nullable<Binary>,
     }

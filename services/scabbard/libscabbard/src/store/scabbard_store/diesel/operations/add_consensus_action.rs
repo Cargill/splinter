@@ -26,8 +26,8 @@ use splinter::service::FullyQualifiedServiceId;
 use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel,
-        Consensus2pcUpdateContextActionModel, InsertableConsensus2pcActionModel,
-        ScabbardServiceModel, UpdateContextActionParticipantList,
+        Consensus2pcUpdateContextActionModel, InsertableConsensus2pcActionModel, MessageTypeModel,
+        NotificationTypeModel, ScabbardServiceModel, UpdateContextActionParticipantList,
     },
     schema::{
         consensus_2pc_action, consensus_2pc_notification_action, consensus_2pc_send_message_action,
@@ -139,26 +139,35 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 Action::SendMessage(receiving_process, message) => {
                     let (message_type, vote_response, vote_request, epoch) = match message {
                         Message::DecisionRequest(epoch) => {
-                            (String::from(&message), None, None, epoch)
+                            (MessageTypeModel::from(&message), None, None, epoch)
                         }
                         Message::VoteResponse(epoch, true) => (
-                            String::from(&message),
+                            MessageTypeModel::from(&message),
                             Some("TRUE".to_string()),
                             None,
                             epoch,
                         ),
                         Message::VoteResponse(epoch, false) => (
-                            String::from(&message),
+                            MessageTypeModel::from(&message),
                             Some("FALSE".to_string()),
                             None,
                             epoch,
                         ),
-                        Message::Commit(epoch) => (String::from(&message), None, None, epoch),
-                        Message::Abort(epoch) => (String::from(&message), None, None, epoch),
-                        Message::VoteRequest(epoch, ref value) => {
-                            (String::from(&message), None, Some(value.clone()), epoch)
+                        Message::Commit(epoch) => {
+                            (MessageTypeModel::from(&message), None, None, epoch)
                         }
-                        Message::DecisionAck(epoch) => (String::from(&message), None, None, epoch),
+                        Message::Abort(epoch) => {
+                            (MessageTypeModel::from(&message), None, None, epoch)
+                        }
+                        Message::VoteRequest(epoch, ref value) => (
+                            MessageTypeModel::from(&message),
+                            None,
+                            Some(value.clone()),
+                            epoch,
+                        ),
+                        Message::DecisionAck(epoch) => {
+                            (MessageTypeModel::from(&message), None, None, epoch)
+                        }
                     };
 
                     let send_message_action = Consensus2pcSendMessageActionModel {
@@ -184,13 +193,17 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 Action::Notify(notification) => {
                     let (notification_type, dropped_message, request_for_vote_value) =
                         match &notification {
-                            Notification::MessageDropped(message) => {
-                                (String::from(&notification), Some(message.clone()), None)
-                            }
-                            Notification::ParticipantRequestForVote(value) => {
-                                (String::from(&notification), None, Some(value.clone()))
-                            }
-                            _ => (String::from(&notification), None, None),
+                            Notification::MessageDropped(message) => (
+                                NotificationTypeModel::from(&notification),
+                                Some(message.clone()),
+                                None,
+                            ),
+                            Notification::ParticipantRequestForVote(value) => (
+                                NotificationTypeModel::from(&notification),
+                                None,
+                                Some(value.clone()),
+                            ),
+                            _ => (NotificationTypeModel::from(&notification), None, None),
                         };
 
                     let notification_action = Consensus2pcNotificationModel {
@@ -295,26 +308,35 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 Action::SendMessage(receiving_process, message) => {
                     let (message_type, vote_response, vote_request, epoch) = match message {
                         Message::DecisionRequest(epoch) => {
-                            (String::from(&message), None, None, epoch)
+                            (MessageTypeModel::from(&message), None, None, epoch)
                         }
                         Message::VoteResponse(epoch, true) => (
-                            String::from(&message),
+                            MessageTypeModel::from(&message),
                             Some("TRUE".to_string()),
                             None,
                             epoch,
                         ),
                         Message::VoteResponse(epoch, false) => (
-                            String::from(&message),
+                            MessageTypeModel::from(&message),
                             Some("FALSE".to_string()),
                             None,
                             epoch,
                         ),
-                        Message::Commit(epoch) => (String::from(&message), None, None, epoch),
-                        Message::Abort(epoch) => (String::from(&message), None, None, epoch),
-                        Message::VoteRequest(epoch, ref value) => {
-                            (String::from(&message), None, Some(value.clone()), epoch)
+                        Message::Commit(epoch) => {
+                            (MessageTypeModel::from(&message), None, None, epoch)
                         }
-                        Message::DecisionAck(epoch) => (String::from(&message), None, None, epoch),
+                        Message::Abort(epoch) => {
+                            (MessageTypeModel::from(&message), None, None, epoch)
+                        }
+                        Message::VoteRequest(epoch, ref value) => (
+                            MessageTypeModel::from(&message),
+                            None,
+                            Some(value.clone()),
+                            epoch,
+                        ),
+                        Message::DecisionAck(epoch) => {
+                            (MessageTypeModel::from(&message), None, None, epoch)
+                        }
                     };
 
                     let send_message_action = Consensus2pcSendMessageActionModel {
@@ -340,13 +362,17 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 Action::Notify(notification) => {
                     let (notification_type, dropped_message, request_for_vote_value) =
                         match &notification {
-                            Notification::MessageDropped(message) => {
-                                (String::from(&notification), Some(message.clone()), None)
-                            }
-                            Notification::ParticipantRequestForVote(value) => {
-                                (String::from(&notification), None, Some(value.clone()))
-                            }
-                            _ => (String::from(&notification), None, None),
+                            Notification::MessageDropped(message) => (
+                                NotificationTypeModel::from(&notification),
+                                Some(message.clone()),
+                                None,
+                            ),
+                            Notification::ParticipantRequestForVote(value) => (
+                                NotificationTypeModel::from(&notification),
+                                None,
+                                Some(value.clone()),
+                            ),
+                            _ => (NotificationTypeModel::from(&notification), None, None),
                         };
 
                     let notification_action = Consensus2pcNotificationModel {

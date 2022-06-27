@@ -24,7 +24,7 @@ use crate::store::scabbard_store::diesel::{
     models::{
         Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel,
         Consensus2pcUpdateContextActionModel, Consensus2pcUpdateContextActionParticipantModel,
-        ScabbardServiceModel,
+        ContextStateModel, MessageTypeModel, NotificationTypeModel, ScabbardServiceModel,
     },
     schema::{
         consensus_2pc_action, consensus_2pc_notification_action, consensus_2pc_send_message_action,
@@ -153,9 +153,9 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                     });
                 }
 
-                let state = match update_context.state.as_str() {
-                    "WAITINGFORSTART" => State::WaitingForStart,
-                    "VOTING" => {
+                let state = match update_context.state {
+                    ContextStateModel::WaitingForStart => State::WaitingForStart,
+                    ContextStateModel::Voting => {
                         let vote_timeout_start = get_system_time(
                             update_context.vote_timeout_start,
                         )?
@@ -168,10 +168,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                         })?;
                         State::Voting { vote_timeout_start }
                     }
-                    "WAITINGFORVOTE" => State::WaitingForVote,
-                    "ABORT" => State::Abort,
-                    "COMMIT" => State::Commit,
-                    "VOTED" => {
+                    ContextStateModel::WaitingForVote => State::WaitingForVote,
+                    ContextStateModel::Abort => State::Abort,
+                    ContextStateModel::Commit => State::Commit,
+                    ContextStateModel::Voted => {
                         let decision_timeout_start = get_system_time(
                             update_context.decision_timeout_start,
                         )?
@@ -208,8 +208,8 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                             decision_timeout_start,
                         }
                     }
-                    "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
-                    "WAITING_FOR_DECISION_ACK" => {
+                    ContextStateModel::WaitingForVoteRequest => State::WaitingForVoteRequest,
+                    ContextStateModel::WaitingForDecisionAck => {
                         let ack_timeout_start = get_system_time(update_context.ack_timeout_start)?
                             .ok_or_else(|| {
                                 ScabbardStoreError::Internal(InternalError::with_message(
@@ -219,11 +219,6 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                             ))
                             })?;
                         State::WaitingForDecisionAck { ack_timeout_start }
-                    }
-                    _ => {
-                        return Err(ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list actions, invalid state value found".to_string(),
-                        )))
                     }
                 };
 
@@ -262,8 +257,8 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                     })?;
 
-                let message = match send_message.message_type.as_str() {
-                    "VOTERESPONSE" => {
+                let message = match send_message.message_type {
+                    MessageTypeModel::VoteResponse => {
                         let vote_response = send_message
                             .vote_response
                             .map(|v| match v.as_str() {
@@ -287,8 +282,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                             })?;
                         Message::VoteResponse(send_message.epoch as u64, vote_response)
                     }
-                    "DECISIONREQUEST" => Message::DecisionRequest(send_message.epoch as u64),
-                    "VOTEREQUEST" => Message::VoteRequest(
+                    MessageTypeModel::DecisionRequest => {
+                        Message::DecisionRequest(send_message.epoch as u64)
+                    }
+                    MessageTypeModel::VoteRequest => Message::VoteRequest(
                         send_message.epoch as u64,
                         send_message.vote_request.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
@@ -298,15 +295,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                             ))
                         })?,
                     ),
-                    "COMMIT" => Message::Commit(send_message.epoch as u64),
-                    "ABORT" => Message::Abort(send_message.epoch as u64),
-                    "DECISION_ACK" => Message::DecisionAck(send_message.epoch as u64),
-                    _ => {
-                        return Err(ScabbardStoreError::InvalidState(
-                            InvalidStateError::with_message(
-                                "Failed to list actions, invalid message type found".to_string(),
-                            ),
-                        ))
+                    MessageTypeModel::Commit => Message::Commit(send_message.epoch as u64),
+                    MessageTypeModel::Abort => Message::Abort(send_message.epoch as u64),
+                    MessageTypeModel::DecisionAck => {
+                        Message::DecisionAck(send_message.epoch as u64)
                     }
                 };
 
@@ -320,21 +312,25 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
             }
 
             for notification in notification_actions {
-                let notification_action = match notification.notification_type.as_str() {
-                    "REQUESTFORSTART" => Notification::RequestForStart(),
-                    "COORDINATORREQUESTFORVOTE" => Notification::CoordinatorRequestForVote(),
-                    "PARTICIPANTREQUESTFORVOTE" => Notification::ParticipantRequestForVote(
-                        notification.request_for_vote_value.ok_or_else(|| {
-                            ScabbardStoreError::Internal(InternalError::with_message(
-                                "Failed to get 'request for vote' notification action, no \
+                let notification_action = match notification.notification_type {
+                    NotificationTypeModel::RequestForStart => Notification::RequestForStart(),
+                    NotificationTypeModel::CoordinatorRequestForVote => {
+                        Notification::CoordinatorRequestForVote()
+                    }
+                    NotificationTypeModel::ParticipantRequestForVote => {
+                        Notification::ParticipantRequestForVote(
+                            notification.request_for_vote_value.ok_or_else(|| {
+                                ScabbardStoreError::Internal(InternalError::with_message(
+                                    "Failed to get 'request for vote' notification action, no \
                                     associated value"
-                                    .to_string(),
-                            ))
-                        })?,
-                    ),
-                    "COMMIT" => Notification::Commit(),
-                    "ABORT" => Notification::Abort(),
-                    "MESSAGEDROPPED" => Notification::MessageDropped(
+                                        .to_string(),
+                                ))
+                            })?,
+                        )
+                    }
+                    NotificationTypeModel::Commit => Notification::Commit(),
+                    NotificationTypeModel::Abort => Notification::Abort(),
+                    NotificationTypeModel::MessageDropped => Notification::MessageDropped(
                         notification.dropped_message.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
                                 "Failed to get 'message dropped' notification action, no \
@@ -343,11 +339,6 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                             ))
                         })?,
                     ),
-                    _ => {
-                        return Err(ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list actions, invalid notification type found".to_string(),
-                        )))
-                    }
                 };
                 let action = Identified {
                     id: notification.action_id,
@@ -467,9 +458,9 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                     });
                 }
 
-                let state = match update_context.state.as_str() {
-                    "WAITINGFORSTART" => State::WaitingForStart,
-                    "VOTING" => {
+                let state = match update_context.state {
+                    ContextStateModel::WaitingForStart => State::WaitingForStart,
+                    ContextStateModel::Voting => {
                         let vote_timeout_start = get_system_time(
                             update_context.vote_timeout_start,
                         )?
@@ -482,10 +473,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                         })?;
                         State::Voting { vote_timeout_start }
                     }
-                    "WAITINGFORVOTE" => State::WaitingForVote,
-                    "ABORT" => State::Abort,
-                    "COMMIT" => State::Commit,
-                    "VOTED" => {
+                    ContextStateModel::WaitingForVote => State::WaitingForVote,
+                    ContextStateModel::Abort => State::Abort,
+                    ContextStateModel::Commit => State::Commit,
+                    ContextStateModel::Voted => {
                         let decision_timeout_start = get_system_time(
                             update_context.decision_timeout_start,
                         )?
@@ -522,8 +513,8 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                             decision_timeout_start,
                         }
                     }
-                    "WAITINGFORVOTEREQUEST" => State::WaitingForVoteRequest,
-                    "WAITING_FOR_DECISION_ACK" => {
+                    ContextStateModel::WaitingForVoteRequest => State::WaitingForVoteRequest,
+                    ContextStateModel::WaitingForDecisionAck => {
                         let ack_timeout_start = get_system_time(update_context.ack_timeout_start)?
                             .ok_or_else(|| {
                                 ScabbardStoreError::Internal(InternalError::with_message(
@@ -533,11 +524,6 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                             ))
                             })?;
                         State::WaitingForDecisionAck { ack_timeout_start }
-                    }
-                    _ => {
-                        return Err(ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list actions, invalid state value found".to_string(),
-                        )))
                     }
                 };
 
@@ -576,8 +562,8 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                     })?;
 
-                let message = match send_message.message_type.as_str() {
-                    "VOTERESPONSE" => {
+                let message = match send_message.message_type {
+                    MessageTypeModel::VoteResponse => {
                         let vote_response = send_message
                             .vote_response
                             .map(|v| match v.as_str() {
@@ -601,8 +587,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                             })?;
                         Message::VoteResponse(send_message.epoch as u64, vote_response)
                     }
-                    "DECISIONREQUEST" => Message::DecisionRequest(send_message.epoch as u64),
-                    "VOTEREQUEST" => Message::VoteRequest(
+                    MessageTypeModel::DecisionRequest => {
+                        Message::DecisionRequest(send_message.epoch as u64)
+                    }
+                    MessageTypeModel::VoteRequest => Message::VoteRequest(
                         send_message.epoch as u64,
                         send_message.vote_request.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
@@ -612,15 +600,10 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                             ))
                         })?,
                     ),
-                    "COMMIT" => Message::Commit(send_message.epoch as u64),
-                    "ABORT" => Message::Abort(send_message.epoch as u64),
-                    "DECISION_ACK" => Message::DecisionAck(send_message.epoch as u64),
-                    _ => {
-                        return Err(ScabbardStoreError::InvalidState(
-                            InvalidStateError::with_message(
-                                "Failed to list actions, invalid message type found".to_string(),
-                            ),
-                        ))
+                    MessageTypeModel::Commit => Message::Commit(send_message.epoch as u64),
+                    MessageTypeModel::Abort => Message::Abort(send_message.epoch as u64),
+                    MessageTypeModel::DecisionAck => {
+                        Message::DecisionAck(send_message.epoch as u64)
                     }
                 };
 
@@ -634,21 +617,25 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
             }
 
             for notification in notification_actions {
-                let notification_action = match notification.notification_type.as_str() {
-                    "REQUESTFORSTART" => Notification::RequestForStart(),
-                    "COORDINATORREQUESTFORVOTE" => Notification::CoordinatorRequestForVote(),
-                    "PARTICIPANTREQUESTFORVOTE" => Notification::ParticipantRequestForVote(
-                        notification.request_for_vote_value.ok_or_else(|| {
-                            ScabbardStoreError::Internal(InternalError::with_message(
-                                "Failed to get 'request for vote' notification action, no \
+                let notification_action = match notification.notification_type {
+                    NotificationTypeModel::RequestForStart => Notification::RequestForStart(),
+                    NotificationTypeModel::CoordinatorRequestForVote => {
+                        Notification::CoordinatorRequestForVote()
+                    }
+                    NotificationTypeModel::ParticipantRequestForVote => {
+                        Notification::ParticipantRequestForVote(
+                            notification.request_for_vote_value.ok_or_else(|| {
+                                ScabbardStoreError::Internal(InternalError::with_message(
+                                    "Failed to get 'request for vote' notification action, no \
                                     associated value"
-                                    .to_string(),
-                            ))
-                        })?,
-                    ),
-                    "COMMIT" => Notification::Commit(),
-                    "ABORT" => Notification::Abort(),
-                    "MESSAGEDROPPED" => Notification::MessageDropped(
+                                        .to_string(),
+                                ))
+                            })?,
+                        )
+                    }
+                    NotificationTypeModel::Commit => Notification::Commit(),
+                    NotificationTypeModel::Abort => Notification::Abort(),
+                    NotificationTypeModel::MessageDropped => Notification::MessageDropped(
                         notification.dropped_message.ok_or_else(|| {
                             ScabbardStoreError::Internal(InternalError::with_message(
                                 "Failed to get 'message dropped' notification action, no \
@@ -657,11 +644,6 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                             ))
                         })?,
                     ),
-                    _ => {
-                        return Err(ScabbardStoreError::Internal(InternalError::with_message(
-                            "Failed to list actions, invalid notification type found".to_string(),
-                        )))
-                    }
                 };
                 let action = Identified {
                     id: notification.action_id,

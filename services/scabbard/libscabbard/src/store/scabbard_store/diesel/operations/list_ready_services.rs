@@ -19,8 +19,12 @@ use diesel::prelude::*;
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
 
-use crate::store::scabbard_store::diesel::schema::{
-    consensus_2pc_action, consensus_2pc_event, scabbard_alarm, scabbard_service,
+use crate::store::scabbard_store::diesel::{
+    models::{
+        AlarmTypeModel, AlarmTypeModelMapping, ServiceStatusTypeModel,
+        ServiceStatusTypeModelMapping,
+    },
+    schema::{consensus_2pc_action, consensus_2pc_event, scabbard_alarm, scabbard_service},
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::AlarmType;
@@ -37,13 +41,17 @@ impl<'a, C> ListReadyServicesOperation for ScabbardStoreOperations<'a, C>
 where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ServiceStatusTypeModelMapping>,
+    ServiceStatusTypeModel: diesel::deserialize::FromSql<ServiceStatusTypeModelMapping, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<AlarmTypeModelMapping>,
+    AlarmTypeModel: diesel::deserialize::FromSql<AlarmTypeModelMapping, C::Backend>,
 {
     fn list_ready_services(&self) -> Result<Vec<FullyQualifiedServiceId>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let current_time = get_timestamp(SystemTime::now())?;
 
             let mut ready_services = scabbard_service::table
-                .filter(scabbard_service::status.eq("FINALIZED"))
+                .filter(scabbard_service::status.eq(ServiceStatusTypeModel::Finalized))
                 .inner_join(
                     scabbard_alarm::table.on(scabbard_service::circuit_id
                         .eq(scabbard_alarm::circuit_id)
@@ -51,7 +59,7 @@ where
                 )
                 .filter(
                     scabbard_alarm::alarm_type
-                        .eq(String::from(&AlarmType::TwoPhaseCommit))
+                        .eq(AlarmTypeModel::from(&AlarmType::TwoPhaseCommit))
                         .and(scabbard_alarm::alarm.le(current_time)),
                 )
                 .select((scabbard_service::circuit_id, scabbard_service::service_id))
@@ -62,7 +70,7 @@ where
 
             ready_services.append(
                 &mut scabbard_service::table
-                    .filter(scabbard_service::status.eq("FINALIZED"))
+                    .filter(scabbard_service::status.eq(ServiceStatusTypeModel::Finalized))
                     .inner_join(
                         consensus_2pc_action::table.on(scabbard_service::circuit_id
                             .eq(consensus_2pc_action::circuit_id)
@@ -83,7 +91,7 @@ where
 
             ready_services.append(
                 &mut scabbard_service::table
-                    .filter(scabbard_service::status.eq("FINALIZED"))
+                    .filter(scabbard_service::status.eq(ServiceStatusTypeModel::Finalized))
                     .inner_join(
                         consensus_2pc_event::table.on(scabbard_service::circuit_id
                             .eq(consensus_2pc_event::circuit_id)
