@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use splinter::admin::store::{AdminServiceStore, CircuitPredicate, CircuitStatus};
 use splinter::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    paging::{PagingBuilder, DEFAULT_LIMIT, DEFAULT_OFFSET},
     ErrorResponse,
 };
 use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
@@ -198,26 +198,52 @@ fn query_list_circuits(
     .then(|res| match res {
         Ok((circuits, link, limit, offset, total_count, protocol_version)) => {
             match protocol_version.as_str() {
-                "1" => Ok(
-                    HttpResponse::Ok().json(resources::v1::circuits::ListCircuitsResponse {
-                        data: circuits
-                            .iter()
-                            .map(resources::v1::circuits::CircuitResponse::from)
-                            .collect(),
-                        paging: get_response_paging_info(limit, offset, &link, total_count),
-                    }),
-                ),
+                "1" => {
+                    let paging = PagingBuilder::new(link, total_count);
+                    let paging = if let Some(limit) = limit {
+                        paging.with_limit(limit)
+                    } else {
+                        paging
+                    };
+                    let paging = if let Some(offset) = offset {
+                        paging.with_offset(offset)
+                    } else {
+                        paging
+                    };
+                    Ok(
+                        HttpResponse::Ok().json(resources::v1::circuits::ListCircuitsResponse {
+                            data: circuits
+                                .iter()
+                                .map(resources::v1::circuits::CircuitResponse::from)
+                                .collect(),
+                            paging: paging.build(),
+                        }),
+                    )
+                }
 
                 // Handles 2
-                "2" => Ok(
-                    HttpResponse::Ok().json(resources::v2::circuits::ListCircuitsResponse {
-                        data: circuits
-                            .iter()
-                            .map(resources::v2::circuits::CircuitResponse::from)
-                            .collect(),
-                        paging: get_response_paging_info(limit, offset, &link, total_count),
-                    }),
-                ),
+                "2" => {
+                    let paging = PagingBuilder::new(link, total_count);
+                    let paging = if let Some(limit) = limit {
+                        paging.with_limit(limit)
+                    } else {
+                        paging
+                    };
+                    let paging = if let Some(offset) = offset {
+                        paging.with_offset(offset)
+                    } else {
+                        paging
+                    };
+                    Ok(
+                        HttpResponse::Ok().json(resources::v2::circuits::ListCircuitsResponse {
+                            data: circuits
+                                .iter()
+                                .map(resources::v2::circuits::CircuitResponse::from)
+                                .collect(),
+                            paging: paging.build(),
+                        }),
+                    )
+                }
                 _ => Ok(
                     HttpResponse::BadRequest().json(ErrorResponse::bad_request(&format!(
                         "Unsupported SplinterProtocolVersion: {}",

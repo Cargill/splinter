@@ -23,7 +23,7 @@ use splinter::admin::service::proposal_store::ProposalStoreFactory;
 use splinter::admin::store::CircuitPredicate;
 use splinter::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    paging::{PagingBuilder, DEFAULT_LIMIT, DEFAULT_OFFSET},
     ErrorResponse,
 };
 use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
@@ -185,15 +185,28 @@ fn query_list_proposals<PSF: ProposalStoreFactory + 'static>(
     .then(|res| match res {
         Ok((proposals, link, limit, offset, total_count, protocol_version)) => {
             match protocol_version.as_str() {
-                "1" => Ok(HttpResponse::Ok().json(
-                    resources::v1::proposals::ListProposalsResponse {
-                        data: proposals
-                            .iter()
-                            .map(resources::v1::proposals::ProposalResponse::from)
-                            .collect(),
-                        paging: get_response_paging_info(limit, offset, &link, total_count),
-                    },
-                )),
+                "1" => {
+                    let paging = PagingBuilder::new(link, total_count);
+                    let paging = if let Some(limit) = limit {
+                        paging.with_limit(limit)
+                    } else {
+                        paging
+                    };
+                    let paging = if let Some(offset) = offset {
+                        paging.with_offset(offset)
+                    } else {
+                        paging
+                    };
+                    Ok(
+                        HttpResponse::Ok().json(resources::v1::proposals::ListProposalsResponse {
+                            data: proposals
+                                .iter()
+                                .map(resources::v1::proposals::ProposalResponse::from)
+                                .collect(),
+                            paging: paging.build(),
+                        }),
+                    )
+                }
                 // Handles 2
                 "2" => {
                     let proposal_responses = match proposals
@@ -208,10 +221,21 @@ fn query_list_proposals<PSF: ProposalStoreFactory + 'static>(
                             return Ok(HttpResponse::InternalServerError().into());
                         }
                     };
+                    let paging = PagingBuilder::new(link, total_count);
+                    let paging = if let Some(limit) = limit {
+                        paging.with_limit(limit)
+                    } else {
+                        paging
+                    };
+                    let paging = if let Some(offset) = offset {
+                        paging.with_offset(offset)
+                    } else {
+                        paging
+                    };
                     Ok(
                         HttpResponse::Ok().json(resources::v2::proposals::ListProposalsResponse {
                             data: proposal_responses,
-                            paging: get_response_paging_info(limit, offset, &link, total_count),
+                            paging: paging.build(),
                         }),
                     )
                 }
