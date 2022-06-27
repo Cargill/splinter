@@ -351,12 +351,12 @@ impl ScabbardState {
                         })?;
 
                     if self.state_autocleanup_enabled {
-                        self.merkle_state.remove_pruned_entries().map_err(|err| {
-                            ScabbardStateError(format!(
-                                "failed to cleanup pruned state entries {}: {}",
+                        if let Err(err) = self.merkle_state.remove_pruned_entries() {
+                            error!(
+                                "failed to cleanup pruned state for root {}: {}",
                                 previous_state_root, err
-                            ))
-                        })?;
+                            )
+                        }
                     }
                 }
 
