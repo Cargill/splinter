@@ -71,7 +71,7 @@ admin-service = [
     "splinter-rest-api-common",
     "splinter/admin-service"
 ]
-authorization = ["splinter/authorization"]
+authorization = ["splinter/authorization", "splinter-rest-api-common/authorization"]
 biome = ["splinter/biome", "serde"]
 biome-key-management = ["biome", "splinter/biome-key-management"]
 registry = ["splinter/registry", "actix-web", "futures"]
