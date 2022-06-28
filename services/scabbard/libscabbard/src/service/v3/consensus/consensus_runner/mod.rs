@@ -111,7 +111,7 @@ where
 
             commands.push(
                 self.consensus_store_command_factory
-                    .new_save_actions_command(service_id, actions),
+                    .new_save_actions_command(service_id, actions, event_id),
             );
             commands.push(
                 self.consensus_store_command_factory

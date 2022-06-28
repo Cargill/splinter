@@ -125,8 +125,9 @@ table! {
         circuit_id  -> Text,
         service_id -> Text,
         created_at -> Timestamp,
-        executed_at -> Nullable<BigInt>,
-        position -> Integer,
+        executed_at -> Nullable<Timestamp>,
+        action_type -> crate::store::scabbard_store::diesel::models::ActionTypeModelMapping,
+        event_id -> Int8,
     }
 }
 

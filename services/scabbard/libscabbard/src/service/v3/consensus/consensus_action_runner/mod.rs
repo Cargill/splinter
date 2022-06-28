@@ -165,9 +165,10 @@ mod tests {
     use crate::migrations::run_sqlite_migrations;
     use crate::store::pool::ConnectionPool;
     use crate::store::{
-        AlarmType, ConsensusAction, ConsensusContext, ConsensusType, Context, ContextBuilder,
-        DieselScabbardStore, Message, Notification, Participant, ScabbardService,
-        ScabbardServiceBuilder, ScabbardStore, ServiceStatus, SqliteScabbardStoreFactory, State,
+        AlarmType, ConsensusAction, ConsensusContext, ConsensusEvent, ConsensusType, Context,
+        ContextBuilder, DieselScabbardStore, Event, Message, Notification, Participant,
+        ScabbardService, ScabbardServiceBuilder, ScabbardStore, ServiceStatus,
+        SqliteScabbardStoreFactory, State,
     };
 
     struct TestMessageSender {
@@ -401,6 +402,14 @@ mod tests {
             )
             .expect("unable to add context to scabbard store");
 
+        // add event
+        scabbard_store
+            .add_consensus_event(
+                &service_fqsi,
+                ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
+            )
+            .expect("unable to add context to scabbard store");
+
         // add actions
         scabbard_store
             .add_consensus_action(
@@ -409,6 +418,7 @@ mod tests {
                     Some(SystemTime::now()),
                 )),
                 &service_fqsi,
+                1,
             )
             .expect("unable to add context to scabbard store");
 
@@ -419,6 +429,7 @@ mod tests {
                     Message::DecisionRequest(1),
                 )),
                 &service_fqsi,
+                1,
             )
             .expect("unable to add context to scabbard store");
 
@@ -426,6 +437,7 @@ mod tests {
             .add_consensus_action(
                 ConsensusAction::TwoPhaseCommit(Action::Notify(Notification::RequestForStart())),
                 &service_fqsi,
+                1,
             )
             .expect("unable to add context to scabbard store");
 

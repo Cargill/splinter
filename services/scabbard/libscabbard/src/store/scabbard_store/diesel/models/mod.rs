@@ -20,7 +20,8 @@ mod service;
 pub use alarm::{AlarmTypeModel, AlarmTypeModelMapping, ScabbardAlarmModel};
 pub use commit_entry::{CommitEntryModel, DecisionTypeModel, DecisionTypeModelMapping};
 pub use consensus::{
-    Consensus2pcContextModel, Consensus2pcContextParticipantModel, Consensus2pcDeliverEventModel,
+    ActionTypeModel, ActionTypeModelMapping, Consensus2pcContextModel,
+    Consensus2pcContextParticipantModel, Consensus2pcDeliverEventModel,
     Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel, Consensus2pcStartEventModel,
     Consensus2pcUpdateContextActionModel, Consensus2pcUpdateContextActionParticipantModel,
     Consensus2pcVoteEventModel, ContextParticipantList, ContextStateModel,

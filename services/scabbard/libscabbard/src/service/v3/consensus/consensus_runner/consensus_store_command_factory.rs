@@ -39,11 +39,13 @@ where
         &self,
         service_id: &FullyQualifiedServiceId,
         actions: Vec<ConsensusAction>,
+        event_id: i64,
     ) -> Box<dyn StoreCommand<Context = C>> {
         Box::new(SaveActionsCommand {
             factory: self.factory.clone(),
             service_id: service_id.clone(),
             actions: RefCell::new(actions),
+            event_id,
         })
     }
 
@@ -64,6 +66,7 @@ struct SaveActionsCommand<C> {
     factory: Arc<dyn ScabbardStoreFactory<C>>,
     service_id: FullyQualifiedServiceId,
     actions: RefCell<Vec<ConsensusAction>>,
+    event_id: i64,
 }
 
 impl<C> StoreCommand for SaveActionsCommand<C>
@@ -77,7 +80,7 @@ where
 
         for action in self.actions.borrow_mut().drain(..) {
             store
-                .add_consensus_action(action, &self.service_id)
+                .add_consensus_action(action, &self.service_id, self.event_id)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
         }
 
