@@ -66,7 +66,7 @@ pub use state::{
     StateSubscriber,
 };
 
-const SERVICE_TYPE: &str = "scabbard";
+pub const SERVICE_TYPE: &str = "scabbard";
 
 const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
