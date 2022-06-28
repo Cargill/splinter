@@ -54,6 +54,7 @@ use super::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
 
 use consensus::ScabbardConsensusManager;
 use error::ScabbardError;
+pub use error::StateSubscriberError;
 pub use factory::ConnectionUri;
 pub use factory::ScabbardArgValidator;
 pub use factory::{ScabbardFactory, ScabbardFactoryBuilder, ScabbardStorageConfiguration};
