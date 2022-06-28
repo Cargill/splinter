@@ -17,22 +17,39 @@ use splinter::service::rest_api::{ServiceEndpoint, ServiceEndpointProvider};
 #[cfg(feature = "rest-api-actix-web-1")]
 use crate::service::rest_api::actix;
 
-pub struct ScabbardServiceEndpointProvider {}
+pub struct ScabbardServiceEndpointProvider {
+    endpoints: Vec<ServiceEndpoint>,
+}
 
 impl ServiceEndpointProvider for ScabbardServiceEndpointProvider {
     fn endpoints(&self) -> Vec<ServiceEndpoint> {
+        self.endpoints.clone()
+    }
+}
+
+impl ScabbardServiceEndpointProvider {
+    fn new(endpoints: Vec<ServiceEndpoint>) -> Self {
+        Self { endpoints }
+    }
+}
+
+impl Default for ScabbardServiceEndpointProvider {
+    fn default() -> Self {
         #[cfg(feature = "rest-api-actix-web-1")]
         {
-            vec![
+            let endpoints = vec![
                 actix::batches::make_add_batches_to_queue_endpoint(),
                 actix::ws_subscribe::make_subscribe_endpoint(),
                 actix::batch_statuses::make_get_batch_status_endpoint(),
                 actix::state_address::make_get_state_at_address_endpoint(),
                 actix::state::make_get_state_with_prefix_endpoint(),
                 actix::state_root::make_get_state_root_endpoint(),
-            ]
+            ];
+            Self::new(endpoints)
         }
         #[cfg(not(feature = "rest-api-actix-web-1"))]
-        Vec::new()
+        {
+            Self::new(Vec::new())
+        }
     }
 }

@@ -615,7 +615,7 @@ impl EndpointFactory for ScabbardFactory {
     ///
     /// [`ServiceEndpoint`]: ../rest_api/struct.ServiceEndpoint.html
     fn get_rest_endpoint_provider(&self) -> Box<dyn ServiceEndpointProvider> {
-        Box::new(endpoint_provider::ScabbardServiceEndpointProvider {})
+        Box::new(endpoint_provider::ScabbardServiceEndpointProvider::default())
     }
 }
 
