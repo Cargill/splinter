@@ -26,10 +26,12 @@ description = """\
 actix-web = { version = "1", optional = true }
 futures = { version = "0.1", optional = true }
 log = { version = "0.4", optional = true }
+scabbard = { path = "../../services/scabbard/libscabbard", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 splinter = { path = "../../libsplinter", features = ["rest-api-actix-web-1"], optional = true }
 splinter-rest-api-common = { path = "../common", optional = true }
+transact = { version = "0.5", features = ["state-merkle-sql", "family-sabre"], optional = true }
 
 [dev-dependencies]
 diesel = { version = "1", features = ["r2d2", "serde_json", "sqlite"] }
@@ -49,6 +51,7 @@ stable = [
     "biome-key-management",
     "registry",
     "rest-api",
+    "scabbard-service",
     "service",
 ]
 
@@ -73,4 +76,5 @@ biome = ["splinter/biome", "serde"]
 biome-key-management = ["biome", "splinter/biome-key-management"]
 registry = ["splinter/registry", "actix-web", "futures"]
 rest-api = ["splinter/rest-api"]
+scabbard-service = ["scabbard/splinter-service", "scabbard/rest-api", "transact"]
 service = ["splinter/runtime-service", "serde_json", "log"]
