@@ -46,7 +46,6 @@ mod message_converter;
 mod message_handler;
 #[cfg(feature = "service-message-handler-factory")]
 mod message_handler_factory;
-#[cfg(feature = "service-message-sender")]
 mod message_sender;
 #[cfg(feature = "service-message-sender-factory")]
 mod message_sender_factory;
@@ -75,12 +74,8 @@ pub use message_converter::MessageConverter;
 pub use message_handler::MessageHandler;
 #[cfg(feature = "service-message-handler-factory")]
 pub use message_handler_factory::MessageHandlerFactory;
-#[cfg(all(
-    feature = "service-message-sender",
-    any(feature = "service-timer-handler", feature = "service-message-handler")
-))]
+#[cfg(any(feature = "service-timer-handler", feature = "service-message-handler"))]
 use message_sender::IntoMessageSender;
-#[cfg(feature = "service-message-sender")]
 pub use message_sender::MessageSender;
 #[cfg(feature = "service-message-sender-factory")]
 pub use message_sender_factory::MessageSenderFactory;
