@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM splintercommunity/splinter-dev:v11 as BUILDER
+# -------------=== splinterd docker build ===-------------
+
+FROM splintercommunity/splinter-dev:v12 as BUILDER
+
+ENV SPLINTER_FORCE_PANDOC=true
 
 # Copy over splinter files
 COPY Cargo.toml /build/Cargo.toml
@@ -39,41 +43,59 @@ COPY examples/gameroom/database/Cargo.toml \
      /build/examples/gameroom/database/Cargo.toml
 
 # Copy over source files
+COPY cli /build/cli
 COPY libsplinter /build/libsplinter
-COPY services/scabbard/cli /build/services/scabbard/cli
+COPY rest_api/actix_web_1/ /build/rest_api/actix_web_1/
+COPY rest_api/common/ /build/rest_api/common/
+COPY splinterd/ /build/splinterd
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
 
-# Build the project
+# Build splinterd
 ARG REPO_VERSION
 ARG CARGO_ARGS
-RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" \
-    services/scabbard/cli/Cargo.toml \
- && cargo build --manifest-path=services/scabbard/cli/Cargo.toml --release $CARGO_ARGS
-WORKDIR /build/services/scabbard/cli
-RUN cargo deb --no-build --deb-version $REPO_VERSION \
-    --manifest-path ./Cargo.toml
+ARG SPLINTERD_ARGS
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" splinterd/Cargo.toml \
+ && cargo build --manifest-path=splinterd/Cargo.toml --release $CARGO_ARGS
+WORKDIR /build/splinterd
+RUN cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml \
+ && mv /build/target/debian/splinter-daemon*.deb /tmp
+
+# Build splinter-cli
+WORKDIR /build
+ARG REPO_VERSION
+ARG CARGO_ARGS
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" cli/Cargo.toml \
+ && cargo build --manifest-path=cli/Cargo.toml --release $CARGO_ARGS
+WORKDIR /build/cli
+RUN cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml \
+ &&  mv /build/target/debian/splinter-cli*.deb /tmp
 
 # Log the commit hash
 COPY .git/ /tmp/.git/
 WORKDIR /tmp
 RUN git rev-parse HEAD > /commit-hash
 
-# -------------=== scabbard cli docker build ===-------------
+# -------------=== splinterd docker build ===-------------
 
-FROM ubuntu:focal
+FROM ubuntu:jammy
 
 ARG CARGO_ARGS
 RUN echo "CARGO_ARGS = '$CARGO_ARGS'" > CARGO_ARGS
+ARG SPLINTERD_ARGS
+RUN echo "SPLINTERD_ARGS = '$SPLINTERD_ARGS'" > SPLINTERD_ARGS
 
-COPY --from=BUILDER /build/target/debian/scabbard-cli_*.deb /tmp
+COPY --from=BUILDER /tmp/splinter-*.deb /tmp/
 COPY --from=BUILDER /commit-hash /commit-hash
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends \
+ && apt-get install -y -q --no-install-recommends \
     ca-certificates \
-    curl \
     man \
+    postgresql-client \
  && mandb \
- && dpkg --unpack /tmp/scabbard-cli_*.deb \
+ && dpkg --unpack /tmp/splinter-*.deb \
  && apt-get -f -y install --no-install-recommends \
- && rm -r /var/lib/apt/lists/*
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* \
+ # source bash completion script at login
+ && echo ". /usr/share/bash-completion/bash_completion" >> ~/.bashrc

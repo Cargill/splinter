@@ -20,7 +20,7 @@
 # docker build -f ci/publish-splinter-crates.dockerfile -t publish-splinter-crates ci/
 # docker run --rm -v $(pwd):/project/splinter -e CARGO_CRED=%CREDVALUE% publish-splinter-crates
 
-FROM ubuntu:focal
+FROM ubuntu:jammy
 
 ENV DEBIAN_FRONTEND=noninteractive
 
