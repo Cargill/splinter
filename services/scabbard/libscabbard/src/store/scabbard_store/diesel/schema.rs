@@ -208,4 +208,5 @@ allow_tables_to_appear_in_same_query!(
     consensus_2pc_deliver_event,
     consensus_2pc_start_event,
     consensus_2pc_vote_event,
+    supervisor_notification,
 );
