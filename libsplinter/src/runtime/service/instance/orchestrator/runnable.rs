@@ -26,6 +26,8 @@ use crate::mesh::Mesh;
 use crate::network::reply::InboundRouter;
 use crate::transport::Connection;
 
+#[cfg(feature = "rest-api-actix-web-1")]
+use super::endpoint_provider::OrchestratorEndpointFactory;
 use super::{JoinHandles, OrchestratableServiceFactory, ServiceOrchestrator};
 
 /// A runnable service orchestrator is configured, but not started ServiceOrchestrator. It may only
@@ -37,6 +39,8 @@ pub struct RunnableServiceOrchestrator {
     pub(super) channel_capacity: usize,
     pub(super) service_factories: Vec<Box<dyn OrchestratableServiceFactory>>,
     pub(super) supported_service_types: Vec<String>,
+    #[cfg(feature = "rest-api-actix-web-1")]
+    pub(super) endpoint_factory: OrchestratorEndpointFactory,
 }
 
 impl RunnableServiceOrchestrator {
@@ -148,6 +152,8 @@ impl RunnableServiceOrchestrator {
             inbound_router,
             running,
             join_handles: Some(join_handles),
+            #[cfg(feature = "rest-api-actix-web-1")]
+            endpoint_factory: self.endpoint_factory.clone(),
         })
     }
 }

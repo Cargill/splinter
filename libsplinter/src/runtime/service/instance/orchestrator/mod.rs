@@ -15,6 +15,8 @@
 //! Dynamic service orchestration.
 
 mod builder;
+#[cfg(feature = "rest-api-actix-web-1")]
+mod endpoint_provider;
 mod error;
 mod runnable;
 
@@ -44,6 +46,8 @@ use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;
 
 pub use self::builder::ServiceOrchestratorBuilder;
+#[cfg(feature = "rest-api-actix-web-1")]
+use self::endpoint_provider::OrchestratorEndpointFactory;
 pub use self::error::{
     AddServiceError, InitializeServiceError, ListServicesError, NewOrchestratorError,
     OrchestratorError, ShutdownServiceError,
@@ -94,6 +98,8 @@ pub struct ServiceOrchestrator {
     /// `running` and `join_handles` are used to shutdown the orchestrator's background threads
     running: Arc<AtomicBool>,
     join_handles: Option<JoinHandles<Result<(), OrchestratorError>>>,
+    #[cfg(feature = "rest-api-actix-web-1")]
+    endpoint_factory: OrchestratorEndpointFactory,
 }
 
 impl ServiceOrchestrator {
@@ -325,6 +331,11 @@ impl ServiceOrchestrator {
     #[cfg(feature = "rest-api-actix-web-1")]
     pub fn services(&self) -> Arc<Mutex<HashMap<ServiceDefinition, ManagedService>>> {
         self.services.clone()
+    }
+
+    #[cfg(feature = "rest-api-actix-web-1")]
+    pub fn get_endpoint_factory(&self) -> OrchestratorEndpointFactory {
+        self.endpoint_factory.clone()
     }
 }
 
