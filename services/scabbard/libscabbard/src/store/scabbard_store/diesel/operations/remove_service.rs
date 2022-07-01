@@ -20,9 +20,7 @@ use diesel::{dsl::delete, prelude::*};
 use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::operations::get_service::GetServiceOperation;
-use crate::store::scabbard_store::diesel::schema::{
-    consensus_2pc_context, scabbard_peer, scabbard_service, scabbard_v3_commit_history,
-};
+use crate::store::scabbard_store::diesel::schema::scabbard_service;
 use crate::store::scabbard_store::ScabbardStoreError;
 
 use super::ScabbardStoreOperations;
@@ -56,45 +54,6 @@ impl<'a> RemoveServiceOperation for ScabbardStoreOperations<'a, SqliteConnection
                             OPERATION_NAME.to_string(),
                         )
                     })?;
-                delete(
-                    scabbard_peer::table.filter(
-                        scabbard_peer::circuit_id
-                            .eq(&circuit_id)
-                            .and(scabbard_peer::service_id.eq(&service_id)),
-                    ),
-                )
-                .execute(self.conn)
-                .map_err(|err| {
-                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
-                })?;
-
-                // delete all commit history for the service
-                delete(
-                    scabbard_v3_commit_history::table.filter(
-                        scabbard_v3_commit_history::circuit_id
-                            .eq(&circuit_id)
-                            .and(scabbard_v3_commit_history::service_id.eq(&service_id)),
-                    ),
-                )
-                .execute(self.conn)
-                .map_err(|err| {
-                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
-                })?;
-
-                // delete all consensus state associated with the services
-                //
-                // delete cascade will remove the remaining associated consensus components
-                delete(
-                    consensus_2pc_context::table.filter(
-                        consensus_2pc_context::circuit_id
-                            .eq(&circuit_id)
-                            .and(consensus_2pc_context::service_id.eq(&service_id)),
-                    ),
-                )
-                .execute(self.conn)
-                .map_err(|err| {
-                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
-                })?;
 
                 Ok(())
             })
@@ -123,54 +82,6 @@ impl<'a> RemoveServiceOperation for ScabbardStoreOperations<'a, PgConnection> {
                                 OPERATION_NAME.to_string(),
                             )
                         })?;
-                    delete(
-                        scabbard_peer::table.filter(
-                            scabbard_peer::circuit_id
-                                .eq(&circuit_id)
-                                .and(scabbard_peer::service_id.eq(&service_id)),
-                        ),
-                    )
-                    .execute(self.conn)
-                    .map_err(|err| {
-                        ScabbardStoreError::from_source_with_operation(
-                            err,
-                            OPERATION_NAME.to_string(),
-                        )
-                    })?;
-
-                    // delete all commit history for the service
-                    delete(
-                        scabbard_v3_commit_history::table.filter(
-                            scabbard_v3_commit_history::circuit_id
-                                .eq(&circuit_id)
-                                .and(scabbard_v3_commit_history::service_id.eq(&service_id)),
-                        ),
-                    )
-                    .execute(self.conn)
-                    .map_err(|err| {
-                        ScabbardStoreError::from_source_with_operation(
-                            err,
-                            OPERATION_NAME.to_string(),
-                        )
-                    })?;
-
-                    // delete all consensus state associated with the services
-                    //
-                    // delete cascade will remove the remaining associated consensus components
-                    delete(
-                        consensus_2pc_context::table.filter(
-                            consensus_2pc_context::circuit_id
-                                .eq(&circuit_id)
-                                .and(consensus_2pc_context::service_id.eq(&service_id)),
-                        ),
-                    )
-                    .execute(self.conn)
-                    .map_err(|err| {
-                        ScabbardStoreError::from_source_with_operation(
-                            err,
-                            OPERATION_NAME.to_string(),
-                        )
-                    })?;
 
                     Ok(())
                 })
