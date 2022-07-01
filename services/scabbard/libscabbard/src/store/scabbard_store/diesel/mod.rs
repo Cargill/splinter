@@ -792,6 +792,8 @@ pub mod tests {
 
     #[cfg(feature = "sqlite")]
     use crate::migrations::run_sqlite_migrations;
+    #[cfg(feature = "diesel-postgres-tests")]
+    use crate::store::diesel_postgres_test::run_postgres_test;
 
     use crate::store::scabbard_store::{
         service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
@@ -801,6 +803,8 @@ pub mod tests {
         CommitEntryBuilder, ConsensusDecision,
     };
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    use diesel::pg::PgConnection;
     use diesel::r2d2::{ConnectionManager, Pool};
     #[cfg(feature = "sqlite")]
     use diesel::{
@@ -875,6 +879,20 @@ pub mod tests {
         scabbard_store_add_context(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_add_context() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+
+            let store = DieselScabbardStore::new(pool);
+
+            scabbard_store_add_context(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `add_consensus_action` operation is successful.
     ///
     /// 1. Add a valid context to the store
@@ -939,6 +957,18 @@ pub mod tests {
         let store = DieselScabbardStore::new(pool);
 
         scabbard_store_add_actions(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_add_actions() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_add_actions(&store);
+
+            Ok(())
+        })
     }
 
     /// Test that the scabbard store `list_consensus_actions` operation is successful.
@@ -1076,6 +1106,18 @@ pub mod tests {
         scabbard_store_list_actions(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_list_actions() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_list_actions(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `update_consensus_context` operation is successful.
     ///
     /// 1. Add a valid context to the store
@@ -1155,6 +1197,18 @@ pub mod tests {
         let store = DieselScabbardStore::new(pool);
 
         scabbard_store_update_context(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_update_context() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_update_context(&store);
+
+            Ok(())
+        })
     }
 
     /// Test that the scabbard store `update_consensus_action` operation is successful.
@@ -1253,6 +1307,18 @@ pub mod tests {
         scabbard_store_update_action(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_update_action() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_update_action(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `get_service` operation is successful.
     ///
     /// 1. Add a service in the finalized state to the database
@@ -1294,6 +1360,18 @@ pub mod tests {
 
         let store = DieselScabbardStore::new(pool);
         scabbard_store_get_service(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_get_service() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_get_service(&store);
+
+            Ok(())
+        })
     }
 
     /// Test that the scabbard store `list_ready_services` operation is successful.
@@ -1413,6 +1491,18 @@ pub mod tests {
         scabbard_store_list_ready_services(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_list_ready_services() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_list_ready_services(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `add_commit_entry` operation is successful.
     ///
     /// 1. Add a valid service to the database
@@ -1494,6 +1584,18 @@ pub mod tests {
         scabbard_add_commit_entry(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_add_commit_entry() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_add_commit_entry(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `get_last_commit_entry` operation is successful.
     ///
     /// 1. Add a valid service to the database
@@ -1569,6 +1671,18 @@ pub mod tests {
 
         let store = DieselScabbardStore::new(pool);
         scabbard_get_last_commit_entry(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_get_last_commit_entry() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_get_last_commit_entry(&store);
+
+            Ok(())
+        })
     }
 
     /// Test that the scabbard store `update_commit_entry` operation is successful.
@@ -1655,6 +1769,18 @@ pub mod tests {
         scabbard_update_commit_entry(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_update_commit_entry() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_update_commit_entry(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `update_service` operation is successful.
     ///
     /// 1. Add a service in the prepared state to the database
@@ -1734,6 +1860,18 @@ pub mod tests {
         scabbard_store_update_service(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_update_service() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_update_service(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `add_consensus_event` operation is successful.
     ///
     /// 1. Add a valid participant context to the store
@@ -1808,6 +1946,18 @@ pub mod tests {
         scabbard_store_add_event(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_add_event() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_add_event(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `update_consensus_event` operation is successful.
     ///
     /// 1. Add a valid participant context to the store
@@ -1879,6 +2029,18 @@ pub mod tests {
 
         let store = DieselScabbardStore::new(pool);
         scabbard_store_update_event(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_update_event() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_update_event(&store);
+
+            Ok(())
+        })
     }
 
     /// Test that the scabbard store `list_consensus_events` operation is successful.
@@ -2013,6 +2175,18 @@ pub mod tests {
 
         let store = DieselScabbardStore::new(pool);
         scabbard_store_list_events(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_list_events() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_list_events(&store);
+
+            Ok(())
+        })
     }
 
     /// Test that the scabbard store `get_current_consensus_context` operation is successful.
@@ -2162,6 +2336,18 @@ pub mod tests {
         scabbard_store_get_current_context(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_get_current_context() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_get_current_context(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `remove_service` operation is successful.
     ///
     /// 1. Add a services to the database
@@ -2249,6 +2435,18 @@ pub mod tests {
         scabbard_store_remove_service(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_remove_service() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_remove_service(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `set_alarm` operation is successful.
     ///
     /// 1. Add a service to the database
@@ -2320,6 +2518,18 @@ pub mod tests {
 
         let store = DieselScabbardStore::new(pool);
         scabbard_store_set_alarm(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_set_alarm() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_set_alarm(&store);
+
+            Ok(())
+        })
     }
 
     /// Test that the scabbard store `unset_alarm` operation is successful.
@@ -2410,6 +2620,18 @@ pub mod tests {
         scabbard_store_unset_alarm(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_unset_alarm() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_unset_alarm(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `get_alarm` operation is successful.
     ///
     /// 1. Add a service to the database
@@ -2498,6 +2720,18 @@ pub mod tests {
         scabbard_store_get_alarm(&store);
     }
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_get_alarm() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_get_alarm(&store);
+
+            Ok(())
+        })
+    }
+
     #[cfg(feature = "sqlite")]
     fn create_sqlite_memory_pool() -> Pool<ConnectionManager<SqliteConnection>> {
         let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
@@ -2530,5 +2764,15 @@ pub mod tests {
             )
             .map_err(diesel::r2d2::Error::QueryError)
         }
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    fn create_postgres_pool(
+        url: &str,
+    ) -> Result<Pool<ConnectionManager<PgConnection>>, Box<dyn std::error::Error>> {
+        let connection_manager = ConnectionManager::<PgConnection>::new(url);
+        let pool = Pool::builder().build(connection_manager)?;
+
+        Ok(pool)
     }
 }
