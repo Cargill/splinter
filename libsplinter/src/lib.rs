@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![cfg_attr(feature = "benchmark", feature(test))]
+#![allow(clippy::extra_unused_lifetimes)]
 
 #[macro_use]
 extern crate log;
