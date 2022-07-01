@@ -801,7 +801,8 @@ pub mod tests {
     };
 
     use diesel::{
-        r2d2::{ConnectionManager, Pool},
+        connection::SimpleConnection,
+        r2d2::{ConnectionManager, CustomizeConnection, Pool},
         sqlite::SqliteConnection,
     };
     use splinter::{service::FullyQualifiedServiceId, service::ServiceId};
@@ -915,8 +916,17 @@ pub mod tests {
         let notification = Notification::RequestForStart();
         let action = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
 
+        let event = ConsensusEvent::TwoPhaseCommit(Event::Deliver(
+            coordinator_fqsi.service_id().clone(),
+            Message::DecisionRequest(1),
+        ));
+
+        let id = store
+            .add_consensus_event(&coordinator_fqsi, event.clone())
+            .expect("unable to add event");
+
         assert!(store
-            .add_consensus_action(action, &coordinator_fqsi, 1)
+            .add_consensus_action(action, &coordinator_fqsi, id)
             .is_ok());
     }
 
@@ -991,16 +1001,25 @@ pub mod tests {
             .build()
             .expect("failed to build update context");
 
+        let event = ConsensusEvent::TwoPhaseCommit(Event::Deliver(
+            coordinator_fqsi.service_id().clone(),
+            Message::DecisionRequest(1),
+        ));
+
+        let id = store
+            .add_consensus_event(&coordinator_fqsi, event.clone())
+            .expect("unable to add event");
+
         let action2 = ConsensusAction::TwoPhaseCommit(Action::Update(
             ConsensusContext::TwoPhaseCommit(update_context),
             None,
         ));
 
         let action_id1 = store
-            .add_consensus_action(action1, &coordinator_fqsi, 1)
+            .add_consensus_action(action1, &coordinator_fqsi, id)
             .expect("failed to add actions");
         let action_id2 = store
-            .add_consensus_action(action2, &coordinator_fqsi, 1)
+            .add_consensus_action(action2, &coordinator_fqsi, id)
             .expect("failed to add actions");
 
         let action_list = store
@@ -1185,13 +1204,23 @@ pub mod tests {
             .with_this_process(coordinator_fqsi.clone().service_id())
             .build()
             .expect("failed to build update context");
+
+        let event = ConsensusEvent::TwoPhaseCommit(Event::Deliver(
+            coordinator_fqsi.service_id().clone(),
+            Message::DecisionRequest(1),
+        ));
+
+        let event_id = store
+            .add_consensus_event(&coordinator_fqsi, event.clone())
+            .expect("unable to add event");
+
         let action = ConsensusAction::TwoPhaseCommit(Action::Update(
             ConsensusContext::TwoPhaseCommit(update_context),
             None,
         ));
 
         let action_id = store
-            .add_consensus_action(action, &coordinator_fqsi, 1)
+            .add_consensus_action(action, &coordinator_fqsi, event_id)
             .expect("failed to add actions");
 
         assert!(store
@@ -1244,9 +1273,9 @@ pub mod tests {
     /// 2. Add a context to the database for the service that has a past due alarm
     /// 3. Call `list_ready_services` and check that the service is returned
     /// 4. Update the context to set the alarm for one week in the future
-    /// 5. Add an unexecuted action
+    /// 5. Add an unexecuted action and event
     /// 6. Call `list_ready_services` and check that the service is returned
-    /// 7. Update the action as if it had been executed
+    /// 7. Update the action and event as if it had been executed
     /// 8. Call `list_ready_services` and check that no services are returned
     #[test]
     fn scabbard_store_list_ready_services() {
@@ -1312,9 +1341,18 @@ pub mod tests {
             .set_alarm(&service_fqsi, &AlarmType::TwoPhaseCommit, updated_alarm)
             .expect("failed to add alarm to store");
 
+        let event = ConsensusEvent::TwoPhaseCommit(Event::Deliver(
+            service_fqsi.service_id().clone(),
+            Message::DecisionRequest(1),
+        ));
+
+        let event_id = store
+            .add_consensus_event(&service_fqsi, event.clone())
+            .expect("unable to add event");
+
         // add an action for the service
         let action_id = store
-            .add_consensus_action(action, &service_fqsi, 1)
+            .add_consensus_action(action, &service_fqsi, event_id)
             .expect("failed to add actions");
 
         let ready_services = store
@@ -1323,6 +1361,10 @@ pub mod tests {
 
         // check that the one service is still returned because it has an unexecuted action
         assert_eq!(&ready_services[0], &service_fqsi);
+
+        store
+            .update_consensus_event(&service_fqsi, event_id, SystemTime::now())
+            .expect("failed to update action");
 
         store
             .update_consensus_action(&service_fqsi, action_id, SystemTime::now())
@@ -2377,6 +2419,7 @@ pub mod tests {
         let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
         let pool = Pool::builder()
             .max_size(1)
+            .connection_customizer(Box::new(ConnectionCustomizer::default()))
             .build(connection_manager)
             .expect("Failed to build connection pool");
 
@@ -2384,5 +2427,22 @@ pub mod tests {
             .expect("Failed to run migrations");
 
         pool
+    }
+
+    #[derive(Default, Debug)]
+    /// Foreign keys must be enabled on a per connection basis. This customizer will be added to the
+    /// SQLite pool builder and then ran against every connection returned from the pool.
+    pub struct ConnectionCustomizer;
+
+    impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCustomizer {
+        fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
+            conn.batch_execute(
+                r#"
+            PRAGMA busy_timeout = 2000;
+            PRAGMA foreign_keys = ON;
+            "#,
+            )
+            .map_err(diesel::r2d2::Error::QueryError)
+        }
     }
 }
