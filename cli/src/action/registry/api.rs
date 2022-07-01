@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::fmt;
+use std::fmt::Write as _;
 
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -106,15 +107,19 @@ impl fmt::Display for RegistryNode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut display_string = format!("identity: {}\nendpoints:", self.identity);
         for endpoint in &self.endpoints {
-            display_string += &format!("\n  - {}", endpoint);
+            write!(display_string, "\n  - {}", endpoint)?;
         }
-        display_string += &format!("\ndisplay name: {}\nkeys:", self.display_name);
+        write!(
+            display_string,
+            "\ndisplay name: {}\nkeys:",
+            self.display_name
+        )?;
         for key in &self.keys {
-            display_string += &format!("\n  - {}", key);
+            write!(display_string, "\n  - {}", key)?;
         }
         display_string += "\nmetadata:";
         for (key, value) in &self.metadata {
-            display_string += &format!("\n  {}: {}", key, value);
+            write!(display_string, "\n  {}: {}", key, value)?;
         }
         write!(f, "{}", display_string)
     }

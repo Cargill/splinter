@@ -14,6 +14,8 @@
 
 //! Contains the Reqwest-based implementation of AdminServiceClient.
 
+use std::fmt::Write as _;
+
 use reqwest::{blocking::Client, header, StatusCode};
 
 use crate::error::InternalError;
@@ -195,7 +197,9 @@ impl AdminServiceClient for ReqwestAdminServiceClient {
 
         let mut url = format!("{}/admin/proposals?limit={}", self.url, PAGING_LIMIT);
         if !filters.is_empty() {
-            url.push_str(&format!("&{}", filters.join("&")));
+            if let Err(e) = write!(url, "&{}", filters.join("&")) {
+                return Err(InternalError::from_source(Box::new(e)));
+            }
         }
 
         let request = Client::new()
