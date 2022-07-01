@@ -89,6 +89,7 @@ pub trait ScabbardStore {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
+        event_id: i64,
     ) -> Result<i64, ScabbardStoreError>;
 
     /// Update an existing 2 phase commit action

@@ -15,6 +15,7 @@
 use std::convert::TryFrom;
 use std::time::SystemTime;
 
+use chrono::naive::NaiveDateTime;
 use diesel::{prelude::*, update};
 use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
@@ -50,6 +51,7 @@ where
     ServiceStatusTypeModel: diesel::deserialize::FromSql<ServiceStatusTypeModelMapping, C::Backend>,
     <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ConsensusTypeModelMapping>,
     ConsensusTypeModel: diesel::deserialize::FromSql<ConsensusTypeModelMapping, C::Backend>,
+    NaiveDateTime: diesel::serialize::ToSql<diesel::sql_types::Timestamp, C::Backend>,
 {
     fn update_consensus_action(
         &self,
@@ -76,17 +78,7 @@ where
                     )))
                 })?;
 
-            let update_executed_at = i64::try_from(
-                executed_at
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .map_err(|err| {
-                        ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-                    })?
-                    .as_secs(),
-            )
-            .map_err(|err| {
-                ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-            })?;
+            let update_executed_at = get_naive_date_time(executed_at)?;
 
             update(consensus_2pc_action::table)
                 .filter(
@@ -107,4 +99,16 @@ where
             Ok(())
         })
     }
+}
+
+fn get_naive_date_time(time: SystemTime) -> Result<NaiveDateTime, InternalError> {
+    let duration = time
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+    let seconds = i64::try_from(duration.as_secs())
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+    Ok(NaiveDateTime::from_timestamp(
+        seconds,
+        duration.subsec_millis() * 1_000_000,
+    ))
 }

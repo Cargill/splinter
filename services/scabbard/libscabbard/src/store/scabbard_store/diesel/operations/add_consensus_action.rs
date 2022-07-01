@@ -25,7 +25,7 @@ use splinter::service::FullyQualifiedServiceId;
 
 use crate::store::scabbard_store::diesel::{
     models::{
-        Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel,
+        ActionTypeModel, Consensus2pcNotificationModel, Consensus2pcSendMessageActionModel,
         Consensus2pcUpdateContextActionModel, InsertableConsensus2pcActionModel, MessageTypeModel,
         NotificationTypeModel, ScabbardServiceModel, UpdateContextActionParticipantList,
     },
@@ -50,6 +50,7 @@ pub(in crate::store::scabbard_store::diesel) trait AddActionOperation {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
+        event_id: i64,
     ) -> Result<i64, ScabbardStoreError>;
 }
 
@@ -59,6 +60,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
+        event_id: i64,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let ConsensusAction::TwoPhaseCommit(action) = action;
@@ -85,6 +87,8 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 circuit_id: service_id.circuit_id().to_string(),
                 service_id: service_id.service_id().to_string(),
                 executed_at: None,
+                event_id,
+                action_type: ActionTypeModel::from(&action),
             };
 
             insert_into(consensus_2pc_action::table)
@@ -234,6 +238,7 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
+        event_id: i64,
     ) -> Result<i64, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let ConsensusAction::TwoPhaseCommit(action) = action;
@@ -260,6 +265,8 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                 circuit_id: service_id.circuit_id().to_string(),
                 service_id: service_id.service_id().to_string(),
                 executed_at: None,
+                event_id,
+                action_type: ActionTypeModel::from(&action),
             };
 
             let action_id: i64 = insert_into(consensus_2pc_action::table)

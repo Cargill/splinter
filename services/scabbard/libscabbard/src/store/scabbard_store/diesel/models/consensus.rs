@@ -16,6 +16,7 @@ use std::convert::TryFrom;
 use std::io::Write;
 use std::time::{Duration, SystemTime};
 
+use chrono::naive::NaiveDateTime;
 use diesel::{
     backend::Backend,
     deserialize::FromSqlRow,
@@ -40,7 +41,9 @@ use splinter::error::InternalError;
 use splinter::service::{FullyQualifiedServiceId, ServiceId};
 
 use crate::store::scabbard_store::{
-    two_phase_commit::{Context, ContextBuilder, Event, Message, Notification, Participant, State},
+    two_phase_commit::{
+        Action, Context, ContextBuilder, Event, Message, Notification, Participant, State,
+    },
     ConsensusContext,
 };
 
@@ -1079,7 +1082,9 @@ pub struct Consensus2pcActionModel {
     pub circuit_id: String,
     pub service_id: String,
     pub created_at: SystemTime,
-    pub executed_at: Option<i64>,
+    pub executed_at: Option<NaiveDateTime>,
+    pub action_type: ActionTypeModel,
+    pub event_id: i64,
 }
 
 #[derive(Debug, PartialEq, Insertable)]
@@ -1087,7 +1092,175 @@ pub struct Consensus2pcActionModel {
 pub struct InsertableConsensus2pcActionModel {
     pub circuit_id: String,
     pub service_id: String,
-    pub executed_at: Option<i64>,
+    pub executed_at: Option<NaiveDateTime>,
+    pub action_type: ActionTypeModel,
+    pub event_id: i64,
+}
+
+impl From<&Action> for ActionTypeModel {
+    fn from(action: &Action) -> Self {
+        match action {
+            Action::Update(..) => ActionTypeModel::Update,
+            Action::SendMessage(..) => ActionTypeModel::SendMessage,
+            Action::Notify(..) => ActionTypeModel::Notify,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ActionTypeModel {
+    Update,
+    SendMessage,
+    Notify,
+}
+
+// This has to be pub, due to its use in the table macro execution for IdentityModel
+pub struct ActionTypeModelMapping;
+
+impl QueryId for ActionTypeModelMapping {
+    type QueryId = EventTypeModelMapping;
+    const HAS_STATIC_QUERY_ID: bool = true;
+}
+
+impl NotNull for ActionTypeModelMapping {}
+
+impl SingleValue for ActionTypeModelMapping {}
+
+impl AsExpression<ActionTypeModelMapping> for ActionTypeModel {
+    type Expression = Bound<ActionTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl AsExpression<Nullable<ActionTypeModelMapping>> for ActionTypeModel {
+    type Expression = Bound<Nullable<ActionTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<ActionTypeModelMapping> for &'a ActionTypeModel {
+    type Expression = Bound<ActionTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<Nullable<ActionTypeModelMapping>> for &'a ActionTypeModel {
+    type Expression = Bound<Nullable<ActionTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<ActionTypeModelMapping> for &'a &'b ActionTypeModel {
+    type Expression = Bound<ActionTypeModelMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<Nullable<ActionTypeModelMapping>> for &'a &'b ActionTypeModel {
+    type Expression = Bound<Nullable<ActionTypeModelMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<DB: Backend> ToSql<ActionTypeModelMapping, DB> for ActionTypeModel {
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        match self {
+            ActionTypeModel::Update => out.write_all(b"UPDATE_CONTEXT")?,
+            ActionTypeModel::SendMessage => out.write_all(b"SEND_MESSAGE")?,
+            ActionTypeModel::Notify => out.write_all(b"NOTIFICATION")?,
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl<DB> ToSql<Nullable<ActionTypeModelMapping>, DB> for ActionTypeModel
+where
+    DB: Backend,
+    Self: ToSql<ActionTypeModelMapping, DB>,
+{
+    fn to_sql<W: ::std::io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        ToSql::<ActionTypeModelMapping, DB>::to_sql(self, out)
+    }
+}
+
+impl<DB> Queryable<ActionTypeModelMapping, DB> for ActionTypeModel
+where
+    DB: Backend + HasSqlType<ActionTypeModelMapping>,
+    ActionTypeModel: FromSql<ActionTypeModelMapping, DB>,
+{
+    type Row = Self;
+
+    fn build(row: Self::Row) -> Self {
+        row
+    }
+}
+
+impl<DB> FromSqlRow<ActionTypeModelMapping, DB> for ActionTypeModel
+where
+    DB: Backend,
+    ActionTypeModel: FromSql<ActionTypeModelMapping, DB>,
+{
+    fn build_from_row<T: Row<DB>>(row: &mut T) -> deserialize::Result<Self> {
+        FromSql::<ActionTypeModelMapping, DB>::from_sql(row.take())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl FromSql<ActionTypeModelMapping, Pg> for ActionTypeModel {
+    fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes {
+            Some(b"UPDATE_CONTEXT") => Ok(ActionTypeModel::Update),
+            Some(b"SEND_MESSAGE") => Ok(ActionTypeModel::SendMessage),
+            Some(b"NOTIFICATION") => Ok(ActionTypeModel::Notify),
+            Some(v) => Err(format!(
+                "Unrecognized enum variant: '{}'",
+                String::from_utf8_lossy(v)
+            )
+            .into()),
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl HasSqlType<ActionTypeModelMapping> for Pg {
+    fn metadata(lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        lookup.lookup_type("action_type")
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl FromSql<ActionTypeModelMapping, Sqlite> for ActionTypeModel {
+    fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes.map(|v| v.read_blob()) {
+            Some(b"UPDATE_CONTEXT") => Ok(ActionTypeModel::Update),
+            Some(b"SEND_MESSAGE") => Ok(ActionTypeModel::SendMessage),
+            Some(b"NOTIFICATION") => Ok(ActionTypeModel::Notify),
+            Some(blob) => {
+                Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
+            }
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl HasSqlType<ActionTypeModelMapping> for Sqlite {
+    fn metadata(_lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        diesel::sqlite::SqliteType::Text
+    }
 }
 
 impl From<&Notification> for String {

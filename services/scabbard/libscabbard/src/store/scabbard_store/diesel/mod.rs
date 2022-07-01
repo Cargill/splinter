@@ -109,9 +109,10 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
+        event_id: i64,
     ) -> Result<i64, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).add_consensus_action(action, service_id)
+            ScabbardStoreOperations::new(conn).add_consensus_action(action, service_id, event_id)
         })
     }
     /// Update an existing 2 phase commit action
@@ -296,9 +297,10 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
+        event_id: i64,
     ) -> Result<i64, ScabbardStoreError> {
         self.pool.execute_write(|conn| {
-            ScabbardStoreOperations::new(conn).add_consensus_action(action, service_id)
+            ScabbardStoreOperations::new(conn).add_consensus_action(action, service_id, event_id)
         })
     }
     /// Update an existing 2 phase commit action
@@ -497,8 +499,10 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
+        event_id: i64,
     ) -> Result<i64, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).add_consensus_action(action, service_id)
+        ScabbardStoreOperations::new(self.connection)
+            .add_consensus_action(action, service_id, event_id)
     }
     /// Update an existing 2 phase commit action
     fn update_consensus_action(
@@ -649,8 +653,10 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
+        event_id: i64,
     ) -> Result<i64, ScabbardStoreError> {
-        ScabbardStoreOperations::new(self.connection).add_consensus_action(action, service_id)
+        ScabbardStoreOperations::new(self.connection)
+            .add_consensus_action(action, service_id, event_id)
     }
     /// Update an existing 2 phase commit action
     fn update_consensus_action(
@@ -910,7 +916,7 @@ pub mod tests {
         let action = ConsensusAction::TwoPhaseCommit(Action::Notify(notification));
 
         assert!(store
-            .add_consensus_action(action, &coordinator_fqsi)
+            .add_consensus_action(action, &coordinator_fqsi, 1)
             .is_ok());
     }
 
@@ -991,10 +997,10 @@ pub mod tests {
         ));
 
         let action_id1 = store
-            .add_consensus_action(action1, &coordinator_fqsi)
+            .add_consensus_action(action1, &coordinator_fqsi, 1)
             .expect("failed to add actions");
         let action_id2 = store
-            .add_consensus_action(action2, &coordinator_fqsi)
+            .add_consensus_action(action2, &coordinator_fqsi, 1)
             .expect("failed to add actions");
 
         let action_list = store
@@ -1185,7 +1191,7 @@ pub mod tests {
         ));
 
         let action_id = store
-            .add_consensus_action(action, &coordinator_fqsi)
+            .add_consensus_action(action, &coordinator_fqsi, 1)
             .expect("failed to add actions");
 
         assert!(store
@@ -1308,7 +1314,7 @@ pub mod tests {
 
         // add an action for the service
         let action_id = store
-            .add_consensus_action(action, &service_fqsi)
+            .add_consensus_action(action, &service_fqsi, 1)
             .expect("failed to add actions");
 
         let ready_services = store

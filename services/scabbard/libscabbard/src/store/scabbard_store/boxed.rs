@@ -67,8 +67,9 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         &self,
         action: ConsensusAction,
         service_id: &FullyQualifiedServiceId,
+        event_id: i64,
     ) -> Result<i64, ScabbardStoreError> {
-        (&**self).add_consensus_action(action, service_id)
+        (&**self).add_consensus_action(action, service_id, event_id)
     }
 
     /// Update an existing 2 phase commit action

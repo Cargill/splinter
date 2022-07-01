@@ -26,8 +26,9 @@ description = """\
 
 [dependencies]
 actix-web = { version = "1.0", optional = true, default-features = false }
+chrono = { version = "0.4", optional = true}
 cylinder = "0.2"
-diesel = { version = "1.0", features = ["r2d2", "serde_json"], optional = true }
+diesel = { version = "1.0", features = ["chrono","r2d2", "serde_json"], optional = true }
 diesel_migrations = { version = "1.4", optional = true }
 futures = { version = "0.1", optional = true }
 log = { version = "0.4", optional = true }
@@ -116,6 +117,6 @@ scabbardv3 = [
     "splinter/service-timer-handler-factory",
     "splinter/service-message-sender-factory",
     ]
-scabbardv3-store = []
+scabbardv3-store = ["chrono"]
 splinter-service = ["log", "sawtooth"]
 sqlite = ["diesel/sqlite", "diesel_migrations", "log", "sawtooth/sqlite", "transact/sqlite"]
