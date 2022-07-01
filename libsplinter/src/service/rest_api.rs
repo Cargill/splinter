@@ -53,6 +53,27 @@ pub struct ServiceEndpoint {
     pub permission: Permission,
 }
 
+impl Clone for ServiceEndpoint {
+    fn clone(&self) -> Self {
+        let service_type = self.service_type.clone();
+        let route = self.route.clone();
+        let method = self.method;
+        let handler = Arc::clone(&self.handler);
+        let request_guards = self.request_guards.clone();
+        #[cfg(feature = "authorization")]
+        let permission = self.permission;
+        Self {
+            service_type,
+            route,
+            method,
+            handler,
+            request_guards,
+            #[cfg(feature = "authorization")]
+            permission,
+        }
+    }
+}
+
 // Trait capturing the behaviour of providing a Vec of ServiceEndpoints
 pub trait ServiceEndpointProvider {
     fn endpoints(&self) -> Vec<ServiceEndpoint> {
