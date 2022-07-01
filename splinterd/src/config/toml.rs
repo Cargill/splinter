@@ -121,13 +121,13 @@ impl<'de> Visitor<'de> for TomlLogFileSizeVisitor {
         //floats support a bunch of different formats, this supports <digit[s]>.<digit[s]>
         let numeric: Result<f32, _> = v
             .chars()
-            .take_while(|x| x.is_digit(10) || *x == '.')
+            .take_while(|x| x.is_ascii_digit() || *x == '.')
             .collect::<String>()
             .parse();
         // Units can be K,M,G for kilo, mega, giga bytes.
         let multiple = v
             .chars()
-            .skip_while(|x| x.is_digit(10) || *x == '.')
+            .skip_while(|x| x.is_ascii_digit() || *x == '.')
             .take_while(|c| c.is_alphabetic())
             .collect::<String>();
         let multiple = match multiple.as_str() {
