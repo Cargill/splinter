@@ -16,6 +16,8 @@
 //! Hyperledger Transact for state management. Scabbard uses two-phase consensus to reach agreement
 //! on transactions.
 
+#![allow(clippy::extra_unused_lifetimes)]
+
 #[cfg(feature = "log")]
 #[macro_use]
 extern crate log;
