@@ -228,6 +228,11 @@ impl Resource {
         self
     }
 
+    pub fn add_service_request_guard(mut self, guard: Arc<dyn RequestGuard + 'static>) -> Self {
+        self.request_guards.push(guard);
+        self
+    }
+
     #[cfg(feature = "authorization")]
     pub(super) fn into_route(self) -> (actix_web::Resource, PermissionMap<Method>) {
         let mut resource = web::resource(&self.route);

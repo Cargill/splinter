@@ -99,7 +99,7 @@ pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
                     }),
             )
         }),
-        request_guards: vec![Box::new(ProtocolVersionRangeGuard::new(
+        request_guards: vec![Arc::new(ProtocolVersionRangeGuard::new(
             protocol::SCABBARD_ADD_BATCHES_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],

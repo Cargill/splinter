@@ -58,7 +58,8 @@ impl ServiceOrchestratorRestResourceProvider {
                         let mut resource_builder = Resource::build(&route);
 
                         for request_guard in endpoint.request_guards.into_iter() {
-                            resource_builder = resource_builder.add_request_guard(request_guard);
+                            resource_builder =
+                                resource_builder.add_service_request_guard(request_guard);
                         }
 
                         let service_type = endpoint.service_type;

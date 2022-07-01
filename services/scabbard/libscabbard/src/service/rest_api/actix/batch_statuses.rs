@@ -118,7 +118,7 @@ pub fn make_get_batch_status_endpoint() -> ServiceEndpoint {
                 ),
             }
         }),
-        request_guards: vec![Box::new(ProtocolVersionRangeGuard::new(
+        request_guards: vec![Arc::new(ProtocolVersionRangeGuard::new(
             protocol::SCABBARD_BATCH_STATUSES_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
