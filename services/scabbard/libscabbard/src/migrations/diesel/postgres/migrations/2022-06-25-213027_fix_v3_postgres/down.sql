@@ -15,9 +15,9 @@
 
 ALTER TABLE consensus_2pc_update_context_action DROP COLUMN ack_timeout_start;
 
-ALTER TABLE consensus_2pc_context DROP CONSTRAINT ack_timeout_start_check;
+ALTER TABLE consensus_2pc_context DROP CONSTRAINT ack_timeout_start;
 
-ALTER TABLE consensus_2pc_context ADD CONSTRAINT ack_timeout_start
+ALTER TABLE consensus_2pc_context ADD CONSTRAINT ack_timeout_start_check
   CHECK ( (ack_timeout_start IS NOT NULL) OR (state != 'WAITING_FOR_DECISION_ACK') );
 
 ALTER TABLE scabbard_v3_commit_history
