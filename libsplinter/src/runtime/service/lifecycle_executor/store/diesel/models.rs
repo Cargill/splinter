@@ -465,7 +465,7 @@ impl FromSql<CommandTypeModelMapping, Pg> for CommandTypeModel {
         match bytes {
             Some(b"PREPARE") => Ok(CommandTypeModel::Prepare),
             Some(b"FINALIZE") => Ok(CommandTypeModel::Finalize),
-            Some(b"RETURE") => Ok(CommandTypeModel::Retire),
+            Some(b"RETIRE") => Ok(CommandTypeModel::Retire),
             Some(b"PURGE") => Ok(CommandTypeModel::Purge),
             Some(v) => Err(format!(
                 "Unrecognized enum variant: '{}'",
