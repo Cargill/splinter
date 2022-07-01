@@ -14,6 +14,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fmt::Write as _;
 
 use reqwest::{blocking::Client, header, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -163,7 +164,8 @@ impl SplinterRestClient {
 
         let mut url = format!("{}/admin/proposals?limit={}", self.url, PAGING_LIMIT);
         if !filters.is_empty() {
-            url.push_str(&format!("&{}", filters.join("&")));
+            write!(url, "&{}", filters.join("&"))
+                .map_err(|e| CliError::ActionError(e.to_string()))?;
         }
 
         Client::new()
@@ -254,58 +256,60 @@ impl fmt::Display for CircuitSlice {
         let mut display_string = format!("Circuit: {}\n    ", self.id,);
 
         if let Some(display_name) = &self.display_name {
-            display_string += &format!("Display Name: {}\n    ", display_name);
+            writeln!(display_string, "Display Name: {}    ", display_name)?;
         } else {
-            display_string += "Display Name: -\n    ";
+            writeln!(display_string, "Display Name: -    ")?;
         }
 
         if let Some(status) = &self.circuit_status {
-            display_string += &format!("Circuit Status: {}\n    ", status);
+            writeln!(display_string, "    Circuit Status: {}    ", status)?;
         } else {
-            display_string += "Circuit Status: Active\n    ";
+            display_string += "    Circuit Status: Active\n    ";
         }
 
-        display_string += &format!(
-            "Schema Version: {}\n    Management Type: {}\n",
+        writeln!(
+            display_string,
+            "    Schema Version: {}\n    Management Type: {}",
             self.circuit_version, self.management_type
-        );
+        )?;
 
         for member in self.members.iter() {
-            display_string += &format!("\n    {}\n", member.node_id);
+            writeln!(display_string, "\n    {}", member.node_id)?;
             if let Some(public_key) = &member.public_key {
-                display_string += &format!("        Public Key: {}\n", public_key);
+                writeln!(display_string, "        Public Key: {}", public_key)?;
             }
 
             display_string += "        Endpoints:\n";
             for endpoint in member.endpoints.iter() {
-                display_string += &format!("            {}\n", endpoint);
+                writeln!(display_string, "            {}", endpoint)?;
             }
 
             for service in self.roster.iter() {
                 if member.node_id == service.node_id {
-                    display_string += &format!(
-                        "        Service ({}): {}\n",
+                    writeln!(
+                        display_string,
+                        "        Service ({}): {}",
                         service.service_type, service.service_id
-                    );
+                    )?;
 
                     for (key, value) in &service.arguments {
-                        display_string += &format!("          {}:\n", key);
+                        writeln!(display_string, "          {}:", key)?;
                         // break apart value if its a list
                         if value.starts_with('[') && value.ends_with(']') {
                             let values: JsonResult<Vec<String>> = serde_json::from_str(value);
                             match values {
                                 Ok(values) => {
                                     for i in values {
-                                        display_string += &format!("              {}\n", i);
+                                        writeln!(display_string, "              {}", i)?;
                                     }
                                 }
-                                Err(_) => display_string += &format!("              {}\n", value),
+                                Err(_) => writeln!(display_string, "              {}", value)?,
                             };
                         } else {
                             let values =
                                 value.split(',').map(String::from).collect::<Vec<String>>();
                             for value in values {
-                                display_string += &format!("              {}\n", value);
+                                writeln!(display_string, "              {}", value)?;
                             }
                         }
                     }
@@ -351,30 +355,31 @@ impl fmt::Display for ProposalSlice {
         };
 
         if let Some(display_name) = &self.circuit.display_name {
-            display_string += &format!("Display Name: {}\n    ", display_name);
+            writeln!(display_string, "Display Name: {}    ", display_name)?;
         } else {
             display_string += "Display Name: -\n    ";
         }
 
         if let Some(status) = &self.circuit.circuit_status {
-            display_string += &format!("Circuit Status: {}\n    ", status);
+            writeln!(display_string, "Circuit Status: {}    ", status)?;
         } else {
             display_string += "Circuit Status: Active\n    ";
         }
 
-        display_string += &format!(
-            "Schema Version: {}\n    Management Type: {}\n",
+        write!(
+            display_string,
+            "    Schema Version: {}\n    Management Type: {}\n",
             self.circuit.circuit_version, self.circuit.management_type
-        );
+        )?;
 
         for member in self.circuit.members.iter() {
-            display_string += &format!("\n    {}\n", member.node_id);
+            write!(display_string, "\n    {}\n", member.node_id)?;
             if let Some(public_key) = &member.public_key {
-                display_string += &format!("        Public Key: {}\n", public_key);
+                writeln!(display_string, "        Public Key: {}", public_key)?;
             }
             if member.node_id == self.requester_node_id {
                 display_string += "        Vote: ACCEPT (implied as requester):\n";
-                display_string += &format!("            {}\n", self.requester);
+                writeln!(display_string, "            {}", self.requester)?;
             } else {
                 let mut vote_string = "        Vote: PENDING".to_string();
                 for vote in self.votes.iter() {
@@ -383,39 +388,40 @@ impl fmt::Display for ProposalSlice {
                             format!("        Vote: ACCEPT\n             {}", vote.public_key)
                     }
                 }
-                display_string += &format!("{}\n", vote_string);
+                writeln!(display_string, "{}", vote_string)?;
             }
             display_string += "        Endpoints:\n";
             for endpoint in member.endpoints.iter() {
-                display_string += &format!("            {}\n", endpoint);
+                writeln!(display_string, "            {}", endpoint)?;
             }
 
             for service in self.circuit.roster.iter() {
                 if service.node_id == member.node_id {
-                    display_string += &format!(
-                        "        Service ({}): {}\n",
+                    writeln!(
+                        display_string,
+                        "        Service ({}): {}",
                         service.service_type, service.service_id
-                    );
+                    )?;
 
                     for key_value in service.arguments.iter() {
                         let key = &key_value[0];
                         let value = &key_value[1];
-                        display_string += &format!("            {}:\n", key);
+                        writeln!(display_string, "            {}:", key)?;
                         if value.starts_with('[') && value.ends_with(']') {
                             let values: JsonResult<Vec<String>> = serde_json::from_str(value);
                             match values {
                                 Ok(values) => {
                                     for i in values {
-                                        display_string += &format!("                {}\n", i);
+                                        writeln!(display_string, "                {}", i)?;
                                     }
                                 }
-                                Err(_) => display_string += &format!("                {}\n", value),
+                                Err(_) => writeln!(display_string, "                {}", value)?,
                             };
                         } else {
                             let values =
                                 value.split(',').map(String::from).collect::<Vec<String>>();
                             for value in values {
-                                display_string += &format!("              {}\n", value);
+                                writeln!(display_string, "              {}", value)?;
                             }
                         }
                     }
