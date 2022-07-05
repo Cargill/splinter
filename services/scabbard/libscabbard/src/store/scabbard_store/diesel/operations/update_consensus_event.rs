@@ -15,6 +15,7 @@
 use std::convert::TryFrom;
 use std::time::SystemTime;
 
+use chrono::naive::NaiveDateTime;
 use diesel::{prelude::*, update};
 use splinter::error::{InternalError, InvalidStateError};
 use splinter::service::FullyQualifiedServiceId;
@@ -46,6 +47,7 @@ where
     C: diesel::Connection,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+    NaiveDateTime: diesel::serialize::ToSql<diesel::sql_types::Timestamp, C::Backend>,
     <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ServiceStatusTypeModelMapping>,
     ServiceStatusTypeModel: diesel::deserialize::FromSql<ServiceStatusTypeModelMapping, C::Backend>,
     <C as diesel::Connection>::Backend: diesel::types::HasSqlType<ConsensusTypeModelMapping>,
@@ -57,6 +59,7 @@ where
         event_id: i64,
         executed_at: SystemTime,
     ) -> Result<(), ScabbardStoreError> {
+        let update_executed_at = get_naive_date_time(executed_at)?;
         self.conn.transaction::<_, _, _>(|| {
             // check to see if a service with the given service_id exists
             scabbard_service::table
@@ -75,18 +78,6 @@ where
                         "Service does not exist",
                     )))
                 })?;
-
-            let update_executed_at = i64::try_from(
-                executed_at
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .map_err(|err| {
-                        ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-                    })?
-                    .as_secs(),
-            )
-            .map_err(|err| {
-                ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
-            })?;
 
             update(consensus_2pc_event::table)
                 .filter(
@@ -107,4 +98,16 @@ where
             Ok(())
         })
     }
+}
+
+fn get_naive_date_time(time: SystemTime) -> Result<NaiveDateTime, InternalError> {
+    let duration = time
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+    let seconds = i64::try_from(duration.as_secs())
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+    Ok(NaiveDateTime::from_timestamp(
+        seconds,
+        duration.subsec_millis() * 1_000_000,
+    ))
 }
