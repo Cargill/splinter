@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::time::SystemTime;
 
 use chrono::naive::NaiveDateTime;
@@ -39,6 +39,7 @@ pub(in crate::store::scabbard_store::diesel) trait UpdateEventOperation {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError>;
 }
 
@@ -58,8 +59,12 @@ where
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError> {
         let update_executed_at = get_naive_date_time(executed_at)?;
+        let update_executed_epoch: i64 = executed_epoch
+            .try_into()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
         self.conn.transaction::<_, _, _>(|| {
             // check to see if a service with the given service_id exists
             scabbard_service::table
@@ -90,7 +95,10 @@ where
                             ),
                     ),
                 )
-                .set(consensus_2pc_event::executed_at.eq(Some(update_executed_at)))
+                .set((
+                    consensus_2pc_event::executed_at.eq(Some(update_executed_at)),
+                    consensus_2pc_event::executed_epoch.eq(Some(update_executed_epoch)),
+                ))
                 .execute(self.conn)
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())

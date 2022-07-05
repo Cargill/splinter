@@ -1328,6 +1328,7 @@ pub struct Consensus2pcEventModel {
     pub service_id: String,
     pub created_at: NaiveDateTime,
     pub executed_at: Option<NaiveDateTime>,
+    pub executed_epoch: Option<i64>,
     pub event_type: EventTypeModel,
 }
 

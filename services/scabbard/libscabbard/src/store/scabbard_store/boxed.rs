@@ -196,8 +196,9 @@ impl ScabbardStore for Box<dyn ScabbardStore> {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError> {
-        (&**self).update_consensus_event(service_id, event_id, executed_at)
+        (&**self).update_consensus_event(service_id, event_id, executed_at, executed_epoch)
     }
 
     /// List all consensus events for a given service_id

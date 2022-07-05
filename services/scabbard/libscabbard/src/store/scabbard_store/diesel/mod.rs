@@ -198,12 +198,14 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_event(
                 service_id,
                 event_id,
                 executed_at,
+                executed_epoch,
             )
         })
     }
@@ -386,12 +388,14 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_event(
                 service_id,
                 event_id,
                 executed_at,
+                executed_epoch,
             )
         })
     }
@@ -572,11 +576,13 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_event(
             service_id,
             event_id,
             executed_at,
+            executed_epoch,
         )
     }
     /// List all consensus events for a given service_id
@@ -725,11 +731,13 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_event(
             service_id,
             event_id,
             executed_at,
+            executed_epoch,
         )
     }
     /// List all consensus events for a given service_id
@@ -2018,7 +2026,7 @@ pub mod tests {
             .expect("failed to add event");
 
         assert!(store
-            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now())
+            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now(), 1)
             .is_ok());
     }
 
@@ -2151,7 +2159,7 @@ pub mod tests {
         );
 
         store
-            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now())
+            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now(), 1)
             .expect("failed to update event");
 
         let events = store
