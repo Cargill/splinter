@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:bionic as builder
+FROM ubuntu:jammy as builder
 
 ENV TRANSACT_FORCE_PANDOC=true
 
@@ -60,7 +60,7 @@ RUN git rev-parse HEAD > /commit-hash
 
 # -------------=== transact-cli docker build ===-------------
 
-FROM ubuntu:bionic
+FROM ubuntu:jammy
 
 ARG CARGO_ARGS
 RUN echo "CARGO_ARGS = '$CARGO_ARGS'" > CARGO_ARGS
