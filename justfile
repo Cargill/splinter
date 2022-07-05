@@ -95,9 +95,14 @@ ci-shellcheck:
 ci-test:
     #!/usr/bin/env sh
     set -e
+
+    trap "docker-compose -f tests/test-splinter.yaml down" EXIT
+
     docker-compose -f tests/test-splinter.yaml build unit-test-splinter
-    docker-compose -f tests/test-splinter.yaml up \
-      --abort-on-container-exit unit-test-splinter
+
+    docker-compose -f tests/test-splinter.yaml up --detach postgres-db
+
+    docker-compose -f tests/test-splinter.yaml up --abort-on-container-exit unit-test-splinter
 
 ci-test-gameroom: test-gameroom
 
