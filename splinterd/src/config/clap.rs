@@ -45,7 +45,7 @@ impl<'a> ClapPartialConfigBuilder<'a> {
 
 /// Implementation of the `PartialConfigBuilder` trait to create a `PartialConfig` object from the
 /// command line config options.
-impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
+impl PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
     fn build(self) -> Result<PartialConfig, ConfigError> {
         let mut partial_config = PartialConfig::new(ConfigSource::CommandLine);
 

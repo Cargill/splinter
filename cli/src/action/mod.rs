@@ -133,7 +133,8 @@ fn print_table(table: Vec<Vec<String>>) {
         let mut col_string = String::from("");
         for (i, len) in max_lengths.iter().enumerate() {
             if let Some(value) = row.get(i) {
-                col_string += &format!("{}{} ", value, " ".repeat(*len - value.len()),);
+                col_string.push_str(value);
+                col_string.push_str(&" ".repeat(1 + *len - value.len()));
             } else {
                 col_string += &" ".repeat(*len);
             }

@@ -16,6 +16,7 @@
 
 use std::error;
 use std::fmt;
+use std::fmt::Write as _;
 
 /// The type of constraint violation that caused the error
 ///
@@ -164,17 +165,17 @@ impl fmt::Display for ConstraintViolationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut format_string = String::new();
         if let Some(store) = &self.store {
-            format_string += &format!("{} ", store);
+            write!(format_string, "{} ", store)?;
         }
 
         if let Some(operation) = &self.operation {
-            format_string += &format!("{}: ", operation);
+            write!(format_string, "{}: ", operation)?;
         }
 
         if let Some(source) = &self.source {
             format_string += &source.to_string();
         } else {
-            format_string += &format!("{} constraint violated", self.violation_type);
+            write!(format_string, "{} constraint violated", self.violation_type)?;
         }
 
         write!(f, "{}", format_string)

@@ -29,6 +29,7 @@ pub mod v3;
 use std::any::Any;
 use std::collections::{HashSet, VecDeque};
 use std::convert::TryFrom;
+use std::fmt::Write as _;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -231,7 +232,8 @@ impl Scabbard {
                     .batch_history()
                     .add_batch(batch.batch().header_signature());
 
-                link.push_str(&format!("{},", batch.batch().header_signature()));
+                write!(link, "{},", batch.batch().header_signature())
+                    .map_err(|e| ScabbardError::Internal(Box::new(e)))?;
 
                 match self.version {
                     ScabbardVersion::V1 => shared.add_batch_to_queue(batch)?,
