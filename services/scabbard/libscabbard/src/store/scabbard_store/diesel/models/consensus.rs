@@ -66,7 +66,7 @@ pub struct Consensus2pcContextModel {
     pub last_commit_epoch: Option<i64>,
     pub state: ContextStateModel,
     pub vote_timeout_start: Option<i64>,
-    pub vote: Option<String>,
+    pub vote: Option<bool>,
     pub decision_timeout_start: Option<i64>,
     pub ack_timeout_start: Option<i64>,
 }
@@ -299,28 +299,13 @@ impl
             ContextStateModel::Commit => State::Commit,
             ContextStateModel::WaitingForVoteRequest => State::WaitingForVoteRequest,
             ContextStateModel::Voted => {
-                let vote = context
-                    .vote
-                    .as_ref()
-                    .map(|v| match v.as_str() {
-                        "TRUE" => Some(true),
-                        "FALSE" => Some(false),
-                        _ => None,
-                    })
-                    .ok_or_else(|| {
-                        InternalError::with_message(
-                        "Failed to convert to ConsensusContext, context has state 'voted' but vote \
-                        is unset"
-                        .to_string(),
+                let vote = context.vote.ok_or_else(|| {
+                    InternalError::with_message(
+                        "Failed to convert to ConsensusContext, context has state 'voted' but \
+                        vote was not set"
+                            .to_string(),
                     )
-                    })?
-                    .ok_or_else(|| {
-                        InternalError::with_message(
-                            "Failed to convert to ConsensusContext, context has state 'voted' but \
-                        an invalid vote response was found"
-                                .to_string(),
-                        )
-                    })?;
+                })?;
                 let decision_timeout_start = if let Some(t) = context.decision_timeout_start {
                     SystemTime::UNIX_EPOCH
                         .checked_add(Duration::from_secs(t as u64))
@@ -423,11 +408,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
                             .as_secs(),
                     )
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                    let vote = match vote {
-                        true => "TRUE",
-                        false => "FALSE",
-                    };
-                    (None, Some(vote.to_string()), Some(time), None)
+                    (None, Some(vote), Some(time), None)
                 }
                 State::WaitingForDecisionAck { ack_timeout_start } => {
                     let time = i64::try_from(
@@ -450,7 +431,7 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
             last_commit_epoch,
             state,
             vote_timeout_start,
-            vote,
+            vote: vote.map(|v| v.to_owned()),
             decision_timeout_start,
             ack_timeout_start,
         })
@@ -465,7 +446,7 @@ pub struct Consensus2pcContextParticipantModel {
     pub service_id: String,
     pub epoch: i64,
     pub process: String,
-    pub vote: Option<String>,
+    pub vote: Option<bool>,
     pub decision_ack: bool,
 }
 
@@ -482,25 +463,10 @@ impl TryFrom<Vec<Consensus2pcContextParticipantModel>> for ParticipantList {
     ) -> Result<Self, Self::Error> {
         let mut all_participants = Vec::new();
         for p in participants {
-            let vote = if let Some(vote) = p.vote {
-                match vote.as_str() {
-                    "TRUE" => Some(true),
-                    "FALSE" => Some(false),
-                    _ => {
-                        return Err(InternalError::with_message(format!(
-                        "Failed to convert context participant model to participant, invalid vote \
-                        value found: {}",
-                        vote,
-                    )))
-                    }
-                }
-            } else {
-                None
-            };
             all_participants.push(Participant {
                 process: ServiceId::new(p.process)
                     .map_err(|e| InternalError::from_source(Box::new(e)))?,
-                vote,
+                vote: p.vote,
                 decision_ack: p.decision_ack,
             });
         }
@@ -525,16 +491,12 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ContextParticipantList {
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
         let mut participants = Vec::new();
         for participant in context.participants() {
-            let vote = participant.vote.map(|vote| match vote {
-                true => "TRUE".to_string(),
-                false => "FALSE".to_string(),
-            });
             participants.push(Consensus2pcContextParticipantModel {
                 circuit_id: service_id.circuit_id().to_string(),
                 service_id: service_id.service_id().to_string(),
                 epoch,
                 process: format!("{}", participant.process),
-                vote,
+                vote: participant.vote,
                 decision_ack: participant.decision_ack,
             })
         }
@@ -555,7 +517,7 @@ pub struct Consensus2pcUpdateContextActionModel {
     pub last_commit_epoch: Option<i64>,
     pub state: ContextStateModel,
     pub vote_timeout_start: Option<i64>,
-    pub vote: Option<String>,
+    pub vote: Option<bool>,
     pub decision_timeout_start: Option<i64>,
     pub action_alarm: Option<i64>,
     pub ack_timeout_start: Option<i64>,
@@ -597,11 +559,7 @@ impl TryFrom<(&Context, &i64, &Option<i64>)> for Consensus2pcUpdateContextAction
                             .as_secs(),
                     )
                     .map_err(|err| InternalError::from_source(Box::new(err)))?;
-                    let vote = match vote {
-                        true => "TRUE",
-                        false => "FALSE",
-                    };
-                    (None, Some(vote.to_string()), Some(time), None)
+                    (None, Some(vote), Some(time), None)
                 }
                 State::WaitingForDecisionAck { ack_timeout_start } => {
                     let time = i64::try_from(
@@ -623,7 +581,7 @@ impl TryFrom<(&Context, &i64, &Option<i64>)> for Consensus2pcUpdateContextAction
             last_commit_epoch,
             state,
             vote_timeout_start,
-            vote,
+            vote: vote.map(|v| v.to_owned()),
             decision_timeout_start,
             action_alarm: *action_alarm,
             ack_timeout_start,
@@ -639,7 +597,7 @@ impl TryFrom<(&Context, &i64, &Option<i64>)> for Consensus2pcUpdateContextAction
 pub struct Consensus2pcUpdateContextActionParticipantModel {
     pub action_id: i64,
     pub process: String,
-    pub vote: Option<String>,
+    pub vote: Option<bool>,
     pub decision_ack: bool,
 }
 
@@ -654,14 +612,10 @@ impl TryFrom<(&Context, &i64)> for UpdateContextActionParticipantList {
     fn try_from((context, action_id): (&Context, &i64)) -> Result<Self, Self::Error> {
         let mut participants = Vec::new();
         for participant in context.participants() {
-            let vote = participant.vote.map(|vote| match vote {
-                true => "TRUE".to_string(),
-                false => "FALSE".to_string(),
-            });
             participants.push(Consensus2pcUpdateContextActionParticipantModel {
                 action_id: *action_id,
                 process: format!("{}", participant.process),
-                vote,
+                vote: participant.vote,
                 decision_ack: participant.decision_ack,
             })
         }
@@ -680,7 +634,7 @@ pub struct Consensus2pcSendMessageActionModel {
     pub epoch: i64,
     pub receiver_service_id: String,
     pub message_type: MessageTypeModel,
-    pub vote_response: Option<String>,
+    pub vote_response: Option<bool>,
     pub vote_request: Option<Vec<u8>>,
 }
 
@@ -1521,7 +1475,7 @@ pub struct Consensus2pcDeliverEventModel {
     pub epoch: i64,
     pub receiver_service_id: String,
     pub message_type: DeliverMessageTypeModel,
-    pub vote_response: Option<String>,
+    pub vote_response: Option<bool>,
     pub vote_request: Option<Vec<u8>>,
 }
 
@@ -1722,5 +1676,5 @@ pub struct Consensus2pcStartEventModel {
 #[primary_key(event_id)]
 pub struct Consensus2pcVoteEventModel {
     pub event_id: i64,
-    pub vote: String, // TRUE or FALSE
+    pub vote: bool, // TRUE or FALSE
 }

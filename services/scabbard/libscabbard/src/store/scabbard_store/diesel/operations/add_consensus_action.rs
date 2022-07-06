@@ -145,18 +145,9 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         Message::DecisionRequest(epoch) => {
                             (MessageTypeModel::from(&message), None, None, epoch)
                         }
-                        Message::VoteResponse(epoch, true) => (
-                            MessageTypeModel::from(&message),
-                            Some("TRUE".to_string()),
-                            None,
-                            epoch,
-                        ),
-                        Message::VoteResponse(epoch, false) => (
-                            MessageTypeModel::from(&message),
-                            Some("FALSE".to_string()),
-                            None,
-                            epoch,
-                        ),
+                        Message::VoteResponse(epoch, vote) => {
+                            (MessageTypeModel::from(&message), Some(vote), None, epoch)
+                        }
                         Message::Commit(epoch) => {
                             (MessageTypeModel::from(&message), None, None, epoch)
                         }
@@ -317,18 +308,9 @@ impl<'a> AddActionOperation for ScabbardStoreOperations<'a, PgConnection> {
                         Message::DecisionRequest(epoch) => {
                             (MessageTypeModel::from(&message), None, None, epoch)
                         }
-                        Message::VoteResponse(epoch, true) => (
-                            MessageTypeModel::from(&message),
-                            Some("TRUE".to_string()),
-                            None,
-                            epoch,
-                        ),
-                        Message::VoteResponse(epoch, false) => (
-                            MessageTypeModel::from(&message),
-                            Some("FALSE".to_string()),
-                            None,
-                            epoch,
-                        ),
+                        Message::VoteResponse(epoch, vote) => {
+                            (MessageTypeModel::from(&message), Some(vote), None, epoch)
+                        }
                         Message::Commit(epoch) => {
                             (MessageTypeModel::from(&message), None, None, epoch)
                         }

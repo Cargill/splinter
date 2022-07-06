@@ -58,7 +58,7 @@ table! {
         last_commit_epoch -> Nullable<BigInt>,
         state -> crate::store::scabbard_store::diesel::models::ContextStateModelMapping,
         vote_timeout_start -> Nullable<BigInt>,
-        vote -> Nullable<Text>,
+        vote -> Nullable<Bool>,
         decision_timeout_start -> Nullable<BigInt>,
         ack_timeout_start -> Nullable<BigInt>,
     }
@@ -70,7 +70,7 @@ table! {
         service_id -> Text,
         epoch -> BigInt,
         process -> Text,
-        vote -> Nullable<Text>,
+        vote -> Nullable<Bool>,
         decision_ack -> Bool,
     }
 }
@@ -90,7 +90,7 @@ table! {
         epoch -> BigInt,
         receiver_service_id -> Text,
         message_type -> crate::store::scabbard_store::diesel::models::MessageTypeModelMapping,
-        vote_response -> Nullable<Text>,
+        vote_response -> Nullable<Bool>,
         vote_request -> Nullable<Binary>,
     }
 }
@@ -103,7 +103,7 @@ table! {
         last_commit_epoch -> Nullable<BigInt>,
         state -> crate::store::scabbard_store::diesel::models::ContextStateModelMapping,
         vote_timeout_start -> Nullable<BigInt>,
-        vote -> Nullable<Text>,
+        vote -> Nullable<Bool>,
         decision_timeout_start -> Nullable<BigInt>,
         action_alarm -> Nullable<BigInt>,
         ack_timeout_start -> Nullable<BigInt>,
@@ -114,7 +114,7 @@ table! {
     consensus_2pc_update_context_action_participant (action_id) {
         action_id -> Int8,
         process -> Text,
-        vote -> Nullable<Text>,
+        vote -> Nullable<Bool>,
         decision_ack -> Bool,
     }
 }
@@ -150,7 +150,7 @@ table! {
         epoch -> BigInt,
         receiver_service_id -> Text,
         message_type -> crate::store::scabbard_store::diesel::models::DeliverMessageTypeModelMapping,
-        vote_response -> Nullable<Text>,
+        vote_response -> Nullable<Bool>,
         vote_request -> Nullable<Binary>,
     }
 }
@@ -165,7 +165,7 @@ table! {
 table! {
     consensus_2pc_vote_event (event_id) {
         event_id -> Int8,
-        vote -> Text,
+        vote -> Bool,
     }
 }
 
