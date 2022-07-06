@@ -262,14 +262,14 @@ impl fmt::Display for CircuitSlice {
         }
 
         if let Some(status) = &self.circuit_status {
-            writeln!(display_string, "Circuit Status: {}    ", status)?;
+            writeln!(display_string, "    Circuit Status: {}    ", status)?;
         } else {
-            display_string += "Circuit Status: Active\n    ";
+            display_string += "    Circuit Status: Active\n    ";
         }
 
         writeln!(
             display_string,
-            "Schema Version: {}\n    Management Type: {}",
+            "    Schema Version: {}\n    Management Type: {}",
             self.circuit_version, self.management_type
         )?;
 
@@ -368,7 +368,7 @@ impl fmt::Display for ProposalSlice {
 
         write!(
             display_string,
-            "Schema Version: {}\n    Management Type: {}\n",
+            "    Schema Version: {}\n    Management Type: {}\n",
             self.circuit.circuit_version, self.circuit.management_type
         )?;
 
