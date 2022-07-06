@@ -149,9 +149,11 @@ impl<DB: Backend> ToSql<ContextStateModelMapping, DB> for ContextStateModel {
             ContextStateModel::Commit => out.write_all(b"COMMIT")?,
             ContextStateModel::Voted => out.write_all(b"VOTED")?,
             ContextStateModel::Voting => out.write_all(b"VOTING")?,
-            ContextStateModel::WaitingForStart => out.write_all(b"WAITINGFORSTART")?,
-            ContextStateModel::WaitingForVoteRequest => out.write_all(b"WAITINGFORVOTEREQUEST")?,
-            ContextStateModel::WaitingForVote => out.write_all(b"WAITINGFORVOTE")?,
+            ContextStateModel::WaitingForStart => out.write_all(b"WAITING_FOR_START")?,
+            ContextStateModel::WaitingForVoteRequest => {
+                out.write_all(b"WAITING_FOR_VOTE_REQUEST")?
+            }
+            ContextStateModel::WaitingForVote => out.write_all(b"WAITING_FOR_VOTE")?,
             ContextStateModel::WaitingForDecisionAck => {
                 out.write_all(b"WAITING_FOR_DECISION_ACK")?
             }
@@ -200,9 +202,9 @@ impl FromSql<ContextStateModelMapping, Pg> for ContextStateModel {
             Some(b"COMMIT") => Ok(ContextStateModel::Commit),
             Some(b"VOTED") => Ok(ContextStateModel::Voted),
             Some(b"VOTING") => Ok(ContextStateModel::Voting),
-            Some(b"WAITINGFORSTART") => Ok(ContextStateModel::WaitingForStart),
-            Some(b"WAITINGFORVOTEREQUEST") => Ok(ContextStateModel::WaitingForVoteRequest),
-            Some(b"WAITINGFORVOTE") => Ok(ContextStateModel::WaitingForVote),
+            Some(b"WAITING_FOR_START") => Ok(ContextStateModel::WaitingForStart),
+            Some(b"WAITING_FOR_VOTE_REQUEST") => Ok(ContextStateModel::WaitingForVoteRequest),
+            Some(b"WAITING_FOR_VOTE") => Ok(ContextStateModel::WaitingForVote),
             Some(b"WAITING_FOR_DECISION_ACK") => Ok(ContextStateModel::WaitingForDecisionAck),
             Some(v) => Err(format!(
                 "Unrecognized enum variant: '{}'",
@@ -229,9 +231,9 @@ impl FromSql<ContextStateModelMapping, Sqlite> for ContextStateModel {
             Some(b"COMMIT") => Ok(ContextStateModel::Commit),
             Some(b"VOTED") => Ok(ContextStateModel::Voted),
             Some(b"VOTING") => Ok(ContextStateModel::Voting),
-            Some(b"WAITINGFORSTART") => Ok(ContextStateModel::WaitingForStart),
-            Some(b"WAITINGFORVOTEREQUEST") => Ok(ContextStateModel::WaitingForVoteRequest),
-            Some(b"WAITINGFORVOTE") => Ok(ContextStateModel::WaitingForVote),
+            Some(b"WAITING_FOR_START") => Ok(ContextStateModel::WaitingForStart),
+            Some(b"WAITING_FOR_VOTE_REQUEST") => Ok(ContextStateModel::WaitingForVoteRequest),
+            Some(b"WAITING_FOR_VOTE") => Ok(ContextStateModel::WaitingForVote),
             Some(b"WAITING_FOR_DECISION_ACK") => Ok(ContextStateModel::WaitingForDecisionAck),
             Some(blob) => {
                 Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
@@ -710,9 +712,9 @@ impl<'a, 'b> AsExpression<Nullable<MessageTypeModelMapping>> for &'a &'b Message
 impl<DB: Backend> ToSql<MessageTypeModelMapping, DB> for MessageTypeModel {
     fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
         match self {
-            MessageTypeModel::VoteResponse => out.write_all(b"VOTERESPONSE")?,
-            MessageTypeModel::DecisionRequest => out.write_all(b"DECISIONREQUEST")?,
-            MessageTypeModel::VoteRequest => out.write_all(b"VOTEREQUEST")?,
+            MessageTypeModel::VoteResponse => out.write_all(b"VOTE_RESPONSE")?,
+            MessageTypeModel::DecisionRequest => out.write_all(b"DECISION_REQUEST")?,
+            MessageTypeModel::VoteRequest => out.write_all(b"VOTE_REQUEST")?,
             MessageTypeModel::Commit => out.write_all(b"COMMIT")?,
             MessageTypeModel::Abort => out.write_all(b"ABORT")?,
             MessageTypeModel::DecisionAck => out.write_all(b"DECISION_ACK")?,
@@ -757,9 +759,9 @@ where
 impl FromSql<MessageTypeModelMapping, Pg> for MessageTypeModel {
     fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
         match bytes {
-            Some(b"VOTERESPONSE") => Ok(MessageTypeModel::VoteResponse),
-            Some(b"DECISIONREQUEST") => Ok(MessageTypeModel::DecisionRequest),
-            Some(b"VOTEREQUEST") => Ok(MessageTypeModel::VoteRequest),
+            Some(b"VOTE_RESPONSE") => Ok(MessageTypeModel::VoteResponse),
+            Some(b"DECISION_REQUEST") => Ok(MessageTypeModel::DecisionRequest),
+            Some(b"VOTE_REQUEST") => Ok(MessageTypeModel::VoteRequest),
             Some(b"COMMIT") => Ok(MessageTypeModel::Commit),
             Some(b"ABORT") => Ok(MessageTypeModel::Abort),
             Some(b"DECISION_ACK") => Ok(MessageTypeModel::DecisionAck),
@@ -784,9 +786,9 @@ impl HasSqlType<MessageTypeModelMapping> for Pg {
 impl FromSql<MessageTypeModelMapping, Sqlite> for MessageTypeModel {
     fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
         match bytes.map(|v| v.read_blob()) {
-            Some(b"VOTERESPONSE") => Ok(MessageTypeModel::VoteResponse),
-            Some(b"DECISIONREQUEST") => Ok(MessageTypeModel::DecisionRequest),
-            Some(b"VOTEREQUEST") => Ok(MessageTypeModel::VoteRequest),
+            Some(b"VOTE_RESPONSE") => Ok(MessageTypeModel::VoteResponse),
+            Some(b"DECISION_REQUEST") => Ok(MessageTypeModel::DecisionRequest),
+            Some(b"VOTE_REQUEST") => Ok(MessageTypeModel::VoteRequest),
             Some(b"COMMIT") => Ok(MessageTypeModel::Commit),
             Some(b"ABORT") => Ok(MessageTypeModel::Abort),
             Some(b"DECISION_ACK") => Ok(MessageTypeModel::DecisionAck),
@@ -890,16 +892,16 @@ impl<'a, 'b> AsExpression<Nullable<NotificationTypeModelMapping>>
 impl<DB: Backend> ToSql<NotificationTypeModelMapping, DB> for NotificationTypeModel {
     fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
         match self {
-            NotificationTypeModel::RequestForStart => out.write_all(b"REQUESTFORSTART")?,
+            NotificationTypeModel::RequestForStart => out.write_all(b"REQUEST_FOR_START")?,
             NotificationTypeModel::CoordinatorRequestForVote => {
-                out.write_all(b"COORDINATORREQUESTFORVOTE")?
+                out.write_all(b"COORDINATOR_REQUEST_FOR_VOTE")?
             }
             NotificationTypeModel::ParticipantRequestForVote => {
-                out.write_all(b"PARTICIPANTREQUESTFORVOTE")?
+                out.write_all(b"PARTICIPANT_REQUEST_FOR_VOTE")?
             }
             NotificationTypeModel::Commit => out.write_all(b"COMMIT")?,
             NotificationTypeModel::Abort => out.write_all(b"ABORT")?,
-            NotificationTypeModel::MessageDropped => out.write_all(b"MESSAGEDROPPED")?,
+            NotificationTypeModel::MessageDropped => out.write_all(b"MESSAGE_DROPPED")?,
         }
         Ok(IsNull::No)
     }
@@ -941,16 +943,16 @@ where
 impl FromSql<NotificationTypeModelMapping, Pg> for NotificationTypeModel {
     fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
         match bytes {
-            Some(b"REQUESTFORSTART") => Ok(NotificationTypeModel::RequestForStart),
-            Some(b"COORDINATORREQUESTFORVOTE") => {
+            Some(b"REQUEST_FOR_START") => Ok(NotificationTypeModel::RequestForStart),
+            Some(b"COORDINATOR_REQUEST_FOR_VOTE") => {
                 Ok(NotificationTypeModel::CoordinatorRequestForVote)
             }
-            Some(b"PARTICIPANTREQUESTFORVOTE") => {
+            Some(b"PARTICIPANT_REQUEST_FOR_VOTE") => {
                 Ok(NotificationTypeModel::ParticipantRequestForVote)
             }
             Some(b"COMMIT") => Ok(NotificationTypeModel::Commit),
             Some(b"ABORT") => Ok(NotificationTypeModel::Abort),
-            Some(b"MESSAGEDROPPED") => Ok(NotificationTypeModel::MessageDropped),
+            Some(b"MESSAGE_DROPPED") => Ok(NotificationTypeModel::MessageDropped),
             Some(v) => Err(format!(
                 "Unrecognized enum variant: '{}'",
                 String::from_utf8_lossy(v)
@@ -972,16 +974,16 @@ impl HasSqlType<NotificationTypeModelMapping> for Pg {
 impl FromSql<NotificationTypeModelMapping, Sqlite> for NotificationTypeModel {
     fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
         match bytes.map(|v| v.read_blob()) {
-            Some(b"REQUESTFORSTART") => Ok(NotificationTypeModel::RequestForStart),
-            Some(b"COORDINATORREQUESTFORVOTE") => {
+            Some(b"REQUEST_FOR_START") => Ok(NotificationTypeModel::RequestForStart),
+            Some(b"COORDINATOR_REQUEST_FOR_VOTE") => {
                 Ok(NotificationTypeModel::CoordinatorRequestForVote)
             }
-            Some(b"PARTICIPANTREQUESTFORVOTE") => {
+            Some(b"PARTICIPANT_REQUEST_FOR_VOTE") => {
                 Ok(NotificationTypeModel::ParticipantRequestForVote)
             }
             Some(b"COMMIT") => Ok(NotificationTypeModel::Commit),
             Some(b"ABORT") => Ok(NotificationTypeModel::Abort),
-            Some(b"MESSAGEDROPPED") => Ok(NotificationTypeModel::MessageDropped),
+            Some(b"MESSAGE_DROPPED") => Ok(NotificationTypeModel::MessageDropped),
             Some(blob) => {
                 Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
             }
@@ -1000,12 +1002,12 @@ impl HasSqlType<NotificationTypeModelMapping> for Sqlite {
 impl From<&State> for String {
     fn from(state: &State) -> Self {
         match *state {
-            State::WaitingForStart => String::from("WAITINGFORSTART"),
+            State::WaitingForStart => String::from("WAITING_FOR_START"),
             State::Voting { .. } => String::from("VOTING"),
-            State::WaitingForVote => String::from("WAITINGFORVOTE"),
+            State::WaitingForVote => String::from("WAITING_FOR_VOTE"),
             State::Abort => String::from("ABORT"),
             State::Commit => String::from("COMMIT"),
-            State::WaitingForVoteRequest => String::from("WAITINGFORVOTEREQUEST"),
+            State::WaitingForVoteRequest => String::from("WAITING_FOR_VOTE_REQUEST"),
             State::Voted { .. } => String::from("VOTED"),
             State::WaitingForDecisionAck { .. } => String::from("WAITING_FOR_DECISION_ACK"),
         }
@@ -1220,12 +1222,16 @@ impl HasSqlType<ActionTypeModelMapping> for Sqlite {
 impl From<&Notification> for String {
     fn from(notification: &Notification) -> Self {
         match *notification {
-            Notification::RequestForStart() => String::from("REQUESTFORSTART"),
-            Notification::CoordinatorRequestForVote() => String::from("COORDINATORREQUESTFORVOTE"),
-            Notification::ParticipantRequestForVote(_) => String::from("PARTICIPANTREQUESTFORVOTE"),
+            Notification::RequestForStart() => String::from("REQUEST_FOR_START"),
+            Notification::CoordinatorRequestForVote() => {
+                String::from("COORDINATOR_REQUEST_FOR_VOTE")
+            }
+            Notification::ParticipantRequestForVote(_) => {
+                String::from("PARTICIPANT_REQUEST_FOR_VOTE")
+            }
             Notification::Commit() => String::from("COMMIT"),
             Notification::Abort() => String::from("ABORT"),
-            Notification::MessageDropped(_) => String::from("MESSAGEDROPPED"),
+            Notification::MessageDropped(_) => String::from("MESSAGE_DROPPED"),
         }
     }
 }
@@ -1250,9 +1256,9 @@ impl From<&Notification> for NotificationTypeModel {
 impl From<&Message> for String {
     fn from(message: &Message) -> Self {
         match *message {
-            Message::VoteRequest(..) => String::from("VOTEREQUEST"),
-            Message::DecisionRequest(_) => String::from("DECISIONREQUEST"),
-            Message::VoteResponse(..) => String::from("VOTERESPONSE"),
+            Message::VoteRequest(..) => String::from("VOTE_REQUEST"),
+            Message::DecisionRequest(_) => String::from("DECISION_REQUEST"),
+            Message::VoteResponse(..) => String::from("VOTE_RESPONSE"),
             Message::Commit(_) => String::from("COMMIT"),
             Message::Abort(_) => String::from("ABORT"),
             Message::DecisionAck(_) => String::from("DECISION_ACK"),
@@ -1553,9 +1559,9 @@ impl<'a, 'b> AsExpression<Nullable<DeliverMessageTypeModelMapping>>
 impl<DB: Backend> ToSql<DeliverMessageTypeModelMapping, DB> for DeliverMessageTypeModel {
     fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
         match self {
-            DeliverMessageTypeModel::VoteResponse => out.write_all(b"VOTERESPONSE")?,
-            DeliverMessageTypeModel::DecisionRequest => out.write_all(b"DECISIONREQUEST")?,
-            DeliverMessageTypeModel::VoteRequest => out.write_all(b"VOTEREQUEST")?,
+            DeliverMessageTypeModel::VoteResponse => out.write_all(b"VOTE_RESPONSE")?,
+            DeliverMessageTypeModel::DecisionRequest => out.write_all(b"DECISION_REQUEST")?,
+            DeliverMessageTypeModel::VoteRequest => out.write_all(b"VOTE_REQUEST")?,
             DeliverMessageTypeModel::Commit => out.write_all(b"COMMIT")?,
             DeliverMessageTypeModel::Abort => out.write_all(b"ABORT")?,
             DeliverMessageTypeModel::DecisionAck => out.write_all(b"DECISION_ACK")?,
@@ -1600,9 +1606,9 @@ where
 impl FromSql<DeliverMessageTypeModelMapping, Pg> for DeliverMessageTypeModel {
     fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
         match bytes {
-            Some(b"VOTERESPONSE") => Ok(DeliverMessageTypeModel::VoteResponse),
-            Some(b"DECISIONREQUEST") => Ok(DeliverMessageTypeModel::DecisionRequest),
-            Some(b"VOTEREQUEST") => Ok(DeliverMessageTypeModel::VoteRequest),
+            Some(b"VOTE_RESPONSE") => Ok(DeliverMessageTypeModel::VoteResponse),
+            Some(b"DECISION_REQUEST") => Ok(DeliverMessageTypeModel::DecisionRequest),
+            Some(b"VOTE_REQUEST") => Ok(DeliverMessageTypeModel::VoteRequest),
             Some(b"COMMIT") => Ok(DeliverMessageTypeModel::Commit),
             Some(b"ABORT") => Ok(DeliverMessageTypeModel::Abort),
             Some(b"DECISION_ACK") => Ok(DeliverMessageTypeModel::DecisionAck),
@@ -1627,9 +1633,9 @@ impl HasSqlType<DeliverMessageTypeModelMapping> for Pg {
 impl FromSql<DeliverMessageTypeModelMapping, Sqlite> for DeliverMessageTypeModel {
     fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
         match bytes.map(|v| v.read_blob()) {
-            Some(b"VOTERESPONSE") => Ok(DeliverMessageTypeModel::VoteResponse),
-            Some(b"DECISIONREQUEST") => Ok(DeliverMessageTypeModel::DecisionRequest),
-            Some(b"VOTEREQUEST") => Ok(DeliverMessageTypeModel::VoteRequest),
+            Some(b"VOTE_RESPONSE") => Ok(DeliverMessageTypeModel::VoteResponse),
+            Some(b"DECISION_REQUEST") => Ok(DeliverMessageTypeModel::DecisionRequest),
+            Some(b"VOTE_REQUEST") => Ok(DeliverMessageTypeModel::VoteRequest),
             Some(b"COMMIT") => Ok(DeliverMessageTypeModel::Commit),
             Some(b"ABORT") => Ok(DeliverMessageTypeModel::Abort),
             Some(b"DECISION_ACK") => Ok(DeliverMessageTypeModel::DecisionAck),

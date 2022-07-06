@@ -131,7 +131,7 @@ impl<'a, 'b> AsExpression<Nullable<AlarmTypeModelMapping>> for &'a &'b AlarmType
 impl<DB: Backend> ToSql<AlarmTypeModelMapping, DB> for AlarmTypeModel {
     fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
         match self {
-            AlarmTypeModel::TwoPhaseCommit => out.write_all(b"TWOPHASECOMMIT")?,
+            AlarmTypeModel::TwoPhaseCommit => out.write_all(b"TWO_PHASE_COMMIT")?,
         }
         Ok(IsNull::No)
     }
@@ -173,7 +173,7 @@ where
 impl FromSql<AlarmTypeModelMapping, Pg> for AlarmTypeModel {
     fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
         match bytes {
-            Some(b"TWOPHASECOMMIT") => Ok(AlarmTypeModel::TwoPhaseCommit),
+            Some(b"TWO_PHASE_COMMIT") => Ok(AlarmTypeModel::TwoPhaseCommit),
             Some(v) => Err(format!(
                 "Unrecognized enum variant: '{}'",
                 String::from_utf8_lossy(v)
@@ -195,7 +195,7 @@ impl HasSqlType<AlarmTypeModelMapping> for Pg {
 impl FromSql<AlarmTypeModelMapping, Sqlite> for AlarmTypeModel {
     fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
         match bytes.map(|v| v.read_blob()) {
-            Some(b"TWOPHASECOMMIT") => Ok(AlarmTypeModel::TwoPhaseCommit),
+            Some(b"TWO_PHASE_COMMIT") => Ok(AlarmTypeModel::TwoPhaseCommit),
             Some(blob) => {
                 Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
             }

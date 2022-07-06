@@ -130,7 +130,12 @@ INSERT INTO new_consensus_2pc_context
         coordinator,
         epoch,
         last_commit_epoch,
-        state,
+        CASE state
+            WHEN 'WAITING_FOR_START' THEN 'WAITINGFORSTART'
+            WHEN 'WAITING_FOR_VOTE' THEN 'WAITINGFORVOTE'
+            WHEN 'WAITING_FOR_VOTE_REQUEST' THEN 'WAITINGFORVOTEREQUEST'
+            ELSE state
+            END,
         vote_timeout_start,
         CASE vote
             WHEN 0 THEN 'FALSE'
@@ -174,7 +179,12 @@ INSERT INTO new_consensus_2pc_deliver_event
         event_id,
         epoch,
         receiver_service_id,
-        message_type,
+        CASE message_type
+            WHEN 'VOTE_RESPONSE' THEN 'VOTERESPONSE'
+            WHEN 'DECISION_REQUEST' THEN 'DECISIONREQUEST'
+            WHEN 'VOTE_REQUEST' THEN 'VOTEREQUEST'
+            ELSE message_type
+            END,
         CASE vote_response
             WHEN 0 THEN 'FALSE'
             WHEN 1 THEN 'TRUE'
@@ -196,7 +206,12 @@ INSERT INTO new_consensus_2pc_send_message_action
         action_id,
         epoch,
         receiver_service_id,
-        message_type,
+        CASE message_type
+            WHEN 'VOTE_RESPONSE' THEN 'VOTERESPONSE'
+            WHEN 'DECISION_REQUEST' THEN 'DECISIONREQUEST'
+            WHEN 'VOTE_REQUEST' THEN 'VOTEREQUEST'
+            ELSE message_type
+            END,
         CASE vote_response
             WHEN 0 THEN 'FALSE'
             WHEN 1 THEN 'TRUE'
@@ -222,7 +237,12 @@ INSERT INTO new_consensus_2pc_update_context_action
         coordinator,
         epoch,
         last_commit_epoch,
-        state,
+        CASE state
+            WHEN 'WAITING_FOR_START' THEN 'WAITINGFORSTART'
+            WHEN 'WAITING_FOR_VOTE' THEN 'WAITINGFORVOTE'
+            WHEN 'WAITING_FOR_VOTE_REQUEST' THEN 'WAITINGFORVOTEREQUEST'
+            ELSE state
+            END,
         vote_timeout_start,
         CASE vote
             WHEN 0 THEN 'FALSE'
@@ -265,6 +285,42 @@ INSERT INTO new_consensus_2pc_vote_event
             END
     FROM consensus_2pc_vote_event;
 
+INSERT INTO new_consensus_2pc_notification_action
+    (
+        action_id,
+        notification_type,
+        dropped_message,
+        request_for_vote_value
+    )
+    SELECT
+        action_id,
+        CASE notification_type
+            WHEN 'REQUEST_FOR_START' THEN 'REQUESTFORSTART'
+            WHEN 'COORDINATOR_REQUEST_FOR_VOTE' THEN 'COORDINATORREQUESTFORVOTE'
+            WHEN 'PARTICIPANT_REQUEST_FOR_VOTE' THEN 'PARTICIPANTREQUESTFORVOTE'
+            WHEN 'MESSAGE_DROPPED' THEN 'MESSAGEDROPPED'
+            ELSE notification_type
+            END,
+        dropped_message,
+        request_for_vote_value
+    FROM consensus_2pc_notification_action;
+
+INSERT INTO new_scabbard_alarm
+    (
+        circuit_id,
+        service_id,
+        alarm_type,
+        alarm
+    )
+    SELECT
+        circuit_id,
+        service_id,
+        CASE alarm_type
+            WHEN 'TWO_PHASE_COMMIT' THEN 'TWOPHASECOMMIT'
+            END,
+        alarm
+    FROM scabbard_alarm;
+
 -- delete existing tables and rename the new tables
 DROP TABLE consensus_2pc_context;
 DROP TABLE consensus_2pc_context_participant;
@@ -273,6 +329,8 @@ DROP TABLE consensus_2pc_send_message_action;
 DROP TABLE consensus_2pc_update_context_action;
 DROP TABLE consensus_2pc_update_context_action_participant;
 DROP TABLE consensus_2pc_vote_event;
+DROP TABLE consensus_2pc_notification_action;
+DROP TABLE scabbard_alarm;
 
 ALTER TABLE new_consensus_2pc_context RENAME TO consensus_2pc_context;
 ALTER TABLE new_consensus_2pc_context_participant RENAME TO consensus_2pc_context_participant;
@@ -281,6 +339,8 @@ ALTER TABLE new_consensus_2pc_send_message_action RENAME TO consensus_2pc_send_m
 ALTER TABLE new_consensus_2pc_update_context_action RENAME TO consensus_2pc_update_context_action;
 ALTER TABLE new_consensus_2pc_update_context_action_participant RENAME TO consensus_2pc_update_context_action_participant;
 ALTER TABLE new_consensus_2pc_vote_event RENAME TO consensus_2pc_vote_event;
+ALTER TABLE new_consensus_2pc_notification_action RENAME TO consensus_2pc_notification_action;
+ALTER TABLE new_scabbard_alarm RENAME TO scabbard_alarm;
 
 PRAGMA foreign_keys=on;
 
