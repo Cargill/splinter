@@ -67,6 +67,9 @@ use crate::store::transact::factory::{LmdbDatabaseFactory, LmdbDatabasePurgeHand
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 use crate::store::CommitHashStore;
 
+#[cfg(feature = "rest-api")]
+pub use endpoint_provider::ScabbardServiceEndpointProvider;
+
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 const DEFAULT_LMDB_DIR: &str = "/var/lib/splinter";
 

@@ -31,7 +31,7 @@ use splinter::store::StoreFactory;
 use splinter::transport::{inproc::InprocTransport, Transport};
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
 use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
-use splinter_rest_api_actix_web_1::service::ServiceOrchestratorRestResourceProvider;
+use splinter_rest_api_actix_web_1::service::ServiceOrchestratorRestResourceProviderBuilder;
 
 use crate::node::builder::admin::AdminServiceEventClientVariant;
 use crate::node::running::admin::{self as running_admin, AdminSubsystem};
@@ -122,8 +122,12 @@ impl RunnableAdminSubsystem {
             .run()
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
-        let orchestrator_rest_provider =
-            ServiceOrchestratorRestResourceProvider::new(&orchestrator);
+        let orchestrator_rest_provider = ServiceOrchestratorRestResourceProviderBuilder::new()
+            .with_endpoint_factory(
+                scabbard::service::SERVICE_TYPE,
+                Box::new(scabbard::service::ScabbardServiceEndpointProvider::default()),
+            )
+            .build(&orchestrator);
 
         let mut admin_service_builder = AdminServiceBuilder::new();
 

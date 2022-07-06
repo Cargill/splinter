@@ -36,6 +36,7 @@ use cylinder::{secp256k1::Secp256k1Context, Signer, SigningError, VerifierFactor
 use scabbard::service::v3::{ScabbardMessageByteConverter, ScabbardMessageHandlerFactory};
 use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactoryBuilder;
+use scabbard::service::ScabbardServiceEndpointProvider;
 #[cfg(feature = "service2")]
 use splinter::admin::lifecycle::sync::SyncLifecycleInterface;
 use splinter::admin::lifecycle::LifecycleDispatch;
@@ -110,7 +111,7 @@ use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitReso
 #[cfg(feature = "biome-key-management")]
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
 use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
-use splinter_rest_api_actix_web_1::service::ServiceOrchestratorRestResourceProvider;
+use splinter_rest_api_actix_web_1::service::ServiceOrchestratorRestResourceProviderBuilder;
 
 use crate::node_id::get_node_id;
 use crate::routes;
@@ -556,8 +557,13 @@ impl SplinterDaemon {
                 StartError::OrchestratorError(format!("failed to start orchestrator: {}", err))
             })?;
 
-        let orchestrator_resources =
-            ServiceOrchestratorRestResourceProvider::new(&orchestrator).resources();
+        let orchestrator_resources = ServiceOrchestratorRestResourceProviderBuilder::new()
+            .with_endpoint_factory(
+                scabbard::service::SERVICE_TYPE,
+                Box::new(ScabbardServiceEndpointProvider::default()),
+            )
+            .build(&orchestrator)
+            .resources();
         let mut orchestator_shutdown_handle =
             orchestrator.take_shutdown_handle().ok_or_else(|| {
                 StartError::OrchestratorError(

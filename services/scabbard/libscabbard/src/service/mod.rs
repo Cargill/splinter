@@ -57,6 +57,8 @@ use error::ScabbardError;
 pub use error::StateSubscriberError;
 pub use factory::ConnectionUri;
 pub use factory::ScabbardArgValidator;
+#[cfg(feature = "rest-api")]
+pub use factory::ScabbardServiceEndpointProvider;
 pub use factory::{ScabbardFactory, ScabbardFactoryBuilder, ScabbardStorageConfiguration};
 use shared::ScabbardShared;
 use state::merkle_state::MerkleState;
