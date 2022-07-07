@@ -342,5 +342,46 @@ ALTER TABLE new_consensus_2pc_vote_event RENAME TO consensus_2pc_vote_event;
 ALTER TABLE new_consensus_2pc_notification_action RENAME TO consensus_2pc_notification_action;
 ALTER TABLE new_scabbard_alarm RENAME TO scabbard_alarm;
 
+-- recreate the old table with `created_at` defaulting to localtime
+CREATE TABLE IF NOT EXISTS new_consensus_2pc_action (
+    id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+    circuit_id                TEXT NOT NULL,
+    service_id                TEXT NOT NULL,
+    created_at                TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now', 'localtime')) NOT NULL,
+    executed_at               TEXT,
+    action_type               TEXT  NOT NULL
+     CHECK ( action_type IN ( 
+        "UPDATE_CONTEXT", 
+        "SEND_MESSAGE", 
+        "NOTIFICATION") ),
+    event_id                 INTEGER  NOT NULL,
+    FOREIGN KEY (circuit_id, service_id) REFERENCES scabbard_service(circuit_id, service_id) ON DELETE CASCADE,
+    FOREIGN KEY (event_id) REFERENCES consensus_2pc_event(id) ON DELETE CASCADE
+);
+
+-- Move data from the current table
+INSERT INTO new_consensus_2pc_action
+    (
+        id,
+        circuit_id,
+        service_id,
+        created_at,
+        executed_at,
+        action_type,
+        event_id
+    )
+    SELECT
+        id,
+        circuit_id,
+        service_id,
+        strftime('%Y-%m-%d %H:%M:%f', created_at, 'localtime') as created_at,
+        executed_at,
+        action_type,
+        event_id
+    FROM consensus_2pc_action;
+
+DROP TABLE consensus_2pc_action;
+ALTER TABLE new_consensus_2pc_action RENAME TO consensus_2pc_action;
+
 PRAGMA foreign_keys=on;
 
