@@ -15,6 +15,8 @@
 //! This module provides the `GET /admin/circuits` endpoint for listing the definitions of circuits
 //! in Splinter's state.
 
+use std::fmt::Write as _;
+
 use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
 use std::collections::HashMap;
@@ -118,7 +120,13 @@ fn list_circuits(
     };
     let mut link = req.uri().path().to_string();
     if !new_queries.is_empty() {
-        link.push_str(&format!("?{}&", new_queries.join("&")));
+        if let Err(e) = write!(link, "?{}&", new_queries.join("&")) {
+            return Box::new(
+                HttpResponse::InternalServerError()
+                    .body(e.to_string())
+                    .into_future(),
+            );
+        }
     }
 
     let protocol_version = match req.headers().get("SplinterProtocolVersion") {

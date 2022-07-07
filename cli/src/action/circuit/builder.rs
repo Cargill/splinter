@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fmt::Write as _;
+
 use splinter::admin::messages::AuthorizationType;
 use splinter::admin::messages::{
     BuilderError, CircuitStatus, CreateCircuit, CreateCircuitBuilder, SplinterNode,
@@ -305,7 +307,8 @@ impl CreateCircuitMessageBuilder {
 
         let mut comments = self.comments.unwrap_or_default();
         if let Some(builder_comments) = circuit_builder.comments() {
-            comments.push_str(&format!("; {}", builder_comments));
+            write!(comments, "; {}", builder_comments)
+                .map_err(|e| CliError::ActionError(e.to_string()))?;
         }
 
         let mut create_circuit_builder = self
