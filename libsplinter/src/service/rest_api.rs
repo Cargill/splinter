@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use crate::actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
 use crate::futures::Future;
-use crate::rest_api::actix_web_1::{Continuation, Method, RequestGuard};
+use crate::rest_api::actix_web_1::{Method, RequestGuard};
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 
@@ -47,7 +47,7 @@ pub struct ServiceEndpoint {
     /// The function that handles requests made to this endpoint
     pub handler: Handler,
     /// Guards for this endpoint
-    pub request_guards: Vec<Box<dyn ServiceRequestGuard>>,
+    pub request_guards: Vec<ServiceRequestGuard>,
     #[cfg(feature = "authorization")]
     /// The permission that a client needs to use this endpoint
     pub permission: Permission,
@@ -60,30 +60,4 @@ pub trait ServiceEndpointProvider {
     }
 }
 
-/// This trait enforces that the Request guard is Clone.
-pub trait ServiceRequestGuard: RequestGuard {
-    fn clone_box(&self) -> Box<dyn ServiceRequestGuard>;
-}
-
-// Much of the following implementations are a bit of gymnastics to ensure that the compiler is
-// happy with the types that are required elsewhere in the system.
-impl<R> ServiceRequestGuard for R
-where
-    R: RequestGuard + Clone + 'static,
-{
-    fn clone_box(&self) -> Box<dyn ServiceRequestGuard> {
-        Box::new(self.clone())
-    }
-}
-
-impl Clone for Box<dyn ServiceRequestGuard> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
-}
-
-impl RequestGuard for Box<dyn ServiceRequestGuard> {
-    fn evaluate(&self, req: &HttpRequest) -> Continuation {
-        (**self).evaluate(req)
-    }
-}
+type ServiceRequestGuard = Arc<dyn RequestGuard + 'static>;

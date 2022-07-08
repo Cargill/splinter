@@ -62,7 +62,7 @@ pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
                 }
             })
         }),
-        request_guards: vec![Box::new(ProtocolVersionRangeGuard::new(
+        request_guards: vec![Arc::new(ProtocolVersionRangeGuard::new(
             protocol::SCABBARD_GET_STATE_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
@@ -247,7 +247,7 @@ mod tests {
     ) -> Resource {
         let mut resource = Resource::build(&service_endpoint.route);
         for request_guard in service_endpoint.request_guards.into_iter() {
-            resource = resource.add_request_guard(request_guard);
+            resource = resource.add_service_request_guard(request_guard);
         }
         let handler = service_endpoint.handler;
         #[cfg(feature = "authorization")]
