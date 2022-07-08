@@ -284,6 +284,18 @@ impl ServiceOrchestrator {
             .collect())
     }
 
+    pub fn list_service_types(&self) -> Vec<String> {
+        self.service_factories
+            .iter()
+            .flat_map(|sf| {
+                sf.available_service_types()
+                    .iter()
+                    .map(|s| s.into())
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
     /// Create a service that has previously been stopped according to the specified definition.
     /// The arguments provided must match those required to create the service.
     pub fn add_stopped_service(
