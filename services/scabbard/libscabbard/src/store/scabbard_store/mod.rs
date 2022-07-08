@@ -196,6 +196,7 @@ pub trait ScabbardStore {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError>;
 
     /// List all pending consensus events for a given service_id

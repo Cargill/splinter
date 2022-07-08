@@ -17,6 +17,8 @@
 #[cfg(feature = "scabbardv3")]
 mod command;
 mod commit_hash;
+#[cfg(all(test, feature = "diesel-postgres-tests"))]
+pub(crate) mod diesel_postgres_test;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 pub(crate) mod pool;
 #[cfg(feature = "scabbardv3-store")]

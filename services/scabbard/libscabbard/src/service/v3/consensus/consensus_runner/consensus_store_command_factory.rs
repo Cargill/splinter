@@ -53,11 +53,13 @@ where
         &self,
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
+        executed_epoch: u64,
     ) -> Box<dyn StoreCommand<Context = C>> {
         Box::new(MarkEventCompleteCommand {
             factory: self.factory.clone(),
             service_id: service_id.clone(),
             event_id,
+            executed_epoch,
         })
     }
 }
@@ -92,6 +94,7 @@ struct MarkEventCompleteCommand<C> {
     factory: Arc<dyn ScabbardStoreFactory<C>>,
     service_id: FullyQualifiedServiceId,
     event_id: i64,
+    executed_epoch: u64,
 }
 
 impl<C> StoreCommand for MarkEventCompleteCommand<C>
@@ -103,7 +106,12 @@ where
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         let store = self.factory.new_store(conn);
         store
-            .update_consensus_event(&self.service_id, self.event_id, SystemTime::now())
+            .update_consensus_event(
+                &self.service_id,
+                self.event_id,
+                SystemTime::now(),
+                self.executed_epoch,
+            )
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
         Ok(())

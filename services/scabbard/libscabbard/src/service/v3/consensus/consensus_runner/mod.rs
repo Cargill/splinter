@@ -102,6 +102,8 @@ where
                     ))
                 })?;
 
+            let epoch = context.epoch();
+
             let algorithm = self.algorithms.get(event.algorithm_name()).ok_or_else(|| {
                 InternalError::with_message(format!("{} is not configured", event.algorithm_name()))
             })?;
@@ -115,7 +117,7 @@ where
             );
             commands.push(
                 self.consensus_store_command_factory
-                    .new_mark_event_complete_command(service_id, event_id),
+                    .new_mark_event_complete_command(service_id, event_id, epoch),
             );
             self.store_command_executor.execute(commands)?;
         }

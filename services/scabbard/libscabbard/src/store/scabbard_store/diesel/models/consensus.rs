@@ -1326,8 +1326,9 @@ pub struct Consensus2pcEventModel {
     pub id: i64,
     pub circuit_id: String,
     pub service_id: String,
-    pub created_at: SystemTime,
-    pub executed_at: Option<i64>,
+    pub created_at: NaiveDateTime,
+    pub executed_at: Option<NaiveDateTime>,
+    pub executed_epoch: Option<i64>,
     pub event_type: EventTypeModel,
 }
 
@@ -1336,7 +1337,7 @@ pub struct Consensus2pcEventModel {
 pub struct InsertableConsensus2pcEventModel {
     pub circuit_id: String,
     pub service_id: String,
-    pub executed_at: Option<i64>,
+    pub executed_at: Option<NaiveDateTime>,
     pub event_type: EventTypeModel,
 }
 

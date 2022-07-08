@@ -81,6 +81,7 @@ experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
+  "diesel-postgres-tests",
   "https",
   "scabbardv3",
   "scabbardv3-consensus",
@@ -92,6 +93,7 @@ experimental = [
 authorization = ["splinter/authorization"]
 client = []
 client-reqwest = ["client", "log", "reqwest"]
+diesel-postgres-tests = ["postgres"]
 events = ["splinter/events"]
 https = []
 lmdb = []

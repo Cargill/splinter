@@ -198,12 +198,14 @@ impl ScabbardStore for DieselScabbardStore<SqliteConnection> {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_event(
                 service_id,
                 event_id,
                 executed_at,
+                executed_epoch,
             )
         })
     }
@@ -386,12 +388,14 @@ impl ScabbardStore for DieselScabbardStore<PgConnection> {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError> {
         self.pool.execute_write(|conn| {
             ScabbardStoreOperations::new(conn).update_consensus_event(
                 service_id,
                 event_id,
                 executed_at,
+                executed_epoch,
             )
         })
     }
@@ -572,11 +576,13 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, SqliteConnection> {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_event(
             service_id,
             event_id,
             executed_at,
+            executed_epoch,
         )
     }
     /// List all consensus events for a given service_id
@@ -725,11 +731,13 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
         service_id: &FullyQualifiedServiceId,
         event_id: i64,
         executed_at: SystemTime,
+        executed_epoch: u64,
     ) -> Result<(), ScabbardStoreError> {
         ScabbardStoreOperations::new(self.connection).update_consensus_event(
             service_id,
             event_id,
             executed_at,
+            executed_epoch,
         )
     }
     /// List all consensus events for a given service_id
@@ -783,14 +791,17 @@ impl<'a> ScabbardStore for DieselConnectionScabbardStore<'a, PgConnection> {
     }
 }
 
-#[cfg(all(test, feature = "sqlite"))]
+#[cfg(test)]
 pub mod tests {
     use super::*;
 
     use std::time::Duration;
     use std::time::SystemTime;
 
+    #[cfg(feature = "sqlite")]
     use crate::migrations::run_sqlite_migrations;
+    #[cfg(feature = "diesel-postgres-tests")]
+    use crate::store::diesel_postgres_test::run_postgres_test;
 
     use crate::store::scabbard_store::{
         service::{ConsensusType, ScabbardServiceBuilder, ServiceStatus},
@@ -800,10 +811,12 @@ pub mod tests {
         CommitEntryBuilder, ConsensusDecision,
     };
 
+    #[cfg(feature = "diesel-postgres-tests")]
+    use diesel::pg::PgConnection;
+    use diesel::r2d2::{ConnectionManager, Pool};
+    #[cfg(feature = "sqlite")]
     use diesel::{
-        connection::SimpleConnection,
-        r2d2::{ConnectionManager, CustomizeConnection, Pool},
-        sqlite::SqliteConnection,
+        connection::SimpleConnection, r2d2::CustomizeConnection, sqlite::SqliteConnection,
     };
     use splinter::{service::FullyQualifiedServiceId, service::ServiceId};
 
@@ -811,12 +824,7 @@ pub mod tests {
     ///
     /// 1. Add a valid context to the store and check that the operation is successful
     /// 2. Attempt to add the same context to the store again and check that an error is returned
-    #[test]
-    fn scabbard_store_add_context() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_add_context(store: &dyn ScabbardStore) {
         let coordinator_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -869,17 +877,36 @@ pub mod tests {
             .is_err());
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_add_context() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+
+        scabbard_store_add_context(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_add_context() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+
+            let store = DieselScabbardStore::new(pool);
+
+            scabbard_store_add_context(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `add_consensus_action` operation is successful.
     ///
     /// 1. Add a valid context to the store
     /// 2. Add an action with the same `service_id` and `epoch` to the store and check
     ///    that the operation was successful
-    #[test]
-    fn scabbard_store_add_actions() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_add_actions(store: &dyn ScabbardStore) {
         let coordinator_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -930,17 +957,34 @@ pub mod tests {
             .is_ok());
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_add_actions() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+
+        scabbard_store_add_actions(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_add_actions() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_add_actions(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `list_consensus_actions` operation is successful.
     ///
     /// 1. Add a valid context to the store
     /// 2. Add two actions with the same `service_id` and `epoch` to the store
     /// 3. List the actions and check that the actions returned match what was added
-    #[test]
-    fn scabbard_store_list_actions() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_list_actions(store: &dyn ScabbardStore) {
         let coordinator_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -1060,17 +1104,34 @@ pub mod tests {
         );
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_list_actions() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+
+        scabbard_store_list_actions(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_list_actions() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_list_actions(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `update_consensus_context` operation is successful.
     ///
     /// 1. Add a valid context to the store
     /// 2. Create a valid updated context
     /// 3. Attempt to update the original context, check that the operation is successful
-    #[test]
-    fn scabbard_store_update_context() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_update_context(store: &dyn ScabbardStore) {
         let coordinator_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -1136,18 +1197,35 @@ pub mod tests {
             .is_ok());
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_update_context() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+
+        scabbard_store_update_context(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_update_context() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_update_context(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `update_consensus_action` operation is successful.
     ///
     /// 1. Add a valid context to the store
     /// 2. Add an action to the database with the same `service_id` and `epoch`
     /// 3. Attempt to update the action as if it had been executed, check that the operation is
     ///    successful
-    #[test]
-    fn scabbard_store_update_action() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_update_action(store: &dyn ScabbardStore) {
         let coordinator_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -1228,17 +1306,33 @@ pub mod tests {
             .is_ok());
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_update_action() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_update_action(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_update_action() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_update_action(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `get_service` operation is successful.
     ///
     /// 1. Add a service in the finalized state to the database
     /// 2. Fetch that service from the store
     /// 3. Verify the correct service was returned
-    #[test]
-    fn scabbard_store_get_service() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_get_service(store: &dyn ScabbardStore) {
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -1267,6 +1361,27 @@ pub mod tests {
         assert_eq!(service, fetched_service);
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_get_service() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_get_service(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_get_service() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_get_service(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `list_ready_services` operation is successful.
     ///
     /// 1. Add a service in the finalized state to the database
@@ -1277,12 +1392,7 @@ pub mod tests {
     /// 6. Call `list_ready_services` and check that the service is returned
     /// 7. Update the action and event as if it had been executed
     /// 8. Call `list_ready_services` and check that no services are returned
-    #[test]
-    fn scabbard_store_list_ready_services() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_list_ready_services(store: &dyn ScabbardStore) {
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -1363,7 +1473,7 @@ pub mod tests {
         assert_eq!(&ready_services[0], &service_fqsi);
 
         store
-            .update_consensus_event(&service_fqsi, event_id, SystemTime::now())
+            .update_consensus_event(&service_fqsi, event_id, SystemTime::now(), 1)
             .expect("failed to update action");
 
         store
@@ -1379,6 +1489,28 @@ pub mod tests {
         assert!(ready_services.is_empty());
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_list_ready_services() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+
+        scabbard_store_list_ready_services(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_list_ready_services() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_list_ready_services(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `add_commit_entry` operation is successful.
     ///
     /// 1. Add a valid service to the database
@@ -1388,12 +1520,7 @@ pub mod tests {
     ///    that was added
     /// 4. Attempt to add a commit entry for a service that does not exist and check that an error
     ///    is returned
-    #[test]
-    fn scabbard_add_commit_entry() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_add_commit_entry(store: &dyn ScabbardStore) {
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -1456,6 +1583,27 @@ pub mod tests {
         assert!(store.add_commit_entry(bad_commit_entry).is_err());
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_add_commit_entry() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_add_commit_entry(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_add_commit_entry() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_add_commit_entry(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `get_last_commit_entry` operation is successful.
     ///
     /// 1. Add a valid service to the database
@@ -1465,12 +1613,7 @@ pub mod tests {
     ///    that was added
     /// 4. Attempt to call `get_last_commit_entry` with a `service_id` for a service that does not
     ///    exist and check that `None` is returned
-    #[test]
-    fn scabbard_get_last_commit_entry() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_get_last_commit_entry(store: &dyn ScabbardStore) {
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -1529,6 +1672,27 @@ pub mod tests {
         assert_eq!(get_last_commit_entry, None);
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_get_last_commit_entry() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_get_last_commit_entry(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_get_last_commit_entry() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_get_last_commit_entry(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `update_commit_entry` operation is successful.
     ///
     /// 1. Add a valid service to the database
@@ -1538,12 +1702,7 @@ pub mod tests {
     ///    successful
     /// 4. Use `get_last_commit_entry` and check that the returned commit entry matches the
     ///    updated commit entry
-    #[test]
-    fn scabbard_update_commit_entry() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_update_commit_entry(store: &dyn ScabbardStore) {
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -1609,6 +1768,27 @@ pub mod tests {
         assert_eq!(get_last_commit_entry, Some(update_commit_entry));
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_update_commit_entry() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_update_commit_entry(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_update_commit_entry() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_update_commit_entry(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `update_service` operation is successful.
     ///
     /// 1. Add a service in the prepared state to the database
@@ -1616,12 +1796,7 @@ pub mod tests {
     /// 3. Call `list_ready_services` and check that the service is not returned
     /// 4. Attempt to use `update_service` the service to change the service state to finalized
     /// 5. Call `list_ready_services` and check that the service is returned
-    #[test]
-    fn scabbard_store_update_service() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_update_service(store: &dyn ScabbardStore) {
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -1684,18 +1859,34 @@ pub mod tests {
         assert_eq!(&ready_services[0], &service_fqsi);
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_update_service() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_update_service(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_update_service() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_update_service(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `add_consensus_event` operation is successful.
     ///
     /// 1. Add a valid participant context to the store
     /// 2. Attempt to add a valid event to the store and check that the operation was successful
     /// 3. Attempt to add a an event for a service_id that does not exist check that an error is
     ///    returned
-    #[test]
-    fn scabbard_store_add_event() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_add_event(store: &dyn ScabbardStore) {
         let coordinator_fqsi = FullyQualifiedServiceId::new_random();
 
         let participant_fqsi = FullyQualifiedServiceId::new_random();
@@ -1753,18 +1944,35 @@ pub mod tests {
             .is_err());
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_add_event() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+
+        scabbard_store_add_event(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_add_event() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_add_event(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `update_consensus_event` operation is successful.
     ///
     /// 1. Add a valid participant context to the store
     /// 2. Add a valid event to the store
     /// 3. Attempt to update the `executed_at` time for the event and check that the operation was
     ///    successful
-    #[test]
-    fn scabbard_store_update_event() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_update_event(store: &dyn ScabbardStore) {
         let coordinator_fqsi = FullyQualifiedServiceId::new_random();
 
         let participant_fqsi = FullyQualifiedServiceId::new_random();
@@ -1818,8 +2026,29 @@ pub mod tests {
             .expect("failed to add event");
 
         assert!(store
-            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now())
+            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now(), 1)
             .is_ok());
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_update_event() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_update_event(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_update_event() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_update_event(&store);
+
+            Ok(())
+        })
     }
 
     /// Test that the scabbard store `list_consensus_events` operation is successful.
@@ -1831,12 +2060,7 @@ pub mod tests {
     /// 5. Call `list_consensus_events` and check that both events are returned in the correct order
     /// 6. Update the `executed_at` time for the first event
     /// 7. Call `list_consensus_events` and check that only the second event is returned
-    #[test]
-    fn scabbard_store_list_events() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_list_events(store: &dyn ScabbardStore) {
         let coordinator_fqsi = FullyQualifiedServiceId::new_random();
 
         let participant_fqsi = FullyQualifiedServiceId::new_random();
@@ -1935,7 +2159,7 @@ pub mod tests {
         );
 
         store
-            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now())
+            .update_consensus_event(&participant_fqsi, event_id, SystemTime::now(), 1)
             .expect("failed to update event");
 
         let events = store
@@ -1950,6 +2174,27 @@ pub mod tests {
                 record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
             },
         );
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_list_events() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_list_events(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_list_events() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_list_events(&store);
+
+            Ok(())
+        })
     }
 
     /// Test that the scabbard store `get_current_consensus_context` operation is successful.
@@ -1967,12 +2212,7 @@ pub mod tests {
     /// 8. Add a participant context with a larger epoch for the first service
     /// 9. Call `get_current_consensus_context` with the first service ID and check that the
     ///    participant context that was most recently added is returned
-    #[test]
-    fn scabbard_store_get_current_context() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_get_current_context(store: &dyn ScabbardStore) {
         let coordinator_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -2095,6 +2335,27 @@ pub mod tests {
         assert_eq!(current_context, Some(context4));
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_get_current_context() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_get_current_context(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_get_current_context() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_get_current_context(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `remove_service` operation is successful.
     ///
     /// 1. Add a services to the database
@@ -2102,12 +2363,7 @@ pub mod tests {
     /// 3. Verify both can be fetched
     /// 4. Remove the service
     /// 5. Verify that the service and context were both removed
-    #[test]
-    fn scabbard_store_remove_service() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_remove_service(store: &dyn ScabbardStore) {
         let coordinator_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -2178,6 +2434,27 @@ pub mod tests {
             .is_none());
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_remove_service() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_remove_service(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_remove_service() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_remove_service(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `set_alarm` operation is successful.
     ///
     /// 1. Add a service to the database
@@ -2186,12 +2463,7 @@ pub mod tests {
     /// 4. Set an alarm for the service and check that the operation was successful
     /// 5. Call `list_ready_services` and check that the service is returned because it
     ///    has an alarm that has passed
-    #[test]
-    fn scabbard_store_set_alarm() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_set_alarm(store: &dyn ScabbardStore) {
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -2247,6 +2519,27 @@ pub mod tests {
         assert_eq!(&ready_services[0], &service_fqsi);
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_set_alarm() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_set_alarm(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_set_alarm() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_set_alarm(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `unset_alarm` operation is successful.
     ///
     /// 1. Add a service to the database
@@ -2257,12 +2550,7 @@ pub mod tests {
     ///    has an alarm that has passed
     /// 6. Unset the alarm for the service
     /// 7. Call `list_ready_services` and check that the service is no longer returned
-    #[test]
-    fn scabbard_store_unset_alarm() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_unset_alarm(store: &dyn ScabbardStore) {
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -2331,6 +2619,27 @@ pub mod tests {
         assert!(ready_services.is_empty());
     }
 
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_unset_alarm() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_unset_alarm(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_unset_alarm() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_unset_alarm(&store);
+
+            Ok(())
+        })
+    }
+
     /// Test that the scabbard store `get_alarm` operation is successful.
     ///
     /// 1. Add a service to the database
@@ -2339,12 +2648,7 @@ pub mod tests {
     /// 4. Call `get_alarm` and check that the alarm is returned
     /// 5. Unset the alarm
     /// 6. Call `get_alarm` and check that the alarm is no longer returned
-    #[test]
-    fn scabbard_store_get_alarm() {
-        let pool = create_connection_pool_and_migrate();
-
-        let store = DieselScabbardStore::new(pool);
-
+    fn scabbard_store_get_alarm(store: &dyn ScabbardStore) {
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");
 
@@ -2415,7 +2719,29 @@ pub mod tests {
         assert_eq!(retrieved_alarm, None);
     }
 
-    fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_scabbard_store_get_alarm() {
+        let pool = create_sqlite_memory_pool();
+
+        let store = DieselScabbardStore::new(pool);
+        scabbard_store_get_alarm(&store);
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    #[test]
+    fn postgres_scabbard_store_get_alarm() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let pool = create_postgres_pool(url)?;
+            let store = DieselScabbardStore::new(pool);
+            scabbard_store_get_alarm(&store);
+
+            Ok(())
+        })
+    }
+
+    #[cfg(feature = "sqlite")]
+    fn create_sqlite_memory_pool() -> Pool<ConnectionManager<SqliteConnection>> {
         let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
         let pool = Pool::builder()
             .max_size(1)
@@ -2429,11 +2755,13 @@ pub mod tests {
         pool
     }
 
+    #[cfg(feature = "sqlite")]
     #[derive(Default, Debug)]
     /// Foreign keys must be enabled on a per connection basis. This customizer will be added to the
     /// SQLite pool builder and then ran against every connection returned from the pool.
     pub struct ConnectionCustomizer;
 
+    #[cfg(feature = "sqlite")]
     impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCustomizer {
         fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
             conn.batch_execute(
@@ -2444,5 +2772,15 @@ pub mod tests {
             )
             .map_err(diesel::r2d2::Error::QueryError)
         }
+    }
+
+    #[cfg(feature = "diesel-postgres-tests")]
+    fn create_postgres_pool(
+        url: &str,
+    ) -> Result<Pool<ConnectionManager<PgConnection>>, Box<dyn std::error::Error>> {
+        let connection_manager = ConnectionManager::<PgConnection>::new(url);
+        let pool = Pool::builder().build(connection_manager)?;
+
+        Ok(pool)
     }
 }

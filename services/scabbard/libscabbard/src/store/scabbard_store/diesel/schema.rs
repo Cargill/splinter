@@ -137,7 +137,8 @@ table! {
         circuit_id  -> Text,
         service_id -> Text,
         created_at -> Timestamp,
-        executed_at -> Nullable<BigInt>,
+        executed_at -> Nullable<Timestamp>,
+        executed_epoch -> Nullable<BigInt>,
         position -> Integer,
         event_type -> crate::store::scabbard_store::diesel::models::EventTypeModelMapping,
     }
