@@ -59,10 +59,11 @@ pub use factory::ScabbardArgValidator;
 pub use factory::{ScabbardFactory, ScabbardFactoryBuilder, ScabbardStorageConfiguration};
 use shared::ScabbardShared;
 use state::merkle_state::MerkleState;
+use state::ScabbardState;
 pub use state::{
     BatchInfo, BatchInfoIter, BatchStatus, Events, StateChange, StateChangeEvent, StateIter,
+    StateSubscriber,
 };
-use state::{ScabbardState, StateSubscriber};
 
 const SERVICE_TYPE: &str = "scabbard";
 
