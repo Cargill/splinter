@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod artifact;
 mod publisher_context;
 
+pub use artifact::{SignedTimestamp, SignedTimestampCreator, SignedTimestampCreatorFactory};
 pub use publisher_context::ScabbardPublishingContext;
-
