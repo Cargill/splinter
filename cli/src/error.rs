@@ -43,9 +43,7 @@ impl fmt::Display for CliError {
             CliError::InvalidSubcommand => write!(f, "An invalid subcommand was specified"),
             CliError::ClapError(err) => f.write_str(&err.message),
             CliError::ActionError(msg) => write!(f, "Subcommand encountered an error: {}", msg),
-            CliError::EnvironmentError(msg) => {
-                write!(f, "Environment not valid for subcommand: {}", msg)
-            }
+            CliError::EnvironmentError(msg) => f.write_str(msg),
         }
     }
 }
