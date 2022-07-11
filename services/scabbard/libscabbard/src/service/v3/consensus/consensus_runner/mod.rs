@@ -179,15 +179,14 @@ mod tests {
             Arc::new(PooledSqliteScabbardStoreFactory::new(pool.clone()));
 
         let service_id = FullyQualifiedServiceId::new_from_string("AAAAA-bbbbb::test")?;
-        let peer_service_id = ServiceId::new("bb00").unwrap();
+        let peer_service_id = ServiceId::new("bb00")?;
         // service with finalized status
         let service = ScabbardServiceBuilder::default()
             .with_service_id(&service_id)
             .with_peers(&[peer_service_id.clone()])
             .with_consensus(&ConsensusType::TwoPC)
             .with_status(&ServiceStatus::Finalized)
-            .build()
-            .expect("failed to build service");
+            .build()?;
 
         let current_context = ConsensusContext::TwoPhaseCommit(
             ContextBuilder::new()
@@ -204,18 +203,14 @@ mod tests {
         );
         let scabbard_store = pooled_scabbard_store_factory.new_store();
 
-        scabbard_store.add_service(service.clone()).unwrap();
+        scabbard_store.add_service(service.clone())?;
 
-        scabbard_store
-            .add_consensus_context(&service_id, current_context.clone())
-            .expect("unable to add context to scabbard store");
+        scabbard_store.add_consensus_context(&service_id, current_context.clone())?;
 
-        scabbard_store
-            .add_consensus_event(
-                &service_id,
-                ConsensusEvent::TwoPhaseCommit(Event::Start(b"test".to_vec())),
-            )
-            .expect("unable to event to the scabbard store");
+        scabbard_store.add_consensus_event(
+            &service_id,
+            ConsensusEvent::TwoPhaseCommit(Event::Start(b"test".to_vec())),
+        )?;
 
         let store_command_executor = Arc::new(SqliteCommandExecutor {
             pool: pool.clone().into(),
