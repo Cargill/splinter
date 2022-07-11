@@ -169,6 +169,19 @@ table! {
     }
 }
 
+table! {
+    supervisor_notification (id) {
+        id -> Int8,
+        circuit_id -> Text,
+        service_id -> Text,
+        action_id -> Int8,
+        notification_type -> crate::store::scabbard_store::diesel::models::SupervisorNotificationTypeModelMapping,
+        request_for_vote_value -> Nullable<Binary>,
+        created_at -> Timestamp,
+        executed_at -> Nullable<Timestamp>,
+    }
+}
+
 joinable!(consensus_2pc_notification_action -> consensus_2pc_action (action_id));
 joinable!(consensus_2pc_send_message_action -> consensus_2pc_action (action_id));
 joinable!(consensus_2pc_update_context_action -> consensus_2pc_action (action_id));
@@ -195,4 +208,5 @@ allow_tables_to_appear_in_same_query!(
     consensus_2pc_deliver_event,
     consensus_2pc_start_event,
     consensus_2pc_vote_event,
+    supervisor_notification,
 );

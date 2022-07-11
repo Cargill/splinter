@@ -87,7 +87,8 @@ experimental = [
   "scabbardv3-consensus",
   "scabbardv3-consensus-action-runner",
   "scabbardv3-consensus-runner",
-  "scabbardv3-store"
+  "scabbardv3-store",
+  "scabbardv3-supervisor"
 ]
 
 authorization = ["splinter/authorization"]
@@ -106,9 +107,11 @@ scabbardv3-consensus-action-runner = [
     "splinter/service-message-sender-factory",
     ]
 scabbardv3-consensus-runner = ["scabbardv3-consensus-action-runner"]
+scabbardv3-supervisor = []
 scabbardv3 = [
     "scabbardv3-consensus-runner",
     "scabbardv3-store",
+    "scabbardv3-supervisor",
     "splinter/service-arguments-converter",
     "splinter/service-lifecycle",
     "splinter/service-message-handler",

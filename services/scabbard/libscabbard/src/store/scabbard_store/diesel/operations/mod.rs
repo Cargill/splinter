@@ -17,6 +17,7 @@ pub(super) mod add_consensus_action;
 pub(super) mod add_consensus_context;
 pub(super) mod add_consensus_event;
 pub(super) mod add_service;
+pub(super) mod add_supervisor_notification;
 pub(super) mod get_alarm;
 pub(super) mod get_current_consensus_context;
 pub(super) mod get_last_commit_entry;
@@ -24,6 +25,7 @@ pub(super) mod get_service;
 pub(super) mod list_consensus_actions;
 pub(super) mod list_consensus_events;
 pub(super) mod list_ready_services;
+pub(super) mod list_supervisor_notifications;
 pub(super) mod remove_service;
 pub(super) mod set_alarm;
 pub(super) mod unset_alarm;
@@ -32,6 +34,7 @@ pub(super) mod update_consensus_action;
 pub(super) mod update_consensus_context;
 pub(super) mod update_consensus_event;
 pub(super) mod update_service;
+pub(super) mod update_supervisor_notification;
 
 pub struct ScabbardStoreOperations<'a, C> {
     conn: &'a C,

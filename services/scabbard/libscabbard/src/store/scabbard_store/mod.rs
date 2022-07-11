@@ -24,6 +24,7 @@ mod event;
 mod factory;
 mod identified;
 mod service;
+mod supervisor;
 mod two_phase_commit;
 
 use splinter::service::FullyQualifiedServiceId;
@@ -40,6 +41,9 @@ pub use context::ConsensusContext;
 pub use event::ConsensusEvent;
 pub use identified::Identified;
 pub use service::{ConsensusType, ScabbardService, ScabbardServiceBuilder, ServiceStatus};
+pub use supervisor::{
+    SupervisorNotification, SupervisorNotificationBuilder, SupervisorNotificationType,
+};
 pub use two_phase_commit::{
     Action, Context, ContextBuilder, Event, Message, Notification, Participant, State,
 };
@@ -271,4 +275,24 @@ pub trait ScabbardStore {
         service_id: &FullyQualifiedServiceId,
         alarm_type: &AlarmType,
     ) -> Result<Option<SystemTime>, ScabbardStoreError>;
+
+    // add a new supervisor notification
+    fn add_supervisor_notification(
+        &self,
+        notification: SupervisorNotification,
+    ) -> Result<(), ScabbardStoreError>;
+
+    // get the next supervisor notification that needs to be handled
+    fn list_supervisor_notifications(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+    ) -> Result<Vec<Identified<SupervisorNotification>>, ScabbardStoreError>;
+
+    // update an existing supervisor notification
+    fn update_supervisor_notification(
+        &self,
+        service_id: &FullyQualifiedServiceId,
+        notification_id: i64,
+        executed_at: SystemTime,
+    ) -> Result<(), ScabbardStoreError>;
 }

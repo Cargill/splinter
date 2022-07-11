@@ -24,7 +24,10 @@ use crate::store::scabbard_store::diesel::{
         AlarmTypeModel, AlarmTypeModelMapping, ServiceStatusTypeModel,
         ServiceStatusTypeModelMapping,
     },
-    schema::{consensus_2pc_action, consensus_2pc_event, scabbard_alarm, scabbard_service},
+    schema::{
+        consensus_2pc_action, consensus_2pc_event, scabbard_alarm, scabbard_service,
+        supervisor_notification,
+    },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 use crate::store::AlarmType;
@@ -98,6 +101,28 @@ where
                             .and(scabbard_service::service_id.eq(consensus_2pc_event::service_id))),
                     )
                     .filter(consensus_2pc_event::executed_at.is_null())
+                    .select((scabbard_service::circuit_id, scabbard_service::service_id))
+                    .load::<(String, String)>(self.conn)
+                    .map_err(|err| {
+                        ScabbardStoreError::from_source_with_operation(
+                            err,
+                            OPERATION_NAME.to_string(),
+                        )
+                    })?,
+            );
+
+            ready_services.append(
+                &mut scabbard_service::table
+                    .filter(scabbard_service::status.eq(ServiceStatusTypeModel::Finalized))
+                    .inner_join(
+                        supervisor_notification::table.on(scabbard_service::circuit_id
+                            .eq(supervisor_notification::circuit_id)
+                            .and(
+                                scabbard_service::service_id
+                                    .eq(supervisor_notification::service_id),
+                            )),
+                    )
+                    .filter(supervisor_notification::executed_at.is_null())
                     .select((scabbard_service::circuit_id, scabbard_service::service_id))
                     .load::<(String, String)>(self.conn)
                     .map_err(|err| {

@@ -15,6 +15,7 @@
 //! Contains commands for marking notifications as handled
 
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use splinter::error::InternalError;
 use splinter::service::FullyQualifiedServiceId;
@@ -23,6 +24,7 @@ use splinter::store::command::StoreCommand;
 use crate::store::CommitEntry;
 use crate::store::ConsensusEvent;
 use crate::store::ScabbardStoreFactory;
+use crate::store::SupervisorNotification;
 
 pub struct AddEventCommand<C> {
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,
@@ -103,6 +105,69 @@ impl<C> StoreCommand for UpdateCommitEntryCommand<C> {
         self.store_factory
             .new_store(&*conn)
             .update_commit_entry(self.commit_entry.clone())
+            .map_err(|e| InternalError::from_source(Box::new(e)))
+    }
+}
+
+pub struct ExecuteSupervisorCommand<C> {
+    store_factory: Arc<dyn ScabbardStoreFactory<C>>,
+    service_id: FullyQualifiedServiceId,
+    notification_id: i64,
+}
+
+impl<C> ExecuteSupervisorCommand<C> {
+    pub fn new(
+        store_factory: Arc<dyn ScabbardStoreFactory<C>>,
+        service_id: FullyQualifiedServiceId,
+        notification_id: i64,
+    ) -> Self {
+        Self {
+            store_factory,
+            service_id,
+            notification_id,
+        }
+    }
+}
+
+impl<C> StoreCommand for ExecuteSupervisorCommand<C> {
+    type Context = C;
+
+    fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
+        self.store_factory
+            .new_store(&*conn)
+            .update_supervisor_notification(
+                &self.service_id,
+                self.notification_id,
+                SystemTime::now(),
+            )
+            .map_err(|e| InternalError::from_source(Box::new(e)))
+    }
+}
+
+pub struct AddSupervisorNotficationCommand<C> {
+    store_factory: Arc<dyn ScabbardStoreFactory<C>>,
+    notification: SupervisorNotification,
+}
+
+impl<C> AddSupervisorNotficationCommand<C> {
+    pub fn new(
+        store_factory: Arc<dyn ScabbardStoreFactory<C>>,
+        notification: SupervisorNotification,
+    ) -> Self {
+        Self {
+            store_factory,
+            notification,
+        }
+    }
+}
+
+impl<C> StoreCommand for AddSupervisorNotficationCommand<C> {
+    type Context = C;
+
+    fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
+        self.store_factory
+            .new_store(&*conn)
+            .add_supervisor_notification(self.notification.clone())
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }
 }

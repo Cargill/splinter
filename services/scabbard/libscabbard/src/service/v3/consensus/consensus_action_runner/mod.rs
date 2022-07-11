@@ -34,11 +34,8 @@ use crate::store::ScabbardStoreFactory;
 
 pub use self::commands::actions::ExecuteActionCommand;
 pub use self::commands::context::UpdateContextCommand;
-pub use self::commands::notifications::{
-    AddCommitEntryCommand, AddEventCommand, UpdateCommitEntryCommand,
-};
 pub use self::context_updater::{ContextUpdater, ScabbardStoreContextUpdater};
-pub use self::notify_observer::{CommandNotifyObserver, NotifyObserver};
+pub use self::notify_observer::NotifyObserver;
 
 /// Runs the actions provided from the consensus algorithm, in order of receipt.
 pub struct ConsensusActionRunner<C> {
@@ -128,10 +125,11 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     )));
                 }
                 ConsensusAction::TwoPhaseCommit(Action::Notify(notification)) => {
-                    commands.extend(
-                        self.notify_observer
-                            .notify(notification.clone(), service_id)?,
-                    );
+                    commands.extend(self.notify_observer.notify(
+                        notification.clone(),
+                        service_id,
+                        action.id,
+                    )?);
 
                     // add command to mark the action as executed
                     commands.push(Box::new(ExecuteActionCommand::new(
@@ -150,7 +148,10 @@ impl<C: 'static> ConsensusActionRunner<C> {
 mod tests {
     use super::*;
 
-    use std::sync::{Arc, Mutex};
+    use std::sync::{
+        mpsc::{channel, Receiver},
+        Arc, Mutex,
+    };
     use std::time::SystemTime;
 
     use diesel::{
@@ -163,6 +164,7 @@ mod tests {
     use splinter::store::command::StoreCommandExecutor;
 
     use crate::migrations::run_sqlite_migrations;
+    use crate::service::v3::{SupervisorMessage, SupervisorNotifyObserver};
     use crate::store::pool::ConnectionPool;
     use crate::store::{
         AlarmType, ConsensusAction, ConsensusContext, ConsensusEvent, ConsensusType, Context,
@@ -224,7 +226,9 @@ mod tests {
         SqliteCommandExecutor,
         TestMessageSenderFactory,
         Box<dyn ScabbardStore>,
+        Receiver<SupervisorMessage>,
     ) {
+        let (_sender, recv) = channel();
         let pool = create_connection_pool_and_migrate();
         let store_command_executor = SqliteCommandExecutor {
             pool: pool.clone().into(),
@@ -236,10 +240,7 @@ mod tests {
             Arc::new(SqliteScabbardStoreFactory);
 
         let context_updater = Box::new(ScabbardStoreContextUpdater::new(store_factory.clone()));
-        let notify_observer = Box::new(CommandNotifyObserver::new(
-            store_factory.clone(),
-            Box::new(DieselScabbardStore::new(pool.clone())),
-        ));
+        let notify_observer = Box::new(SupervisorNotifyObserver::new(store_factory.clone()));
 
         let action_runner = ConsensusActionRunner::new(
             message_sender_factory,
@@ -255,6 +256,7 @@ mod tests {
             store_command_executor,
             test_messsage_factory,
             scabbard_store,
+            recv,
         )
     }
 
@@ -375,7 +377,7 @@ mod tests {
     /// 8. Verify a commit entry was added after RequestForStart
     #[test]
     fn test_consensus_action_runner() {
-        let (action_runner, executor, message_sender_factory, scabbard_store) =
+        let (action_runner, executor, message_sender_factory, scabbard_store, _recv) =
             create_action_runner();
 
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
@@ -466,10 +468,13 @@ mod tests {
         assert_eq!(sent_messages.len(), 1);
         assert_eq!(sent_messages[0].0, peer_service_id);
 
-        // verify a commit entry was added after RequestForStart
-        assert!(scabbard_store
-            .get_last_commit_entry(&service_fqsi)
-            .expect("unable to get commit entry")
-            .is_some());
+        // verify a supervisor notification was added after RequestForStart
+        assert!(
+            scabbard_store
+                .list_supervisor_notifications(&service_fqsi)
+                .expect("unable to get commit entry")
+                .len()
+                == 1
+        );
     }
 }
