@@ -20,6 +20,8 @@ mod lifecycle;
 mod message_converter;
 mod message_handler;
 mod message_handler_factory;
+#[cfg(feature = "scabbardv3-publisher")]
+mod publisher;
 #[cfg(feature = "scabbardv3-supervisor")]
 mod supervisor;
 mod timer_filter;
