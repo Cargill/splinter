@@ -60,67 +60,80 @@ where
     <E as StoreCommandExecutor>::Context: 'static,
 {
     pub fn run(&self, service_id: &FullyQualifiedServiceId) -> Result<(), InternalError> {
-        loop {
-            let store = self.pooled_scabbard_store_factory.new_store();
+        let store = self.pooled_scabbard_store_factory.new_store();
 
-            let unprocessed_actions = store
-                .list_consensus_actions(service_id)
-                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+        let unprocessed_actions = store
+            .list_consensus_actions(service_id)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-            if !unprocessed_actions.is_empty() {
-                // run each action and execute the commands before running the next action
-                for action in unprocessed_actions {
-                    let commands = self.action_runner.run_actions(vec![action], service_id)?;
-                    self.store_command_executor.execute(commands)?;
-                }
+        if !unprocessed_actions.is_empty() {
+            // run each action and execute the commands before running the next action
+            for action in unprocessed_actions {
+                let commands = self.action_runner.run_actions(vec![action], service_id)?;
+                self.store_command_executor.execute(commands)?;
             }
-
-            let unprocessed_event = store
-                .list_consensus_events(service_id)
-                .map_err(|err| InternalError::from_source(Box::new(err)))?
-                .get(0)
-                .cloned();
-
-            let mut commands = vec![];
-            let event = match unprocessed_event {
-                Some(event) => event,
-                None => {
-                    // No events
-                    break Ok(());
-                }
-            };
-
-            let (event_id, event) = event.deconstruct();
-
-            let context = store
-                .get_current_consensus_context(service_id)
-                .map_err(|err| InternalError::from_source(Box::new(err)))?
-                .ok_or_else(|| {
-                    InternalError::with_message(format!(
-                        "No scabbard context for service {}",
-                        service_id
-                    ))
-                })?;
-
-            let epoch = context.epoch();
-
-            let algorithm = self.algorithms.get(event.algorithm_name()).ok_or_else(|| {
-                InternalError::with_message(format!("{} is not configured", event.algorithm_name()))
-            })?;
-            let actions = algorithm
-                .event(event, context)
-                .map_err(|e| InternalError::from_source(Box::new(e)))?;
-
-            commands.push(
-                self.consensus_store_command_factory
-                    .new_save_actions_command(service_id, actions, event_id),
-            );
-            commands.push(
-                self.consensus_store_command_factory
-                    .new_mark_event_complete_command(service_id, event_id, epoch),
-            );
-            self.store_command_executor.execute(commands)?;
         }
+
+        let unprocessed_event = store
+            .list_consensus_events(service_id)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?
+            .get(0)
+            .cloned();
+
+        let mut commands = vec![];
+        let event = match unprocessed_event {
+            Some(event) => event,
+            None => {
+                // No events
+                return Ok(());
+            }
+        };
+
+        let (event_id, event) = event.deconstruct();
+
+        let context = store
+            .get_current_consensus_context(service_id)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?
+            .ok_or_else(|| {
+                InternalError::with_message(format!(
+                    "No scabbard context for service {}",
+                    service_id
+                ))
+            })?;
+
+        let epoch = context.epoch();
+
+        let algorithm = self.algorithms.get(event.algorithm_name()).ok_or_else(|| {
+            InternalError::with_message(format!("{} is not configured", event.algorithm_name()))
+        })?;
+        let actions = algorithm
+            .event(event, context)
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        commands.push(
+            self.consensus_store_command_factory
+                .new_save_actions_command(service_id, actions, event_id),
+        );
+        commands.push(
+            self.consensus_store_command_factory
+                .new_mark_event_complete_command(service_id, event_id, epoch),
+        );
+        self.store_command_executor.execute(commands)?;
+
+        // run the resulting actions
+        let unprocessed_actions = store
+            .list_consensus_actions(service_id)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        if !unprocessed_actions.is_empty() {
+            // run each action and execute the commands before running the next action
+            for action in unprocessed_actions {
+                let commands = self.action_runner.run_actions(vec![action], service_id)?;
+                self.store_command_executor.execute(commands)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -166,15 +179,14 @@ mod tests {
             Arc::new(PooledSqliteScabbardStoreFactory::new(pool.clone()));
 
         let service_id = FullyQualifiedServiceId::new_from_string("AAAAA-bbbbb::test")?;
-        let peer_service_id = ServiceId::new("bb00").unwrap();
+        let peer_service_id = ServiceId::new("bb00")?;
         // service with finalized status
         let service = ScabbardServiceBuilder::default()
             .with_service_id(&service_id)
             .with_peers(&[peer_service_id.clone()])
             .with_consensus(&ConsensusType::TwoPC)
             .with_status(&ServiceStatus::Finalized)
-            .build()
-            .expect("failed to build service");
+            .build()?;
 
         let current_context = ConsensusContext::TwoPhaseCommit(
             ContextBuilder::new()
@@ -191,18 +203,14 @@ mod tests {
         );
         let scabbard_store = pooled_scabbard_store_factory.new_store();
 
-        scabbard_store.add_service(service.clone()).unwrap();
+        scabbard_store.add_service(service.clone())?;
 
-        scabbard_store
-            .add_consensus_context(&service_id, current_context.clone())
-            .expect("unable to add context to scabbard store");
+        scabbard_store.add_consensus_context(&service_id, current_context.clone())?;
 
-        scabbard_store
-            .add_consensus_event(
-                &service_id,
-                ConsensusEvent::TwoPhaseCommit(Event::Start(b"test".to_vec())),
-            )
-            .expect("unable to event to the scabbard store");
+        scabbard_store.add_consensus_event(
+            &service_id,
+            ConsensusEvent::TwoPhaseCommit(Event::Start(b"test".to_vec())),
+        )?;
 
         let store_command_executor = Arc::new(SqliteCommandExecutor {
             pool: pool.clone().into(),
@@ -222,13 +230,28 @@ mod tests {
             .with_notify_observer(notify_observer)
             .build()?;
 
-        // runner should handle 1 event(Event::Start), which should result in to actions,
+        // should be ready, as it has an event
+        assert!(scabbard_store
+            .list_ready_services()?
+            .iter()
+            .any(|service| service == &service_id));
+
+        // runner should handle 1 event(Event::Start), which should result in two actions,
         // send message and update context
         runner.run(&service_id)?;
+
+        assert_eq!(scabbard_store.list_consensus_events(&service_id)?.len(), 0);
+        assert_eq!(scabbard_store.list_consensus_actions(&service_id)?.len(), 0);
 
         let sent_messages = test_messsage_factory.sent_messages.lock().unwrap();
         assert_eq!(sent_messages.len(), 1);
         assert_eq!(sent_messages[0].0, peer_service_id);
+
+        // no longer ready, as there are no more events and actions
+        assert!(!scabbard_store
+            .list_ready_services()?
+            .iter()
+            .any(|service| service == &service_id));
 
         let update_alarm = scabbard_store
             .get_alarm(&service_id, &AlarmType::TwoPhaseCommit)
