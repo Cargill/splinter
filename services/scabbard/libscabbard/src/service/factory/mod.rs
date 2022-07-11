@@ -38,7 +38,7 @@ use sawtooth::receipt::store::ReceiptStore;
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 use splinter::error::InternalError;
 use splinter::error::{InvalidArgumentError, InvalidStateError};
-#[cfg(feature = "rest-api-actix-web-1")]
+#[cfg(feature = "rest-api")]
 use splinter::service::instance::EndpointFactory;
 use splinter::service::instance::{
     FactoryCreateError, ServiceArgValidator, ServiceFactory, ServiceInstance,
