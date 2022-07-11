@@ -71,6 +71,6 @@ admin-service = [
 authorization = ["splinter/authorization"]
 biome = ["splinter/biome", "serde"]
 biome-key-management = ["biome", "splinter/biome-key-management"]
-registry = ["splinter/registry"]
+registry = ["splinter/registry", "actix-web", "futures"]
 rest-api = ["splinter/rest-api"]
 service = ["splinter/runtime-service", "serde_json", "log"]
