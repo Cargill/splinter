@@ -69,7 +69,7 @@ admin-service = [
     "splinter/admin-service"
 ]
 authorization = ["splinter/authorization"]
-biome = ["splinter/biome"]
+biome = ["splinter/biome", "serde"]
 biome-key-management = ["biome", "splinter/biome-key-management"]
 registry = ["splinter/registry"]
 rest-api = ["splinter/rest-api"]
