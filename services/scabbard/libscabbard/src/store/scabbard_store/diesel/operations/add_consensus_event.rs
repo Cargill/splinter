@@ -106,15 +106,9 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                         Message::DecisionRequest(epoch) => {
                             (DeliverMessageTypeModel::from(&message), None, None, epoch)
                         }
-                        Message::VoteResponse(epoch, true) => (
+                        Message::VoteResponse(epoch, vote) => (
                             DeliverMessageTypeModel::from(&message),
-                            Some("TRUE".to_string()),
-                            None,
-                            epoch,
-                        ),
-                        Message::VoteResponse(epoch, false) => (
-                            DeliverMessageTypeModel::from(&message),
-                            Some("FALSE".to_string()),
+                            Some(vote),
                             None,
                             epoch,
                         ),
@@ -169,10 +163,6 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                     Ok(event_id)
                 }
                 Event::Vote(vote) => {
-                    let vote = match vote {
-                        true => String::from("TRUE"),
-                        false => String::from("FALSE"),
-                    };
                     let vote_event = Consensus2pcVoteEventModel { event_id, vote };
                     insert_into(consensus_2pc_vote_event::table)
                         .values(vec![vote_event])
@@ -239,15 +229,9 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                         Message::DecisionRequest(epoch) => {
                             (DeliverMessageTypeModel::from(&message), None, None, epoch)
                         }
-                        Message::VoteResponse(epoch, true) => (
+                        Message::VoteResponse(epoch, vote) => (
                             DeliverMessageTypeModel::from(&message),
-                            Some("TRUE".to_string()),
-                            None,
-                            epoch,
-                        ),
-                        Message::VoteResponse(epoch, false) => (
-                            DeliverMessageTypeModel::from(&message),
-                            Some("FALSE".to_string()),
+                            Some(vote),
                             None,
                             epoch,
                         ),
@@ -302,10 +286,6 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                     Ok(event_id)
                 }
                 Event::Vote(vote) => {
-                    let vote = match vote {
-                        true => String::from("TRUE"),
-                        false => String::from("FALSE"),
-                    };
                     let vote_event = Consensus2pcVoteEventModel { event_id, vote };
                     insert_into(consensus_2pc_vote_event::table)
                         .values(vec![vote_event])

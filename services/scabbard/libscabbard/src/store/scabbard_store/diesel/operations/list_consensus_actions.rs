@@ -131,24 +131,12 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                 let mut final_participants = Vec::new();
 
                 for participant in participants.into_iter() {
-                    let vote = participant
-                        .vote
-                        .map(|v| match v.as_str() {
-                            "TRUE" => Ok(true),
-                            "FALSE" => Ok(false),
-                            _ => Err(ScabbardStoreError::Internal(InternalError::with_message(
-                                "Failed to get 'vote response' send message action, invalid \
-                                    vote response found"
-                                    .to_string(),
-                            ))),
-                        })
-                        .transpose()?;
                     let process = ServiceId::new(participant.process).map_err(|err| {
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                     })?;
                     final_participants.push(Participant {
                         process,
-                        vote,
+                        vote: participant.vote,
                         decision_ack: participant.decision_ack,
                     });
                 }
@@ -182,27 +170,13 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                                 .to_string(),
                             ))
                         })?;
-                        let vote = update_context
-                            .vote
-                            .map(|v| match v.as_str() {
-                                "TRUE" => Some(true),
-                                "FALSE" => Some(false),
-                                _ => None,
-                            })
-                            .ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get update context action, context has state \
-                                    'voted' but no associated vote response found"
-                                        .to_string(),
-                                ))
-                            })?
-                            .ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get update context action, invalid vote response \
+                        let vote = update_context.vote.ok_or_else(|| {
+                            ScabbardStoreError::Internal(InternalError::with_message(
+                                "Failed to get update context action, no associated vote response \
                                     found"
-                                        .to_string(),
-                                ))
-                            })?;
+                                    .to_string(),
+                            ))
+                        })?;
                         State::Voted {
                             vote,
                             decision_timeout_start,
@@ -258,30 +232,16 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, SqliteConnection> 
                     })?;
 
                 let message = match send_message.message_type {
-                    MessageTypeModel::VoteResponse => {
-                        let vote_response = send_message
-                            .vote_response
-                            .map(|v| match v.as_str() {
-                                "TRUE" => Some(true),
-                                "FALSE" => Some(false),
-                                _ => None,
-                            })
-                            .ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get 'vote response' send message action, no \
-                                    associated vote response found"
-                                        .to_string(),
-                                ))
-                            })?
-                            .ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get 'vote response' send message action, invalid \
-                                    vote response found"
-                                        .to_string(),
-                                ))
-                            })?;
-                        Message::VoteResponse(send_message.epoch as u64, vote_response)
-                    }
+                    MessageTypeModel::VoteResponse => Message::VoteResponse(
+                        send_message.epoch as u64,
+                        send_message.vote_response.ok_or_else(|| {
+                            ScabbardStoreError::Internal(InternalError::with_message(
+                                "Failed to get 'vote response' send message action, no \
+                                associated vote found"
+                                    .to_string(),
+                            ))
+                        })?,
+                    ),
                     MessageTypeModel::DecisionRequest => {
                         Message::DecisionRequest(send_message.epoch as u64)
                     }
@@ -436,24 +396,12 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                 let mut final_participants = Vec::new();
 
                 for participant in participants.into_iter() {
-                    let vote = participant
-                        .vote
-                        .map(|v| match v.as_str() {
-                            "TRUE" => Ok(true),
-                            "FALSE" => Ok(false),
-                            _ => Err(ScabbardStoreError::Internal(InternalError::with_message(
-                                "Failed to get 'vote response' send message action, invalid \
-                                    vote response found"
-                                    .to_string(),
-                            ))),
-                        })
-                        .transpose()?;
                     let process = ServiceId::new(participant.process).map_err(|err| {
                         ScabbardStoreError::Internal(InternalError::from_source(Box::new(err)))
                     })?;
                     final_participants.push(Participant {
                         process,
-                        vote,
+                        vote: participant.vote,
                         decision_ack: participant.decision_ack,
                     });
                 }
@@ -487,27 +435,13 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                                 .to_string(),
                             ))
                         })?;
-                        let vote = update_context
-                            .vote
-                            .map(|v| match v.as_str() {
-                                "TRUE" => Some(true),
-                                "FALSE" => Some(false),
-                                _ => None,
-                            })
-                            .ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get update context action, context has state \
-                                    'voted' but no associated vote response found"
-                                        .to_string(),
-                                ))
-                            })?
-                            .ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get update context action, invalid vote response \
+                        let vote = update_context.vote.ok_or_else(|| {
+                            ScabbardStoreError::Internal(InternalError::with_message(
+                                "Failed to get update context action, no associated vote response \
                                     found"
-                                        .to_string(),
-                                ))
-                            })?;
+                                    .to_string(),
+                            ))
+                        })?;
                         State::Voted {
                             vote,
                             decision_timeout_start,
@@ -563,30 +497,16 @@ impl<'a> ListActionsOperation for ScabbardStoreOperations<'a, PgConnection> {
                     })?;
 
                 let message = match send_message.message_type {
-                    MessageTypeModel::VoteResponse => {
-                        let vote_response = send_message
-                            .vote_response
-                            .map(|v| match v.as_str() {
-                                "TRUE" => Some(true),
-                                "FALSE" => Some(false),
-                                _ => None,
-                            })
-                            .ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get 'vote response' send message action, no \
-                                    associated vote response found"
-                                        .to_string(),
-                                ))
-                            })?
-                            .ok_or_else(|| {
-                                ScabbardStoreError::Internal(InternalError::with_message(
-                                    "Failed to get 'vote response' send message action, invalid \
-                                    vote response found"
-                                        .to_string(),
-                                ))
-                            })?;
-                        Message::VoteResponse(send_message.epoch as u64, vote_response)
-                    }
+                    MessageTypeModel::VoteResponse => Message::VoteResponse(
+                        send_message.epoch as u64,
+                        send_message.vote_response.ok_or_else(|| {
+                            ScabbardStoreError::Internal(InternalError::with_message(
+                                "Failed to get 'vote response' send message action, no \
+                                associated vote found"
+                                    .to_string(),
+                            ))
+                        })?,
+                    ),
                     MessageTypeModel::DecisionRequest => {
                         Message::DecisionRequest(send_message.epoch as u64)
                     }
