@@ -35,8 +35,9 @@ default = [
 
 stable = [
     # The stable feature extends default:
-    "default"
+    "default",
     # The following features are stable:
+    "authorization",
 ]
 
 experimental = [
@@ -45,4 +46,5 @@ experimental = [
     # The following features are experimental:
 ]
 
+authorization = ["splinter/authorization"]
 scabbard-service = ["scabbard", "splinter/rest-api", "splinter/rest-api-actix-web-1", "serde_json"]
