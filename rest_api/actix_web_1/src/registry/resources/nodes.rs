@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
+use serde::{Deserialize, Serialize};
 use splinter::registry::{InvalidNodeError, Node};
 use splinter::rest_api::paging::Paging;
 

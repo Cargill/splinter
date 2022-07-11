@@ -14,6 +14,7 @@
 
 //! Defines structures used in key management.
 
+use serde::{Deserialize, Serialize};
 use splinter::biome::key_management::Key;
 
 #[derive(Deserialize)]
