@@ -18,8 +18,6 @@ use crate::error::InvalidStateError;
 use crate::service::instance::OrchestratableServiceFactory;
 use crate::transport::Connection;
 
-#[cfg(feature = "rest-api-actix-web-1")]
-use super::endpoint_provider::OrchestratorEndpointFactoryBuilder;
 use super::runnable::RunnableServiceOrchestrator;
 
 const DEFAULT_INCOMING_CAPACITY: usize = 512;
@@ -34,8 +32,6 @@ pub struct ServiceOrchestratorBuilder {
     outgoing_capacity: Option<usize>,
     channel_capacity: Option<usize>,
     service_factories: Vec<Box<dyn OrchestratableServiceFactory>>,
-    #[cfg(feature = "rest-api-actix-web-1")]
-    endpoint_factory_builder: OrchestratorEndpointFactoryBuilder,
 }
 
 impl ServiceOrchestratorBuilder {
@@ -86,12 +82,6 @@ impl ServiceOrchestratorBuilder {
         mut self,
         service_factory: Box<dyn OrchestratableServiceFactory>,
     ) -> Self {
-        #[cfg(feature = "rest-api-actix-web-1")]
-        {
-            self.endpoint_factory_builder = self
-                .endpoint_factory_builder
-                .with_provider(service_factory.get_rest_endpoint_provider());
-        }
         self.service_factories.push(service_factory);
 
         self
@@ -110,8 +100,6 @@ impl ServiceOrchestratorBuilder {
         let incoming_capacity = self.incoming_capacity.unwrap_or(DEFAULT_INCOMING_CAPACITY);
         let outgoing_capacity = self.outgoing_capacity.unwrap_or(DEFAULT_OUTGOING_CAPACITY);
         let channel_capacity = self.channel_capacity.unwrap_or(DEFAULT_CHANNEL_CAPACITY);
-        #[cfg(feature = "rest-api-actix-web-1")]
-        let endpoint_factory = self.endpoint_factory_builder.build();
 
         let supported_service_types_vec = self
             .service_factories
@@ -131,8 +119,6 @@ impl ServiceOrchestratorBuilder {
             incoming_capacity,
             outgoing_capacity,
             channel_capacity,
-            #[cfg(feature = "rest-api-actix-web-1")]
-            endpoint_factory,
         })
     }
 }

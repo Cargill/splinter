@@ -11,23 +11,3 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-#[cfg(feature = "rest-api-actix-web-1")]
-pub mod actix;
-pub mod resources;
-
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
-use splinter::rest_api::auth::authorization::Permission;
-
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
-const SCABBARD_READ_PERMISSION: Permission = Permission::Check {
-    permission_id: "scabbard.read",
-    permission_display_name: "Scabbard read",
-    permission_description: "Allows the client to read scabbard services' state and batch statuses",
-};
-#[cfg(all(feature = "authorization", feature = "rest-api-actix-web-1"))]
-const SCABBARD_WRITE_PERMISSION: Permission = Permission::Check {
-    permission_id: "scabbard.write",
-    permission_display_name: "Scabbard write",
-    permission_description: "Allows the client to submit batches to scabbard services",
-};

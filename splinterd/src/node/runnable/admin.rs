@@ -125,7 +125,7 @@ impl RunnableAdminSubsystem {
         let orchestrator_rest_provider = ServiceOrchestratorRestResourceProviderBuilder::new()
             .with_endpoint_factory(
                 scabbard::service::SERVICE_TYPE,
-                Box::new(scabbard::service::ScabbardServiceEndpointProvider::default()),
+                Box::new(splinter_rest_api_actix_web_1::scabbard::ScabbardServiceEndpointProvider::default()),
             )
             .build(&orchestrator);
 

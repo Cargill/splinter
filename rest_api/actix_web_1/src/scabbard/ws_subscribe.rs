@@ -25,14 +25,12 @@ use splinter::{
     service::rest_api::ServiceEndpoint,
 };
 
-use crate::protocol;
-#[cfg(feature = "authorization")]
-use crate::service::rest_api::SCABBARD_READ_PERMISSION;
-use crate::service::{
-    error::StateSubscriberError,
-    state::{StateChangeEvent, StateSubscriber},
-    Scabbard, SERVICE_TYPE,
+use scabbard::protocol;
+use scabbard::service::{
+    Scabbard, StateChangeEvent, StateSubscriber, StateSubscriberError, SERVICE_TYPE,
 };
+#[cfg(feature = "authorization")]
+use splinter_rest_api_common::scabbard::SCABBARD_READ_PERMISSION;
 
 struct WsStateSubscriber {
     sender: EventSender<StateChangeEvent>,
@@ -134,7 +132,7 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
             }
         }),
         request_guards: vec![Arc::new(ProtocolVersionRangeGuard::new(
-            protocol::SCABBARD_SUBSCRIBE_PROTOCOL_MIN,
+            splinter_rest_api_common::scabbard::SCABBARD_SUBSCRIBE_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
         #[cfg(feature = "authorization")]

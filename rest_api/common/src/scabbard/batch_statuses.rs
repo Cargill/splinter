@@ -16,7 +16,7 @@ use std::time::SystemTime;
 
 use serde::{ser::SerializeSeq, Serialize, Serializer};
 
-use crate::service::state::{BatchInfo, BatchStatus, InvalidTransaction, ValidTransaction};
+use scabbard::service::{BatchInfo, BatchStatus, InvalidTransaction, ValidTransaction};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BatchInfoResponse<'a> {

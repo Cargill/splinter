@@ -19,8 +19,6 @@
 mod consensus;
 mod error;
 pub(crate) mod factory;
-#[cfg(feature = "rest-api")]
-mod rest_api;
 mod shared;
 mod state;
 #[cfg(feature = "scabbardv3")]
@@ -57,15 +55,13 @@ use error::ScabbardError;
 pub use error::StateSubscriberError;
 pub use factory::ConnectionUri;
 pub use factory::ScabbardArgValidator;
-#[cfg(feature = "rest-api")]
-pub use factory::ScabbardServiceEndpointProvider;
 pub use factory::{ScabbardFactory, ScabbardFactoryBuilder, ScabbardStorageConfiguration};
 use shared::ScabbardShared;
 use state::merkle_state::MerkleState;
 use state::ScabbardState;
 pub use state::{
-    BatchInfo, BatchInfoIter, BatchStatus, Events, StateChange, StateChangeEvent, StateIter,
-    StateSubscriber,
+    BatchInfo, BatchInfoIter, BatchStatus, Events, InvalidTransaction, StateChange,
+    StateChangeEvent, StateIter, StateSubscriber, ValidTransaction,
 };
 
 pub const SERVICE_TYPE: &str = "scabbard";
