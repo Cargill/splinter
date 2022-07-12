@@ -20,6 +20,8 @@ mod lifecycle;
 mod message_converter;
 mod message_handler;
 mod message_handler_factory;
+#[cfg(feature = "scabbardv3-publisher")]
+mod publisher;
 #[cfg(feature = "scabbardv3-supervisor")]
 mod supervisor;
 mod timer_filter;
@@ -40,6 +42,8 @@ pub use lifecycle::ScabbardLifecycle;
 pub use message_converter::ScabbardMessageByteConverter;
 pub use message_handler::ScabbardMessageHandler;
 pub use message_handler_factory::ScabbardMessageHandlerFactory;
+#[cfg(feature = "scabbardv3-publisher")]
+pub use publisher::{SignedTimestamp, SignedTimestampCreator, SignedTimestampCreatorFactory};
 #[cfg(feature = "scabbardv3-supervisor")]
 pub use supervisor::{
     Supervisor, SupervisorBuilder, SupervisorMessage, SupervisorNotifierFactory,
