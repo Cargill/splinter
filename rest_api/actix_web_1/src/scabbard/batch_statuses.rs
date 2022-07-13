@@ -23,12 +23,11 @@ use splinter::{
     service::rest_api::ServiceEndpoint,
 };
 
-use crate::protocol;
+use scabbard::protocol;
+use scabbard::service::{Scabbard, SERVICE_TYPE};
+use splinter_rest_api_common::scabbard::batch_statuses::BatchInfoResponse;
 #[cfg(feature = "authorization")]
-use crate::service::rest_api::SCABBARD_READ_PERMISSION;
-use crate::service::{
-    rest_api::resources::batch_statuses::BatchInfoResponse, Scabbard, SERVICE_TYPE,
-};
+use splinter_rest_api_common::scabbard::SCABBARD_READ_PERMISSION;
 
 const DEFAULT_BATCH_STATUS_WAIT_SECS: u64 = 300;
 
@@ -119,7 +118,7 @@ pub fn make_get_batch_status_endpoint() -> ServiceEndpoint {
             }
         }),
         request_guards: vec![Arc::new(ProtocolVersionRangeGuard::new(
-            protocol::SCABBARD_BATCH_STATUSES_PROTOCOL_MIN,
+            splinter_rest_api_common::scabbard::SCABBARD_BATCH_STATUSES_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
         #[cfg(feature = "authorization")]

@@ -24,10 +24,11 @@ use splinter::{
     service::rest_api::ServiceEndpoint,
 };
 
-use crate::protocol;
+use scabbard::protocol;
+use scabbard::service::{Scabbard, SERVICE_TYPE};
+use splinter_rest_api_common::scabbard::batches::BatchLinkResponse;
 #[cfg(feature = "authorization")]
-use crate::service::rest_api::SCABBARD_WRITE_PERMISSION;
-use crate::service::{rest_api::resources::batches::BatchLinkResponse, Scabbard, SERVICE_TYPE};
+use splinter_rest_api_common::scabbard::SCABBARD_WRITE_PERMISSION;
 
 pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
     ServiceEndpoint {
@@ -100,7 +101,7 @@ pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
             )
         }),
         request_guards: vec![Arc::new(ProtocolVersionRangeGuard::new(
-            protocol::SCABBARD_ADD_BATCHES_PROTOCOL_MIN,
+            splinter_rest_api_common::scabbard::SCABBARD_ADD_BATCHES_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
         #[cfg(feature = "authorization")]

@@ -11,10 +11,3 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-pub mod batch_statuses;
-pub mod batches;
-pub mod state;
-pub mod state_address;
-pub mod state_root;
-pub mod ws_subscribe;

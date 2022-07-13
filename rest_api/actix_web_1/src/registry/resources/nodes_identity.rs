@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
+use serde::{Deserialize, Serialize};
 use splinter::registry::{InvalidNodeError, Node};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

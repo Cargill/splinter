@@ -38,14 +38,10 @@ use sawtooth::receipt::store::ReceiptStore;
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 use splinter::error::InternalError;
 use splinter::error::{InvalidArgumentError, InvalidStateError};
-#[cfg(feature = "rest-api-actix-web-1")]
-use splinter::service::instance::EndpointFactory;
 use splinter::service::instance::{
     FactoryCreateError, ServiceArgValidator, ServiceFactory, ServiceInstance,
 };
 use splinter::service::instance::{OrchestratableService, OrchestratableServiceFactory};
-#[cfg(feature = "rest-api")]
-use splinter::service::rest_api::ServiceEndpointProvider;
 #[cfg(all(feature = "lmdb", any(feature = "postgres", feature = "sqlite")))]
 use transact::database::Database;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
@@ -594,28 +590,6 @@ impl ServiceFactory for ScabbardFactory {
     ) -> Result<Box<dyn ServiceInstance>, FactoryCreateError> {
         // As the factory cannot be created under these conditions, this function is not reachable.
         unreachable!()
-    }
-}
-
-#[cfg(feature = "rest-api")]
-impl EndpointFactory for ScabbardFactory {
-    /// The `Scabbard` services created by the `ScabbardFactory` provide the following REST API
-    /// endpoints as [`ServiceEndpoint`]s:
-    ///
-    /// * `POST /batches` - Add one or more batches to scabbard's queue
-    /// * `GET /batch_statuses` - Get the status of one or more batches
-    /// * `GET /ws/subscribe` - Subscribe to scabbard state-delta events
-    /// * `GET /state/{address}` - Get a value from scabbard's state
-    /// * `GET /state` - Get multiple scabbard state entries
-    /// * `GET /state_root` - Get the current state root hash of scabbard's state
-    ///
-    /// These endpoints are only available if the following REST API backend feature is enabled:
-    ///
-    /// * `rest-api-actix`
-    ///
-    /// [`ServiceEndpoint`]: ../rest_api/struct.ServiceEndpoint.html
-    fn get_rest_endpoint_provider(&self) -> Box<dyn ServiceEndpointProvider> {
-        Box::new(endpoint_provider::ScabbardServiceEndpointProvider {})
     }
 }
 

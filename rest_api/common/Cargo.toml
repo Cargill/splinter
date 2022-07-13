@@ -24,15 +24,20 @@ description = """\
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
 splinter = { path = "../../libsplinter" }
+scabbard = { path = "../../services/scabbard/libscabbard", optional = true }
 
 [features]
-default = []
+default = [
+    "scabbard-service",
+]
 
 stable = [
     # The stable feature extends default:
-    "default"
+    "default",
     # The following features are stable:
+    "authorization",
 ]
 
 experimental = [
@@ -40,3 +45,6 @@ experimental = [
     "stable",
     # The following features are experimental:
 ]
+
+authorization = ["splinter/authorization"]
+scabbard-service = ["scabbard", "splinter/rest-api", "splinter/rest-api-actix-web-1", "serde_json"]

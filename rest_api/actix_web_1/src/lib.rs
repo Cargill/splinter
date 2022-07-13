@@ -28,6 +28,8 @@ pub mod admin;
 pub mod biome;
 #[cfg(feature = "registry")]
 pub mod registry;
+#[cfg(feature = "scabbard-service")]
+pub mod scabbard;
 #[cfg(feature = "service")]
 pub mod service;
 

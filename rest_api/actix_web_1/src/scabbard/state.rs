@@ -22,10 +22,11 @@ use splinter::{
     service::rest_api::ServiceEndpoint,
 };
 
-use crate::protocol;
+use scabbard::protocol;
+use scabbard::service::{Scabbard, SERVICE_TYPE};
+use splinter_rest_api_common::scabbard::state::StateEntryResponse;
 #[cfg(feature = "authorization")]
-use crate::service::rest_api::SCABBARD_READ_PERMISSION;
-use crate::service::{rest_api::resources::state::StateEntryResponse, Scabbard, SERVICE_TYPE};
+use splinter_rest_api_common::scabbard::SCABBARD_READ_PERMISSION;
 
 pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
     ServiceEndpoint {
@@ -87,7 +88,7 @@ pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
             })
         }),
         request_guards: vec![Arc::new(ProtocolVersionRangeGuard::new(
-            protocol::SCABBARD_LIST_STATE_PROTOCOL_MIN,
+            splinter_rest_api_common::scabbard::SCABBARD_LIST_STATE_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
         #[cfg(feature = "authorization")]
