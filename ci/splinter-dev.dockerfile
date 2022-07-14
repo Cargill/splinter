@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:focal
+FROM ubuntu:jammy
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -35,7 +35,7 @@ RUN apt-get update \
     openssl \
     pandoc \
     pkg-config \
-    python \
+    python3 \
     unzip \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM splintercommunity/splinter-dev:v11 as BUILDER
+FROM splintercommunity/splinter-dev:v12 as BUILDER
 
 # Copy over splinter files
 COPY Cargo.toml /build/Cargo.toml
@@ -83,7 +83,7 @@ WORKDIR /tmp
 RUN git rev-parse HEAD > /commit-hash
 
 # -------------=== gameroomd docker build ===-------------
-FROM ubuntu:focal
+FROM ubuntu:jammy
 
 ARG CARGO_ARGS
 RUN echo "CARGO_ARGS = '$CARGO_ARGS'" > CARGO_ARGS
@@ -94,6 +94,7 @@ COPY --from=BUILDER /commit-hash /commit-hash
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
+    bzip2 \
     ca-certificates \
     curl \
     postgresql-client \

@@ -13,7 +13,7 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 
-FROM ubuntu:focal as swagger_downloader
+FROM ubuntu:jammy as swagger_downloader
 
 RUN apt-get update \
   && apt-get install -y -q --no-install-recommends \

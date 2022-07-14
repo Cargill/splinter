@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:focal
+FROM ubuntu:jammy
 
 RUN apt-get update && apt-get install -yq --no-install-recommends \
     python3 \
