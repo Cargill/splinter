@@ -20,7 +20,8 @@ use scabbard::store::{
     transact::{factory::LmdbDatabaseFactory, TransactCommitHashStore},
     CommitHashStore,
 };
-use splinter::error::InternalError;
+
+use splinter::error::{InternalError, InvalidStateError};
 
 use super::error::UpgradeError;
 
@@ -31,6 +32,11 @@ pub(super) fn upgrade_scabbard_commit_hash_state(
     state_dir: &Path,
     database_uri: &ConnectionUri,
 ) -> Result<(), UpgradeError> {
+    // If there are no LMDB files there is nothing to do
+    if !check_for_lmdb_files(state_dir)? {
+        info!("Skipping scabbard commit hash store upgrade, no LMDB files found");
+        return Ok(());
+    }
     let lmdb_db_factory = LmdbDatabaseFactory::new_state_db_factory(state_dir, None);
     let upgrade_stores = new_upgrade_stores(database_uri)?;
 
@@ -90,4 +96,45 @@ pub(super) fn upgrade_scabbard_commit_hash_state(
     }
 
     Ok(())
+}
+
+fn check_for_lmdb_files(lmdb_path: &Path) -> Result<bool, InvalidStateError> {
+    if !lmdb_path.is_dir() {
+        return Err(InvalidStateError::with_message(format!(
+            "{} is not a directory",
+            lmdb_path.display(),
+        )));
+    }
+
+    match std::fs::read_dir(lmdb_path) {
+        Ok(entries) => {
+            for entry in entries {
+                error!("{:?}", entry);
+                let entry = entry.map_err(|err| {
+                    InvalidStateError::with_message(format!(
+                        "Unable to list files in {}: {}",
+                        lmdb_path.display(),
+                        err
+                    ))
+                })?;
+                if entry
+                    .path()
+                    .extension()
+                    .map(|extension| extension == "lmdb")
+                    .unwrap_or(false)
+                {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(
+            InvalidStateError::with_message(format!("{} is not found", lmdb_path.display())),
+        ),
+        Err(err) => Err(InvalidStateError::with_message(format!(
+            "Unable to read {}: {}",
+            lmdb_path.display(),
+            err
+        ))),
+    }
 }
