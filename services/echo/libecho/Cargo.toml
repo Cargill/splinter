@@ -40,6 +40,9 @@ features = [
     "service-timer-handler-factory",
 ]
 
+[dev-dependencies]
+splinter = { path = "../../../libsplinter", features = ["diesel"]}
+
 [features]
 default = ["sqlite"]
 

@@ -12,9 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(any(feature = "sqlite", feature = "postgres"))]
+mod diesel;
+
 use splinter::{error::InternalError, service::FullyQualifiedServiceId, service::ServiceId};
 
 use crate::service::{EchoArguments, EchoRequest, EchoServiceStatus, RequestStatus};
+
+#[cfg(any(feature = "sqlite", feature = "postgres"))]
+pub use self::diesel::DieselEchoStore;
 
 pub trait EchoStore {
     fn add_service(
