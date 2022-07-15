@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "diesel_migrations")]
-pub mod migrations;
-pub mod service;
-pub mod store;
-
-#[macro_use]
-#[cfg(any(feature = "sqlite", feature = "postgres"))]
-extern crate diesel;
-#[cfg(feature = "diesel_migrations")]
-#[macro_use]
-extern crate diesel_migrations;
+pub enum EchoMessage {
+    Request {
+        message: String,
+        correlation_id: u64,
+    },
+    Response {
+        message: String,
+        correlation_id: u64,
+    },
+}

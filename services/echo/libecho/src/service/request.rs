@@ -12,14 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "diesel_migrations")]
-pub mod migrations;
-pub mod service;
-pub mod store;
+use splinter::service::{FullyQualifiedServiceId, ServiceId};
 
-#[macro_use]
-#[cfg(any(feature = "sqlite", feature = "postgres"))]
-extern crate diesel;
-#[cfg(feature = "diesel_migrations")]
-#[macro_use]
-extern crate diesel_migrations;
+pub struct EchoRequest {
+    pub sender_service_id: FullyQualifiedServiceId,
+    pub correlation_id: i64,
+    pub receiver_service_id: ServiceId,
+    pub message: String,
+    pub sent: RequestStatus,
+    pub sent_at: Option<i64>,
+    pub ack: RequestStatus,
+    pub ack_at: Option<i64>,
+}
+
+pub enum RequestStatus {
+    NotSent,
+    Sent,
+}

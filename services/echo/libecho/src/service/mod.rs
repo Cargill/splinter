@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "diesel_migrations")]
-pub mod migrations;
-pub mod service;
-pub mod store;
+mod arguments;
+mod message;
+mod request;
+mod status;
 
-#[macro_use]
-#[cfg(any(feature = "sqlite", feature = "postgres"))]
-extern crate diesel;
-#[cfg(feature = "diesel_migrations")]
-#[macro_use]
-extern crate diesel_migrations;
+pub use arguments::EchoArguments;
+pub use message::EchoMessage;
+pub use request::{EchoRequest, RequestStatus};
+pub use status::EchoServiceStatus;
