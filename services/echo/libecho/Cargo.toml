@@ -23,6 +23,10 @@ description = """\
     between services.
 """
 
+[dependencies]
+diesel = { version = "1.0", features = ["r2d2", "serde_json"], optional = true }
+diesel_migrations = { version = "1.4", optional = true }
+
 [dependencies.splinter]
 path = "../../../libsplinter"
 features = [
@@ -37,7 +41,7 @@ features = [
 ]
 
 [features]
-default = []
+default = ["sqlite"]
 
 stable = [
   # The stable feature extends default:
@@ -49,4 +53,8 @@ experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
+  "postgres"
 ]
+
+postgres = ["diesel/postgres", "diesel_migrations"]
+sqlite = ["diesel/sqlite", "diesel_migrations"]
