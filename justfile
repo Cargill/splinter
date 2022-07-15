@@ -20,6 +20,7 @@ crates := '\
     rest_api/actix_web_4 \
     rest_api/common \
     services/scabbard/cli \
+    services/echo/libecho \
     services/scabbard/libscabbard \
     '
 

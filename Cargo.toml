@@ -21,6 +21,7 @@ members = [
     "rest_api/actix_web_1",
     "rest_api/actix_web_4",
     "rest_api/common",
+    "services/echo/libecho",
     "services/scabbard/cli",
     "services/scabbard/libscabbard",
 ]
