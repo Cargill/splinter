@@ -15,6 +15,7 @@
 use std::env;
 use std::error::Error;
 use std::panic;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
@@ -78,12 +79,18 @@ where
 }
 
 fn db_name() -> String {
+    static GLOBAL_THREAD_COUNT: AtomicUsize = AtomicUsize::new(1);
+
     let current_thread = std::thread::current();
     let thread_id = current_thread.name();
     // thread names during the unit test process are the path of the test being run, minus the
     // crate name.
     thread_id
-        .and_then(|test_name| test_name.rsplit("::").next())
-        .unwrap_or("test_db")
-        .to_string()
+        .and_then(|test_name| test_name.rsplit("::").next().map(String::from))
+        .unwrap_or_else(|| {
+            format!(
+                "test_db_{}",
+                GLOBAL_THREAD_COUNT.fetch_add(1, Ordering::SeqCst)
+            )
+        })
 }
