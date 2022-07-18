@@ -25,7 +25,10 @@ use std::time::{Duration, Instant, SystemTime};
 
 use protobuf::Message;
 use sawtooth::receipt::store::ReceiptStore;
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{SeqAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
 #[cfg(feature = "events")]
 use splinter::events::{ParseBytes, ParseError};
 #[cfg(test)]
@@ -568,11 +571,40 @@ impl Iterator for Events {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "statusType", content = "message")]
 pub enum BatchStatus {
+    #[serde(deserialize_with = "empty_array")]
     Unknown,
+    #[serde(deserialize_with = "empty_array")]
     Pending,
     Invalid(Vec<InvalidTransaction>),
     Valid(Vec<ValidTransaction>),
     Committed(Vec<ValidTransaction>),
+}
+
+fn empty_array<'de, D>(d: D) -> Result<(), D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct OuterVisitor;
+
+    impl<'de> Visitor<'de> for OuterVisitor {
+        type Value = Vec<()>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("an array of messages")
+        }
+
+        #[inline]
+        fn visit_seq<V>(self, _: V) -> Result<Self::Value, V::Error>
+        where
+            V: SeqAccess<'de>,
+        {
+            Ok(Vec::new())
+        }
+    }
+
+    d.deserialize_seq(OuterVisitor)?;
+
+    Ok(())
 }
 
 impl From<BatchExecutionResult> for BatchStatus {
@@ -1377,5 +1409,83 @@ mod tests {
 
         // Validate there are no extra items
         assert_eq!(results.values().count(), 3);
+    }
+
+    #[test]
+    fn batch_status_deserializes_correctly() {
+        assert_eq!(
+            serde_json::from_str::<BatchStatus>(
+                r#"{
+              "statusType": "Unknown",
+              "message": []
+            }"#
+            )
+            .expect("could not deserialize"),
+            BatchStatus::Unknown,
+        );
+
+        assert_eq!(
+            serde_json::from_str::<BatchStatus>(
+                r#"{
+              "statusType": "Pending",
+              "message": []
+            }"#
+            )
+            .expect("could not deserialize"),
+            BatchStatus::Pending,
+        );
+
+        assert_eq!(
+            serde_json::from_str::<BatchStatus>(
+                r#"{
+              "statusType": "Invalid",
+              "message": [{
+                "transaction_id": "txid",
+                "error_message": "message",
+                "error_data": [
+                    0,
+                    1,
+                    2
+                ]
+              }]
+            }"#
+            )
+            .expect("could not deserialize"),
+            BatchStatus::Invalid(vec![InvalidTransaction {
+                transaction_id: String::from("txid"),
+                error_message: String::from("message"),
+                error_data: vec![0, 1, 2]
+            }]),
+        );
+
+        assert_eq!(
+            serde_json::from_str::<BatchStatus>(
+                r#"{
+              "statusType": "Valid",
+              "message": [{
+                "transaction_id": "txid"
+              }]
+            }"#
+            )
+            .expect("could not deserialize"),
+            BatchStatus::Valid(vec![ValidTransaction {
+                transaction_id: String::from("txid")
+            }]),
+        );
+
+        assert_eq!(
+            serde_json::from_str::<BatchStatus>(
+                r#"{
+              "statusType": "Committed",
+              "message": [{
+                "transaction_id": "txid"
+              }]
+            }"#
+            )
+            .expect("could not deserialize"),
+            BatchStatus::Committed(vec![ValidTransaction {
+                transaction_id: String::from("txid")
+            }]),
+        );
     }
 }
