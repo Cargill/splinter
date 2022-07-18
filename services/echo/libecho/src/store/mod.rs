@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod command;
 #[cfg(any(feature = "sqlite", feature = "postgres"))]
 mod diesel;
 mod factory;
@@ -22,6 +23,10 @@ use crate::service::{EchoArguments, EchoRequest, EchoServiceStatus, RequestStatu
 
 #[cfg(any(feature = "sqlite", feature = "postgres"))]
 pub use self::diesel::DieselEchoStore;
+pub use command::{
+    EchoFinalizeServiceCommand, EchoPrepareServiceCommand, EchoPurgeServiceCommand,
+    EchoRetireServiceCommand,
+};
 pub use factory::{EchoStoreFactory, PooledEchoStoreFactory};
 #[cfg(feature = "postgres")]
 pub use factory::{PgEchoStoreFactory, PooledPgEchoStoreFactory};
