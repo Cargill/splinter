@@ -17,9 +17,11 @@ mod message;
 mod request;
 mod status;
 mod timer_filter;
+mod timer_handler;
 
 pub use arguments::EchoArguments;
 pub use message::EchoMessage;
 pub use request::{EchoRequest, RequestStatus};
 pub use status::EchoServiceStatus;
 pub use timer_filter::EchoTimerFilter;
+pub use timer_handler::EchoTimerHandler;
