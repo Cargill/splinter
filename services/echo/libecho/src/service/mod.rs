@@ -15,6 +15,7 @@
 mod arguments;
 mod lifecycle;
 mod message;
+mod message_handler;
 mod request;
 mod status;
 mod timer_filter;
@@ -23,6 +24,7 @@ mod timer_handler;
 pub use arguments::EchoArguments;
 pub use lifecycle::EchoLifecycle;
 pub use message::EchoMessage;
+pub use message_handler::EchoMessageHandler;
 pub use request::{EchoRequest, RequestStatus};
 pub use status::EchoServiceStatus;
 pub use timer_filter::EchoTimerFilter;
