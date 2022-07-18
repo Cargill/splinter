@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod arguments;
+mod lifecycle;
 mod message;
 mod request;
 mod status;
@@ -20,6 +21,7 @@ mod timer_filter;
 mod timer_handler;
 
 pub use arguments::EchoArguments;
+pub use lifecycle::EchoLifecycle;
 pub use message::EchoMessage;
 pub use request::{EchoRequest, RequestStatus};
 pub use status::EchoServiceStatus;
