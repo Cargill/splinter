@@ -616,7 +616,7 @@ impl TwoPhaseEngine {
             } else {
                 match proposal_manager.create_proposal(None, vec![]) {
                     Ok(()) => self.state = State::AwaitingProposal,
-                    Err(err) => error!("Error while creating proposal: {}", err),
+                    Err(err) => debug!("Error while creating proposal: {}", err),
                 }
             }
         }
