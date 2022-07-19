@@ -45,7 +45,7 @@ ENV PATH=$PATH:/root/.cargo/bin
 # Install Rust
 RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
  && chmod +x /usr/bin/rustup-init \
- && rustup-init -y \
+ && rustup-init -y --default-toolchain=1.62.0 \
 # Install cargo deb
  && cargo install cargo-deb \
 # Install protoc

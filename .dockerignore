@@ -42,7 +42,6 @@
 
 /examples/gameroom/gameroom-app/node_modules
 /examples/gameroom/gameroom-app/dist
-/examples/gameroom/gameroom-app/package-lock.json
 
 /examples/gameroom/gameroom-app/src/compiled_protos.json
 
