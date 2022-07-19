@@ -70,10 +70,6 @@ RUN USER=root cargo new --bin cli \
  && USER=root cargo new --lib rest_api/common \
  && USER=root cargo new --bin splinterd \
  && cp libsplinter/src/lib.rs splinterd/src/lib.rs \
-# Create empty Cargo projects for gameroom
- && USER=root cargo new --bin examples/gameroom/cli \
- && USER=root cargo new --bin examples/gameroom/daemon \
- && USER=root cargo new --lib examples/gameroom/database \
 # Create empty Cargo projects for splinter services
  && USER=root cargo new --bin services/scabbard/cli \
  && USER=root cargo new --lib services/scabbard/libscabbard
@@ -93,14 +89,6 @@ COPY services/scabbard/libscabbard/build.rs /build/services/scabbard/libscabbard
 COPY services/scabbard/libscabbard/Cargo.toml /build/services/scabbard/libscabbard/Cargo.toml
 COPY services/scabbard/libscabbard/protos /build/services/scabbard/libscabbard/protos
 
-# Copy over example Cargo.toml files
-COPY examples/gameroom/cli/Cargo.toml \
-     /build/examples/gameroom/cli/Cargo.toml
-COPY examples/gameroom/daemon/Cargo.toml \
-     /build/examples/gameroom/daemon/Cargo.toml
-COPY examples/gameroom/database/Cargo.toml \
-     /build/examples/gameroom/database/Cargo.toml
-
 # Do release builds for each Cargo.toml
 # Workaround for https://github.com/koalaman/shellcheck/issues/1894
 #hadolint ignore=SC2016
@@ -113,7 +101,6 @@ RUN find ./*/ -name 'Cargo.toml' -print0 | \
  && find ./*/ -name 'Cargo.toml' -print0 | \
     xargs -0 -I {} sh -c 'echo Building $1; cargo build --tests --release --manifest-path $1 --no-default-features' sh {} \
 # Clean up built files
- && find target/release -path target/release/.fingerprint -prune -false -o -name '*gameroom*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
  && find target/release -path target/release/.fingerprint -prune -false -o -name '*scabbard*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
  && find target/release -path target/release/.fingerprint -prune -false -o -name '*splinter*' | xargs -I {} sh -c 'rm -rf $1' sh {} \
 # Clean up leftover files

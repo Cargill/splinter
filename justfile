@@ -21,9 +21,6 @@ crates := '\
     rest_api/common \
     services/scabbard/cli \
     services/scabbard/libscabbard \
-    examples/gameroom/database \
-    examples/gameroom/daemon \
-    examples/gameroom/cli \
     '
 
 crates_quick := '\
@@ -59,20 +56,11 @@ build:
     echo "\n\033[92mBuild Success\033[0m\n"
 
 ci:
-    just ci-lint-client
     just ci-lint-dockerfiles
     just ci-lint-openapi
     just ci-lint-splinter
     just ci-shellcheck
     just ci-test
-    just ci-test-gameroom
-
-ci-lint-client:
-    #!/usr/bin/env sh
-    set -e
-    docker-compose -f docker/compose/run-lint.yaml build lint-gameroom-client
-    docker-compose -f docker/compose/run-lint.yaml up \
-      --abort-on-container-exit lint-gameroom-client
 
 ci-lint-dockerfiles: lint-dockerfiles
 
@@ -103,10 +91,6 @@ ci-test:
     docker-compose -f tests/test-splinter.yaml up --detach postgres-db
 
     docker-compose -f tests/test-splinter.yaml up --abort-on-container-exit unit-test-splinter
-
-ci-test-gameroom: test-gameroom
-
-ci-test-gameroom-ui: test-gameroom-ui
 
 clean:
     cargo clean
@@ -142,12 +126,6 @@ lint: lint-ignore
     done
     echo "\n\033[92mLint Success\033[0m\n"
 
-lint-client:
-    #!/usr/bin/env sh
-    set -e
-    cd examples/gameroom/gameroom-app
-    npm run lint
-
 lint-dockerfiles:
     #!/usr/bin/env sh
     set -e
@@ -173,7 +151,7 @@ lint-openapi:
     #!/usr/bin/env sh
     set -e
     docker run --volume "$PWD":/data jamescooke/openapi-validator:0.46.0 -e \
-    	splinterd/api/static/openapi.yaml examples/gameroom/daemon/openapi.yml
+     	splinterd/api/static/openapi.yaml
     echo "\n\033[92mLint Splinter OpenAPI Success\033[0m\n"
 
 metrics:
@@ -238,17 +216,3 @@ test:
         done
     done
     echo "\n\033[92mTest Success\033[0m\n"
-
-test-gameroom:
-    #!/usr/bin/env sh
-    set -e
-    docker-compose -f examples/gameroom/tests/docker-compose.yaml build
-    docker-compose -f examples/gameroom/tests/docker-compose.yaml up \
-    --abort-on-container-exit
-
-test-gameroom-ui:
-    #!/usr/bin/env sh
-    set -e
-    docker-compose -f examples/gameroom/tests/cypress/docker-compose.yaml build
-    docker-compose -f examples/gameroom/tests/cypress/docker-compose.yaml up \
-    --abort-on-container-exit

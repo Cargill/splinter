@@ -17,11 +17,6 @@ group "default" {
     "scabbard-cli",
     "splinter-cli",
     "splinterd",
-    "gameroomd",
-    "gameroom-app-acme",
-    "gameroom-app-bubba",
-    "gameroom-app",
-    "gameroom-database"
     ]
 }
 
@@ -69,39 +64,4 @@ target "splinterd" {
     inherits = ["all"]
     dockerfile = "splinterd/Dockerfile-installed-${DISTRO}"
     tags = ["ghcr.io/splintercommunity/splinterd:${ISOLATION_ID}"]
-}
-
-# --== gameroom ==--
-
-target "gameroomd" {
-    inherits = ["all"]
-    dockerfile = "examples/gameroom/daemon/Dockerfile-installed-${DISTRO}"
-    tags = ["ghcr.io/splintercommunity/gameroomd:${ISOLATION_ID}"]
-}
-
-target "gameroom-app-acme" {
-    inherits = ["all"]
-    args = {VUE_APP_BRAND = "acme"}
-    dockerfile = "examples/gameroom/gameroom-app/Dockerfile-installed"
-    tags = ["ghcr.io/splintercommunity/gameroom-app-acme:${ISOLATION_ID}"]
-}
-
-target "gameroom-app-bubba" {
-    inherits = ["all"]
-    args = {VUE_APP_BRAND = "bubba"}
-    dockerfile = "examples/gameroom/gameroom-app/Dockerfile-installed"
-    tags = ["ghcr.io/splintercommunity/gameroom-app-bubba:${ISOLATION_ID}"]
-}
-
-target "gameroom-app" {
-    inherits = ["all"]
-    args = {VUE_APP_BRAND = "generic"}
-    dockerfile = "examples/gameroom/gameroom-app/Dockerfile-installed"
-    tags = ["ghcr.io/splintercommunity/gameroom-app:${ISOLATION_ID}"]
-}
-
-target "gameroom-database" {
-    inherits = ["all"]
-    dockerfile = "examples/gameroom/database/Dockerfile-installed"
-    tags = ["ghcr.io/splintercommunity/gameroom-database:${ISOLATION_ID}"]
 }
