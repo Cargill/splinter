@@ -15,18 +15,15 @@
 use std::convert::From;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::ops::Deref;
 
 use log::Level;
 
 use super::error::ConfigError;
 use super::toml::{TomlRawLogTarget, TomlUnnamedAppenderConfig, TomlUnnamedLoggerConfig};
 
-pub const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
+const DEFAULT_LOGGING_PATTERN: &str = "[{d(%Y-%m-%d %H:%M:%S%.3f)}] T[{T}] {l} [{M}] {m}\n";
 const DEFAULT_LOG_SIZE: u64 = 100_000_000;
-
-pub(super) fn default_pattern() -> String {
-    String::from(DEFAULT_LOGGING_PATTERN)
-}
 
 #[derive(Clone, Debug)]
 pub struct LogConfig {
@@ -57,14 +54,14 @@ pub struct RootConfig {
 #[derive(Clone, Debug)]
 pub struct AppenderConfig {
     pub name: String,
-    pub encoder: String,
+    pub encoder: LogEncoder,
     pub kind: LogTarget,
     pub level: Option<Level>,
 }
 
 #[derive(Clone, Debug)]
 pub struct UnnamedAppenderConfig {
-    pub encoder: String,
+    pub encoder: LogEncoder,
     pub kind: RawLogTarget,
     pub filename: Option<String>,
     pub size: Option<u64>,
@@ -85,6 +82,32 @@ pub enum RawLogTarget {
     Stderr,
     File,
     RollingFile,
+}
+
+#[derive(Clone, Debug)]
+pub struct LogEncoder {
+    value: String,
+}
+
+impl From<String> for LogEncoder {
+    fn from(value: String) -> Self {
+        LogEncoder { value }
+    }
+}
+
+impl Default for LogEncoder {
+    fn default() -> Self {
+        Self {
+            value: DEFAULT_LOGGING_PATTERN.to_string(),
+        }
+    }
+}
+
+impl Deref for LogEncoder {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
 }
 
 impl AppenderConfig {
@@ -155,7 +178,9 @@ impl TryFrom<(String, TomlUnnamedAppenderConfig)> for AppenderConfig {
 impl From<TomlUnnamedAppenderConfig> for UnnamedAppenderConfig {
     fn from(unnamed: TomlUnnamedAppenderConfig) -> Self {
         Self {
-            encoder: unnamed.encoder,
+            encoder: unnamed
+                .encoder
+                .map_or_else(LogEncoder::default, |f| f.into()),
             kind: unnamed.kind.into(),
             filename: unnamed.filename,
             size: unnamed.size.map(|s| s.into()),

@@ -25,7 +25,7 @@ use std::convert::TryInto;
 #[cfg(feature = "service2")]
 use std::time::Duration;
 
-use super::logging::{default_pattern, UnnamedAppenderConfig, UnnamedLoggerConfig};
+use super::logging::{UnnamedAppenderConfig, UnnamedLoggerConfig};
 use super::ScabbardState;
 
 /// `TOML_VERSION` represents the version of the toml config file.
@@ -46,9 +46,8 @@ pub enum TomlRawLogTarget {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct TomlUnnamedAppenderConfig {
-    #[serde(default = "default_pattern")]
     #[serde(alias = "pattern")]
-    pub encoder: String,
+    pub encoder: Option<String>,
     pub kind: TomlRawLogTarget,
     pub filename: Option<String>,
     pub size: Option<TomlLogFileSize>,
@@ -462,7 +461,7 @@ impl From<ScabbardStateToml> for ScabbardState {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::LoggerConfig;
+    use crate::config::{LogEncoder, LoggerConfig};
 
     use super::*;
 
@@ -887,7 +886,7 @@ mod tests {
         assert!(matches!(stdout.kind, crate::config::RawLogTarget::Stdout));
         assert!(stdout.size.is_none());
         assert!(stdout.filename.is_none());
-        assert_eq!(stdout.encoder, default_pattern());
+        assert_eq!(&*stdout.encoder, &*LogEncoder::default());
 
         assert!(appenders.contains_key("rolling_file"));
         assert!(appenders.get("rolling_file").is_some());
@@ -903,7 +902,7 @@ mod tests {
             rolling_file.filename.as_ref().unwrap(),
             "/var/log/splinter/splinterd.log"
         );
-        assert_eq!(rolling_file.encoder, default_pattern());
+        assert_eq!(&*rolling_file.encoder, &*LogEncoder::default());
 
         let loggers = toml.loggers();
         assert!(loggers.is_some());

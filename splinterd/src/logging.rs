@@ -39,15 +39,15 @@ use log4rs::{
 use splinter::error::InternalError;
 
 use crate::config::{
-    AppenderConfig, Config as InternalConfig, LogConfig, LogTarget, LoggerConfig, RootConfig,
-    DEFAULT_LOGGING_PATTERN,
+    AppenderConfig, Config as InternalConfig, LogConfig, LogEncoder, LogTarget, LoggerConfig,
+    RootConfig,
 };
 use crate::error::UserError;
 
 impl TryInto<Appender> for AppenderConfig {
     type Error = std::io::Error;
     fn try_into(self) -> Result<Appender, Self::Error> {
-        let encoder: Box<dyn Encode> = Box::new(PatternEncoder::new(&self.encoder));
+        let encoder: Box<dyn Encode> = self.encoder.into();
         let boxed: Box<dyn Append> = match &self.kind {
             LogTarget::Stdout => Box::new(
                 ConsoleAppender::builder()
@@ -204,6 +204,12 @@ pub fn configure_logging(
     }
 }
 
+impl From<LogEncoder> for Box<dyn log4rs::encode::Encode> {
+    fn from(log_encoder: LogEncoder) -> Self {
+        Box::new(PatternEncoder::new(&*log_encoder))
+    }
+}
+
 pub fn default_log_settings() -> Config {
     let default_config: LogConfig = LogConfig {
         root: RootConfig {
@@ -212,7 +218,7 @@ pub fn default_log_settings() -> Config {
         },
         appenders: vec![AppenderConfig {
             name: String::from("default"),
-            encoder: String::from(DEFAULT_LOGGING_PATTERN),
+            encoder: LogEncoder::default(),
             kind: LogTarget::Stdout,
             level: None,
         }],
