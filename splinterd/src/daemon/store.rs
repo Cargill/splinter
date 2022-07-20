@@ -37,6 +37,13 @@ use scabbard::store::PooledScabbardStoreFactory;
 #[cfg(all(feature = "scabbardv3", feature = "database-sqlite"))]
 use scabbard::store::PooledSqliteScabbardStoreFactory;
 
+#[cfg(feature = "service-echo")]
+use splinter_echo::store::PooledEchoStoreFactory;
+#[cfg(all(feature = "service-echo", feature = "database-postgres"))]
+use splinter_echo::store::PooledPgEchoStoreFactory;
+#[cfg(all(feature = "service-echo", feature = "database-sqlite"))]
+use splinter_echo::store::PooledSqliteEchoStoreFactory;
+
 pub enum ConnectionPool {
     #[cfg(feature = "database-postgres")]
     Postgres {
@@ -121,6 +128,31 @@ pub fn create_scabbard_store_factory(
         #[cfg(feature = "database-sqlite")]
         ConnectionPool::Sqlite { pool } => Ok(Arc::new(
             PooledSqliteScabbardStoreFactory::new_with_write_exclusivity(pool.clone()),
+        )),
+        #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
+        ConnectionPool::Unsupported => Err(InternalError::with_message(
+            "Connection pools are unavailable in this configuration".into(),
+        )),
+    }
+}
+
+/// Creates a `EchoStoreFactory` backed by the given connection pool
+///
+/// # Arguments
+///
+/// * `connection_pool` - the connection pool to use to create the store factory
+#[cfg(feature = "service-echo")]
+pub fn create_echo_store_factory(
+    connection_pool: &ConnectionPool,
+) -> Result<Box<dyn PooledEchoStoreFactory>, InternalError> {
+    match connection_pool {
+        #[cfg(feature = "database-postgres")]
+        ConnectionPool::Postgres { pool } => {
+            Ok(Box::new(PooledPgEchoStoreFactory::new(pool.clone())))
+        }
+        #[cfg(feature = "database-sqlite")]
+        ConnectionPool::Sqlite { pool } => Ok(Box::new(
+            PooledSqliteEchoStoreFactory::new_with_write_exclusivity(pool.clone()),
         )),
         #[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
         ConnectionPool::Unsupported => Err(InternalError::with_message(
