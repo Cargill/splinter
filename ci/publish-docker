@@ -24,11 +24,6 @@ SERVICES="
     scabbard-cli
     splinter-cli
     splinterd
-    gameroomd
-    gameroom-app-acme
-    gameroom-app-bubba
-    gameroom-app
-    gameroom-database
 "
 
 build_docker() {

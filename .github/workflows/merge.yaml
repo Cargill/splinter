@@ -12,29 +12,6 @@ env:
 
 jobs:
 
-  lint_gameroom_client:
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Display envvars
-        run: env
-
-      - name: Install Just
-        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
-
-      - name: Lint Gameroom Client
-        run: just ci-lint-client
-
-      - name: Notify Slack of Failure
-        if: cancelled() || failure()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          fields: repo,message,author,job
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
   lint_splinter:
     runs-on: ubuntu-18.04
     steps:
@@ -103,53 +80,7 @@ jobs:
           fields: repo,message,author,job
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  gameroom_tests:
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Display envvars
-        run: env
-
-      - name: Install Just
-        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
-
-      - name: Gameroom Tests
-        run: just ci-test-gameroom
-
-      - name: Notify Slack of Failure
-        if: cancelled() || failure()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          fields: repo,message,author,job
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  gameroom_ui_tests:
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Display envvars
-        run: env
-
-      - name: Install Just
-        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
-
-      - name: Gameroom UI Tests
-        run: just ci-test-gameroom-ui
-
-      - name: Notify Slack of Failure
-        if: cancelled() || failure()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          fields: repo,message,author,job
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
+  
   build_docker:
     runs-on: ubuntu-18.04
     if: >-

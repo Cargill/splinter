@@ -28,10 +28,3 @@ services:
     volumes:
       - ../../:/project/splinter
     command: just lint
-
-  lint-gameroom-client:
-    build:
-      context: ../../
-      dockerfile: ./docker/lint-client.dockerfile
-    image: lint-gameroom-client:${ISOLATION_ID}
-    command: just lint-client
