@@ -99,13 +99,15 @@ use splinter::runtime::service::{
     RoutingTableServiceTypeResolver, ServiceDispatcher,
 };
 use splinter::service::instance::ServiceArgValidator;
-#[cfg(feature = "scabbardv3")]
+#[cfg(any(feature = "scabbardv3", feature = "service-echo"))]
 use splinter::service::{MessageHandler, MessageHandlerFactory, ServiceType};
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, Connection, Incoming, Listener,
     Transport,
 };
+#[cfg(feature = "service-echo")]
+use splinter_echo::service::{EchoMessageByteConverter, EchoMessageHandlerFactory};
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
 #[cfg(feature = "biome-key-management")]
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
@@ -393,11 +395,18 @@ impl SplinterDaemon {
         #[cfg(feature = "scabbardv3")]
         let scabbard_store_factory = store::create_scabbard_store_factory(&connection_pool)?;
 
+        #[cfg(feature = "service-echo")]
+        let echo_store_factory = store::create_echo_store_factory(&connection_pool)?;
+
         #[cfg(feature = "service2")]
         let message_handlers: Vec<BoxedByteMessageHandlerFactory> = vec![
             #[cfg(feature = "scabbardv3")]
             ScabbardMessageHandlerFactory::new(scabbard_store_factory, timer.alarm_factory())
                 .into_factory(ScabbardMessageByteConverter {})
+                .into_boxed(),
+            #[cfg(feature = "service-echo")]
+            EchoMessageHandlerFactory::new(echo_store_factory)
+                .into_factory(EchoMessageByteConverter {})
                 .into_boxed(),
         ];
 
