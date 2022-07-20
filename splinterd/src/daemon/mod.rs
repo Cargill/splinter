@@ -376,13 +376,19 @@ impl SplinterDaemon {
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         #[cfg(feature = "service2")]
-        let (mut timer, mut supervisor) = timer::create_timer_and_supervisor(
+        let service_timer_and_supervisor = timer::create_timer_and_supervisor(
             &connection_pool,
             &node_id,
             network_sender.clone(),
             routing_reader.clone(),
             &self.service_timer_interval,
         )?;
+
+        #[cfg(feature = "service2")]
+        let mut timer = service_timer_and_supervisor.timer;
+
+        #[cfg(feature = "scabbardv3")]
+        let mut supervisor = service_timer_and_supervisor.supervisor;
 
         #[cfg(feature = "scabbardv3")]
         let scabbard_store_factory = store::create_scabbard_store_factory(&connection_pool)?;
@@ -987,7 +993,9 @@ impl SplinterDaemon {
                 );
             }
 
+            #[cfg(feature = "scabbardv3")]
             supervisor.signal_shutdown();
+            #[cfg(feature = "scabbardv3")]
             if let Err(err) = supervisor.wait_for_shutdown() {
                 error!("Unable to cleanly shut down scabbard supervisor: {}", err);
             }
