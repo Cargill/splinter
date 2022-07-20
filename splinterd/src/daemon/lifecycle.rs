@@ -44,6 +44,7 @@ use splinter_echo::store::SqliteEchoStoreFactory;
 use super::store::ConnectionPool;
 #[cfg(feature = "service-echo")]
 use super::ECHO_SERVICE_TYPE;
+#[cfg(feature = "scabbardv3")]
 use super::SCABBARD_SERVICE_TYPE;
 
 pub enum DaemonLifecycleExecutor {
