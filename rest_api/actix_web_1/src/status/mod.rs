@@ -15,9 +15,9 @@
 
 use actix_web::{Error, HttpResponse};
 use futures::{Future, IntoFuture};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "authorization")]
 use splinter::rest_api::auth::authorization::Permission;
+use splinter_rest_api_common::status::Status;
 
 #[cfg(feature = "authorization")]
 pub const STATUS_READ_PERMISSION: Permission = Permission::Check {
@@ -25,37 +25,6 @@ pub const STATUS_READ_PERMISSION: Permission = Permission::Check {
     permission_display_name: "Status read",
     permission_description: "Allows the client to get node status info",
 };
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Status {
-    node_id: String,
-    display_name: String,
-    #[cfg(feature = "service-endpoint")]
-    service_endpoint: String,
-    network_endpoints: Vec<String>,
-    advertised_endpoints: Vec<String>,
-    version: String,
-}
-
-impl Status {
-    fn new(
-        node_id: String,
-        display_name: String,
-        #[cfg(feature = "service-endpoint")] service_endpoint: String,
-        network_endpoints: Vec<String>,
-        advertised_endpoints: Vec<String>,
-    ) -> Self {
-        Self {
-            node_id,
-            display_name,
-            #[cfg(feature = "service-endpoint")]
-            service_endpoint,
-            network_endpoints,
-            advertised_endpoints,
-            version: get_version(),
-        }
-    }
-}
 
 pub fn get_status(
     node_id: String,
@@ -74,13 +43,4 @@ pub fn get_status(
     );
 
     Box::new(HttpResponse::Ok().json(status).into_future())
-}
-
-fn get_version() -> String {
-    format!(
-        "{}.{}.{}",
-        env!("CARGO_PKG_VERSION_MAJOR"),
-        env!("CARGO_PKG_VERSION_MINOR"),
-        env!("CARGO_PKG_VERSION_PATCH")
-    )
 }
