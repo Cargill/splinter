@@ -37,6 +37,26 @@ struct Status {
     version: String,
 }
 
+impl Status {
+    fn new(
+        node_id: String,
+        display_name: String,
+        #[cfg(feature = "service-endpoint")] service_endpoint: String,
+        network_endpoints: Vec<String>,
+        advertised_endpoints: Vec<String>,
+    ) -> Self {
+        Self {
+            node_id,
+            display_name,
+            #[cfg(feature = "service-endpoint")]
+            service_endpoint,
+            network_endpoints,
+            advertised_endpoints,
+            version: get_version(),
+        }
+    }
+}
+
 pub fn get_status(
     node_id: String,
     display_name: String,
@@ -44,15 +64,14 @@ pub fn get_status(
     network_endpoints: Vec<String>,
     advertised_endpoints: Vec<String>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let status = Status {
+    let status = Status::new(
         node_id,
         display_name,
         #[cfg(feature = "service-endpoint")]
         service_endpoint,
         network_endpoints,
         advertised_endpoints,
-        version: get_version(),
-    };
+    );
 
     Box::new(HttpResponse::Ok().json(status).into_future())
 }
