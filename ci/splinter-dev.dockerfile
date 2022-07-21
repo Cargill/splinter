@@ -31,7 +31,6 @@ RUN apt-get update \
     libsasl2-dev \
     libssl-dev \
     libsqlite3-dev \
-    libzmq3-dev \
     openssl \
     pandoc \
     pkg-config \

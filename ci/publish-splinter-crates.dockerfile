@@ -34,7 +34,6 @@ RUN apt-get update \
     libpq-dev \
     libsqlite3-dev \
     libssl-dev \
-    libzmq3-dev \
     pkg-config \
     unzip \
  && apt-get clean \
