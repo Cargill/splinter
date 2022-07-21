@@ -162,7 +162,7 @@ lint-typos:
     set -e
     docker build -t lint-typos -f docker/typos.dockerfile .
     echo "\033[1mLinting Typos\033[0m"
-    docker run -i --rm -v $(pwd):/project lint-typos typos
+    docker run -i --rm -v $(pwd):/project lint-typos typos --config .github/typos_config.toml
     echo "\n\033[92mLint Typos Success\033[0m\n"
 
 metrics:

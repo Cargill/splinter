@@ -43,7 +43,7 @@ use operations::add_consensus_action::AddActionOperation as _;
 use operations::add_consensus_context::AddContextOperation as _;
 use operations::add_consensus_event::AddEventOperation as _;
 use operations::add_service::AddServiceOperation as _;
-use operations::add_supervisor_notification::AddSupervisorNotficationOperation as _;
+use operations::add_supervisor_notification::AddSupervisorNotificationOperation as _;
 use operations::get_alarm::GetAlarmOperation as _;
 use operations::get_current_consensus_context::GetCurrentContextAction as _;
 use operations::get_last_commit_entry::GetLastCommitEntryOperation as _;
@@ -1671,7 +1671,7 @@ pub mod tests {
             .build()
             .expect("failed to build service");
 
-        store.add_service(service).expect("faield to add service");
+        store.add_service(service).expect("failed to add service");
 
         let coordinator_context = ContextBuilder::default()
             .with_coordinator(service_fqsi.clone().service_id())
@@ -1764,7 +1764,7 @@ pub mod tests {
             .build()
             .expect("failed to build service");
 
-        store.add_service(service).expect("faield to add service");
+        store.add_service(service).expect("failed to add service");
 
         let coordinator_context = ContextBuilder::default()
             .with_coordinator(service_fqsi.clone().service_id())
@@ -1853,7 +1853,7 @@ pub mod tests {
             .build()
             .expect("failed to build service");
 
-        store.add_service(service).expect("faield to add service");
+        store.add_service(service).expect("failed to add service");
 
         let coordinator_context = ContextBuilder::default()
             .with_coordinator(service_fqsi.clone().service_id())
@@ -2362,7 +2362,7 @@ pub mod tests {
             .build()
             .expect("failed to build service");
 
-        store.add_service(service).expect("faield to add service");
+        store.add_service(service).expect("failed to add service");
 
         let service = ScabbardServiceBuilder::default()
             .with_service_id(&participant_service_id)
@@ -2372,7 +2372,7 @@ pub mod tests {
             .build()
             .expect("failed to build service");
 
-        store.add_service(service).expect("faield to add service");
+        store.add_service(service).expect("failed to add service");
 
         let coordinator_context = ContextBuilder::default()
             .with_coordinator(coordinator_fqsi.clone().service_id())
@@ -2887,7 +2887,7 @@ pub mod tests {
     /// 7. Add a supervisor notification for Abort
     /// 8. Verify that both notifications are returned, with Abort coming after RequestForStart
     /// 9. Update RequestForStart notification to be executed
-    /// 10. Verify that only the Abort notfication is returned
+    /// 10. Verify that only the Abort notification is returned
     fn scabbard_store_get_supervisor_notification(store: &dyn ScabbardStore) {
         let service_fqsi = FullyQualifiedServiceId::new_from_string("abcde-fghij::aa00")
             .expect("creating FullyQualifiedServiceId from string 'abcde-fghij::aa00'");

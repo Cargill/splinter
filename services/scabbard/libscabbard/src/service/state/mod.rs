@@ -444,7 +444,7 @@ impl TryFrom<TransactionReceipt> for StateChangeEvent {
                 })
             }
             TransactionResult::Invalid { .. } => Err(ScabbardStateError(
-                format!("cannot convert transaction receipt ({}) to state cahnge event because transction result is `Invalid`", transaction_id)
+                format!("cannot convert transaction receipt ({}) to state change event because transction result is `Invalid`", transaction_id)
             )),
         }
     }

@@ -148,7 +148,7 @@ impl ServiceProcessor {
     /// Once the service processor is started it will handle incoming messages from the splinter
     /// node and route it to a running service.
     ///
-    /// Returns a [ShutdownHandle] impelmentation so the service can be properly shutdown.
+    /// Returns a [ShutdownHandle] implementation so the service can be properly shutdown.
     pub fn start(self) -> Result<ServiceProcessorShutdownHandle, ServiceProcessorError> {
         self.do_start().map(
             |(do_shutdown, join_handles)| ServiceProcessorShutdownHandle {
@@ -360,7 +360,7 @@ fn process_incoming_msg(
         .map_err(to_process_err!("unable parse network message"))?;
 
     // if a service is waiting on a reply the inbound router will
-    // route back the reponse to the service based on the correlation id in
+    // route back the response to the service based on the correlation id in
     // the message, otherwise it will be sent to the inbound thread
     match msg {
         NetworkMessage::Circuit(payload) => {
@@ -708,7 +708,7 @@ pub mod tests {
         mesh.add(connection, "service_processor".to_string())
             .unwrap();
 
-        // Receive service connect request and respond with ServiceConnectionResposne with status
+        // Receive service connect request and respond with ServiceConnectionResponse with status
         // OK
         let mut service_request = get_service_connect(mesh.recv().unwrap().payload().to_vec());
         assert_eq!(service_request.get_service_id(), "mock_service");
@@ -826,7 +826,7 @@ pub mod tests {
         mesh.add(connection, "service_processor".to_string())
             .unwrap();
 
-        // Receive service connect request and respond with ServiceConnectionResposne with status
+        // Receive service connect request and respond with ServiceConnectionResponse with status
         // OK
         let mut service_request = get_service_connect(mesh.recv().unwrap().payload().to_vec());
         assert_eq!(service_request.get_service_id(), "mock_service");

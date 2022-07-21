@@ -576,7 +576,7 @@ mod tests {
     /// 3. Create an inbound negotiation and execute it on the stream.
     /// 4. Verify that negotiation returns an Handshake error.
     #[test]
-    fn frame_negotation_eof() {
+    fn frame_negotiation_eof() {
         let (mut tx, rx) = stream::byte_stream_pair();
 
         let (done_tx, done_rx) = std::sync::mpsc::channel();

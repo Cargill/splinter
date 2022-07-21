@@ -326,12 +326,12 @@ mod test {
         let unified =
             UnifiedRegistry::new(Box::new(MemRegistry::default()), vec![Box::new(readable)]);
 
-        let retreived_node = unified
+        let retrieved_node = unified
             .get_node("node1")
             .expect("Unable to fetch node")
             .expect("Node not found");
 
-        assert_eq!(node, retreived_node);
+        assert_eq!(node, retrieved_node);
     }
 
     /// Verify that a node is fetched from the internal source if it only exists there.
@@ -347,12 +347,12 @@ mod test {
         let unified =
             UnifiedRegistry::new(Box::new(writable), vec![Box::new(MemRegistry::default())]);
 
-        let retreived_node = unified
+        let retrieved_node = unified
             .get_node("node1")
             .expect("Unable to fetch node")
             .expect("Node not found");
 
-        assert_eq!(node, retreived_node);
+        assert_eq!(node, retrieved_node);
     }
 
     /// Verify that a node is fetched from the highest-precedence read-only source if it does not
@@ -398,12 +398,12 @@ mod test {
             ],
         );
 
-        let retreived_node = unified
+        let retrieved_node = unified
             .get_node("node1")
             .expect("Unable to fetch node")
             .expect("Node not found");
 
-        assert_eq!(expected_node, retreived_node);
+        assert_eq!(expected_node, retrieved_node);
     }
 
     /// Verify that a node is fetched from the internal source even if it exists in one or more
@@ -448,12 +448,12 @@ mod test {
             ],
         );
 
-        let retreived_node = unified
+        let retrieved_node = unified
             .get_node("node1")
             .expect("Unable to fetch node")
             .expect("Node not found");
 
-        assert_eq!(expected_node, retreived_node);
+        assert_eq!(expected_node, retrieved_node);
     }
 
     /// Verify that `has_node` properly determines if a node exists in any of the sources.

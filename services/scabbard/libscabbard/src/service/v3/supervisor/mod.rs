@@ -37,7 +37,7 @@ pub enum SupervisorMessage {
     Shutdown,
 }
 
-/// The componet that drives transaction execution
+/// The component that drives transaction execution
 pub struct Supervisor {
     sender: Sender<SupervisorMessage>,
     join_handle: thread::JoinHandle<()>,

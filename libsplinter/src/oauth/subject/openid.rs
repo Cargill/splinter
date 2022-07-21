@@ -178,7 +178,7 @@ mod tests {
         shutdown_handle.shutdown();
     }
 
-    /// Runs a mock Openid server to mimick an Openid OAuth provider. Recieves a test name
+    /// Runs a mock Openid server to mimic an Openid OAuth provider. Receives a test name
     /// and a function for handling requests to the user_info endpoint. Returns its
     /// shutdown handle along with the address the server is running on.
     fn run_mock_openid_server(
@@ -238,7 +238,7 @@ mod tests {
 
     /// A handler for the Openid server's user_info endpoint. This handler simulates a successful http
     /// response with an unexpected response body from an Openid OAuth provider's user_info endpoint.
-    /// This handler returns a json object with user info but no `sub` field if the recieved request
+    /// This handler returns a json object with user info but no `sub` field if the received request
     /// has an authorization header with a valid access token.
     fn bad_response_body_user_info_endpoint(request: HttpRequest) -> HttpResponse {
         match request.headers().get("Authorization") {

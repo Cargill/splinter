@@ -84,7 +84,7 @@ impl AuthorizationDispatchBuilder {
         self
     }
 
-    /// Adds an authorization implmentation
+    /// Adds an authorization implementation
     ///
     /// # Arguments
     ///

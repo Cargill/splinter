@@ -27,7 +27,7 @@ const AZURE_SCOPE: &str = "offline_access";
 const DEFAULT_SCOPES: &[&str] = &["openid", "profile", "email"];
 /// The authorization request parameters required to get a refresh token from a Google provider.
 const GOOGLE_AUTH_PARAMS: &[(&str, &str)] = &[("access_type", "offline"), ("prompt", "consent")];
-/// The URL fo the Google OpenID discovery document
+/// The URL of the Google OpenID discovery document
 const GOOGLE_DISCOVERY_URL: &str = "https://accounts.google.com/.well-known/openid-configuration";
 
 /// Builds a new `OAuthClient` using an OpenID discovery document.

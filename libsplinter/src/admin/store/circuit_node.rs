@@ -63,7 +63,7 @@ impl From<ProposedNode> for CircuitNode {
     }
 }
 
-/// Builder for creating a `CircutNode`
+/// Builder for creating a `CircuitNode`
 #[derive(Default, Clone)]
 pub struct CircuitNodeBuilder {
     node_id: Option<String>,

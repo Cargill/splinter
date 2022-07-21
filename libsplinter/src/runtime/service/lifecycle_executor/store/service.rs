@@ -39,7 +39,7 @@ impl LifecycleService {
         &self.service_type
     }
 
-    /// Returns the list of key/value arugments for the service
+    /// Returns the list of key/value arguments for the service
     pub fn arguments(&self) -> &[(String, String)] {
         &self.arguments
     }

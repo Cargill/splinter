@@ -40,7 +40,7 @@ pub type Handler = Arc<
 pub struct ServiceEndpoint {
     /// The type of service this endpoint belongs to
     pub service_type: String,
-    /// The enpoint's route
+    /// The endpoint's route
     pub route: String,
     /// The endpoint's HTTP method
     pub method: Method,

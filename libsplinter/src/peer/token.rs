@@ -14,7 +14,7 @@
 
 //! With the addition of challenge authorization, the idenity of a peer can either be a node ID
 //! when using Trust authorization or a public key when using Challenge authorization. The
-//! PeerAuthorizationToken will be used to idenitfy the peer on the networking level.
+//! PeerAuthorizationToken will be used to identify the peer on the networking level.
 
 use std::cmp::Ordering;
 use std::fmt;
@@ -69,7 +69,7 @@ impl PeerAuthorizationToken {
         }
     }
 
-    /// Convert the token to a string represention
+    /// Convert the token to a string representation
     pub fn id_as_string(&self) -> String {
         match self {
             PeerAuthorizationToken::Trust { peer_id } => peer_id.to_string(),
@@ -156,7 +156,7 @@ impl PeerTokenPair {
         &self.local_id
     }
 
-    /// Convert the token to a string represention
+    /// Convert the token to a string representation
     pub fn id_as_string(&self) -> String {
         match self.peer_id {
             PeerAuthorizationToken::Trust { .. } => self.peer_id.id_as_string(),

@@ -80,7 +80,7 @@ fn test_endpoints_with_no_permissions() {
 
     let circuit_id = "ABCDE-01234";
 
-    // Create a 2 pary circuit
+    // Create a 2 party circuit
     commit_2_party_circuit_with_auth(
         circuit_id,
         node_a,
@@ -346,7 +346,7 @@ fn check_endpoint_with_perm(
                 Ok(())
             } else if status.as_u16() == 400 && (method == "post" || method == "put") {
                 // The "post" and "put" requests do not contain the additional data required
-                // to recieve a '200' response but a '400' response would not be possible
+                // to receive a '200' response but a '400' response would not be possible
                 // without the necessary permissions configured for the requestor so this
                 // response for these methods is considered a successful response
                 Ok(())

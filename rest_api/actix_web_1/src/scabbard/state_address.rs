@@ -62,7 +62,7 @@ pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
                     .json(ErrorResponse::not_found("Address not set"))
                     .into_future(),
                 Err(err) => {
-                    error!("Failed to get state at adddress: {}", err);
+                    error!("Failed to get state at address: {}", err);
                     HttpResponse::InternalServerError()
                         .json(ErrorResponse::internal_error())
                         .into_future()

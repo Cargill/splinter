@@ -45,7 +45,7 @@ impl ProposedService {
         &self.node_id
     }
 
-    /// Returns the list of key/value arugments for the  proposed service
+    /// Returns the list of key/value arguments for the  proposed service
     pub fn arguments(&self) -> &[(String, String)] {
         &self.arguments
     }

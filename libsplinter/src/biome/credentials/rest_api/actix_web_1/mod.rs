@@ -40,7 +40,7 @@ pub use config::{BiomeCredentialsRestConfig, BiomeCredentialsRestConfigBuilder};
 
 /// Provides the following REST API endpoints for Biome credentials:
 ///
-/// * `POST /biome/login` - Login enpoint for getting access tokens and refresh tokens
+/// * `POST /biome/login` - Login endpoint for getting access tokens and refresh tokens
 /// * `PATCH /biome/logout` - Login endpoint for removing refresh tokens
 /// * `POST /biome/register - Creates credentials for a user
 /// * `POST /biome/token` - Creates a new access token for the authorized user

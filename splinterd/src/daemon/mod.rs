@@ -1241,7 +1241,7 @@ fn create_registry(
                     forced_refresh_interval,
                 ) {
                     Ok(mut registry) => {
-                        // this should alwasy return some
+                        // this should always return some
                         if let Some(shutdown_handle) = registry.take_shutdown_handle() {
                             registry_shutdown_handle
                                 .add_remote_yaml_shutdown_handle(shutdown_handle)
@@ -1376,7 +1376,7 @@ fn create_allow_keys_path(config_path: &str, allow_keys_file: &str) -> PathBuf {
 
 /// Parse the peer endpoint that we want to connect to regardless of a circuit. The endpoint will
 /// either be in normal form impling it should use the configured peer authorization token for
-/// peering (usally challenge, unless no keys were provided) or includes +trust after the
+/// peering (usually challenge, unless no keys were provided) or includes +trust after the
 /// transport type which means a trust token should be used
 fn parse_peer_endpoint(
     endpoint: &str,

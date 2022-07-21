@@ -224,7 +224,7 @@ mod tests {
     // Test that:
     // 1. setup an authorizer with three match prefixes
     // 2. test that connections that match each prefix should trigger the correct auhtorizer
-    // 3. Check that non-matching connections sttll faill in this case, but falling through to the
+    // 3. Check that non-matching connections sttll fail in this case, but falling through to the
     //    default.
     #[test]
     fn authorizers_configured_authorizations() {

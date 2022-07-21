@@ -317,7 +317,7 @@ fn add_delete_user_method(credentials_store: Arc<dyn CredentialsStore>) -> Handl
 
         Box::new(match credentials_store.remove_credentials(&user) {
             Ok(()) => HttpResponse::Ok()
-                .json(json!({ "message": "User deleted sucessfully" }))
+                .json(json!({ "message": "User deleted successfully" }))
                 .into_future(),
             Err(err) => match err {
                 CredentialsStoreError::NotFoundError(msg) => {

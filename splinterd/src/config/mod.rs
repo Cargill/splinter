@@ -1623,7 +1623,7 @@ mod tests {
         let toml = TomlPartialConfigBuilder::new(toml_string.to_string(), TEST_TOML.to_string())
             .expect("Could not deserialize full toml")
             .build()
-            .expect("A config error has occured");
+            .expect("A config error has occurred");
         let default = DefaultPartialConfigBuilder::new()
             .build()
             .expect("Could not build default partial config");

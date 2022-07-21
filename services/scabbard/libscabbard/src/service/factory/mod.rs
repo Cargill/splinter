@@ -998,7 +998,7 @@ mod tests {
     }
 
     /// Verify that the scabbard factory produces a valid `Scabbard` instance if the service
-    /// arguments are commo seperated instead of json fmt.
+    /// arguments are commo separated instead of json fmt.
     #[test]
     fn create_successful_no_json() {
         let factory = get_factory();
@@ -1061,7 +1061,7 @@ mod tests {
         );
     }
 
-    /// Verify arg validation returns ok with valid common seperated Args
+    /// Verify arg validation returns ok with valid common separated Args
     #[test]
     fn test_valid_argument_validation_no_json() {
         let validator = ScabbardArgValidator;

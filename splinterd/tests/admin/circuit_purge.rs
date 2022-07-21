@@ -232,7 +232,7 @@ pub fn test_3_party_circuit_purge() {
         .add_nodes_with_defaults(3)
         .expect("Unable to start 3-node ActixWeb1 network");
     let node_a = network.node(0).expect("Could not get first node");
-    let node_b = network.node(1).expect("Cound not get second node");
+    let node_b = network.node(1).expect("Could not get second node");
     let node_c = network.node(2).expect("Could not get third node");
 
     let test_circuit_id = "QWERT-01234";

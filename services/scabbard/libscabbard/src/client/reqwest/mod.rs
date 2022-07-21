@@ -511,7 +511,7 @@ mod tests {
             .submit(&service_id, vec![], None)
             .expect("Failed to submit batches without wait");
 
-        // Verify that basic batch submision with a wait time is successful
+        // Verify that basic batch submission with a wait time is successful
         client
             .submit(&service_id, vec![], Some(Duration::from_secs(1)))
             .expect("Failed to submit batches with wait");

@@ -391,7 +391,7 @@ pub mod tests {
     }
 
     // Test that peer_metadata() return the correct PeerMetadata for the provided id
-    //  1. Test that None is retured for a peer ID that does not exist
+    //  1. Test that None is returned for a peer ID that does not exist
     //  2. Insert a peer
     //  3. Validate the expected PeerMetadata is returned from
     //     get_peer_from_endpoint("test_endpoint1")
@@ -504,7 +504,7 @@ pub mod tests {
     fn test_remove_peer() {
         let mut peer_map = PeerMap::new(10);
 
-        let peer_metdata = peer_map.remove(&PeerTokenPair::new(
+        let peer_metadata = peer_map.remove(&PeerTokenPair::new(
             PeerAuthorizationToken::Trust {
                 peer_id: "next_peer".to_string(),
             },
@@ -513,7 +513,7 @@ pub mod tests {
             },
         ));
 
-        assert_eq!(peer_metdata, None);
+        assert_eq!(peer_metadata, None);
 
         peer_map.insert(
             PeerAuthorizationToken::Trust {

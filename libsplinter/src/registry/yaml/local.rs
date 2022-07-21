@@ -1329,7 +1329,7 @@ mod test {
             .is_empty());
 
         // Allow some time before writing the file to make sure the read time is earlier than the
-        // write time; the sytem clock may not be very precise.
+        // write time; the system clock may not be very precise.
         std::thread::sleep(std::time::Duration::from_secs(1));
 
         write_to_file(&[get_node_1()], &path);

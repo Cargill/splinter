@@ -656,7 +656,7 @@ impl ServiceInstance for AdminService {
             })?
             .change_status();
 
-        if let Some((peer_subscriber_id, peer_notfication_join_handle)) =
+        if let Some((peer_subscriber_id, peer_notification_join_handle)) =
             self.peer_notification_run_state.take()
         {
             if let Err(err) = self.peer_connector.unsubscribe(peer_subscriber_id) {
@@ -666,7 +666,7 @@ impl ServiceInstance for AdminService {
                 );
             }
 
-            if let Err(err) = peer_notfication_join_handle.join() {
+            if let Err(err) = peer_notification_join_handle.join() {
                 error!("Failed to join peer notification thread: {:?}", err);
             }
         }

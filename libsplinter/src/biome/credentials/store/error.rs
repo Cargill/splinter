@@ -40,7 +40,7 @@ pub enum CredentialsStoreError {
 
     /// Represents an issue connecting to the database
     ConnectionError(Box<dyn Error>),
-    /// Represents error occured when an attempt is made to add a new credential with a
+    /// Represents error occurred when an attempt is made to add a new credential with a
     /// username that already exists in the database
     DuplicateError(String),
     // Represents the specific case where a query returns no records

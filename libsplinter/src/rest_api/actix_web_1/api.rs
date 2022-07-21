@@ -220,7 +220,7 @@ impl RestApi {
         let do_shutdown = Box::new(move || {
             debug!("Shutting down Rest API");
             if let Err(err) = addr.stop(true).wait() {
-                error!("An error occured while shutting down rest API: {:?}", err);
+                error!("An error occurred while shutting down rest API: {:?}", err);
             }
             debug!("Graceful signal sent to Rest API");
 
@@ -329,7 +329,7 @@ impl RestApi {
         let do_shutdown = Box::new(move || {
             debug!("Shutting down Rest API");
             if let Err(err) = addr.stop(true).wait() {
-                error!("An error occured while shutting down rest API: {:?}", err);
+                error!("An error occurred while shutting down rest API: {:?}", err);
             }
             debug!("Graceful signal sent to Rest API");
 

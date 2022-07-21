@@ -50,7 +50,7 @@ struct TlsInner {
 /// fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let mut transport = WsTransport::new(None)?;
 ///
-///     // Connect to a remote endpoint starting wtih `ws://`.
+///     // Connect to a remote endpoint starting with `ws://`.
 ///     let mut connection = transport.connect("ws://127.0.0.1:5555")?;
 ///
 ///     // Send some bytes

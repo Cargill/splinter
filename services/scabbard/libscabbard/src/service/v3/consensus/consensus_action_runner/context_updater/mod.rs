@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defination of an updater for handling context updates and setting alarms consensus.
+//! Definition of an updater for handling context updates and setting alarms consensus.
 //!
 //! The `ConsensusActionRunner` makes no assumptions about how the context are updated
 //! or how alarms are set.

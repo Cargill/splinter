@@ -158,7 +158,7 @@ impl AdminServiceBuilder {
         self
     }
 
-    /// Constructs the AdminServce.
+    /// Constructs the AdminService.
     ///
     /// # Errors
     ///

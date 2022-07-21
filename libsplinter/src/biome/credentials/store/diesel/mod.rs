@@ -616,7 +616,7 @@ pub mod tests {
         }));
     }
 
-    /// Creates a conneciton pool for an in-memory SQLite database with only a single connection
+    /// Creates a connection pool for an in-memory SQLite database with only a single connection
     /// available. Each connection is backed by a different in-memory SQLite database, so limiting
     /// the pool to a single connection insures that the same DB is used for all operations.
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {

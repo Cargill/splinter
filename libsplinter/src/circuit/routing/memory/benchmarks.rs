@@ -143,7 +143,7 @@ fn test_high_load_2_to_14_circuits() {
     assert_eq!(fetched_node, Some(first_node));
 }
 
-// Benchmark the time it takes to load 2^14 cirucits with 2^7 nodes, while a seperate thread is
+// Benchmark the time it takes to load 2^14 cirucits with 2^7 nodes, while a separate thread is
 // also adding a new circuit continuously.
 //
 // The circuits are added 1000 at a time.

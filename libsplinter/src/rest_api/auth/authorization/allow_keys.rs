@@ -317,7 +317,7 @@ mod tests {
         let handler = AllowKeysAuthorizationHandler::new(&path).expect("Failed to create handler");
 
         // Allow some time before writing the file to make sure the read time is earlier than the
-        // write time; the sytem clock may not be very precise.
+        // write time; the system clock may not be very precise.
         sleep(Duration::from_secs(1));
 
         write_to_file(&[KEY1, KEY2], &path);
@@ -332,7 +332,7 @@ mod tests {
         ));
 
         // Allow some time before writing the file to make sure the read time is earlier than the
-        // write time; the sytem clock may not be very precise.
+        // write time; the system clock may not be very precise.
         sleep(Duration::from_secs(1));
 
         write_to_file(&[KEY1], &path);
@@ -413,7 +413,7 @@ mod tests {
         ));
 
         // Allow some time before writing the file to make sure the last read time is earlier than
-        // the write time; the sytem clock may not be very precise.
+        // the write time; the system clock may not be very precise.
         sleep(Duration::from_secs(1));
 
         write_to_file(&[KEY1], &path);

@@ -1224,7 +1224,7 @@ InfluxDB
 
 * Implemented simple back pressure for pending batches. The submit route will
   return TOO_MANY_REQUESTS and reject the batch if the pending batch queue is
-  longer than 30 batches. Scabbard will start accepting batches agains when the
+  longer than 30 batches. Scabbard will start accepting batches again when the
   batch queue makes it to 15 batches pending. This feature is experimental
   behind `back-pressure`.
 
@@ -1377,7 +1377,7 @@ InfluxDB
     - ResourceTemporarilyUnavailableError
 
 * Guard all admin service code with an `admin-service` feature. The admin
-  service code is quite large and is not alway required. This feature is stable.
+  service code is quite large and is not always required. This feature is stable.
 
 * Move all migrations file to a top level location. Running migrations from
   multiple locations can cause conflicts because there is only one table for

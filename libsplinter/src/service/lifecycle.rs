@@ -64,7 +64,7 @@ pub trait Lifecycle<K> {
     ) -> Result<Box<dyn StoreCommand<Context = K>>, InternalError>;
 
     /// Return a `StoreCommand` for purging a service. The service after the command is run should
-    /// be completly remove from state.
+    /// be completely remove from state.
     ///
     /// # Arguments
     ///

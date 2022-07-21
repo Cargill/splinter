@@ -81,7 +81,7 @@ impl NetworkMessageSender {
     ///
     /// # Arguments
     ///
-    /// * `recipient` - the peer ID the messsage is for
+    /// * `recipient` - the peer ID the message is for
     /// * `payload` - the bytes of the message that should be sent
     pub fn send(
         &self,
@@ -356,7 +356,7 @@ where
                 ))
             })?;
 
-        // set up pacemaker that will notifiy the pending thread to retry the received messages
+        // set up pacemaker that will notify the pending thread to retry the received messages
         let pacemaker = pacemaker::Pacemaker::builder()
             .with_interval(DEFAULT_TIME_BETWEEN_ATTEMPTS)
             .with_sender(pacemaker_pending_incoming_sender)
@@ -585,7 +585,7 @@ pub mod tests {
     // PeerInterconnect will receive a message from peer test_peer and pass it to
     // NetworkTestHandler. This handler will validate it came from test_peer. The handler will
     // then send a message to the PeerInterconnect to send the message back to test_peer.
-    // This valdiates that messages can be sent and recieved over the PeerInterconnect.
+    // This valdiates that messages can be sent and received over the PeerInterconnect.
     //
     // This tests also validates that PeerInterconnect can retrieve the list of peers from the
     // PeerManager using the PeerManagerConnector.
@@ -615,7 +615,7 @@ pub mod tests {
     //    the connection_id to peer_id information from the PeerManager. When it receives the
     //    request, it will update its local copy of the peer map and try to find the peer again.
     //
-    // 4. After the peer running in the thread has sucessfully received the NetworkEcho response
+    // 4. After the peer running in the thread has successfully received the NetworkEcho response
     //    it will send another NetworkEcho with "shutdown_string" bytes. This will cause the
     //    Handler to send a shutdown notification that will shutdown the test.
     //

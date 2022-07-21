@@ -364,7 +364,7 @@ pub(crate) mod tests {
     }
 
     pub fn create_test_tls_transport(insecure: bool) -> TlsTransport {
-        // Genearte Certificat Authority keys and certificate
+        // Genearte Certificate Authority keys and certificate
         let (ca_key, ca_cert) = make_ca_cert();
 
         // create temp directory to store ca.cert

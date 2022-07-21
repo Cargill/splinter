@@ -215,9 +215,9 @@ mod tests {
         let store_command_executor = Arc::new(SqliteCommandExecutor {
             pool: pool.clone().into(),
         });
-        let test_messsage_factory = TestMessageSenderFactory::default();
+        let test_message_factory = TestMessageSenderFactory::default();
 
-        let message_sender_factory = Box::new(test_messsage_factory.clone());
+        let message_sender_factory = Box::new(test_message_factory.clone());
         let store_factory = Arc::new(SqliteScabbardStoreFactory);
 
         let notify_observer = Box::new(SupervisorNotifyObserver::new(store_factory.clone()));
@@ -243,7 +243,7 @@ mod tests {
         assert_eq!(scabbard_store.list_consensus_events(&service_id)?.len(), 0);
         assert_eq!(scabbard_store.list_consensus_actions(&service_id)?.len(), 0);
 
-        let sent_messages = test_messsage_factory.sent_messages.lock().unwrap();
+        let sent_messages = test_message_factory.sent_messages.lock().unwrap();
         assert_eq!(sent_messages.len(), 1);
         assert_eq!(sent_messages[0].0, peer_service_id);
 

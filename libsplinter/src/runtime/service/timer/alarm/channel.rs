@@ -45,8 +45,8 @@ impl TimerAlarm for ChannelTimerAlarm {
     /// * `service_type` - The service type of the the filter that will be checked
     /// * `service_id` - An optional service ID
     ///
-    /// If a service ID is provided, only the `TimerHandler` for that ID will be run. The serivce
-    /// ID must be returned from the `TimerFilter` to show there is pending work. If ther service
+    /// If a service ID is provided, only the `TimerHandler` for that ID will be run. The service
+    /// ID must be returned from the `TimerFilter` to show there is pending work. If the service
     /// ID is not returned, no handlers will be run.
     ///
     /// If the service ID is not provided, the handlers for all service IDs returned from the

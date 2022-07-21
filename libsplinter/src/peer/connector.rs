@@ -168,7 +168,7 @@ impl PeerManagerConnector {
     ///
     /// Unreferenced peers are those peers that have successfully connected from a remote node, but
     /// have not yet been referenced by a circuit. These peers are available to be promoted to
-    /// fully refrerenced peers.
+    /// fully referenced peers.
     pub fn list_unreferenced_peers(&self) -> Result<Vec<PeerTokenPair>, PeerListError> {
         let (sender, recv) = channel();
         let message =

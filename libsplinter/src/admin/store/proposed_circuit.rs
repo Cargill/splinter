@@ -79,7 +79,7 @@ impl ProposedCircuit {
         &self.routes
     }
 
-    /// Returns the mangement type of the circuit
+    /// Returns the management type of the circuit
     pub fn circuit_management_type(&self) -> &str {
         &self.circuit_management_type
     }
@@ -88,7 +88,7 @@ impl ProposedCircuit {
         &self.application_metadata
     }
 
-    /// Returns the mangement type of the circuit
+    /// Returns the management type of the circuit
     pub fn comments(&self) -> &Option<String> {
         &self.comments
     }
@@ -354,7 +354,7 @@ impl ProposedCircuitBuilder {
         self.circuit_management_type.clone()
     }
 
-    /// Returns the appplication metdata in the builder
+    /// Returns the application metadata in the builder
     pub fn application_metadata(&self) -> Option<Vec<u8>> {
         self.application_metadata.clone()
     }
@@ -449,7 +449,7 @@ impl ProposedCircuitBuilder {
         self
     }
 
-    /// Sets the circuit managment type
+    /// Sets the circuit management type
     ///
     /// # Arguments
     ///

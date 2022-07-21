@@ -60,7 +60,7 @@ impl ScabbardConfigBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an InternalError if the data directory has been ommitted.
+    /// Returns an InternalError if the data directory has been omitted.
     pub fn build(self) -> Result<ScabbardConfig, InternalError> {
         let database_size = self.database_size.unwrap_or(DEFAULT_TEST_DB_SIZE);
         let data_dir = self

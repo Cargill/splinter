@@ -31,28 +31,28 @@ use crate::error::CliError;
 fn import_store(
     to: &'_ dyn NodeIdStore,
     from: &'_ dyn NodeIdStore,
-) -> Result<WarningEmited, CliError> {
+) -> Result<WarningEmitted, CliError> {
     match (from.get_node_id(), to.get_node_id()) {
         (Ok(Some(id)), Ok(None)) => to
             .set_node_id(id)
             .map_err(|e| CliError::ActionError(format!("{}", e)))
-            .map(|_| WarningEmited::No),
+            .map(|_| WarningEmitted::No),
         (Ok(Some(_)), Ok(Some(_))) => Err(CliError::ActionError(
             "Skipping node_id import: destination store already has node_id set".to_string(),
         )),
         (Ok(None), _) => {
             warn!("Skipping node_id import: node_id file is empty");
-            Ok(WarningEmited::Yes)
+            Ok(WarningEmitted::Yes)
         }
         (Err(err), _) => {
             warn!("Skipping node_id import");
             debug!("{}", err);
-            Ok(WarningEmited::Yes)
+            Ok(WarningEmitted::Yes)
         }
         (_, Err(err)) => {
             warn!("Skipping node_id import");
             debug!("{}", err);
-            Ok(WarningEmited::Yes)
+            Ok(WarningEmitted::Yes)
         }
     }
 }
@@ -72,7 +72,7 @@ pub fn migrate_node_id_to_db(
     );
     let result = import_store(&*db_store, &file_store);
 
-    if let Ok(WarningEmited::No) = result {
+    if let Ok(WarningEmitted::No) = result {
         info!(
             "Renaming {} to {}",
             filename.to_string_lossy(),
@@ -83,7 +83,7 @@ pub fn migrate_node_id_to_db(
     result.map(|_| ())
 }
 
-enum WarningEmited {
+enum WarningEmitted {
     Yes,
     No,
 }
@@ -155,7 +155,7 @@ mod tests {
         assert!(non_empty_store.value.borrow().as_ref().unwrap() == NODE_ID);
         let import_result = import_store(&empty_store, &non_empty_store);
         assert!(import_result.is_ok());
-        assert!(matches!(import_result.unwrap(), WarningEmited::No));
+        assert!(matches!(import_result.unwrap(), WarningEmitted::No));
         assert!(non_empty_store.get_node_id().is_ok());
         assert!(non_empty_store.get_node_id().unwrap() == Some(NODE_ID.to_string()));
     }
@@ -179,13 +179,13 @@ mod tests {
     }
 
     #[test]
-    // Test that a debug message is shown if the store being writen too has some sort of an error.
+    // Test that a debug message is shown if the store being written too has some sort of an error.
     fn test_import_store_write_error() {
         let error_store = MockErrorNodeIdStore {};
         let normal_store = MockNodeIdStore::new(Some(String::from(NODE_ID)));
         let import_result = import_store(&error_store, &normal_store);
         assert!(import_result.is_ok());
-        assert!(matches!(import_result.unwrap(), WarningEmited::Yes));
+        assert!(matches!(import_result.unwrap(), WarningEmitted::Yes));
     }
 
     #[test]
@@ -195,7 +195,7 @@ mod tests {
         let normal_store = MockNodeIdStore::new(Some(String::from(NODE_ID)));
         let import_result = import_store(&normal_store, &error_store);
         assert!(import_result.is_ok());
-        assert!(matches!(import_result.unwrap(), WarningEmited::Yes));
+        assert!(matches!(import_result.unwrap(), WarningEmitted::Yes));
     }
 
     #[test]

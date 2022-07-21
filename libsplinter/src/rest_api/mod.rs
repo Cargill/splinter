@@ -16,7 +16,7 @@
 //!
 //! Module for creating REST APIs for services.
 //!
-//! Below is an example of a `struct` that implements `ResouceProvider` and then passes its resources
+//! Below is an example of a `struct` that implements `ResourceProvider` and then passes its resources
 //! to a running instance of `RestApi`.
 //!
 //! ```

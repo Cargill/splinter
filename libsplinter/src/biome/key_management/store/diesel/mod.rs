@@ -258,7 +258,7 @@ pub mod tests {
     /// 3. Add some keys.
     /// 4. Verify that the `list_keys` method returns the correct values when no user is specified
     ///    (show all keys).
-    /// 5. Verify that the `list_keys` method returns the correct values when users are speciefied.
+    /// 5. Verify that the `list_keys` method returns the correct values when users are specified.
     #[test]
     fn sqlite_list() {
         let pool = create_connection_pool_and_migrate();
@@ -436,7 +436,7 @@ pub mod tests {
             .expect("Failed to verify password"));
     }
 
-    /// Creates a conneciton pool for an in-memory SQLite database with only a single connection
+    /// Creates a connection pool for an in-memory SQLite database with only a single connection
     /// available. Each connection is backed by a different in-memory SQLite database, so limiting
     /// the pool to a single connection insures that the same DB is used for all operations.
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {

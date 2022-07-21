@@ -144,12 +144,12 @@ impl<C> StoreCommand for ExecuteSupervisorCommand<C> {
     }
 }
 
-pub struct AddSupervisorNotficationCommand<C> {
+pub struct AddSupervisorNotificationCommand<C> {
     store_factory: Arc<dyn ScabbardStoreFactory<C>>,
     notification: SupervisorNotification,
 }
 
-impl<C> AddSupervisorNotficationCommand<C> {
+impl<C> AddSupervisorNotificationCommand<C> {
     pub fn new(
         store_factory: Arc<dyn ScabbardStoreFactory<C>>,
         notification: SupervisorNotification,
@@ -161,7 +161,7 @@ impl<C> AddSupervisorNotficationCommand<C> {
     }
 }
 
-impl<C> StoreCommand for AddSupervisorNotficationCommand<C> {
+impl<C> StoreCommand for AddSupervisorNotificationCommand<C> {
     type Context = C;
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {

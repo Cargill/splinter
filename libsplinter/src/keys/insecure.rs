@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The insecure keys module provides an allow-all permissions implemenation.
+//! The insecure keys module provides an allow-all permissions implementation.
 
 use crate::hex::to_hex;
 

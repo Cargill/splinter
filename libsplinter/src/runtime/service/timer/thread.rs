@@ -18,7 +18,7 @@ use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 
-use crate::channel::DeferedSend;
+use crate::channel::DeferredSend;
 use crate::error::InternalError;
 use crate::service::{FullyQualifiedServiceId, MessageSenderFactory, ServiceType};
 use crate::threading::{
@@ -163,7 +163,7 @@ fn wake_up_all(
             let callback_id = service_id.clone();
             executor.execute(move || {
                 // This message will be sent upon thread termination
-                let _defered_send = DeferedSend::new(
+                let _deferred_send = DeferredSend::new(
                     callback_sender,
                     TimerMessage::Complete {
                         service_id: callback_id,
@@ -216,7 +216,7 @@ fn wake_up(
     {
         Some((filter, handler_factory)) => (filter, handler_factory),
         None => {
-            error!("No filter for serivce type {}", service_type);
+            error!("No filter for service type {}", service_type);
             return;
         }
     };
@@ -242,7 +242,7 @@ fn wake_up(
             let callback_id = id.clone();
             executor.execute(move || {
                 // This message will be sent upon thread termination
-                let _defered_send = DeferedSend::new(
+                let _deferred_send = DeferredSend::new(
                     sender,
                     TimerMessage::Complete {
                         service_id: callback_id,
@@ -296,7 +296,7 @@ fn wake_up(
             let callback_id = service_id.clone();
             executor.execute(move || {
                 // This message will be sent upon thread termination
-                let _defered_send = DeferedSend::new(
+                let _deferred_send = DeferredSend::new(
                     callback_sender,
                     TimerMessage::Complete {
                         service_id: callback_id,

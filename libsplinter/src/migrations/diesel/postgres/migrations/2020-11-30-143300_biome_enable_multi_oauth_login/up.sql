@@ -13,7 +13,7 @@
 -- limitations under the License.
 -- -----------------------------------------------------------------------------
 
--- Drop the exising not null constraints
+-- Drop the existing not null constraints
 ALTER TABLE oauth_user DROP CONSTRAINT oauth_user_user_id_key;
 ALTER TABLE oauth_user DROP CONSTRAINT oauth_user_provider_user_ref_key;
 

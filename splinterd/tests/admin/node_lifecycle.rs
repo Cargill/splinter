@@ -33,7 +33,7 @@ use crate::framework::network::Network;
 ///    retrieved from the network
 /// 8. Start the first node and check that it can now be retrieved from the network
 /// 9. Check that the first node is running by getting its registry client and using it
-/// 10. Check that the second and thrid nodes are still stopped
+/// 10. Check that the second and third nodes are still stopped
 /// 11. Start the second node and check that it can now be retrieved from the network
 /// 12. Check that the second node is running by getting its registry client and using it
 /// 13. Check that the third node is still stopped
@@ -105,7 +105,7 @@ pub fn test_stop_start_nodes_multiple() {
     network = network.start(0).expect("Unable to start the first node");
 
     // Check that the first node has been started and can be retrieved from the network
-    let node_0 = network.node(0).expect("Unable to retieve first node");
+    let node_0 = network.node(0).expect("Unable to retrieve first node");
     // Check that the first node is running by using the registry client
     let registry_response = node_0
         .registry_client()
@@ -127,7 +127,7 @@ pub fn test_stop_start_nodes_multiple() {
     network = network.start(1).expect("Unable to start the first node");
 
     // Check that the second node has been started and can be retrieved from the network
-    let node_1 = network.node(1).expect("Unable to retieve second node");
+    let node_1 = network.node(1).expect("Unable to retrieve second node");
     // Check that the second node is running by using the registry client
     let registry_response = node_1
         .registry_client()
@@ -146,7 +146,7 @@ pub fn test_stop_start_nodes_multiple() {
     network = network.start(2).expect("Unable to start the third node");
 
     // Check that the third node has been started and can be retrieved from the network
-    let node_2 = network.node(2).expect("Unable to retieve third node");
+    let node_2 = network.node(2).expect("Unable to retrieve third node");
     // Check that the third node's is active by using the registry client
     let registry_response = node_2
         .registry_client()

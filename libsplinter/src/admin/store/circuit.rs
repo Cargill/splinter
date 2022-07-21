@@ -77,7 +77,7 @@ impl Circuit {
         &self.routes
     }
 
-    /// Returns the mangement type of the circuit
+    /// Returns the management type of the circuit
     pub fn circuit_management_type(&self) -> &str {
         &self.circuit_management_type
     }
