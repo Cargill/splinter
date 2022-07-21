@@ -14,10 +14,11 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::HttpResponse;
+use actix_web::HttpResponse;
+use futures::{Future, IntoFuture};
+
 use crate::biome::credentials::rest_api::actix_web_1::config::BiomeCredentialsRestConfig;
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
-use crate::futures::{Future, IntoFuture};
 use crate::rest_api::{
     actix_web_1::{into_bytes, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
     ErrorResponse, SPLINTER_PROTOCOL_VERSION,

@@ -15,13 +15,14 @@
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::actix_web::HttpResponse;
+use actix_web::HttpResponse;
+use futures::{Future, IntoFuture};
+
 use crate::biome::credentials::rest_api::actix_web_1::BiomeCredentialsRestConfig;
 use crate::biome::credentials::rest_api::resources::credentials::{NewUser, UsernamePassword};
 use crate::biome::credentials::store::{
     CredentialsBuilder, CredentialsStore, CredentialsStoreError,
 };
-use crate::futures::{Future, IntoFuture};
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{

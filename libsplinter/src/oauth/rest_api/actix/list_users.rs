@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::actix_web::{web, HttpResponse};
+use actix_web::{web, HttpResponse};
+
 use crate::biome::oauth::store::OAuthUserSessionStore;
 use crate::oauth::rest_api::{
     resources::list_users::{ListOAuthUserResponse, OAuthUserResponse, PagingQuery},

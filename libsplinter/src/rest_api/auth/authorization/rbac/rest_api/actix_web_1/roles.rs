@@ -18,9 +18,10 @@
 
 use std::convert::TryInto;
 
-use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use futures::{stream::Stream, Future, IntoFuture};
+
 use crate::error::InvalidStateError;
-use crate::futures::{stream::Stream, Future, IntoFuture};
 use crate::rbac::store::{Role, RoleBasedAuthorizationStore};
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},

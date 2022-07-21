@@ -16,8 +16,9 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
-use crate::futures::Future;
+use actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
+use futures::Future;
+
 use crate::rest_api::actix_web_1::{Method, RequestGuard};
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;

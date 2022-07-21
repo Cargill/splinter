@@ -21,9 +21,9 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt::Write as _;
 
-use splinter::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use futures::{future::IntoFuture, stream::Stream, Future};
 use splinter::error::InvalidStateError;
-use splinter::futures::{future::IntoFuture, stream::Stream, Future};
 use splinter::registry::{MetadataPredicate, Node, RegistryReader, RegistryWriter, RwRegistry};
 use splinter::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},

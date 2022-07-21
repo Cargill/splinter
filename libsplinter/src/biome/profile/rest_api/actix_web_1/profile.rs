@@ -14,9 +14,10 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::HttpResponse;
+use actix_web::HttpResponse;
+use futures::IntoFuture;
+
 use crate::biome::profile::store::UserProfileStore;
-use crate::futures::IntoFuture;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
