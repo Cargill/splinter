@@ -643,8 +643,6 @@ impl SplinterDaemon {
             StartError::AdminServiceError(format!("unable to create admin service: {}", err))
         })?;
 
-        #[cfg(feature = "authorization")]
-        let node_id_clone = node_id.clone();
         let display_name: String = self
             .display_name
             .to_owned()
@@ -674,7 +672,18 @@ impl SplinterDaemon {
             .add_resources(AdminServiceRestProvider::new(&admin_service).resources())
             .add_resources(RwRegistryRestResourceProvider::new(&registry).resources())
             .add_resources(orchestrator_resources)
-            .add_resources(circuit_resource_provider.resources());
+            .add_resources(circuit_resource_provider.resources())
+            .add_resources(
+                status::StatusResourceProvider::new(
+                    node_id,
+                    display_name,
+                    #[cfg(feature = "service-endpoint")]
+                    service_endpoint,
+                    network_endpoints,
+                    advertised_endpoints,
+                )
+                .resources(),
+            );
 
         #[cfg(feature = "authorization")]
         {
@@ -730,20 +739,6 @@ impl SplinterDaemon {
                     Permission::AllowAuthenticated,
                     open_api::get_openapi,
                 ))
-                .add_resource(Resource::build("/status").add_method(
-                    Method::Get,
-                    status::STATUS_READ_PERMISSION,
-                    move |_, _| {
-                        status::get_status(
-                            node_id_clone.clone(),
-                            display_name.clone(),
-                            #[cfg(feature = "service-endpoint")]
-                            service_endpoint.clone(),
-                            network_endpoints.clone(),
-                            advertised_endpoints.clone(),
-                        )
-                    },
-                ));
         }
         #[cfg(not(feature = "authorization"))]
         {
