@@ -55,11 +55,10 @@ where
     ) -> Result<Option<ScabbardService>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let service_model: ScabbardServiceModel = match scabbard_service::table
-                .filter(
-                    scabbard_service::circuit_id
-                        .eq(&service_id.circuit_id().to_string())
-                        .and(scabbard_service::service_id.eq(&service_id.service_id().to_string())),
-                )
+                .find((
+                    &service_id.circuit_id().to_string(),
+                    &service_id.service_id().to_string(),
+                ))
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
@@ -69,7 +68,7 @@ where
                 None => return Ok(None),
             };
 
-            let service_peers: Vec<ServiceId> = scabbard_peer::table
+            let mut service_peers: Vec<ScabbardPeerModel> = scabbard_peer::table
                 .filter(
                     scabbard_peer::circuit_id
                         .eq(&service_id.circuit_id().to_string())
@@ -79,9 +78,13 @@ where
                 .load(self.conn)
                 .map_err(|err| {
                     ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
-                })?
+                })?;
+
+            service_peers.sort_by(|a, b| a.peer_service_id.cmp(&b.peer_service_id));
+
+            let service_peers: Vec<ServiceId> = service_peers
                 .into_iter()
-                .map(|peer: ScabbardPeerModel| ServiceId::new(peer.peer_service_id))
+                .map(|peer| ServiceId::new(peer.peer_service_id))
                 .collect::<Result<Vec<_>, InvalidArgumentError>>()
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
