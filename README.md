@@ -32,12 +32,19 @@ following commands.
 
 Homebrew (OS X):
 ```bash
-brew install openssl zeromq pkg-config protobuf postgresql
+brew install openssl pkg-config protobuf libpq
 ```
 
 APT (Ubuntu):
 ```bash
-apt install libssl-dev libzmq3-dev pkg-config libprotobuf-dev postgresql
+apt install \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler \
+    libsqlite3-dev \
+    libpq-dev \
+    openssl
 ```
 
 Once you have the prerequisites installed, build Splinter by running `cargo
