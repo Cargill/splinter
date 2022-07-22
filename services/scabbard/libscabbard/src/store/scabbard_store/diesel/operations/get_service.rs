@@ -55,11 +55,10 @@ where
     ) -> Result<Option<ScabbardService>, ScabbardStoreError> {
         self.conn.transaction::<_, _, _>(|| {
             let service_model: ScabbardServiceModel = match scabbard_service::table
-                .filter(
-                    scabbard_service::circuit_id
-                        .eq(&service_id.circuit_id().to_string())
-                        .and(scabbard_service::service_id.eq(&service_id.service_id().to_string())),
-                )
+                .find((
+                    &service_id.circuit_id().to_string(),
+                    &service_id.service_id().to_string(),
+                ))
                 .first::<ScabbardServiceModel>(self.conn)
                 .optional()
                 .map_err(|err| {
