@@ -85,11 +85,9 @@ use splinter::rest_api::auth::authorization::rbac::{
     feature = "authorization-handler-allow-keys"
 ))]
 use splinter::rest_api::auth::authorization::AuthorizationHandler;
-#[cfg(feature = "authorization")]
-use splinter::rest_api::auth::authorization::Permission;
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
-use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
+use splinter::rest_api::{AuthConfig, RestApiBuilder, RestResourceProvider};
 use splinter::runtime::service::instance::{
     ServiceOrchestratorBuilder, ServiceProcessor, ServiceProcessorShutdownHandle,
 };
@@ -683,7 +681,8 @@ impl SplinterDaemon {
                     advertised_endpoints,
                 )
                 .resources(),
-            );
+            )
+            .add_resources(open_api::OpenApiResourceProvider::default().resources());
 
         #[cfg(feature = "authorization")]
         {
@@ -731,33 +730,6 @@ impl SplinterDaemon {
                     .resources(),
                 );
             }
-
-            rest_api_builder = rest_api_builder
-                .with_authorization_handlers(authorization_handlers)
-                .add_resource(Resource::build("/openapi.yaml").add_method(
-                    Method::Get,
-                    Permission::AllowAuthenticated,
-                    open_api::get_openapi,
-                ))
-        }
-        #[cfg(not(feature = "authorization"))]
-        {
-            rest_api_builder = rest_api_builder
-                .add_resource(
-                    Resource::build("/openapi.yaml").add_method(Method::Get, open_api::get_openapi),
-                )
-                .add_resource(
-                    Resource::build("/status").add_method(Method::Get, move |_, _| {
-                        status::get_status(
-                            node_id.clone(),
-                            display_name.clone(),
-                            #[cfg(feature = "service-endpoint")]
-                            service_endpoint.clone(),
-                            network_endpoints.clone(),
-                            advertised_endpoints.clone(),
-                        )
-                    }),
-                );
         }
 
         #[cfg(feature = "rest-api-cors")]

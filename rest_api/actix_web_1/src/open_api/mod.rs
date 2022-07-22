@@ -13,8 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod resource_provider;
+
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use futures::{Future, IntoFuture};
+
+pub use resource_provider::OpenApiResourceProvider;
 
 pub fn get_openapi(
     _: HttpRequest,
