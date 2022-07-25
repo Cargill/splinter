@@ -141,6 +141,7 @@ table! {
         executed_epoch -> Nullable<BigInt>,
         position -> Integer,
         event_type -> crate::store::scabbard_store::diesel::models::EventTypeModelMapping,
+        update_context_action_id -> Nullable<Int8>,
     }
 }
 
