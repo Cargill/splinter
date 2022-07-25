@@ -70,6 +70,7 @@ RUN USER=root cargo new --bin cli \
  && USER=root cargo new --bin splinterd \
  && cp libsplinter/src/lib.rs splinterd/src/lib.rs \
 # Create empty Cargo projects for splinter services
+ && USER=root cargo new --lib services/echo/libecho/ \
  && USER=root cargo new --bin services/scabbard/cli \
  && USER=root cargo new --lib services/scabbard/libscabbard
 
@@ -83,6 +84,7 @@ COPY rest_api/actix_web_1/Cargo.toml /build/rest_api/actix_web_1/Cargo.toml
 COPY rest_api/actix_web_4/Cargo.toml /build/rest_api/actix_web_4/Cargo.toml
 COPY rest_api/common/Cargo.toml /build/rest_api/common/Cargo.toml
 COPY splinterd/Cargo.toml /build/splinterd/Cargo.toml
+COPY services/echo/libecho/Cargo.toml /build/services/echo/libecho/Cargo.toml
 COPY services/scabbard/cli/Cargo.toml /build/services/scabbard/cli/Cargo.toml
 COPY services/scabbard/libscabbard/build.rs /build/services/scabbard/libscabbard/build.rs
 COPY services/scabbard/libscabbard/Cargo.toml /build/services/scabbard/libscabbard/Cargo.toml

@@ -17,7 +17,7 @@ set -e
 
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t ghcr.io/splintercommunity/splinter-dev:v12 \
+  -t ghcr.io/splintercommunity/splinter-dev:v13 \
   -f ci/splinter-dev.dockerfile \
   --push .
 
@@ -25,5 +25,5 @@ docker run quay.io/skopeo/stable \
   copy \
   --dest-creds "${DOCKER_HUB_USERNAME}:${DOCKER_HUB_ACCESS_TOKEN}" \
   --multi-arch all \
-  "docker://ghcr.io/splintercommunity/splinter-dev:v12" \
-  "docker://docker.io/splintercommunity/splinter-dev:v12"
+  "docker://ghcr.io/splintercommunity/splinter-dev:v13" \
+  "docker://docker.io/splintercommunity/splinter-dev:v13"
