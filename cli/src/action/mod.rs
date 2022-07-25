@@ -27,9 +27,11 @@ pub mod permissions;
 #[cfg(feature = "authorization-handler-rbac")]
 pub mod rbac;
 pub mod registry;
+#[cfg(any(feature = "workload", feature = "playlist-smallbank"))]
+mod request_logger;
+pub mod time;
 #[cfg(feature = "user")]
 pub mod user;
-pub mod time;
 
 use std::collections::HashMap;
 use std::ffi::CString;
