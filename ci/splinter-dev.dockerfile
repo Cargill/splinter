@@ -87,6 +87,7 @@ COPY services/scabbard/cli/Cargo.toml /build/services/scabbard/cli/Cargo.toml
 COPY services/scabbard/libscabbard/build.rs /build/services/scabbard/libscabbard/build.rs
 COPY services/scabbard/libscabbard/Cargo.toml /build/services/scabbard/libscabbard/Cargo.toml
 COPY services/scabbard/libscabbard/protos /build/services/scabbard/libscabbard/protos
+COPY services/echo/libecho/Cargo.toml /build/services/echo/libecho/Cargo.toml
 
 # Do release builds for each Cargo.toml
 # Workaround for https://github.com/koalaman/shellcheck/issues/1894
