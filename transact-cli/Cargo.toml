@@ -1,0 +1,87 @@
+# Copyright 2018-2019 Bitwise IO, Inc.
+# Copyright 2019-2021 Cargill Incorporated
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[package]
+name = "transact-cli"
+version = "0.5.1"
+authors = ["Cargill Incorporated"]
+edition = "2018"
+license = "Apache-2.0"
+readme = "../README.md"
+description = """\
+    Transact is a transaction execution platform designed to be used as \
+    a library or component when implementing distributed ledgers, including \
+    blockchains.
+"""
+repository = "http://github.com/hyperledger/transact"
+
+[[bin]]
+name = "transact"
+path = "src/main.rs"
+
+[dependencies]
+clap = "2"
+ctrlc = { version = "3.0", optional = true }
+cylinder = { version = "0.2.2", features = ["jwt", "key-load"], optional = true }
+flexi_logger = { version = "0.20", features = ["use_chrono_for_offset"] }
+hex = { version = "0.4", optional = true }
+log = "0.4"
+protobuf = { version = "2.23", optional = true }
+rand = { version = "0.8", optional = true }
+reqwest = { version = "0.11", features = ["blocking"], optional = true}
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true}
+transact = {path = "../libtransact", features=["family-smallbank-workload", "family-command-workload"]}
+
+
+[features]
+default = [
+    "command",
+    "workload",
+]
+
+stable = [
+    # The stable feature extends default:
+    "default",
+]
+
+experimental = [
+    # The experimental feature extends stable:
+    "stable",
+    # The following features are experimental:
+    "playlist-smallbank",
+    "workload-smallbank"
+]
+
+command = ["cylinder", "hex", "protobuf", "reqwest", "serde", "serde_json"]
+playlist-smallbank = ["cylinder", "serde_json", "transact/family-smallbank-workload", "transact/workload-batch-gen"]
+workload = ["ctrlc", "cylinder", "rand", "transact/family-command-workload"]
+workload-smallbank = ["workload", "transact/family-smallbank-workload"]
+
+[package.metadata.deb]
+maintainer = "The Transact Team"
+depends = "$auto, man"
+assets = [
+    ["packaging/man/*.1", "/usr/share/man/man1", "644"],
+    ["target/release/transact", "/usr/bin/transact", "755"]
+]
+
+
+[package.metadata.docs.rs]
+features = [
+  "default",
+  "experimental",
+  "stable",
+]
