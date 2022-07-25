@@ -25,7 +25,10 @@ use crate::store::scabbard_store::diesel::{
         ConsensusTypeModel, ConsensusTypeModelMapping, ScabbardServiceModel,
         ServiceStatusTypeModel, ServiceStatusTypeModelMapping,
     },
-    schema::{consensus_2pc_event, scabbard_service},
+    schema::{
+        consensus_2pc_action, consensus_2pc_event, consensus_2pc_update_context_action,
+        scabbard_service,
+    },
 };
 use crate::store::scabbard_store::ScabbardStoreError;
 
@@ -84,6 +87,28 @@ where
                     )))
                 })?;
 
+            // get the action_id of the most recently executed update context action
+            let update_context_action_id = consensus_2pc_update_context_action::table
+                .inner_join(consensus_2pc_action::table.on(
+                    consensus_2pc_update_context_action::action_id.eq(consensus_2pc_action::id),
+                ))
+                .filter(
+                    consensus_2pc_action::circuit_id
+                        .eq(service_id.circuit_id().to_string())
+                        .and(
+                            consensus_2pc_action::service_id
+                                .eq(service_id.service_id().to_string()),
+                        )
+                        .and(consensus_2pc_action::executed_at.is_not_null()),
+                )
+                .order(consensus_2pc_action::executed_at.desc())
+                .select(consensus_2pc_update_context_action::action_id)
+                .first::<i64>(self.conn)
+                .optional()
+                .map_err(|err| {
+                    ScabbardStoreError::from_source_with_operation(err, OPERATION_NAME.to_string())
+                })?;
+
             update(consensus_2pc_event::table)
                 .filter(
                     consensus_2pc_event::id.eq(event_id).and(
@@ -98,6 +123,7 @@ where
                 .set((
                     consensus_2pc_event::executed_at.eq(Some(update_executed_at)),
                     consensus_2pc_event::executed_epoch.eq(Some(update_executed_epoch)),
+                    consensus_2pc_event::update_context_action_id.eq(update_context_action_id),
                 ))
                 .execute(self.conn)
                 .map_err(|err| {
