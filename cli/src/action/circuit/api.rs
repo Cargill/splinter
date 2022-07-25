@@ -256,15 +256,15 @@ impl fmt::Display for CircuitSlice {
         let mut display_string = format!("Circuit: {}\n    ", self.id,);
 
         if let Some(display_name) = &self.display_name {
-            writeln!(display_string, "Display Name: {}    ", display_name)?;
+            writeln!(display_string, "Display Name: {}", display_name)?;
         } else {
-            writeln!(display_string, "Display Name: -    ")?;
+            writeln!(display_string, "Display Name: -")?;
         }
 
         if let Some(status) = &self.circuit_status {
-            writeln!(display_string, "    Circuit Status: {}    ", status)?;
+            writeln!(display_string, "    Circuit Status: {}", status)?;
         } else {
-            display_string += "    Circuit Status: Active\n    ";
+            display_string += "    Circuit Status: Active\n";
         }
 
         writeln!(
@@ -355,15 +355,15 @@ impl fmt::Display for ProposalSlice {
         };
 
         if let Some(display_name) = &self.circuit.display_name {
-            writeln!(display_string, "Display Name: {}    ", display_name)?;
+            writeln!(display_string, "Display Name: {}", display_name)?;
         } else {
             display_string += "Display Name: -\n    ";
         }
 
         if let Some(status) = &self.circuit.circuit_status {
-            writeln!(display_string, "Circuit Status: {}    ", status)?;
+            writeln!(display_string, "    Circuit Status: {}", status)?;
         } else {
-            display_string += "Circuit Status: Active\n    ";
+            display_string += "Circuit Status: Active\n";
         }
 
         write!(
@@ -412,10 +412,10 @@ impl fmt::Display for ProposalSlice {
                             match values {
                                 Ok(values) => {
                                     for i in values {
-                                        writeln!(display_string, "                {}", i)?;
+                                        writeln!(display_string, "              {}", i)?;
                                     }
                                 }
-                                Err(_) => writeln!(display_string, "                {}", value)?,
+                                Err(_) => writeln!(display_string, "              {}", value)?,
                             };
                         } else {
                             let values =
