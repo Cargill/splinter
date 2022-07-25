@@ -484,3 +484,545 @@ pub struct Paging {
     pub next: String,
     pub last: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const CIRCUIT_STRING: &str = "Circuit: 0z2C4-hheAY
+    Display Name: circuit_scabbard
+    Circuit Status: Active
+    Schema Version: 2
+    Management Type: scabbard
+
+    n20959
+        Public Key: 0372a7ee5e43a241fb0d622e02a53797507d1b4d289286577157b1ed72a82a6edd
+        Endpoints:
+            tcp://127.0.0.1:18044
+        Service (scabbard): a000
+          admin_keys:
+              03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+              038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+          peer_services:
+              b000
+          version:
+              2
+
+    n8198
+        Public Key: 02bf74d9263327a571763c6557f50d7995bf3dec86387fc8e5f9f75a74b15919a4
+        Endpoints:
+            tcp://127.0.0.1:28044
+        Service (scabbard): b000
+          admin_keys:
+              03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+              038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+          peer_services:
+              a000
+          version:
+              2\n";
+
+    const CIRCUIT_NONE_STRING: &str = "Circuit: 0z2C4-hheAY
+    Display Name: -
+    Circuit Status: Active
+    Schema Version: 2
+    Management Type: scabbard
+
+    n20959
+        Endpoints:
+            tcp://127.0.0.1:18044
+        Service (scabbard): a000
+          admin_keys:
+              03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+              038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+          peer_services:
+              b000
+          version:
+              2
+
+    n8198
+        Endpoints:
+            tcp://127.0.0.1:28044
+        Service (scabbard): b000
+          admin_keys:
+              03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+              038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+          peer_services:
+              a000
+          version:
+              2\n";
+
+    const PROPOSAL_STRING: &str = "Proposal to create: RsiRD-hYqaG
+    Display Name: circuit_scabbard
+    Circuit Status: Active
+    Schema Version: 2
+    Management Type: scabbard
+
+    n20959
+        Public Key: 0372a7ee5e43a241fb0d622e02a53797507d1b4d289286577157b1ed72a82a6edd
+        Vote: ACCEPT (implied as requester):
+            03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+        Endpoints:
+            tcp://127.0.0.1:18044
+        Service (scabbard): a000
+            admin_keys:
+              03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+              038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+            version:
+              2
+            peer_services:
+              b000
+
+    n8198
+        Public Key: 02bf74d9263327a571763c6557f50d7995bf3dec86387fc8e5f9f75a74b15919a4
+        Vote: PENDING
+        Endpoints:
+            tcp://127.0.0.1:28044
+        Service (scabbard): b000
+            admin_keys:
+              03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+              038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+            version:
+              2
+            peer_services:
+              a000\n";
+
+    const PROPOSAL_NONE_STRING: &str = "Proposal to create: RsiRD-hYqaG
+    Display Name: -
+    Circuit Status: Active
+    Schema Version: 2
+    Management Type: scabbard
+
+    n20959
+        Vote: ACCEPT (implied as requester):
+            03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+        Endpoints:
+            tcp://127.0.0.1:18044
+        Service (scabbard): a000
+            admin_keys:
+              03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+              038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+            version:
+              2
+            peer_services:
+              b000
+
+    n8198
+        Vote: PENDING
+        Endpoints:
+            tcp://127.0.0.1:28044
+        Service (scabbard): b000
+            admin_keys:
+              03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+              038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+            version:
+              2
+            peer_services:
+              a000\n";
+
+    const PROPOSAL_VOTE_STRING: &str = "Proposal to create: RsiRD-hYqaG
+    Display Name: circuit_scabbard
+    Circuit Status: Active
+    Schema Version: 2
+    Management Type: scabbard
+
+    n20959
+        Public Key: 0372a7ee5e43a241fb0d622e02a53797507d1b4d289286577157b1ed72a82a6edd
+        Vote: ACCEPT (implied as requester):
+            03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+        Endpoints:
+            tcp://127.0.0.1:18044
+        Service (scabbard): a000
+            admin_keys:
+              03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+              038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+            version:
+              2
+            peer_services:
+              b000
+
+    n8198
+        Public Key: 02bf74d9263327a571763c6557f50d7995bf3dec86387fc8e5f9f75a74b15919a4
+        Vote: ACCEPT
+             038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+        Endpoints:
+            tcp://127.0.0.1:28044
+        Service (scabbard): b000
+            admin_keys:
+              03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03
+              038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82
+            version:
+              2
+            peer_services:
+              a000\n";
+
+    #[test]
+    /// Verify that a circuit's display string matches the current expected
+    /// CLI output.
+    fn test_circuit_display_string() {
+        let mut service_1_arg = BTreeMap::new();
+
+        service_1_arg.insert(
+            "admin_keys".into(),
+            "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03,\
+            038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                .into(),
+        );
+
+        service_1_arg.insert("version".into(), "2".into());
+        service_1_arg.insert("peer_services".into(), "b000".into());
+
+        let mut service_2_arg = BTreeMap::new();
+
+        service_2_arg.insert(
+            "admin_keys".into(),
+            "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03,\
+            038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                .into(),
+        );
+        service_2_arg.insert("version".into(), "2".into());
+        service_2_arg.insert("peer_services".into(), "a000".into());
+
+        let circuit = CircuitSlice {
+            id: "0z2C4-hheAY".into(),
+            members: vec![
+                CircuitMembers {
+                    node_id: "n20959".into(),
+                    endpoints: vec!["tcp://127.0.0.1:18044".into()],
+                    public_key: Some(
+                        "0372a7ee5e43a241fb0d622e02a53797507d1b4d289286577157b1ed72a82a6edd".into(),
+                    ),
+                },
+                CircuitMembers {
+                    node_id: "n8198".into(),
+                    endpoints: vec!["tcp://127.0.0.1:28044".into()],
+                    public_key: Some(
+                        "02bf74d9263327a571763c6557f50d7995bf3dec86387fc8e5f9f75a74b15919a4".into(),
+                    ),
+                },
+            ],
+            roster: vec![
+                CircuitServiceSlice {
+                    service_id: "a000".into(),
+                    service_type: "scabbard".into(),
+                    node_id: "n20959".into(),
+                    arguments: service_1_arg,
+                },
+                CircuitServiceSlice {
+                    service_id: "b000".into(),
+                    service_type: "scabbard".into(),
+                    node_id: "n8198".into(),
+                    arguments: service_2_arg,
+                },
+            ],
+            management_type: "scabbard".into(),
+            display_name: Some("circuit_scabbard".into()),
+            circuit_version: 2,
+            circuit_status: Some(CircuitStatus::Active),
+        };
+        assert_eq!(format!("{}", circuit), CIRCUIT_STRING);
+    }
+
+    #[test]
+    /// Verify that a circuit's display string that has several items set to None
+    /// matches the current expected CLI output.
+    fn test_circuit_none_display_string() {
+        let mut service_1_arg = BTreeMap::new();
+
+        service_1_arg.insert(
+            "admin_keys".into(),
+            "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03,\
+            038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                .into(),
+        );
+
+        service_1_arg.insert("version".into(), "2".into());
+        service_1_arg.insert("peer_services".into(), "b000".into());
+
+        let mut service_2_arg = BTreeMap::new();
+
+        service_2_arg.insert(
+            "admin_keys".into(),
+            "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03,\
+            038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                .into(),
+        );
+        service_2_arg.insert("version".into(), "2".into());
+        service_2_arg.insert("peer_services".into(), "a000".into());
+
+        let circuit = CircuitSlice {
+            id: "0z2C4-hheAY".into(),
+            members: vec![
+                CircuitMembers {
+                    node_id: "n20959".into(),
+                    endpoints: vec!["tcp://127.0.0.1:18044".into()],
+                    public_key: None,
+                },
+                CircuitMembers {
+                    node_id: "n8198".into(),
+                    endpoints: vec!["tcp://127.0.0.1:28044".into()],
+                    public_key: None,
+                },
+            ],
+            roster: vec![
+                CircuitServiceSlice {
+                    service_id: "a000".into(),
+                    service_type: "scabbard".into(),
+                    node_id: "n20959".into(),
+                    arguments: service_1_arg,
+                },
+                CircuitServiceSlice {
+                    service_id: "b000".into(),
+                    service_type: "scabbard".into(),
+                    node_id: "n8198".into(),
+                    arguments: service_2_arg,
+                },
+            ],
+            management_type: "scabbard".into(),
+            display_name: None,
+            circuit_version: 2,
+            circuit_status: None,
+        };
+        assert_eq!(format!("{}", circuit), CIRCUIT_NONE_STRING);
+    }
+
+    #[test]
+    /// Verify that a proposal's display string matches the current expected
+    /// CLI output.
+    fn test_proposal_display_string() {
+        let mut service_1_arg = Vec::new();
+
+        service_1_arg.push(vec![
+            "admin_keys".into(),
+            "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03,\
+            038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                .into(),
+        ]);
+
+        service_1_arg.push(vec!["version".into(), "2".into()]);
+        service_1_arg.push(vec!["peer_services".into(), "b000".into()]);
+
+        let mut service_2_arg = Vec::new();
+
+        service_2_arg.push(vec![
+            "admin_keys".into(),
+            "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03,\
+            038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                .into(),
+        ]);
+
+        service_2_arg.push(vec!["version".into(), "2".into()]);
+        service_2_arg.push(vec!["peer_services".into(), "a000".into()]);
+
+        let proposal_circuit = ProposalCircuitSlice {
+            circuit_id: "RsiRD-hYqaG".into(),
+            members: vec![
+                CircuitMembers {
+                    node_id: "n20959".into(),
+                    endpoints: vec!["tcp://127.0.0.1:18044".into()],
+                    public_key: Some(
+                        "0372a7ee5e43a241fb0d622e02a53797507d1b4d289286577157b1ed72a82a6edd".into(),
+                    ),
+                },
+                CircuitMembers {
+                    node_id: "n8198".into(),
+                    endpoints: vec!["tcp://127.0.0.1:28044".into()],
+                    public_key: Some(
+                        "02bf74d9263327a571763c6557f50d7995bf3dec86387fc8e5f9f75a74b15919a4".into(),
+                    ),
+                },
+            ],
+            roster: vec![
+                CircuitService {
+                    service_id: "a000".into(),
+                    service_type: "scabbard".into(),
+                    node_id: "n20959".into(),
+                    arguments: service_1_arg,
+                },
+                CircuitService {
+                    service_id: "b000".into(),
+                    service_type: "scabbard".into(),
+                    node_id: "n8198".into(),
+                    arguments: service_2_arg,
+                },
+            ],
+            management_type: "scabbard".into(),
+            display_name: Some("circuit_scabbard".into()),
+            circuit_version: 2,
+            circuit_status: Some(CircuitStatus::Active),
+            comments: None,
+        };
+
+        let proposal = ProposalSlice {
+            proposal_type: "Create".into(),
+            circuit_id: "RsiRD-hYqaG".into(),
+            circuit_hash: "circuit_hash".into(),
+            circuit: proposal_circuit,
+            votes: vec![],
+            requester: "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03".into(),
+            requester_node_id: "n20959".into(),
+        };
+
+        assert_eq!(format!("{}", proposal), PROPOSAL_STRING);
+    }
+
+    #[test]
+    /// Verify that a proposals's display string that has several items set to None
+    /// matches the current expected CLI output.
+    fn test_proposal_none_display_string() {
+        let mut service_1_arg = Vec::new();
+
+        service_1_arg.push(vec![
+            "admin_keys".into(),
+            "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03,\
+            038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                .into(),
+        ]);
+
+        service_1_arg.push(vec!["version".into(), "2".into()]);
+        service_1_arg.push(vec!["peer_services".into(), "b000".into()]);
+
+        let mut service_2_arg = Vec::new();
+
+        service_2_arg.push(vec![
+            "admin_keys".into(),
+            "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03,\
+            038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                .into(),
+        ]);
+
+        service_2_arg.push(vec!["version".into(), "2".into()]);
+        service_2_arg.push(vec!["peer_services".into(), "a000".into()]);
+
+        let proposal_circuit = ProposalCircuitSlice {
+            circuit_id: "RsiRD-hYqaG".into(),
+            members: vec![
+                CircuitMembers {
+                    node_id: "n20959".into(),
+                    endpoints: vec!["tcp://127.0.0.1:18044".into()],
+                    public_key: None,
+                },
+                CircuitMembers {
+                    node_id: "n8198".into(),
+                    endpoints: vec!["tcp://127.0.0.1:28044".into()],
+                    public_key: None,
+                },
+            ],
+            roster: vec![
+                CircuitService {
+                    service_id: "a000".into(),
+                    service_type: "scabbard".into(),
+                    node_id: "n20959".into(),
+                    arguments: service_1_arg,
+                },
+                CircuitService {
+                    service_id: "b000".into(),
+                    service_type: "scabbard".into(),
+                    node_id: "n8198".into(),
+                    arguments: service_2_arg,
+                },
+            ],
+            management_type: "scabbard".into(),
+            display_name: None,
+            circuit_version: 2,
+            circuit_status: None,
+            comments: None,
+        };
+
+        let proposal = ProposalSlice {
+            proposal_type: "Create".into(),
+            circuit_id: "RsiRD-hYqaG".into(),
+            circuit_hash: "circuit_hash".into(),
+            circuit: proposal_circuit,
+            votes: vec![],
+            requester: "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03".into(),
+            requester_node_id: "n20959".into(),
+        };
+
+        assert_eq!(format!("{}", proposal), PROPOSAL_NONE_STRING);
+    }
+
+    #[test]
+    /// Verify that a proposals's display string that has a vote matches the current expected
+    /// CLI output.s
+    fn test_proposal_vote_display_string() {
+        let mut service_1_arg = Vec::new();
+
+        service_1_arg.push(vec![
+            "admin_keys".into(),
+            "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03,\
+            038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                .into(),
+        ]);
+
+        service_1_arg.push(vec!["version".into(), "2".into()]);
+        service_1_arg.push(vec!["peer_services".into(), "b000".into()]);
+
+        let mut service_2_arg = Vec::new();
+
+        service_2_arg.push(vec![
+            "admin_keys".into(),
+            "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03,\
+            038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                .into(),
+        ]);
+
+        service_2_arg.push(vec!["version".into(), "2".into()]);
+        service_2_arg.push(vec!["peer_services".into(), "a000".into()]);
+
+        let proposal_circuit = ProposalCircuitSlice {
+            circuit_id: "RsiRD-hYqaG".into(),
+            members: vec![
+                CircuitMembers {
+                    node_id: "n20959".into(),
+                    endpoints: vec!["tcp://127.0.0.1:18044".into()],
+                    public_key: Some(
+                        "0372a7ee5e43a241fb0d622e02a53797507d1b4d289286577157b1ed72a82a6edd".into(),
+                    ),
+                },
+                CircuitMembers {
+                    node_id: "n8198".into(),
+                    endpoints: vec!["tcp://127.0.0.1:28044".into()],
+                    public_key: Some(
+                        "02bf74d9263327a571763c6557f50d7995bf3dec86387fc8e5f9f75a74b15919a4".into(),
+                    ),
+                },
+            ],
+            roster: vec![
+                CircuitService {
+                    service_id: "a000".into(),
+                    service_type: "scabbard".into(),
+                    node_id: "n20959".into(),
+                    arguments: service_1_arg,
+                },
+                CircuitService {
+                    service_id: "b000".into(),
+                    service_type: "scabbard".into(),
+                    node_id: "n8198".into(),
+                    arguments: service_2_arg,
+                },
+            ],
+            management_type: "scabbard".into(),
+            display_name: Some("circuit_scabbard".into()),
+            circuit_version: 2,
+            circuit_status: Some(CircuitStatus::Active),
+            comments: None,
+        };
+
+        let proposal = ProposalSlice {
+            proposal_type: "Create".into(),
+            circuit_id: "RsiRD-hYqaG".into(),
+            circuit_hash: "circuit_hash".into(),
+            circuit: proposal_circuit,
+            votes: vec![VoteRecord {
+                public_key: "038684ef88607ca0e5175fe31b7d94f65b30dc27ef838845f0496eb9c1126c8c82"
+                    .into(),
+                vote: "Accepted".into(),
+                voter_node_id: "n8198".into(),
+            }],
+            requester: "03f91f722329b99234be43f962e7ce33bbd4f2e72634a1a68f12ad908ca5693f03".into(),
+            requester_node_id: "n20959".into(),
+        };
+
+        assert_eq!(format!("{}", proposal), PROPOSAL_VOTE_STRING);
+    }
+}
