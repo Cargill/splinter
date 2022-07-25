@@ -29,6 +29,7 @@ pub mod rbac;
 pub mod registry;
 #[cfg(feature = "user")]
 pub mod user;
+pub mod time;
 
 use std::collections::HashMap;
 use std::ffi::CString;

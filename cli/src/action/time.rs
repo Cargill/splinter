@@ -245,6 +245,6 @@ impl std::fmt::Display for TimeParseError {
 
 impl From<TimeParseError> for CliError {
     fn from(error: TimeParseError) -> Self {
-        CliError::UnparseableArg(format!("{}", error))
+        CliError::ActionError(format!("{}", error))
     }
 }
