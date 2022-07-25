@@ -1,5 +1,26 @@
 # Release Notes
 
+## Changes in Splinter 0.6.14
+
+### splinterd
+
+* Add scabbard state autocleanup which prunes the previous state root hash from
+  the tree after each commit. Because scabbard consensus has finality, this
+  state snapshot is no longer needed.
+
+* Add the experimental `disable-scabbard-autocleanup` feature which can be used
+  to disable automatic state pruning with the flag
+  `--disable-scabbard-autocleanup` or via the config file.
+
+### scabbard 
+
+* Move CommitHashStore to its own module.
+
+### builds
+
+* Commit package-lock.json files for Gameroom App and tests.
+* Pin Rust version in splinter-dev Dockerfile.
+
 ## Changes in Splinter 0.6.13
 
 ### scabbard
