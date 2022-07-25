@@ -1290,6 +1290,7 @@ pub struct Consensus2pcEventModel {
     pub executed_at: Option<NaiveDateTime>,
     pub executed_epoch: Option<i64>,
     pub event_type: EventTypeModel,
+    pub update_context_action_id: Option<i64>,
 }
 
 #[derive(Debug, PartialEq, Insertable)]
@@ -1299,6 +1300,7 @@ pub struct InsertableConsensus2pcEventModel {
     pub service_id: String,
     pub executed_at: Option<NaiveDateTime>,
     pub event_type: EventTypeModel,
+    pub update_context_action_id: Option<i64>,
 }
 
 impl From<&Event> for EventTypeModel {

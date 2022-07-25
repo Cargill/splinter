@@ -83,6 +83,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, SqliteConnection> {
                 service_id: service_id.service_id().to_string(),
                 executed_at: None,
                 event_type: EventTypeModel::from(&event),
+                update_context_action_id: None,
             };
 
             insert_into(consensus_2pc_event::table)
@@ -212,6 +213,7 @@ impl<'a> AddEventOperation for ScabbardStoreOperations<'a, PgConnection> {
                 service_id: service_id.service_id().to_string(),
                 executed_at: None,
                 event_type: EventTypeModel::from(&event),
+                update_context_action_id: None,
             };
 
             let event_id: i64 = insert_into(consensus_2pc_event::table)
