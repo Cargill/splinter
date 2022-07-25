@@ -28,13 +28,12 @@ use transact::protos::IntoBytes;
 use transact::workload::batch_gen::{BatchListFeeder, SignedBatchProducer};
 use transact::workload::HttpRequestCounter;
 
+use crate::action::request_logger::RequestLogger;
 use crate::action::time::Time;
 use crate::error::CliError;
-use crate::request_logger::RequestLogger;
 
-use super::{
-    create_cylinder_jwt_auth_signer_key, load_cylinder_signer_key, Action, DEFAULT_LOG_TIME_SECS,
-};
+use super::{Action, DEFAULT_LOG_TIME_SECS};
+use crate::signing::{create_cylinder_jwt_auth, load_signer};
 
 const DEFAULT_ACCOUNTS: &str = "10";
 const DEFAULT_TRANSACTIONS: &str = "10";
@@ -133,10 +132,7 @@ impl Action for ProcessPlaylistAction {
             None => Box::new(std::io::stdout()),
         };
 
-        let key_path = args
-            .value_of("key")
-            .ok_or_else(|| CliError::ActionError("'key' is required".into()))?;
-        let signer = load_cylinder_signer_key(key_path)?;
+        let signer = load_signer(args.value_of("key"))?;
 
         let workload = args
             .value_of("workload")
@@ -189,11 +185,7 @@ impl Action for BatchPlaylistAction {
         )
         .map_err(|_| CliError::ActionError("Unable to open output file".to_string()))?;
 
-        let key_path = args
-            .value_of("key")
-            .ok_or_else(|| CliError::ActionError("'key' is required".into()))?;
-        let signer = load_cylinder_signer_key(key_path)?;
-
+        let signer = load_signer(args.value_of("key"))?;
         SignedBatchProducer::new(&mut in_file, max_txns, &*signer)
             .write_to(&mut out_file)
             .map_err(|err| {
@@ -209,16 +201,16 @@ pub struct SubmitPlaylistAction;
 impl Action for SubmitPlaylistAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
-
-        let (auth, _) = create_cylinder_jwt_auth_signer_key(args.value_of("key"))?;
+        let signer = load_signer(args.value_of("key"))?;
+        let auth = create_cylinder_jwt_auth(signer)?;
 
         let rate_string = args.value_of("rate").unwrap_or(DEFAULT_RATE);
         let rate: Duration = if let Ok(interval) = rate_string.parse::<Time>() {
             interval.into()
         } else {
-            let raw_num = rate_string.parse::<f32>().map_err(|_| {
-                CliError::UnparseableArg("'rate' must be floating point value".into())
-            })?;
+            let raw_num = rate_string
+                .parse::<f32>()
+                .map_err(|_| CliError::ActionError("'rate' must be floating point value".into()))?;
             std::time::Duration::from_secs_f32(1.0 / raw_num)
         };
 

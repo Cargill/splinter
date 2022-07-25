@@ -24,6 +24,8 @@ pub mod keygen;
 #[cfg(feature = "authorization-handler-maintenance")]
 pub mod maintenance;
 pub mod permissions;
+#[cfg(feature = "playlist-smallbank")]
+pub mod playlist;
 #[cfg(feature = "authorization-handler-rbac")]
 pub mod rbac;
 pub mod registry;
@@ -44,6 +46,9 @@ use super::error::CliError;
 
 const DEFAULT_SPLINTER_REST_API_URL: &str = "http://127.0.0.1:8080";
 const SPLINTER_REST_API_URL_ENV: &str = "SPLINTER_REST_API_URL";
+
+#[cfg(any(feature = "workload", feature = "playlist-smallbank"))]
+const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
 
 /// A CLI Command Action.
 ///
