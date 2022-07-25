@@ -30,12 +30,21 @@ use splinter::runtime::service::{
     ExecutorAlarm, LifecycleCommandGenerator, LifecycleExecutor, LifecycleStore,
     LifecycleStoreFactory,
 };
-#[cfg(feature = "scabbardv3")]
+#[cfg(any(feature = "scabbardv3", feature = "service-echo"))]
 use splinter::service::{Lifecycle, ServiceType};
 use splinter::store::command::DieselStoreCommandExecutor;
 use splinter::threading::lifecycle::ShutdownHandle;
+#[cfg(feature = "service-echo")]
+use splinter_echo::service::{EchoArgumentsVecConverter, EchoLifecycle};
+#[cfg(all(feature = "service-echo", feature = "database-postgres"))]
+use splinter_echo::store::PgEchoStoreFactory;
+#[cfg(all(feature = "service-echo", feature = "database-sqlite"))]
+use splinter_echo::store::SqliteEchoStoreFactory;
 
 use super::store::ConnectionPool;
+#[cfg(feature = "service-echo")]
+use super::ECHO_SERVICE_TYPE;
+#[cfg(feature = "scabbardv3")]
 use super::SCABBARD_SERVICE_TYPE;
 
 pub enum DaemonLifecycleExecutor {
@@ -89,7 +98,10 @@ pub fn create_lifecycle_executor(
     match connection_pool {
         #[cfg(feature = "database-sqlite")]
         ConnectionPool::Sqlite { pool } => {
-            #[cfg_attr(not(feature = "scabbardv3"), allow(usused_mut))]
+            #[cfg_attr(
+                not(any(feature = "scabbardv3", feature = "service-echo")),
+                allow(usused_mut)
+            )]
             let mut lifecycles: SqliteLifecycles = HashMap::new();
 
             #[cfg(feature = "scabbardv3")]
@@ -99,6 +111,14 @@ pub fn create_lifecycle_executor(
                 let scabbard_vec_lifecycle =
                     scabbard_lifecycle.into_lifecycle(ScabbardArgumentsVecConverter {});
                 lifecycles.insert(SCABBARD_SERVICE_TYPE, Box::new(scabbard_vec_lifecycle));
+            }
+
+            #[cfg(feature = "service-echo")]
+            {
+                let echo_lifecycle = EchoLifecycle::new(Arc::new(SqliteEchoStoreFactory));
+                let echo_vec_lifecycle =
+                    echo_lifecycle.into_lifecycle(EchoArgumentsVecConverter {});
+                lifecycles.insert(ECHO_SERVICE_TYPE, Box::new(echo_vec_lifecycle));
             }
 
             let lifecycle_pool = pool.write().unwrap().clone();
@@ -120,7 +140,10 @@ pub fn create_lifecycle_executor(
         }
         #[cfg(feature = "database-postgres")]
         ConnectionPool::Postgres { pool } => {
-            #[cfg_attr(not(feature = "scabbardv3"), allow(usused_mut))]
+            #[cfg_attr(
+                not(any(feature = "scabbardv3", feature = "service-echo")),
+                allow(usused_mut)
+            )]
             let mut lifecycles: PostgresLifecycles = HashMap::new();
 
             #[cfg(feature = "scabbardv3")]
@@ -129,6 +152,14 @@ pub fn create_lifecycle_executor(
                 let scabbard_vec_lifecycle =
                     scabbard_lifecycle.into_lifecycle(ScabbardArgumentsVecConverter {});
                 lifecycles.insert(SCABBARD_SERVICE_TYPE, Box::new(scabbard_vec_lifecycle));
+            }
+
+            #[cfg(feature = "service-echo")]
+            {
+                let echo_lifecycle = EchoLifecycle::new(Arc::new(PgEchoStoreFactory));
+                let echo_vec_lifecycle =
+                    echo_lifecycle.into_lifecycle(EchoArgumentsVecConverter {});
+                lifecycles.insert(ECHO_SERVICE_TYPE, Box::new(echo_vec_lifecycle));
             }
 
             let lifecycle_pool = pool.clone();

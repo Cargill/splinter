@@ -47,6 +47,7 @@ rand = "0.8"
 sawtooth = { version = "0.7", default-features = false, optional = true }
 serde = "1.0.80"
 serde_derive = "1.0.80"
+splinter-echo = { path = "../services/echo/libecho", optional = true }
 splinter-rest-api-actix-web-1 = { path = "../rest_api/actix_web_1" , features = ["admin-service", "registry", "service", "scabbard-service"] }
 toml = "0.5"
 
@@ -112,6 +113,7 @@ experimental = [
     "service-endpoint",
     "service-timer-interval",
     "service2",
+    "service-echo",
     "ws-transport",
 ]
 
@@ -131,8 +133,8 @@ biome-credentials = ["splinter/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management", "splinter-rest-api-actix-web-1/biome-key-management"]
 biome-profile = ["splinter/biome-profile"]
 config-allow-keys = ["authorization-handler-allow-keys"]
-database-postgres = ["diesel", "diesel/postgres", "scabbard/postgres", "splinter/postgres"]
-database-sqlite = ["diesel", "diesel/sqlite", "scabbard/sqlite", "splinter/sqlite"]
+database-postgres = ["diesel", "diesel/postgres", "scabbard/postgres", "splinter/postgres", "splinter-echo/postgres"]
+database-sqlite = ["diesel", "diesel/sqlite", "scabbard/sqlite", "splinter/sqlite", "splinter-echo/sqlite"]
 disable-scabbard-autocleanup = []
 https-bind = ["splinter/https-bind"]
 lifecycle-executor-interval = []
@@ -172,6 +174,7 @@ service2 = [
   "splinter/service-timer",
   "splinter/service-lifecycle-executor"
 ]
+service-echo = ["splinter-echo"]
 trust-authorization = ["splinter/trust-authorization"]
 ws-transport = ["splinter/ws-transport"]
 

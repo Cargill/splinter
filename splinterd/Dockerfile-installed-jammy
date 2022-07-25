@@ -33,6 +33,7 @@ COPY services/scabbard/cli/Cargo.toml /build/services/scabbard/cli/Cargo.toml
 COPY services/scabbard/libscabbard/build.rs /build/services/scabbard/libscabbard/build.rs
 COPY services/scabbard/libscabbard/Cargo.toml /build/services/scabbard/libscabbard/Cargo.toml
 COPY services/scabbard/libscabbard/protos /build/services/scabbard/libscabbard/protos
+COPY services/echo/libecho/Cargo.toml /build/services/echo/libecho/Cargo.toml
 
 # Copy over source files
 COPY cli /build/cli
@@ -41,6 +42,7 @@ COPY rest_api/actix_web_1/ /build/rest_api/actix_web_1/
 COPY rest_api/common/ /build/rest_api/common/
 COPY splinterd/ /build/splinterd
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
+COPY services/echo/libecho /build/services/echo/libecho
 
 # Build splinterd
 ARG REPO_VERSION

@@ -127,7 +127,9 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             filename: None,
             level: None,
         };
-        let loggers = vec![
+
+        #[allow(unused_mut)]
+        let mut loggers = vec![
             (
                 "splinter".to_string(),
                 UnnamedLoggerConfig {
@@ -187,6 +189,18 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         ]
         .into_iter()
         .collect::<HashMap<String, UnnamedLoggerConfig>>();
+
+        #[cfg(feature = "service-echo")]
+        {
+            loggers.insert(
+                "splinter_echo".to_string(),
+                UnnamedLoggerConfig {
+                    appenders: None,
+                    level: Some(log::Level::Trace),
+                },
+            );
+        }
+
         let mut appenders = HashMap::new();
         appenders.insert("stdout".to_string(), stdout);
         partial_config = partial_config

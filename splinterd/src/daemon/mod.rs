@@ -99,13 +99,15 @@ use splinter::runtime::service::{
     RoutingTableServiceTypeResolver, ServiceDispatcher,
 };
 use splinter::service::instance::ServiceArgValidator;
-#[cfg(feature = "scabbardv3")]
+#[cfg(any(feature = "scabbardv3", feature = "service-echo"))]
 use splinter::service::{MessageHandler, MessageHandlerFactory, ServiceType};
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, Connection, Incoming, Listener,
     Transport,
 };
+#[cfg(feature = "service-echo")]
+use splinter_echo::service::{EchoMessageByteConverter, EchoMessageHandlerFactory};
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
 #[cfg(feature = "biome-key-management")]
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
@@ -127,6 +129,8 @@ const ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 const ADMIN_SERVICE_LIFECYCLE_TIMEOUT: u64 = 30;
 #[cfg(feature = "scabbardv3")]
 const SCABBARD_SERVICE_TYPE: ServiceType = ServiceType::new_static("scabbard:v3");
+#[cfg(feature = "service-echo")]
+const ECHO_SERVICE_TYPE: ServiceType = ServiceType::new_static("echo");
 
 #[cfg(feature = "service2")]
 type BoxedByteMessageHandlerFactory =
@@ -374,7 +378,7 @@ impl SplinterDaemon {
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         #[cfg(feature = "service2")]
-        let (mut timer, mut supervisor) = timer::create_timer_and_supervisor(
+        let service_timer_and_supervisor = timer::create_timer_and_supervisor(
             &connection_pool,
             &node_id,
             network_sender.clone(),
@@ -382,14 +386,27 @@ impl SplinterDaemon {
             &self.service_timer_interval,
         )?;
 
+        #[cfg(feature = "service2")]
+        let mut timer = service_timer_and_supervisor.timer;
+
+        #[cfg(feature = "scabbardv3")]
+        let mut supervisor = service_timer_and_supervisor.supervisor;
+
         #[cfg(feature = "scabbardv3")]
         let scabbard_store_factory = store::create_scabbard_store_factory(&connection_pool)?;
+
+        #[cfg(feature = "service-echo")]
+        let echo_store_factory = store::create_echo_store_factory(&connection_pool)?;
 
         #[cfg(feature = "service2")]
         let message_handlers: Vec<BoxedByteMessageHandlerFactory> = vec![
             #[cfg(feature = "scabbardv3")]
             ScabbardMessageHandlerFactory::new(scabbard_store_factory, timer.alarm_factory())
                 .into_factory(ScabbardMessageByteConverter {})
+                .into_boxed(),
+            #[cfg(feature = "service-echo")]
+            EchoMessageHandlerFactory::new(echo_store_factory)
+                .into_factory(EchoMessageByteConverter {})
                 .into_boxed(),
         ];
 
@@ -580,6 +597,8 @@ impl SplinterDaemon {
         let supported_types = vec![
             #[cfg(feature = "scabbardv3")]
             SCABBARD_SERVICE_TYPE.to_string(),
+            #[cfg(feature = "service-echo")]
+            ECHO_SERVICE_TYPE.to_string(),
         ];
         #[cfg(feature = "service2")]
         lifecycle_dispatches.push(Box::new(SyncLifecycleInterface::new(
@@ -983,7 +1002,9 @@ impl SplinterDaemon {
                 );
             }
 
+            #[cfg(feature = "scabbardv3")]
             supervisor.signal_shutdown();
+            #[cfg(feature = "scabbardv3")]
             if let Err(err) = supervisor.wait_for_shutdown() {
                 error!("Unable to cleanly shut down scabbard supervisor: {}", err);
             }

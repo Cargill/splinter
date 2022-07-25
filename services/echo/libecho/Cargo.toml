@@ -1,0 +1,67 @@
+# Copyright 2018-2022 Cargill Incorporated
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[package]
+name = "splinter-echo"
+version = "0.7.1"
+authors = ["Cargill Incorporated"]
+edition = "2018"
+license = "Apache-2.0"
+description = """\
+    Splinter Echo is a service that will send echo requests and responses \
+    between services.
+"""
+
+[dependencies]
+diesel = { version = "1.0", features = ["r2d2", "serde_json"], optional = true }
+diesel_migrations = { version = "1.4", optional = true }
+log = "0.4"
+rand = "0.8"
+serde_json = "1"
+serde = { version = "1.0", features = ["derive"] }
+
+[dependencies.splinter]
+path = "../../../libsplinter"
+features = [
+    "service",
+    "service-arguments-converter",
+    "service-lifecycle",
+    "service-message-handler",
+    "service-message-handler-factory",
+    "service-timer-filter",
+    "service-timer-handler",
+    "service-timer-handler-factory",
+]
+
+[dev-dependencies]
+splinter = { path = "../../../libsplinter", features = ["diesel"]}
+
+[features]
+default = ["sqlite"]
+
+stable = [
+  # The stable feature extends default:
+  "default",
+  # The following features are stable:
+]
+
+experimental = [
+  # The experimental feature extends stable:
+  "stable",
+  # The following features are experimental:
+  "postgres"
+]
+
+postgres = ["diesel/postgres", "diesel_migrations"]
+sqlite = ["diesel/sqlite", "diesel_migrations"]

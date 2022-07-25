@@ -37,6 +37,14 @@ pub fn postgres_migrations(url: &str) -> Result<(), CliError> {
         ))
     })?;
 
+    #[cfg(feature = "echo")]
+    splinter_echo::migrations::run_postgres_migrations(&connection).map_err(|err| {
+        CliError::ActionError(format!(
+            "Unable to run Postgres migrations for echo: {}",
+            err
+        ))
+    })?;
+
     Ok(())
 }
 

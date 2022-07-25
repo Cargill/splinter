@@ -29,6 +29,7 @@ COPY rest_api/actix_web_4/Cargo.toml /build/rest_api/actix_web_4/Cargo.toml
 COPY rest_api/common/ /build/rest_api/common/
 COPY services/scabbard/cli /build/services/scabbard/cli
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
+COPY services/echo/libecho /build/services/echo/libecho
 
 COPY justfile /build
 
