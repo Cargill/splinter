@@ -48,7 +48,7 @@ variable "REGISTRY" {
 }
 
 variable "REPO_VERSION" {
-    default = "0.6.14-dev"
+    default = "0.6.15-dev"
 }
 
 target "all" {
