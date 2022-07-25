@@ -26,8 +26,9 @@ use transact::protos::{
 };
 
 use crate::error::CliError;
+use crate::signing::{create_cylinder_jwt_auth, load_signer};
 
-use super::{create_cylinder_jwt_auth_signer_key, Action};
+use super::Action;
 
 pub struct CommandSetStateAction;
 
@@ -35,7 +36,7 @@ impl Action for CommandSetStateAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
-        let (auth, signer) = create_cylinder_jwt_auth_signer_key(args.value_of("key"))?;
+        let signer = load_signer(args.value_of("key"))?;
 
         let target = args
             .value_of("target")
@@ -150,6 +151,8 @@ impl Action for CommandSetStateAction {
             }
         };
 
+        let auth = create_cylinder_jwt_auth(signer)?;
+
         // send batch to target
         Client::new()
             .post(&format!("{}/batches", target))
@@ -191,8 +194,6 @@ impl Action for CommandGetStateAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
-        let (auth, signer) = create_cylinder_jwt_auth_signer_key(args.value_of("key"))?;
-
         let target = args
             .value_of("target")
             .ok_or_else(|| CliError::ActionError("'target' is required".into()))?;
@@ -217,6 +218,8 @@ impl Action for CommandGetStateAction {
         let payload_bytes = payload.write_to_bytes().map_err(|err| {
             CliError::ActionError(format!("Unable to convert payload to bytes: {}", err))
         })?;
+
+        let signer = load_signer(args.value_of("key"))?;
 
         // build the transaction
         let txn = ExecuteContractActionBuilder::new()
@@ -296,6 +299,8 @@ impl Action for CommandGetStateAction {
             }
         };
 
+        let auth = create_cylinder_jwt_auth(signer)?;
+
         // send batch to target
         Client::new()
             .post(&format!("{}/batches", target))
@@ -337,7 +342,8 @@ impl Action for CommandShowStateAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
-        let (auth, _) = create_cylinder_jwt_auth_signer_key(args.value_of("key"))?;
+        let signer = load_signer(args.value_of("key"))?;
+        let auth = create_cylinder_jwt_auth(signer)?;
 
         let target = args
             .value_of("target")

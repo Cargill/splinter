@@ -16,6 +16,8 @@
 mod api;
 pub mod certs;
 pub mod circuit;
+#[cfg(feature = "command")]
+pub mod command;
 #[cfg(feature = "database")]
 pub mod database;
 pub mod keygen;

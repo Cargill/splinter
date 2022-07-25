@@ -73,6 +73,7 @@ tempfile = "3"
 [features]
 default = [
     "authorization-handler-rbac",
+    "command",
     "circuit-template",
     "database",
     "postgres",
@@ -98,6 +99,7 @@ experimental = [
 authorization-handler-maintenance = []
 authorization-handler-rbac = []
 circuit-template = ["splinter/circuit-template"]
+command = ["transact/family-command-workload"]
 database = ["diesel"]
 echo = ["splinter-echo"]
 https-certs = []
