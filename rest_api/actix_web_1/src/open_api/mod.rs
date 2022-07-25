@@ -13,6 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod status;
+use actix_web::{web, Error, HttpRequest, HttpResponse};
+use futures::{Future, IntoFuture};
 
-pub use status::*;
+pub fn get_openapi(
+    _: HttpRequest,
+    _: web::Payload,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    Box::new(
+        HttpResponse::Ok()
+            .body(include_str!(
+                "../../../../splinterd/api/static/openapi.yaml"
+            ))
+            .into_future(),
+    )
+}

@@ -15,8 +15,6 @@
 #[macro_use]
 extern crate log;
 #[macro_use]
-extern crate serde_derive;
-#[macro_use]
 extern crate clap;
 
 mod config;
@@ -24,7 +22,6 @@ mod daemon;
 mod error;
 mod logging;
 pub mod node_id;
-mod routes;
 mod transport;
 
 use cylinder::{load_key_from_path, secp256k1::Secp256k1Context, Context, Signer};

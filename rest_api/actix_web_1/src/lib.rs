@@ -26,11 +26,13 @@ extern crate serde_json;
 pub mod admin;
 #[cfg(feature = "biome")]
 pub mod biome;
+pub mod open_api;
 #[cfg(feature = "registry")]
 pub mod registry;
 #[cfg(feature = "scabbard-service")]
 pub mod scabbard;
 #[cfg(feature = "service")]
 pub mod service;
+pub mod status;
 
 mod hex;

@@ -1,3 +1,4 @@
+// Copyright (c) 2019 Target Brands, Inc.
 // Copyright 2018-2022 Cargill Incorporated
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,8 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use splinter::actix_web::{web, Error, HttpRequest, HttpResponse};
-use splinter::futures::{Future, IntoFuture};
+use actix_web::{Error, HttpResponse};
+use futures::{Future, IntoFuture};
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "authorization")]
 use splinter::rest_api::auth::authorization::Permission;
 
@@ -53,17 +55,6 @@ pub fn get_status(
     };
 
     Box::new(HttpResponse::Ok().json(status).into_future())
-}
-
-pub fn get_openapi(
-    _: HttpRequest,
-    _: web::Payload,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    Box::new(
-        HttpResponse::Ok()
-            .body(include_str!("../../api/static/openapi.yaml"))
-            .into_future(),
-    )
 }
 
 fn get_version() -> String {

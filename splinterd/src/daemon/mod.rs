@@ -111,12 +111,13 @@ use splinter_echo::service::{EchoMessageByteConverter, EchoMessageHandlerFactory
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
 #[cfg(feature = "biome-key-management")]
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
+use splinter_rest_api_actix_web_1::open_api;
 use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
 use splinter_rest_api_actix_web_1::scabbard::ScabbardServiceEndpointProvider;
 use splinter_rest_api_actix_web_1::service::ServiceOrchestratorRestResourceProviderBuilder;
+use splinter_rest_api_actix_web_1::status;
 
 use crate::node_id::get_node_id;
-use crate::routes;
 
 pub use error::{CreateError, StartError};
 use registry::RegistryShutdownHandle;
@@ -727,13 +728,13 @@ impl SplinterDaemon {
                 .add_resource(Resource::build("/openapi.yaml").add_method(
                     Method::Get,
                     Permission::AllowAuthenticated,
-                    routes::get_openapi,
+                    open_api::get_openapi,
                 ))
                 .add_resource(Resource::build("/status").add_method(
                     Method::Get,
-                    routes::STATUS_READ_PERMISSION,
+                    status::STATUS_READ_PERMISSION,
                     move |_, _| {
-                        routes::get_status(
+                        status::get_status(
                             node_id_clone.clone(),
                             display_name.clone(),
                             #[cfg(feature = "service-endpoint")]
@@ -748,11 +749,11 @@ impl SplinterDaemon {
         {
             rest_api_builder = rest_api_builder
                 .add_resource(
-                    Resource::build("/openapi.yaml").add_method(Method::Get, routes::get_openapi),
+                    Resource::build("/openapi.yaml").add_method(Method::Get, open_api::get_openapi),
                 )
                 .add_resource(
                     Resource::build("/status").add_method(Method::Get, move |_, _| {
-                        routes::get_status(
+                        status::get_status(
                             node_id.clone(),
                             display_name.clone(),
                             #[cfg(feature = "service-endpoint")]
