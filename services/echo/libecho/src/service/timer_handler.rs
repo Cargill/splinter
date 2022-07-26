@@ -180,8 +180,8 @@ mod tests {
     #[test]
     fn test_get_jitter() {
         let jitter = get_jitter(45).expect("failed to get jitter");
-        assert!(jitter > (-45));
-        assert!(jitter < (45));
+        assert!(jitter >= (-45));
+        assert!(jitter <= (45));
 
         let jitter = get_jitter(0).expect("failed to get jitter");
         assert_eq!(jitter, 0);
