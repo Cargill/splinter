@@ -142,30 +142,6 @@ impl TimerHandler for EchoTimerHandler {
         }
 
         Ok(())
-
-        // -- message generation --
-        // 1) get the arguments for this service which will include:
-        //      peers
-        //      frequency
-        //      jitter
-        //      error_rate
-        // 2) get the list of peers that haven't been send a message in frequency+jitter duration.
-        // 3) for each peer, calculate a unique actual jitter value betwene [-jitter, +jitter]
-        // 4) from the list of peers, keep only those which haven't received a message in
-        //    frequence+actual_jitter
-        // 5) for remaining peers, add a new request to the database with sent=false
-        // -- end of message generation --
-        // -- message sending --
-        // 6) read a list of messages from the database wich are in the sent=false state
-        // 7) for each message:
-        // 7a) using error_rate, determine whether to emulate an error; if so, emulate an error
-        // 7b) otherwise, send message; as each are sent
-        // 7c) using error_rate, determine whether to emulate an error; if so, go to next message
-        // 7d) update the database state to set that message to sent=true
-        // -- end message sending --
-        //
-        // Note: important that the message sending phase picks up any that weren't sent the
-        // previous attempt.
     }
 }
 
