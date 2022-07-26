@@ -118,7 +118,7 @@ impl RunnableNode {
                     biome_resources.append(&mut biome_resource_provider.take_actix1_resources());
                 };
 
-                // Create the authroization handler resources to allow the node to access the
+                // Create the authorization handler resources to allow the node to access the
                 // authorization endpoints
                 let auth_handler_resources = vec![
                     RoleBasedAuthorizationResourceProvider::new(

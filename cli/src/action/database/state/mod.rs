@@ -92,7 +92,7 @@ impl Action for StateMigrateAction {
         let lower_in_database = in_database.to_string().to_lowercase();
         let lower_out_database = out_database.to_string().to_lowercase();
 
-        // Get the database uri that wil be used for getting the circuit information. If lmdb
+        // Get the database uri that will be used for getting the circuit information. If lmdb
         // is the target directory, we need to use the URI for the in database, otherwise the
         // out database is used.
         let database_uri = match (lower_in_database.as_str(), lower_out_database.as_str()) {
@@ -325,7 +325,7 @@ fn get_state_dir(arg_matches: Option<&ArgMatches>) -> Result<PathBuf, CliError> 
 ///
 /// # Returns
 ///
-/// * Ok if the state was sucessfully copied and results in the correct state root hash, otherwise
+/// * Ok if the state was successfully copied and results in the correct state root hash, otherwise
 /// a CliError is returned
 fn copy_state(
     state_reader: &MerkleState,

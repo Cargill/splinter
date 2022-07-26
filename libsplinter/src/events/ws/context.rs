@@ -52,7 +52,7 @@ impl<T: ParseBytes<T> + 'static> Context<T> {
     }
 
     /// Should called by the ws to inform that the connection was established successfully
-    /// the Context resets the wait and reconnect cound to its intial values.
+    /// the Context resets the wait and reconnect count to its initial values.
     pub fn ws_connected(&mut self) {
         self.reset_wait();
         self.reset_reconnect_count();

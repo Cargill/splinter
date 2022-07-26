@@ -58,7 +58,7 @@ WORKDIR /project/splinter/libsplinter
 
 # hadolint ignore=DL3025
 CMD cargo login $CARGO_CRED \
- && echo "Publshing version $REPO_VERSION" \
+ && echo "Publishing version $REPO_VERSION" \
  && rm -f ../Cargo.lock ./Cargo.lock \
  && cargo clean \
  && cargo test \

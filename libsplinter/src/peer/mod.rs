@@ -583,7 +583,7 @@ fn add_peer(
                         };
 
                         return Err(PeerRefAddError::AddError(format!(
-                            "Mismatch betwen existing and requested peer endpoints: {:?} does not \
+                            "Mismatch between existing and requested peer endpoints: {:?} does not \
                             contain {}",
                             endpoints, endpoint
                         )));
@@ -1615,7 +1615,7 @@ fn log_connect_request_err(
     }
 }
 
-/// Check to make sure if multiple peer IDs point to the same endpoint, they are not diffferent
+/// Check to make sure if multiple peer IDs point to the same endpoint, they are not different
 /// Trust peer token. There can only be one Trust peer per endpoint, but multiple Challenge peers
 /// are okay.
 fn check_for_duplicate_endpoint(
@@ -2432,7 +2432,7 @@ pub mod tests {
             .start()
             .expect("Unable to start Connection Manager");
 
-        // let (finish_tx, fininsh_rx) = channel();
+        // let (finish_tx, finish_rx) = channel();
         let connector = cm.connector();
         let mut peer_manager = PeerManager::builder()
             .with_connector(connector)

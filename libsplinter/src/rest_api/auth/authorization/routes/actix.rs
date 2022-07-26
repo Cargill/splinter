@@ -101,7 +101,7 @@ mod tests {
     /// 1. Start the REST API with a duplicated permission, a non-duplicated permission, an
     ///    "allow authenticated" permission, and an "allow unauthenticated" permission
     /// 2. Make a request to the endpoint and verify the resulting permissions list contains only
-    ///    the non-duplciated permision, a single instance of the duplicated permission, and the
+    ///    the non-duplciated permission, a single instance of the duplicated permission, and the
     ///    endpoint's own permission
     /// 3. Shutdown the REST API
     #[test]

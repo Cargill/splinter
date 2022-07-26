@@ -105,7 +105,7 @@ impl<C: 'static> ConsensusActionRunner<C> {
                     )));
                 }
                 ConsensusAction::TwoPhaseCommit(Action::SendMessage(to_service, msg)) => {
-                    // close out notfication regardless of if this was succesful
+                    // close out notification regardless of if this was successful
                     let msg_bytes: Vec<u8> = Vec::<u8>::try_from(msg.clone())
                         .map_err(|err| InternalError::from_source(Box::new(err)))?;
                     let message_sender =
@@ -233,8 +233,8 @@ mod tests {
         let store_command_executor = SqliteCommandExecutor {
             pool: pool.clone().into(),
         };
-        let test_messsage_factory = TestMessageSenderFactory::default();
-        let message_sender_factory = Box::new(test_messsage_factory.clone());
+        let test_message_factory = TestMessageSenderFactory::default();
+        let message_sender_factory = Box::new(test_message_factory.clone());
 
         let store_factory: Arc<(dyn ScabbardStoreFactory<diesel::sqlite::SqliteConnection>)> =
             Arc::new(SqliteScabbardStoreFactory);
@@ -254,7 +254,7 @@ mod tests {
         (
             action_runner,
             store_command_executor,
-            test_messsage_factory,
+            test_message_factory,
             scabbard_store,
             recv,
         )
@@ -272,7 +272,7 @@ mod tests {
             ))
         })?;
 
-        print!("Coordinatore {}", coordinator);
+        print!("Coordinator {}", coordinator);
 
         if service.service_id().service_id() == &coordinator {
             ContextBuilder::default()
@@ -362,7 +362,7 @@ mod tests {
     ///
     /// Verifies that one of each action type can be processed
     ///
-    /// 1. Set up the intial state for the test
+    /// 1. Set up the initial state for the test
     ///    - Add a finalized service
     ///    - Add an initial context for the service
     /// 2. Add 3 pending Actions for to the store
@@ -371,7 +371,7 @@ mod tests {
     ///     - Notify of RequestForStart
     /// 3. Fetch pending actions from the scabbard store
     /// 4. Call run_actions on the ConsensusActionRunner, executing the Actions
-    /// 5. Verify that no actions are returned after execution, meaning they have all ben udpated
+    /// 5. Verify that no actions are returned after execution, meaning they have all ben updated
     /// 6. Verify the service now has a consensus 2pc alarm set
     /// 7. Verify that a message was send to the peer
     /// 8. Verify a commit entry was added after RequestForStart

@@ -25,8 +25,8 @@ use crate::error::InternalError;
 /// `R`. `L` is for the left side, `R` is for the right side. The functions `to_left` and
 /// `to_right` convert in the desired direction.
 pub trait ArgumentsConverter<L, R> {
-    /// Convert from generic type paramter `R` to type `L`.
+    /// Convert from generic type parameter `R` to type `L`.
     fn to_left(&self, right: R) -> Result<L, InternalError>;
-    /// Convert from generic type paramter `L` to type `R`.
+    /// Convert from generic type parameter `L` to type `R`.
     fn to_right(&self, left: L) -> Result<R, InternalError>;
 }

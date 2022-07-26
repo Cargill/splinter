@@ -277,7 +277,7 @@ pub mod tests {
         // add node 1 endpoint
         node.endpoints.push("tcps://12.0.0.123:8431".to_string());
 
-        // This should fail becasue the added endpoint already belongs to node 1
+        // This should fail because the added endpoint already belongs to node 1
         assert!(registry.update_node(node).is_err());
     }
 
@@ -409,7 +409,7 @@ pub mod tests {
     /// 2. Insert node 1, 2 and 3
     /// 3. Validate that the registry returns only node 3 when filtered by company and admin
     #[test]
-    fn test_list_nodes_filter_metadata_mutliple() {
+    fn test_list_nodes_filter_metadata_multiple() {
         let pool = create_connection_pool_and_migrate();
         let registry = DieselRegistry::new(pool);
 

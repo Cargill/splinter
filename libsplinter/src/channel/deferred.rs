@@ -13,25 +13,25 @@
 // limitations under the License.
 use std::sync::mpsc::Sender;
 
-pub struct DeferedSend<M> {
+pub struct DeferredSend<M> {
     sender: Sender<M>,
     msg: Option<M>,
 }
 
-impl<M> DeferedSend<M> {
+impl<M> DeferredSend<M> {
     pub fn new(sender: Sender<M>, msg: M) -> Self {
-        DeferedSend {
+        DeferredSend {
             sender,
             msg: Some(msg),
         }
     }
 }
 
-impl<M> Drop for DeferedSend<M> {
+impl<M> Drop for DeferredSend<M> {
     fn drop(&mut self) {
         if let Some(msg) = self.msg.take() {
             if self.sender.send(msg).is_err() {
-                error!("Unable to send message for defered send")
+                error!("Unable to send message for deferred send")
             }
         }
     }

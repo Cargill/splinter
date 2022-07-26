@@ -25,7 +25,7 @@ use super::ScabbardPublishingContext;
 
 /// The header for a SignedTimestamp
 ///
-/// This is the componenet that will be turned to bytes and signed
+/// This is the component that will be turned to bytes and signed
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedTimestampHeader {
     timestamp: SystemTime,

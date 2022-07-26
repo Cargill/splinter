@@ -56,7 +56,7 @@ pub enum RetryMessage {
 
 /// This thread is in charge of retrying messages that were received but interconnect did not yet
 /// have a matching peer ID for the connection ID. It is possible this peer did not exist yet due
-/// to timing so it should be retried in the future. The message will be rechecked serveral
+/// to timing so it should be retried in the future. The message will be rechecked several
 /// times, but if the peer is not added after a configured number of attempts the message will
 /// be dropped. The number of pending queue messages is limited to a set size.
 pub fn run_pending_loop<S>(
@@ -222,18 +222,18 @@ where
                                 .send(new_connection_id, pending.payload.to_vec())
                                 .is_ok()
                             {
-                                // if send was sucessfully move on to next pending message
+                                // if send was successfully move on to next pending message
                                 continue;
                             }
                         }
                     }
                 } else {
-                    // if send was sucessfully move on to next pending message
+                    // if send was successfully move on to next pending message
                     continue;
                 }
             }
 
-            // Send was not sucessful, check to see if the pending message still has retry attempts
+            // Send was not successful, check to see if the pending message still has retry attempts
             // remaining
             if pending.remaining_attempts > 0 {
                 pending.remaining_attempts -= 1;

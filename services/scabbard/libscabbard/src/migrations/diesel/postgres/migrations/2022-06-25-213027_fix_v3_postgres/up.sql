@@ -22,7 +22,7 @@ ALTER TABLE consensus_2pc_context DROP CONSTRAINT ack_timeout_start_check;
 ALTER TABLE consensus_2pc_context ADD CONSTRAINT ack_timeout_start
   CHECK ( (ack_timeout_start IS NOT NULL) OR (state != 'WAITING_FOR_DECISION_ACK') );
 
--- Fix type for serveral columns
+-- Fix type for several columns
 ALTER TABLE scabbard_v3_commit_history
 ALTER COLUMN epoch TYPE BIGINT;
 

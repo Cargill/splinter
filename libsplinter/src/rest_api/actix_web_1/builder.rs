@@ -272,7 +272,7 @@ mod test {
     use crate::error::InternalError;
     use crate::rest_api::auth::{identity::Identity, AuthorizationHeader};
 
-    /// Verifies that the `RestApiBuilder` builds succesfully when all required configuration is
+    /// Verifies that the `RestApiBuilder` builds successfully when all required configuration is
     /// provided.
     #[test]
     fn rest_api_builder_successful() {

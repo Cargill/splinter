@@ -270,7 +270,7 @@ impl Handler for AuthChallengeNonceResponseHandler {
 
 pub struct AuthChallengeSubmitRequestHandler {
     auth_manager: AuthorizationManagerStateMachine,
-    verifer: Box<dyn Verifier>,
+    verifier: Box<dyn Verifier>,
     nonce: Vec<u8>,
     expected_public_key: Option<public_key::PublicKey>,
 }
@@ -278,13 +278,13 @@ pub struct AuthChallengeSubmitRequestHandler {
 impl AuthChallengeSubmitRequestHandler {
     pub fn new(
         auth_manager: AuthorizationManagerStateMachine,
-        verifer: Box<dyn Verifier>,
+        verifier: Box<dyn Verifier>,
         nonce: Vec<u8>,
         expected_public_key: Option<public_key::PublicKey>,
     ) -> Self {
         Self {
             auth_manager,
-            verifer,
+            verifier,
             nonce,
             expected_public_key,
         }
@@ -316,7 +316,7 @@ impl Handler for AuthChallengeSubmitRequestHandler {
 
         for request in submit_msg.submit_requests {
             let verified = self
-                .verifer
+                .verifier
                 .verify(
                     &self.nonce,
                     &Signature::new(request.signature.to_vec()),

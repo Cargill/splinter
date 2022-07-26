@@ -101,7 +101,7 @@ mod tests {
     }
 
     /// Verifies that the authorization middleware returns a `404 Not Found` response when the
-    /// `authorize` function returns an "unkonwn endpoint" result.
+    /// `authorize` function returns an "unknown endpoint" result.
     #[test]
     fn auth_middleware_not_found() {
         let app = App::new()

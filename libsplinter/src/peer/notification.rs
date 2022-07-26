@@ -32,7 +32,7 @@ pub enum PeerManagerNotification {
     Disconnected { peer: PeerTokenPair },
 }
 
-/// `PeerNotificationIter` is used to receive notfications from the `PeerManager`. The notifications
+/// `PeerNotificationIter` is used to receive notifications from the `PeerManager`. The notifications
 /// include:
 /// - `PeerManagerNotification::Disconnected`: peer disconnected and reconnection is being
 ///   attempted
@@ -175,7 +175,7 @@ pub mod tests {
     fn test_peer_manager_notifications() {
         let (send, recv) = channel();
 
-        let notifcation_iter = PeerNotificationIter { recv };
+        let notification_iter = PeerNotificationIter { recv };
 
         let join_handle = thread::spawn(move || {
             for i in 0..5 {
@@ -194,9 +194,9 @@ pub mod tests {
         });
 
         let mut notifications_sent = 0;
-        for notifcation in notifcation_iter {
+        for notification in notification_iter {
             assert_eq!(
-                notifcation,
+                notification,
                 PeerManagerNotification::Connected {
                     peer: PeerTokenPair::new(
                         PeerAuthorizationToken::Trust {

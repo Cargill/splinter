@@ -280,7 +280,7 @@ pub fn test_2_party_circuit_creation_challenge_authorization_different_key() {
     assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
     assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
 
-    // Submit the same `CircuitManagmentPayload` to create the circuit to the second node
+    // Submit the same `CircuitManagementPayload` to create the circuit to the second node
     // to validate this duplicate proposal is rejected
     let duplicate_res = node_b
         .admin_service_client()
@@ -471,7 +471,7 @@ pub fn test_2_party_circuit_creation_challenge_authorization_different_keys() {
     assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
     assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
 
-    // Submit the same `CircuitManagmentPayload` to create the circuit to the second node
+    // Submit the same `CircuitManagementPayload` to create the circuit to the second node
     // to validate this duplicate proposal is rejected
     let duplicate_res = node_b
         .admin_service_client()
@@ -548,7 +548,7 @@ pub fn test_2_party_circuit_creation_challenge_authorization_different_keys() {
 /// 1. Create and submit a `CircuitCreateRequest` from the first node
 /// 2. Wait until the proposal is available to one of the other nodes, using `list_proposals`
 /// 3. Verify the same proposal is available on every node
-/// 4. Submit the same `CircuitManagmentPayload` created in the first step from the nodes that did
+/// 4. Submit the same `CircuitManagementPayload` created in the first step from the nodes that did
 ///    not submit the original `CircuitCreateRequest`.
 /// 5. Validate the duplicate proposals submitted in the previous step each result in an error
 /// 6. Create and submit a `CircuitProposalVote` from the second node to accept the proposal
@@ -2046,7 +2046,7 @@ pub fn test_3_party_circuit_proposal_rejected_stop() {
 ///    of peer connection
 /// 2. Immediately propose a circuit. This creates a good chance that two connection will be
 ///    created, where one needs to be closed
-/// 3. Wait for the circuit to be created sucessfully
+/// 3. Wait for the circuit to be created successfully
 #[test]
 pub fn test_2_party_circuit_duplicate_connection() {
     // Start a 2-node network

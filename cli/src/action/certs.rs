@@ -626,7 +626,7 @@ fn make_ca_signed_cert(
 }
 
 /// write the a file to a temp file name and then rename to final filename
-/// this will guarantee that the final file will ony ever contain valid data
+/// this will guarantee that the final file will only ever contain valid data
 fn write_file(path: &Path, file_name: &str, bytes: &[u8]) -> Result<(), CliError> {
     let temp_path_buf = path.join(format!(".{}.new", file_name));
     let temp_path = {
@@ -692,7 +692,7 @@ fn absolute_path(path: &Path) -> Result<String, CliError> {
     }
 }
 
-// create a X509 certficate from a file
+// create a X509 certificate from a file
 fn get_ca_cert(cert_path: &Path) -> Result<X509, CliError> {
     let cert = fs::read(cert_path)?;
     let cert = X509::from_pem(&cert)?;

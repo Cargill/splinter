@@ -126,7 +126,7 @@ pub struct AdminServiceShared {
     // the agreed upon protocol version between another admin service, map of peer token for the
     // service id to version protocol
     service_protocols: HashMap<PeerTokenPair, u32>,
-    // CircuitManagmentPayloads that still need to go through consensus
+    // CircuitManagementPayloads that still need to go through consensus
     pending_circuit_payloads: VecDeque<CircuitManagementPayload>,
     // The pending consensus proposals
     pending_consensus_proposals: HashMap<ProposalId, (Proposal, CircuitManagementPayload)>,
@@ -2719,7 +2719,7 @@ impl AdminServiceShared {
 
         if circuit.get_circuit_management_type().is_empty() {
             return Err(AdminSharedError::ValidationFailed(
-                "The circuit must have a mangement type".to_string(),
+                "The circuit must have a management type".to_string(),
             ));
         }
 
@@ -3589,7 +3589,7 @@ impl AdminServiceShared {
     }
 }
 
-// This should never return an error since we recieved a message from this service id
+// This should never return an error since we received a message from this service id
 pub fn get_peer_token_from_service_id(
     service_id: &str,
     local_node_id: &str,

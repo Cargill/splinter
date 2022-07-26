@@ -19,7 +19,7 @@ use std::io;
 use toml::de::Error as TomlError;
 
 #[derive(Debug)]
-/// General error type used during `Config` contruction.
+/// General error type used during `Config` construction.
 pub enum ConfigError {
     ReadError { file: String, err: io::Error },
     TomlParseError(TomlError),

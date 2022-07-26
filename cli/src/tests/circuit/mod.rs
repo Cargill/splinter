@@ -52,7 +52,7 @@ fn run_with_captured_output(command: &str) -> Result<String, CliError> {
     Ok(stdout_output)
 }
 
-/// Get the ciricuit ID from the output of a successful `splinter circuit propose`.
+/// Get the circuit ID from the output of a successful `splinter circuit propose`.
 fn get_circuit_id_from_propose_output(output: &str) -> String {
     output
         .split_whitespace()

@@ -43,7 +43,7 @@ impl LifecycleDispatch for ServiceOrchestrator {
             circuit_id, service_id, service_type,
         );
 
-        let service_defination = ServiceDefinition {
+        let service_definition = ServiceDefinition {
             circuit: circuit_id.to_string(),
             service_id: service_id.to_string(),
             service_type: service_type.to_string(),
@@ -54,7 +54,7 @@ impl LifecycleDispatch for ServiceOrchestrator {
             arg_map.insert(key, value);
         }
 
-        ServiceOrchestrator::initialize_service(self, service_defination, arg_map)
+        ServiceOrchestrator::initialize_service(self, service_definition, arg_map)
             .map_err(|err| InternalError::from_source(Box::new(err)))
     }
 
@@ -80,13 +80,13 @@ impl LifecycleDispatch for ServiceOrchestrator {
             circuit_id, service_id, service_type,
         );
 
-        let service_defination = ServiceDefinition {
+        let service_definition = ServiceDefinition {
             circuit: circuit_id.to_string(),
             service_id: service_id.to_string(),
             service_type: service_type.to_string(),
         };
 
-        ServiceOrchestrator::stop_service(self, &service_defination)
+        ServiceOrchestrator::stop_service(self, &service_definition)
             .map_err(|err| InternalError::from_source(Box::new(err)))
     }
 
@@ -112,13 +112,13 @@ impl LifecycleDispatch for ServiceOrchestrator {
             circuit_id, service_id, service_type,
         );
 
-        let service_defination = ServiceDefinition {
+        let service_definition = ServiceDefinition {
             circuit: circuit_id.to_string(),
             service_id: service_id.to_string(),
             service_type: service_type.to_string(),
         };
 
-        ServiceOrchestrator::purge_service(self, &service_defination)
+        ServiceOrchestrator::purge_service(self, &service_definition)
             .map_err(|err| InternalError::from_source(Box::new(err)))
     }
 
@@ -151,7 +151,7 @@ impl LifecycleDispatch for ServiceOrchestrator {
             circuit_id, service_id, service_type,
         );
 
-        let service_defination = ServiceDefinition {
+        let service_definition = ServiceDefinition {
             circuit: circuit_id.to_string(),
             service_id: service_id.to_string(),
             service_type: service_type.to_string(),
@@ -162,7 +162,7 @@ impl LifecycleDispatch for ServiceOrchestrator {
             arg_map.insert(key, value);
         }
 
-        ServiceOrchestrator::add_stopped_service(self, service_defination, arg_map)
+        ServiceOrchestrator::add_stopped_service(self, service_definition, arg_map)
             .map_err(|err| InternalError::from_source(Box::new(err)))
     }
 }

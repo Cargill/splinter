@@ -1044,7 +1044,7 @@ mod tests {
 
     /// Test that adding the same connection twice is an idempotent operation
     #[test]
-    fn test_mutiple_add_connection_requests() {
+    fn test_multiple_add_connection_requests() {
         let mut transport = Box::new(InprocTransport::default());
         let mut listener = transport.listen("inproc://test").unwrap();
 

@@ -61,7 +61,7 @@ pub trait ServiceInstance: Send {
 
     /// Handle any incoming message intended for this service instance.
     ///
-    /// Messages recevied by this service are provided in raw bytes.  The format of the service
+    /// Messages received by this service are provided in raw bytes.  The format of the service
     fn handle_message(
         &self,
         message_bytes: &[u8],

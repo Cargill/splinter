@@ -99,7 +99,7 @@ impl fmt::Display for WebSocketError {
                 original_error,
             } => write!(
                 f,
-                "A failure occured while executing \
+                "A failure occurred while executing \
                  the on fail callback: original error: {}, on fail error: {}",
                 on_fail_error, original_error
             ),

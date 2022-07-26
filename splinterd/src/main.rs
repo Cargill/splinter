@@ -441,7 +441,7 @@ fn main() {
                 .long("oauth-openid-auth-params")
                 .alias("oauth-openid-auth-param")
                 .long_help(
-                    "Addtional parameters to add to OAuth OpenID auth requests, formatted as \
+                    "Additional parameters to add to OAuth OpenID auth requests, formatted as \
                      `key=value` pairs (requires `--oauth-provider openid`)",
                 )
                 .takes_value(true)
@@ -452,7 +452,7 @@ fn main() {
                 .long("oauth-openid-scopes")
                 .alias("oauth-openid-scope")
                 .long_help(
-                    "Addtional scopes to request from the OAuth OpenID provider (requires \
+                    "Additional scopes to request from the OAuth OpenID provider (requires \
                      `--oauth-provider openid`)",
                 )
                 .takes_value(true)
@@ -645,7 +645,7 @@ fn start_daemon(matches: ArgMatches, log_handle: Handle) -> Result<(), UserError
         }
     }
 
-    // set up metric recorder as soon as possilbe
+    // set up metric recorder as soon as possible
     #[cfg(feature = "tap")]
     setup_metrics_recorder(&config)?;
 

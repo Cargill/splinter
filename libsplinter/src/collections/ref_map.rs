@@ -53,7 +53,7 @@ impl<K: Hash + Eq> RefMap<K> {
         }
     }
 
-    /// Decrements the referece count for `ref_id`
+    /// Decrements the reference count for `ref_id`
     ///
     /// If the internal reference count reaches zero, then `ref_id` will be removed.
     pub fn remove_ref<Q: ?Sized>(&mut self, ref_id: &Q) -> Result<Option<K>, RefMapRemoveError>
@@ -99,10 +99,10 @@ pub mod tests {
     }
 
     // Test that when removing a reference, if the reference count is greater than 1, the reference
-    // count is decremented and `None` is retured to notify that caller that the reference has not
+    // count is decremented and `None` is returned to notify that caller that the reference has not
     // been fully removed.
     //
-    // Then test that if the reference count is 1, the reference is removed and the ID is retured
+    // Then test that if the reference count is 1, the reference is removed and the ID is returned
     // to tell the caller the reference has been removed.
     #[test]
     fn test_remove_ref() {

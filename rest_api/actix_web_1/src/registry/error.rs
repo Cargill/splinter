@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Contains an error tht can be sent from
+//! Contains an error that can be sent from
 
 use std::error::Error;
 use std::fmt;

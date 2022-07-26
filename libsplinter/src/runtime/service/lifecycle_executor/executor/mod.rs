@@ -636,7 +636,7 @@ mod tests {
             .unwrap();
 
         if let Ok(_) = recv.recv_timeout(std::time::Duration::from_secs(5)) {
-            panic!("Should not have recieved a message")
+            panic!("Should not have received a message")
         }
 
         executor.signal_shutdown();

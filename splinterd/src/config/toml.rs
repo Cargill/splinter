@@ -811,7 +811,7 @@ mod tests {
         )
         .expect("Could not deserialize full toml")
         .build()
-        .expect("A config error has occured");
+        .expect("A config error has occurred");
         assert!(matches!(toml.config_dir(), Some(text) if text == "/etc/splinter"));
         assert!(matches!(toml.state_dir() , Some(text) if text == "/var/lib/splinter"));
         assert!(matches!(toml.database() , Some(text) if text == "splinter_state.db"));

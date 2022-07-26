@@ -312,12 +312,12 @@ impl ServiceNetworkSender for StandardServiceNetworkSender {
     }
 }
 
-/// Helper function for creating a NetworkMessge with a Circuit message type
+/// Helper function for creating a NetworkMessage with a Circuit message type
 ///
 /// # Arguments
 ///
 /// * `payload` - The payload in bytes that should be set in the Circuit message get_payload
-/// * `circuit_message_type` - The message type that should be set in teh Circuit message
+/// * `circuit_message_type` - The message type that should be set in the Circuit message
 pub fn create_message(
     payload: Vec<u8>,
     circuit_message_type: CircuitMessageType,

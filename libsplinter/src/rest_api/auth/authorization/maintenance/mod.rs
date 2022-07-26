@@ -194,9 +194,9 @@ mod tests {
     /// 1. Create a new `MaintenanceModeAuthorizationHandler` with a mock RBAC store
     /// 2. Enable maintenance mode
     /// 3. Verify that a `Continue` result is returned by `has_permission` when an identity with the
-    ///    admin role is speicified
+    ///    admin role is specified
     /// 4. Verify that a `Deny` result is returned by `has_permission` when an identity without the
-    ///    admin role is speicified
+    ///    admin role is specified
     /// 5. Verify that a `Deny` result is returned by `has_permission` when an unknown identity is
     ///    specified
     #[cfg(feature = "authorization-handler-rbac")]

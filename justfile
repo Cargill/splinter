@@ -60,6 +60,7 @@ ci:
     just ci-lint-dockerfiles
     just ci-lint-openapi
     just ci-lint-splinter
+    just ci-lint-typos
     just ci-shellcheck
     just ci-test
 
@@ -73,6 +74,8 @@ ci-lint-splinter:
       --abort-on-container-exit lint-splinter
 
 ci-lint-openapi: lint-openapi
+
+ci-lint-typos: lint-typos
 
 ci-shellcheck:
     #!/usr/bin/env sh
@@ -154,6 +157,14 @@ lint-openapi:
     docker run --volume "$PWD":/data jamescooke/openapi-validator:0.46.0 -e \
      	splinterd/api/static/openapi.yaml
     echo "\n\033[92mLint Splinter OpenAPI Success\033[0m\n"
+
+lint-typos:
+    #!/usr/bin/env sh
+    set -e
+    docker build -t lint-typos -f docker/typos.dockerfile .
+    echo "\033[1mLinting Typos\033[0m"
+    docker run -i --rm -v $(pwd):/project lint-typos typos --config .github/typos_config.toml
+    echo "\n\033[92mLint Typos Success\033[0m\n"
 
 metrics:
     docker-compose -f docker/metrics/docker-compose.yaml down;

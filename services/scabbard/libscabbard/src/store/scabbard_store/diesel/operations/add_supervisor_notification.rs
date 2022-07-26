@@ -30,7 +30,7 @@ use super::ScabbardStoreOperations;
 
 const OPERATION_NAME: &str = "add_supervisor_notification";
 
-pub(in crate::store::scabbard_store::diesel) trait AddSupervisorNotficationOperation {
+pub(in crate::store::scabbard_store::diesel) trait AddSupervisorNotificationOperation {
     fn add_supervisor_notification(
         &self,
         supervisor_notification: SupervisorNotification,
@@ -38,7 +38,7 @@ pub(in crate::store::scabbard_store::diesel) trait AddSupervisorNotficationOpera
 }
 
 #[cfg(feature = "sqlite")]
-impl<'a> AddSupervisorNotficationOperation for ScabbardStoreOperations<'a, SqliteConnection> {
+impl<'a> AddSupervisorNotificationOperation for ScabbardStoreOperations<'a, SqliteConnection> {
     fn add_supervisor_notification(
         &self,
         notification: SupervisorNotification,
@@ -59,7 +59,7 @@ impl<'a> AddSupervisorNotficationOperation for ScabbardStoreOperations<'a, Sqlit
 }
 
 #[cfg(feature = "postgres")]
-impl<'a> AddSupervisorNotficationOperation for ScabbardStoreOperations<'a, PgConnection> {
+impl<'a> AddSupervisorNotificationOperation for ScabbardStoreOperations<'a, PgConnection> {
     fn add_supervisor_notification(
         &self,
         notification: SupervisorNotification,

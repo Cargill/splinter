@@ -158,7 +158,7 @@ mod tests {
 
     use crate::error::InternalError;
 
-    /// Verfifies that the `AuthorizationHeader` enum is correctly parsed from strings
+    /// Verifies that the `AuthorizationHeader` enum is correctly parsed from strings
     #[test]
     fn parse_authorization_header() {
         assert!(matches!(
@@ -177,7 +177,7 @@ mod tests {
         ));
     }
 
-    /// Verfifies that the `BearerToken` enum is correctly parsed from strings
+    /// Verifies that the `BearerToken` enum is correctly parsed from strings
     #[test]
     fn parse_bearer_token() {
         #[cfg(feature = "biome-credentials")]
@@ -504,7 +504,7 @@ mod tests {
         ));
     }
 
-    /// Verifies the case where `authorize` is called with multile identity providers and only one
+    /// Verifies the case where `authorize` is called with multiple identity providers and only one
     /// successfully gets the client's identity. This test uses an endpoint with
     /// `Permission::AllowAuthenticated` to ignore authorization handlers which are covered by other
     /// tests.

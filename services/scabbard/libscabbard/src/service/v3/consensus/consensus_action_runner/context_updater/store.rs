@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Contains an implementation of a `ContextUpdater` that soley uses commands to update
+//! Contains an implementation of a `ContextUpdater` that solely uses commands to update
 //! the context and alarms.
 
 use std::sync::Arc;

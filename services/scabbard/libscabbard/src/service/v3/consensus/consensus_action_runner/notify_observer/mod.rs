@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Definations of observers for handling notifications from consensus algorithm.
+//! Definitions of observers for handling notifications from consensus algorithm.
 //!
 //! The notification will need to be handled by another part of the system, but the
 //! `ConsensusActionRunner` makes no assumptions about how the notifications are delivered.

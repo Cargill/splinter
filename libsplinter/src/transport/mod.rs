@@ -192,7 +192,7 @@ pub mod tests {
     /// writable states on each connection.
     ///
     /// Additionally, this test does send messages in both directions and confirms that the
-    /// messages are recieved on the other end.
+    /// messages are received on the other end.
     ///
     /// The process used is essentially:
     ///
@@ -209,7 +209,7 @@ pub mod tests {
     /// 8. Join the connector thread.
     pub fn test_poll<T: Transport + Send + 'static>(mut transport: T, bind: &str) {
         // The number of connections to create during the test. The higher the number, the more
-        // likely we would be to find issues which only occur occassionally. However, the higher
+        // likely we would be to find issues which only occur occasionally. However, the higher
         // the number, the more likely we are to cause false failures because of system-level
         // concerns such as running out of file descriptors.
         const CONNECTIONS: usize = 16;
@@ -336,7 +336,7 @@ pub mod tests {
 
             // For each connection, make sure we can receive the message sent, then send
             // a response. Sending a response here will unblock the listener thread, so it is
-            // important we do this even in the error case, as the test will hang ohterwise.
+            // important we do this even in the error case, as the test will hang otherwise.
             for (mut conn, _token) in connections {
                 assert_eq!(b"hello".to_vec(), block!(conn.recv(), RecvError).unwrap());
                 assert_ok(conn.send(b"world"));

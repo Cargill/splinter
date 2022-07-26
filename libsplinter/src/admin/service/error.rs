@@ -162,7 +162,7 @@ pub enum AdminSharedError {
     /// An error occurred while trying to add an admin service event subscriber to the service.
     UnableToAddSubscriber(String),
 
-    // An error occured while trying to negotiated protocol versions
+    // An error occurred while trying to negotiated protocol versions
     ServiceProtocolError(String),
 }
 
@@ -233,7 +233,7 @@ impl fmt::Display for AdminSharedError {
             }
             AdminSharedError::ServiceProtocolError(msg) => write!(
                 f,
-                "error occured while trying to agree on protocol: {}",
+                "error occurred while trying to agree on protocol: {}",
                 msg
             ),
         }

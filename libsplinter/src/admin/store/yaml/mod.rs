@@ -2034,7 +2034,7 @@ proposals:
     //
     // 1. Setup the temp directory with existing state
     // 2. Fetch an existing proposal from state, validate proposal is returned
-    // 3. Fetch an non exisitng proposal from state, validate None
+    // 3. Fetch an non existing proposal from state, validate None
     // 4. Update fetched proposal with a vote record and update, validate ok
     // 5. Call update with new proposal, validate error is returned
     // 6. Add new proposal, validate ok
@@ -2153,7 +2153,7 @@ proposals:
     //
     // 1. Setup the temp directory with existing state
     // 2. Fetch an existing circuit from state, validate circuit is returned
-    // 3. Fetch an non exisitng circuit from state, validate None
+    // 3. Fetch an non existing circuit from state, validate None
     // 4. Update fetched proposa with a vote record and update, validate ok
     // 5. Call update with new circuit, validate error is returned
     // 6. Add new circuit, validate ok
@@ -2258,12 +2258,12 @@ proposals:
 
         assert!(
             store.update_circuit(new_circuit.clone()).is_err(),
-            "Updating new cirucit should fail"
+            "Updating new circuit should fail"
         );
 
         store
             .add_circuit(new_circuit.clone(), vec![new_node.clone()])
-            .expect("Unable to add cirucit");
+            .expect("Unable to add circuit");
 
         assert_eq!(
             store

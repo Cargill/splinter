@@ -444,7 +444,7 @@ fn run_incoming_loop(
             .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
 
         // if a service is waiting on a reply the inbound router will
-        // route back the reponse to the service based on the correlation id in
+        // route back the response to the service based on the correlation id in
         // the message, otherwise it will be sent to the inbound thread
         match msg {
             NetworkMessage::Circuit(payload) => {

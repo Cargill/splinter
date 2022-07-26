@@ -25,7 +25,7 @@ use crate::store::{
     Notification, ScabbardStoreFactory, SupervisorNotificationBuilder, SupervisorNotificationType,
 };
 
-use super::commands::AddSupervisorNotficationCommand;
+use super::commands::AddSupervisorNotificationCommand;
 
 /// Implementation of `NotifyObserver` that works with the `Supervisor`
 pub struct SupervisorNotifyObserver<C: 'static> {
@@ -67,7 +67,7 @@ impl<C: 'static> NotifyObserver<C> for SupervisorNotifyObserver<C> {
                 builder =
                     builder.with_notification_type(&SupervisorNotificationType::RequestForStart)
             }
-            // if we are the coordiantor always, vote yes
+            // if we are the coordinator always, vote yes
             Notification::CoordinatorRequestForVote() => {
                 builder = builder
                     .with_notification_type(&SupervisorNotificationType::CoordinatorRequestForVote)
@@ -80,12 +80,12 @@ impl<C: 'static> NotifyObserver<C> for SupervisorNotifyObserver<C> {
                 )
             }
             // Commit pending value
-            // creates a command to update the current commit entry withs status commited
+            // creates a command to update the current commit entry with status committed
             Notification::Commit() => {
                 builder = builder.with_notification_type(&SupervisorNotificationType::Commit)
             }
             // Abort pending value
-            // creates a command to update the current commit entry withs status aborted
+            // creates a command to update the current commit entry with status aborted
             Notification::Abort() => {
                 builder = builder.with_notification_type(&SupervisorNotificationType::Abort)
             }
@@ -100,7 +100,7 @@ impl<C: 'static> NotifyObserver<C> for SupervisorNotifyObserver<C> {
             .build()
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        Ok(vec![Box::new(AddSupervisorNotficationCommand::new(
+        Ok(vec![Box::new(AddSupervisorNotificationCommand::new(
             self.store_factory.clone(),
             supervisor_notification,
         ))])

@@ -634,7 +634,7 @@ mod tests {
     }
 
     #[test]
-    fn service_owner_corect() {
+    fn service_owner_correct() {
         let owner = "node01".to_string();
         let service = SplinterService {
             service_id: "sc01".to_string(),

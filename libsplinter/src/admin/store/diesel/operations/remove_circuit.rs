@@ -58,7 +58,7 @@ where
                     for node in circuit.members() {
                         // Count the amount of `circuit_member` entries with the same `node_id`. If
                         // there are still `circuit_member` entries with the associated `node_id`,
-                        // or the count is not equal to 0, the `node_enpoint` should not be deleted.
+                        // or the count is not equal to 0, the `node_endpoint` should not be deleted.
                         if let Some(0) = circuit_member::table
                             .filter(circuit_member::node_id.eq(&node.node_id()))
                             .count()

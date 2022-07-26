@@ -26,7 +26,7 @@ use crate::migrations::run_postgres_migrations;
 ///
 /// This function will create a database, based on the name of the current test being run, if
 /// known. It will then run the migrations against the new database.  After the test completes, it
-/// will drop the test datbase previously created, regardless of success or failure of the test.
+/// will drop the test database previously created, regardless of success or failure of the test.
 ///
 /// The base url for a postgres server is specified by the environment variable
 /// `DIESEL_POSTGRES_TEST_URL` or defaults to `"postgres://postgres:test@localhost:5432"`.

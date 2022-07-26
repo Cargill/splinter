@@ -108,7 +108,7 @@ pub(in crate::admin) fn commit_2_party_circuit(
     assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
     assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
 
-    // Submit the same `CircuitManagmentPayload` to create the circuit to the second node
+    // Submit the same `CircuitManagementPayload` to create the circuit to the second node
     // to validate this duplicate proposal is rejected
     let duplicate_res = node_b
         .admin_service_client()
@@ -274,7 +274,7 @@ pub(in crate::admin) fn commit_2_party_circuit_with_auth(
     assert_eq!(&EventType::ProposalSubmitted, proposal_b_event.event_type());
     assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
 
-    // Submit the same `CircuitManagmentPayload` to create the circuit to the second node
+    // Submit the same `CircuitManagementPayload` to create the circuit to the second node
     // to validate this duplicate proposal is rejected
     let duplicate_res = node_b
         .admin_service_client_with_auth(auth.clone())
@@ -458,13 +458,13 @@ pub(in crate::admin) fn commit_3_party_circuit(
     assert_eq!(proposal_a_event.proposal(), proposal_b_event.proposal());
     assert_eq!(proposal_a_event.proposal(), proposal_c_event.proposal());
 
-    // Submit the same `CircuitManagmentPayload` to create the circuit to the second node
+    // Submit the same `CircuitManagementPayload` to create the circuit to the second node
     // to validate this duplicate proposal is rejected
     let duplicate_res_b = node_b
         .admin_service_client()
         .submit_admin_payload(circuit_payload_bytes.clone());
     assert!(duplicate_res_b.is_err());
-    // Submit the same `CircuitManagmentPayload` to create the circuit to the third node
+    // Submit the same `CircuitManagementPayload` to create the circuit to the third node
     // to validate this duplicate proposal is rejected
     let duplicate_res_c = node_c
         .admin_service_client()
