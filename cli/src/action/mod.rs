@@ -34,6 +34,8 @@ mod request_logger;
 pub mod time;
 #[cfg(feature = "user")]
 pub mod user;
+#[cfg(feature = "workload")]
+pub mod workload;
 
 use std::collections::HashMap;
 use std::ffi::CString;

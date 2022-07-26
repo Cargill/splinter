@@ -30,6 +30,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2"
+ctrlc = { version = "3.0", optional = true }
 cylinder = { version = "0.2.2", features = ["jwt", "key-load"] }
 diesel = { version = "1.0", features = ["postgres"], optional = true }
 dirs = "4"
@@ -38,6 +39,7 @@ libc = "0.2"
 log = "0.4"
 openssl = "0.10"
 protobuf = "2.23"
+rand = { version = "0.8", optional = true }
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -80,6 +82,7 @@ default = [
     "sqlite",
     "upgrade",
     "user",
+    "workload"
 ]
 
 stable = [
@@ -95,6 +98,7 @@ experimental = [
     "https-certs",
     "playlist-smallbank",
     "registry",
+    "workload-smallbank"
 ]
 
 authorization-handler-maintenance = []
@@ -122,7 +126,14 @@ upgrade = [
     "splinter/store-factory"
 ]
 user = []
-
+workload = [
+    "ctrlc",
+    "rand",
+    "transact/family-command-workload",
+    "transact/workload",
+    "transact/workload-runner"
+]
+workload-smallbank = ["workload", "transact/family-smallbank-workload"]
 
 
 [package.metadata.deb]

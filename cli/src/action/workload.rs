@@ -28,10 +28,11 @@ use transact::families::smallbank::workload::{
 };
 use transact::workload::{HttpRequestCounter, WorkloadRunner};
 
+use crate::action::request_logger::RequestLogger;
 use crate::error::CliError;
-use crate::request_logger::RequestLogger;
+use crate::signing::{create_cylinder_jwt_auth, load_signer};
 
-use super::{create_cylinder_jwt_auth_signer_key, Action, DEFAULT_LOG_TIME_SECS};
+use super::{Action, DEFAULT_LOG_TIME_SECS};
 
 pub struct WorkloadAction;
 
@@ -39,7 +40,7 @@ impl Action for WorkloadAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
-        let (auth, signer) = create_cylinder_jwt_auth_signer_key(args.value_of("key"))?;
+        let signer = load_signer(args.value_of("key"))?;
 
         let targets_vec: Vec<String> = args
             .values_of("targets")
@@ -67,14 +68,14 @@ impl Action for WorkloadAction {
                     .parse::<Time>()
                     .or_else(|_| min_string.parse::<f64>().map(Time::from))
                     .map_err(|_| {
-                        CliError::UnparseableArg("Unable to parse provided min target rate".into())
+                        CliError::ActionError("Unable to parse provided min target rate".into())
                     })?;
 
                 let max = max_string
                     .parse::<Time>()
                     .or_else(|_| max_string.parse::<f64>().map(Time::from))
                     .map_err(|_| {
-                        CliError::UnparseableArg("Unable to parse provided max target rate".into())
+                        CliError::ActionError("Unable to parse provided max target rate".into())
                     })?;
 
                 (min, max)
@@ -146,6 +147,8 @@ impl Action for WorkloadAction {
         .map_err(|err| CliError::ActionError(format!("Unable to start request logger: {}", err)))?;
 
         let mut workload_runner = WorkloadRunner::default();
+
+        let auth = create_cylinder_jwt_auth(signer.clone())?;
 
         match workload {
             #[cfg(feature = "workload-smallbank")]
