@@ -59,7 +59,7 @@ where
                 )));
             }
 
-            let updat_ack_status = match ack {
+            let update_ack_status = match ack {
                 RequestStatus::Sent => 1,
                 RequestStatus::NotSent => 0,
             };
@@ -73,7 +73,7 @@ where
                                 .and(echo_requests::sender_service_id.eq(format!("{}", service))),
                         )
                         .set((
-                            echo_requests::ack.eq(updat_ack_status),
+                            echo_requests::ack.eq(update_ack_status),
                             echo_requests::ack_at.eq(ack_at),
                         ))
                         .execute(self.conn)
@@ -87,7 +87,7 @@ where
                                 .eq(correlation_id)
                                 .and(echo_requests::sender_service_id.eq(format!("{}", service))),
                         )
-                        .set(echo_requests::ack.eq(updat_ack_status))
+                        .set(echo_requests::ack.eq(update_ack_status))
                         .execute(self.conn)
                         .map(|_| ())
                         .map_err(|err| InternalError::from_source(Box::new(err)))?;

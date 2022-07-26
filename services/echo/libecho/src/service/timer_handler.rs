@@ -150,13 +150,13 @@ impl TimerHandler for EchoTimerHandler {
         //      jitter
         //      error_rate
         // 2) get the list of peers that haven't been send a message in frequency+jitter duration.
-        // 3) for each peer, calculate a unique actual jitter value betwene [-jitter, +jitter]
+        // 3) for each peer, calculate a unique actual jitter value between [-jitter, +jitter]
         // 4) from the list of peers, keep only those which haven't received a message in
-        //    frequence+actual_jitter
+        //    frequency+actual_jitter
         // 5) for remaining peers, add a new request to the database with sent=false
         // -- end of message generation --
         // -- message sending --
-        // 6) read a list of messages from the database wich are in the sent=false state
+        // 6) read a list of messages from the database which are in the sent=false state
         // 7) for each message:
         // 7a) using error_rate, determine whether to emulate an error; if so, emulate an error
         // 7b) otherwise, send message; as each are sent
