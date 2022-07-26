@@ -1,4 +1,5 @@
-# Copyright 2022 Cargill Incorporated
+#!/bin/bash
+# Copyright 2018-2022 Cargill Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,13 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# ------------------------------------------------------------------------------
 
-[default.extend-words]
-OTU = "OTU"
-# workaround for false positive in splinterd/api/static/openapi.yaml
-# https://github.com/crate-ci/typos/issues/484
+set -e
 
-[default.extend-identifiers]
-ERRORs = "ERRORs"
-# workaround for false positive in tests/migrations/bin/test_psql_migrations
-# https://github.com/crate-ci/typos/issues/399
+end=$((SECONDS+10))
+while [[ $(curl --write-out %{http_code} --silent --output /dev/null http://$1:8080/status) -ne 401 ]] ;
+do
+  >&2 echo "$1 is unavailable - sleeping"
+  sleep 1
+  if [ $SECONDS -gt $end ];
+  then
+    echo -e "\033[91mERROR\033[0m - $1 is not available after 10 seconds"
+    exit 1
+  fi
+done

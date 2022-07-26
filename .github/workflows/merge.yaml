@@ -153,3 +153,32 @@ jobs:
           fields: repo,message,author,job
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  test_psql_migrations:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Test PSQL Migrations
+        run: just ci-test-migrations
+
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: test-psql-migrations.log
+          path: ./tests/migrations/test-psql-migrations.log
+
+      - name: Notify Slack of Failure
+        if: cancelled() || failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

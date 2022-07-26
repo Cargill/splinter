@@ -1,4 +1,4 @@
-# Copyright 2022 Cargill Incorporated
+# Copyright 2018-2022 Cargill Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,13 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# ------------------------------------------------------------------------------
 
-[default.extend-words]
-OTU = "OTU"
-# workaround for false positive in splinterd/api/static/openapi.yaml
-# https://github.com/crate-ci/typos/issues/484
-
-[default.extend-identifiers]
-ERRORs = "ERRORs"
-# workaround for false positive in tests/migrations/bin/test_psql_migrations
-# https://github.com/crate-ci/typos/issues/399
+- identity: "splinterd-alpha"
+  endpoints:
+    - "tcps://splinterd-alpha:8044"
+  display_name: "splinterd-alpha"
+  keys:
+    - "%ALPHA%"
+  metadata:
+    network: "migration_test"
+- identity: "splinterd-beta"
+  endpoints:
+    - "splinterd-beta:8044"
+  display_name: "splinterd-beta"
+  keys:
+    - "%BETA%"
+  metadata:
+    network: "migration_test"

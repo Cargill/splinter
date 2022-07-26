@@ -1,0 +1,130 @@
+#!/bin/bash
+# Copyright 2018-2022 Cargill Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ------------------------------------------------------------------------------
+
+check_for_errors() {
+  grep ERROR $work_dir/test-psql-migrations.log
+  if [ $? == "0" ]; then
+      echo -e "\033[91mERROR\033[0m - ERRORs were logged"
+      exit 1
+  else
+      echo -e "\033[92mPASS\033[0m - No ERRORs were logged"
+  fi
+}
+
+check_states() {
+  echo
+  echo "Checking to see if state root hashes match..."
+  docker exec -t workload bash -c "/config/bin/check_states"
+  echo
+}
+
+compare_state_roots() {
+  echo "Checking to see if transactions were applied..."
+  echo "Comparing $1 and $2"
+  if [ $1 == $2 ]; then
+      echo -e "\033[91mERROR\033[0m - The previous state root and resulting state root are identical."
+      echo -e "\033[91mERROR\033[0m - No transactions were applied."
+      exit 1
+  else
+      echo -e "\033[92mPASS\033[0m - Previous state root and resulting state root are different."
+      echo
+  fi
+}
+
+get_state_root() {
+  echo
+  echo $(docker exec -t workload bash -c "/config/bin/check_states" | awk {'print $1'})
+  echo
+}
+
+dockerdown() {
+  docker-compose down
+}
+trap dockerdown EXIT
+
+work_dir=$(cd $(dirname $(dirname $0)) && pwd)
+
+cd $work_dir
+
+docker pull splintercommunity/splinterd:0.6
+docker pull splintercommunity/splinterd:main
+
+docker-compose build
+
+#--== 0.6 ==--
+echo "Testing 0.6 migrations"
+NAMESPACE="splintercommunity/" ISOLATION_ID="0.6" docker-compose up -d
+
+docker exec -t workload bash -c "/config/bin/check_splinterd splinterd-alpha"
+docker exec -t workload bash -c "/config/bin/check_splinterd splinterd-beta"
+
+docker exec -t workload bash -c "/config/bin/prepare_circuit"
+check_states
+
+docker exec -t workload bash -c "/config/bin/workload"
+sleep 5
+
+docker-compose logs -t |sort -k 5,5 > test-psql-migrations.log
+
+check_states
+STATE_ROOT_06="$(get_state_root)"
+check_for_errors
+
+docker kill splinterd-alpha splinterd-beta
+
+#--== main ==--
+echo "Testing main migrations"
+NAMESPACE="splintercommunity/" ISOLATION_ID="main" docker-compose up -d
+docker exec -t workload bash -c "/config/bin/check_splinterd splinterd-alpha"
+docker exec -t workload bash -c "/config/bin/check_splinterd splinterd-beta"
+check_states
+
+docker exec -t workload bash -c "/config/bin/workload"
+sleep 5
+
+docker-compose logs -t |sort -k 5,5 >> test-psql-migrations.log
+
+check_states
+STATE_ROOT_MAIN=$(get_state_root)
+check_for_errors
+
+compare_state_roots $STATE_ROOT_06 $STATE_ROOT_MAIN
+
+docker kill splinterd-alpha splinterd-beta
+
+#--== branch ==--
+echo "Testing branch migrations"
+NAMESPACE="" ISOLATION_ID="latest" docker-compose up -d
+docker exec -t workload bash -c "/config/bin/check_splinterd splinterd-alpha"
+docker exec -t workload bash -c "/config/bin/check_splinterd splinterd-beta"
+check_states
+
+docker exec -t workload bash -c "/config/bin/workload"
+sleep 5
+
+docker-compose logs -t |sort -k 5,5 >> test-psql-migrations.log
+
+check_states
+STATE_ROOT_BRANCH=$(get_state_root)
+check_for_errors
+
+compare_state_roots $STATE_ROOT_MAIN $STATE_ROOT_BRANCH
+
+echo -e "\033[92mPASS\033[0m - Successfully migrated from 0.6 branch..."
+
+docker kill splinterd-alpha splinterd-beta
+
+docker-compose down
