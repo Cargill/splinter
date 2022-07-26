@@ -111,7 +111,7 @@ table! {
 }
 
 table! {
-    consensus_2pc_update_context_action_participant (action_id) {
+    consensus_2pc_update_context_action_participant (action_id, process) {
         action_id -> Int8,
         process -> Text,
         vote -> Nullable<Bool>,
