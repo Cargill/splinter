@@ -1,15 +1,15 @@
-% TRANSACT-COMMAND(1) Cargill, Incorporated | Transact Commands
+% SPLINTER-COMMAND(1) Cargill, Incorporated | Splinter Commands
 <!--
   Copyright 2018-2021 Cargill Incorporated
   Licensed under Creative Commons Attribution 4.0 International License
   https://creativecommons.org/licenses/by/4.0/
 -->
 
-**transact-command** — Interacts with the command family smart contract
+**splinter-command** — Interacts with the command family smart contract
 
 SYNOPSIS
 ========
-**transact command** \[**FLAGS**\] \[**SUBCOMMAND**\]
+**splinter command** \[**FLAGS**\] \[**SUBCOMMAND**\]
 
 DESCRIPTION
 ===========
@@ -50,9 +50,9 @@ SUBCOMMANDS
 
 SEE ALSO
 ========
-| `transact(1)`
-| `transact-command-get-state(1)`
-| `transact-command-set-state(1)`
-| `transact-command-show-state(1)`
+| `splinter(1)`
+| `splinter-command-get-state(1)`
+| `splinter-command-set-state(1)`
+| `splinter-command-show-state(1)`
 |
-| Transact documentation: https://docs.rs/transact/latest
+| Splinter documentation: https://www.splinter.dev/docs/0.7/

@@ -1,4 +1,4 @@
-% TRANSACT-WORKLOAD(1) Cargill, Incorporated | Transact Commands
+% SPLINTER-WORKLOAD(1) Cargill, Incorporated | Splinter Commands
 <!--
   Copyright 2018-2021 Cargill Incorporated
   Licensed under Creative Commons Attribution 4.0 International License
@@ -8,11 +8,11 @@
 NAME
 ====
 
-**transact-workload** — Submits a workload against a distributed ledger
+**splinter-workload** — Submits a workload against a distributed ledger
 
 SYNOPSIS
 ========
-**transact workload** \[**FLAGS**\] \[**SUBCOMMAND**\]
+**splinter workload** \[**FLAGS**\] \[**SUBCOMMAND**\]
 
 DESCRIPTION
 ===========
@@ -57,8 +57,9 @@ OPTIONS
 : An integer to use as a seed to make the workload reproducible.
 
 `--target-rate TARGET-RATE`
-: Rate of batch submissions, either provide a float, a batch rate in form <float>/<h,m,s> or a range
-  with the min and max separated by `-` ex: `5.0/s-15.0/m`,`1/m`,`15/s-2/m`,`2.0` (default: `1/s`)
+: Rate of batch submissions, either provide a float, a batch rate in form 
+  <float>/<h,m,s> or a range with the min and max separated by `-` 
+  ex: `5.0/s-15.0/m`,`1/m`,`15/s-2/m`,`2.0` (default: `1/s`)
 
 `--targets TARGETS`
 :  Node URLS to submit batches to, combine groups with `;`. Each group will get
@@ -82,7 +83,7 @@ with scabbard services. A Scabbard service runs a sabre transaction handler.
 The smallbank smart contract must already be submitted to scabbard.
 
 ```
-transact workload \
+splinter workload \
   --target-rate 1/s \
   --key ./alice.priv \
   --workload smallbank \
@@ -96,6 +97,6 @@ transact workload \
 
 SEE ALSO
 ========
-| `transact(1)`
+| `splinter(1)`
 |
-| Transact documentation: https://docs.rs/transact/latest
+| Splinter documentation: https://www.splinter.dev/docs/0.7/

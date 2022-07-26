@@ -1,4 +1,4 @@
-% TRANSACT-PLAYLIST-SUBMIT(1) Cargill, Incorporated | Transact Commands
+% SPLINTER-PLAYLIST-SUBMIT(1) Cargill, Incorporated | Splinter Commands
 <!--
   Copyright 2018-2021 Cargill Incorporated
   Licensed under Creative Commons Attribution 4.0 International License
@@ -8,11 +8,11 @@
 NAME
 ====
 
-**transact-paylist-submit** — Submits signed batches to targets from batch input
+**splinter-paylist-submit** — Submits signed batches to targets from batch input
 
 SYNOPSIS
 ========
-**transact playlist submit** \[**FLAGS**\] \[**SUBCOMMAND**\]
+**splinter playlist submit** \[**FLAGS**\] \[**SUBCOMMAND**\]
 
 DESCRIPTION
 ===========
@@ -69,7 +69,7 @@ transaction handler. The smallbank smart contract must already be submitted to
 scabbard.
 
 ```
-transact playlist submit \
+splinter playlist submit \
   --input batches.dat \
   --key ./alice.priv \
   --rate 1/s  \
@@ -79,10 +79,10 @@ transact playlist submit \
 
 SEE ALSO
 ========
-| `transact(1)`
-| `transact-playlist(1)`
-| `transact-playlist-batch(1)`
-| `transact-playlist-create(1)`
-| `transact-playlist-process(1)`
+| `splinter(1)`
+| `splinter-playlist(1)`
+| `splinter-playlist-create(1)`
+| `splinter-playlist-batch(1)`
+| `splinter-playlist-process(1)`
 |
-| Transact documentation: https://docs.rs/transact/latest
+| Splinter documentation: https://www.splinter.dev/docs/0.7/

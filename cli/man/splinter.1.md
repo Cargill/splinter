@@ -46,6 +46,9 @@ SUBCOMMANDS
 : Provides circuit creation and management functions with `list`, `propose`,
   `template`, `vote`, and other subcommands
 
+`command`
+: Interacts with the command family smart contract
+
 `database`
 : Provides database functions with the `migrate` subcommand
 
@@ -61,6 +64,9 @@ SUBCOMMANDS
 `permissions`
 : Lists REST API permissions for a Splinter node
 
+`playlist `
+:  Create and process playlists of pregenerated payloads
+
 `registry`
 : Provides commands to create and manage Splinter registry information.
 
@@ -75,6 +81,9 @@ SUBCOMMANDS
 
 `user`
 : Splinter user commands
+
+`workload`
+: Run a continuous workload against a set of targets
 
 FLAGS
 =====
@@ -111,6 +120,9 @@ SEE ALSO
 | `splinter-authid-show(1)`
 | `splinter-authid-update(1)`
 | `splinter-cert-generate(1)`
+| `splinter-command-get-state(1)`
+| `splinter-command-set-state(1)`
+| `splinter-command-show-state(1)`
 | `splinter-circuit-abandon(1)`
 | `splinter-circuit-disband(1)`
 | `splinter-circuit-list(1)`
@@ -129,6 +141,10 @@ SEE ALSO
 | `splinter-maintenance-status(1)`
 | `splinter-maintenance-enable(1)`
 | `splinter-maintenance-disable(1)`
+| `splinter-playlist-create(1)`
+| `splinter-playlist-batch(1)`
+| `splinter-playlist-submit(1)`
+| `splinter-playlist-process(1)`
 | `splinter-permissions(1)`
 | `splinter-registry-add(1)`
 | `splinter-registry-build(1)`
@@ -140,6 +156,7 @@ SEE ALSO
 | `splinter-state-migrate(1)`
 | `splinter-upgrade(1)`
 | `splinter-user(1)`
+| `splinter-workload(1)`
 |
 | `splinterd(1)`
 |

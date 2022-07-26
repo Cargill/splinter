@@ -1,4 +1,4 @@
-% TRANSACT-PLAYLIST-CREATE(1) Cargill, Incorporated | Transact Commands
+% SPLINTER-PLAYLIST-CREATE(1) Cargill, Incorporated | Splinter Commands
 <!--
   Copyright 2018-2021 Cargill Incorporated
   Licensed under Creative Commons Attribution 4.0 International License
@@ -8,11 +8,11 @@
 NAME
 ====
 
-**transact-playlist-create** — Generates a workload transaction playlist
+**splinter-playlist-create** — Generates a workload transaction playlist
 
 SYNOPSIS
 ========
-**transact playlist create ** \[**FLAGS**\] \[**SUBCOMMAND**\]
+**splinter playlist create** \[**FLAGS**\] \[**SUBCOMMAND**\]
 
 DESCRIPTION
 ===========
@@ -20,7 +20,7 @@ This command generates a workload transaction playlist. A playlist is a series
 of transactions, described in YAML.  This command generates a playlist and
 writes it to file or standard out.
 
-`transact-playlist-process` takes this playlist and creates signed transactions
+`splinter-playlist-process` takes this playlist and creates signed transactions
 for the payloads.
 
 FLAGS
@@ -65,7 +65,7 @@ The following shows creating a smallbank playlist file `smallbank.yaml` with 20
 transactions.
 
 ```
-transact playlist create \
+splinter playlist create \
   --smallbank-num-accounts 10 \
   --output smallbank.yaml  \
   --smallbank-seed 10 \
@@ -76,10 +76,10 @@ transact playlist create \
 
 SEE ALSO
 ========
-| `transact(1)`
-| `transact-playlist(1)`
-| `transact-playlist-batch(1)`
-| `transact-playlist-process(1)`
-| `transact-playlist-submit(1)`
+| `splinter(1)`
+| `splinter-playlist(1)`
+| `splinter-playlist-batch(1)`
+| `splinter-playlist-process(1)`
+| `splinter-playlist-submit(1)`
 |
-| Transact documentation: https://docs.rs/transact/latest
+| Splinter documentation: https://www.splinter.dev/docs/0.7/

@@ -1,4 +1,4 @@
-% TRANSACT-COMMAND-SHOW-STATE(1) Cargill, Incorporated | Transact Commands
+% SPLINTER-COMMAND-SHOW-STATE(1) Cargill, Incorporated | Splinter Commands
 <!--
   Copyright 2018-2021 Cargill Incorporated
   Licensed under Creative Commons Attribution 4.0 International License
@@ -8,11 +8,11 @@
 NAME
 ====
 
-**transact-command-show-state** — Displays the state value at a given address
+**splinter-command-show-state** — Displays the state value at a given address
 
 SYNOPSIS
 ========
-| **transact command show state** \[**FLAGS**\] \[**OPTIONS**\]
+| **splinter command show-state** \[**FLAGS**\] \[**OPTIONS**\]
 
 DESCRIPTION
 ===========
@@ -62,7 +62,7 @@ from a Splinter circuit `vpENT-eSfFZ` with scabbard services. The command smart
 contract must already be uploaded to scabbard.
 
 ```
-transact command show-state \
+splinter command show-state \
   --key /alice.priv \
   --target "http://0.0.0.0:8080/scabbard/vpENT-eSfFZ/gsAA" \
   --address \
@@ -72,9 +72,9 @@ transact command show-state \
 
 SEE ALSO
 ========
-| `transact(1)`
-| `transact-command(1)`
-| `transact-command-set-state(1)`
-| `transact-command-get-state(1)`
+| `splinter(1)`
+| `splinter-command(1)`
+| `splinter-command-get-state(1)`
+| `splinter-command-set-state(1)`
 |
-| Transact documentation: https://docs.rs/transact/latest
+| Splinter documentation: https://www.splinter.dev/docs/0.7/

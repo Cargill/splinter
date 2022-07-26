@@ -1,4 +1,4 @@
-% TRANSACT-COMMAND-SET-STATE(1) Cargill, Incorporated | Transact Commands
+% SPLINTER-COMMAND-SET-STATE(1) Cargill, Incorporated | Splinter Commands
 <!--
   Copyright 2018-2021 Cargill Incorporated
   Licensed under Creative Commons Attribution 4.0 International License
@@ -8,12 +8,12 @@
 NAME
 ====
 
-**transact-command-set-state** — Submits a Sabre transaction to request a state 
+**splinter-command-set-state** — Submits a Sabre transaction to request a state 
 write
 
 SYNOPSIS
 ========
-| **transact command set state** \[**FLAGS**\] \[**OPTIONS**\]
+| **splinter command set-state** \[**FLAGS**\] \[**OPTIONS**\]
 
 DESCRIPTION
 ===========
@@ -63,7 +63,7 @@ transaction handler. The command smart contract must already be uploaded to
 scabbard.
 
 ```
-transact command set-state \
+splinter command set-state \
   --key /alice.priv
   --target "http://0.0.0.0:8080/scabbard/vpENT-eSfFZ/gsAA"
   --state-entry \
@@ -76,7 +76,7 @@ transaction handler. The command smart contract must already be uploaded to
 scabbard.
 
 ```
-transact command set-state \
+splinter command set-state \
   --key /alice.priv \
   --target "http://0.0.0.0:8080/scabbard/kpHVT-sjpQM/gsAA" \
   --state-entry \
@@ -88,9 +88,9 @@ transact command set-state \
 
 SEE ALSO
 ========
-| `transact(1)`
-| `transact-command(1)`
-| `transact-command-get-state(1)`
-| `transact-command-show-state(1)`
+| `splinter(1)`
+| `splinter-command(1)`
+| `splinter-command-get-state(1)`
+| `splinter-command-show-state(1)`
 |
-| Transact documentation: https://docs.rs/transact/latest
+| Splinter documentation: https://www.splinter.dev/docs/0.7/

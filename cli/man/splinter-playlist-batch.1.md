@@ -1,4 +1,4 @@
-% TRANSACT-PLAYLIST-BATCH(1) Cargill, Incorporated | Transact Commands
+% SPLINTER-PLAYLIST-BATCH(1) Cargill, Incorporated | Splinter Commands
 <!--
   Copyright 2018-2021 Cargill Incorporated
   Licensed under Creative Commons Attribution 4.0 International License
@@ -8,11 +8,11 @@
 NAME
 ====
 
-**transact-playlist-batch** — Generates signed batches from transaction input
+**splinter-playlist-batch** — Generates signed batches from transaction input
 
 SYNOPSIS
 ========
-**transact playlist batch** \[**FLAGS**\] \[**SUBCOMMAND**\]
+**splinter playlist batch** \[**FLAGS**\] \[**SUBCOMMAND**\]
 
 DESCRIPTION
 ===========
@@ -59,7 +59,7 @@ The following shows providing a transaction file `txns.txt` and creating
 `batches.txt` file of length-delimited protobuf batches.
 
 ```
-transact playlist batch \
+splinter playlist batch \
   --input txns.dat \
   --key ./alice.priv \
   --output batches.dat
@@ -68,10 +68,10 @@ transact playlist batch \
 
 SEE ALSO
 ========
-| `transact(1)`
-| `transact-playlist(1)`
-| `transact-playlist-create(1)`
-| `transact-playlist-process(1)`
-| `transact-playlist-submit(1)`
+| `splinter(1)`
+| `splinter-playlist(1)`
+| `splinter-playlist-create(1)`
+| `splinter-playlist-process(1)`
+| `splinter-playlist-submit(1)`
 |
-| Transact documentation: https://docs.rs/transact/latest
+| Splinter documentation: https://www.splinter.dev/docs/0.7/

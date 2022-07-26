@@ -1,15 +1,15 @@
-% TRANSACT-PLAYLIST(1) Cargill, Incorporated | Transact Commands
+% SPLINTER-PLAYLIST(1) Cargill, Incorporated | Splinter Commands
 <!--
   Copyright 2018-2021 Cargill Incorporated
   Licensed under Creative Commons Attribution 4.0 International License
   https://creativecommons.org/licenses/by/4.0/
 -->
 
-**transact-playlist** — Create and process playlists of pregenerated payloads
+**splinter-playlist** — Create and process playlists of pregenerated payloads
 
 SYNOPSIS
 ========
-**transact playlist** \[**FLAGS**\] \[**SUBCOMMAND**\]
+**splinter playlist** \[**FLAGS**\] \[**SUBCOMMAND**\]
 
 DESCRIPTION
 ===========
@@ -64,10 +64,10 @@ SUBCOMMANDS
 
 SEE ALSO
 ========
-| `transact(1)`
-| `transact-playlist-batch(1)`
-| `transact-playlist-create(1)`
-| `transact-playlist-process(1)`
-| `transact-playlist-submit(1)`
+| `splinter(1)`
+| `splinter-playlist-create(1)`
+| `splinter-playlist-batch(1)`
+| `splinter-playlist-submit(1)`
+| `splinter-playlist-process(1)`
 |
-| Transact documentation: https://docs.rs/transact/latest
+| Splinter documentation: https://www.splinter.dev/docs/0.7/

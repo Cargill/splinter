@@ -1,4 +1,4 @@
-% TRANSACT-PLAYLIST-PROCESS(1) Cargill, Incorporated | Transact Commands
+% SPLINTER-PLAYLIST-PROCESS(1) Cargill, Incorporated | Splinter Commands
 <!--
   Copyright 2018-2021 Cargill Incorporated
   Licensed under Creative Commons Attribution 4.0 International License
@@ -8,11 +8,11 @@
 NAME
 ====
 
-**transact-playlist-processe** — Processes a transaction playlist
+**splinter-playlist-process** — Processes a transaction playlist
 
 SYNOPSIS
 ========
-**transact playlist create ** \[**FLAGS**\] \[**SUBCOMMAND**\]
+**splinter playlist process** \[**FLAGS**\] \[**SUBCOMMAND**\]
 
 DESCRIPTION
 ===========
@@ -20,7 +20,7 @@ Processes a transaction playlist. A playlist is a series of transactions,
 described in YAML.  This command processes a playlist, converting it into
 transactions and writes it to file or standard out.
 
-`transact-playlist-batch` takes the output file and creates signed batches
+`splinter-playlist-batch` takes the output file and creates signed batches
 for the payloads.
 
 FLAGS
@@ -59,7 +59,7 @@ EXAMPLES
 The following shows creating a file, `txns.text`
 
 ```
-transact playlist process \
+splinter playlist process \
   -i smallbank.yaml \
   --key ./alice.priv \
   --output txns.dat \
@@ -69,10 +69,10 @@ transact playlist process \
 
 SEE ALSO
 ========
-| `transact(1)`
-| `transact-playlist(1)`
-| `transact-playlist-create(1)`
-| `transact-playlist-batch(1)`
-| `transact-playlist-submit(1)`
+| `splinter(1)`
+| `splinter-playlist(1)`
+| `splinter-playlist-create(1)`
+| `splinter-playlist-batch(1)`
+| `splinter-playlist-submit(1)`
 |
-| Transact documentation: https://docs.rs/transact/latest
+| Splinter documentation: https://www.splinter.dev/docs/0.7/
