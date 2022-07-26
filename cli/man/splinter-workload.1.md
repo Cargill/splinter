@@ -42,7 +42,7 @@ FLAGS
 OPTIONS
 =======
 `-d, --duration DURATION`
-: Lenght of time in hours that the workload should run for. If this option is not
+: Length of time in hours that the workload should run for. If this option is not
   used, the workload will run indefinitely. Duration can be provided in seconds,
   minutes, hours, or days ex: `7s`, `20m`, `24h`, `2d`
 

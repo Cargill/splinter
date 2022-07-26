@@ -58,7 +58,7 @@ impl RequestLogger {
                         }
                     }
                     match receiver.try_recv() {
-                        // Recieved shutdown
+                        // Received shutdown
                         Ok(_) => {
                             break;
                         }
