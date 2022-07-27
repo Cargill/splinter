@@ -48,3 +48,4 @@ experimental = [
 
 authorization = ["splinter/authorization"]
 scabbard-service = ["scabbard", "splinter/rest-api", "splinter/rest-api-actix-web-1", "serde_json"]
+service-endpoint = []

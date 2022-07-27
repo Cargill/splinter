@@ -15,9 +15,9 @@
 use std::sync::Arc;
 
 use crate::biome::key_management::resources::{NewKey, ResponseKey, UpdatedKey};
-use futures::{Future, IntoFuture};
 
-use splinter::actix_web::HttpResponse;
+use actix_web::HttpResponse;
+use futures::{Future, IntoFuture};
 use splinter::biome::key_management::store::{KeyStore, KeyStoreError};
 use splinter::biome::key_management::Key;
 #[cfg(feature = "authorization")]

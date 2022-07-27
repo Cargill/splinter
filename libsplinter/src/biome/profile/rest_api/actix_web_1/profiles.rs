@@ -14,11 +14,12 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::HttpResponse;
+use actix_web::HttpResponse;
+use futures::IntoFuture;
+
 #[cfg(feature = "authorization")]
 use crate::biome::profile::rest_api::BIOME_PROFILE_READ_PERMISSION;
 use crate::biome::profile::store::UserProfileStore;
-use crate::futures::IntoFuture;
 use crate::rest_api::{
     ErrorResponse, Method, ProtocolVersionRangeGuard, Resource, SPLINTER_PROTOCOL_VERSION,
 };

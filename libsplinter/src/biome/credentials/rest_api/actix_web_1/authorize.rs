@@ -14,10 +14,10 @@
 
 use std::sync::Arc;
 
+use actix_web::HttpRequest;
 #[cfg(feature = "biome-credentials")]
 use jsonwebtoken::{decode, DecodingKey, Validation};
 
-use crate::actix_web::HttpRequest;
 #[cfg(feature = "biome-credentials")]
 use crate::biome::credentials::rest_api::resources::authorize::AuthorizationResult;
 use crate::rest_api::secrets::SecretManager;

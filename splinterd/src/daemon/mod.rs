@@ -85,11 +85,9 @@ use splinter::rest_api::auth::authorization::rbac::{
     feature = "authorization-handler-allow-keys"
 ))]
 use splinter::rest_api::auth::authorization::AuthorizationHandler;
-#[cfg(feature = "authorization")]
-use splinter::rest_api::auth::authorization::Permission;
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
-use splinter::rest_api::{AuthConfig, Method, Resource, RestApiBuilder, RestResourceProvider};
+use splinter::rest_api::{AuthConfig, RestApiBuilder, RestResourceProvider};
 use splinter::runtime::service::instance::{
     ServiceOrchestratorBuilder, ServiceProcessor, ServiceProcessorShutdownHandle,
 };
@@ -111,12 +109,13 @@ use splinter_echo::service::{EchoMessageByteConverter, EchoMessageHandlerFactory
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
 #[cfg(feature = "biome-key-management")]
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
+use splinter_rest_api_actix_web_1::open_api;
 use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
 use splinter_rest_api_actix_web_1::scabbard::ScabbardServiceEndpointProvider;
 use splinter_rest_api_actix_web_1::service::ServiceOrchestratorRestResourceProviderBuilder;
+use splinter_rest_api_actix_web_1::status;
 
 use crate::node_id::get_node_id;
-use crate::routes;
 
 pub use error::{CreateError, StartError};
 use registry::RegistryShutdownHandle;
@@ -642,8 +641,6 @@ impl SplinterDaemon {
             StartError::AdminServiceError(format!("unable to create admin service: {}", err))
         })?;
 
-        #[cfg(feature = "authorization")]
-        let node_id_clone = node_id.clone();
         let display_name: String = self
             .display_name
             .to_owned()
@@ -673,7 +670,19 @@ impl SplinterDaemon {
             .add_resources(AdminServiceRestProvider::new(&admin_service).resources())
             .add_resources(RwRegistryRestResourceProvider::new(&registry).resources())
             .add_resources(orchestrator_resources)
-            .add_resources(circuit_resource_provider.resources());
+            .add_resources(circuit_resource_provider.resources())
+            .add_resources(
+                status::StatusResourceProvider::new(
+                    node_id,
+                    display_name,
+                    #[cfg(feature = "service-endpoint")]
+                    service_endpoint,
+                    network_endpoints,
+                    advertised_endpoints,
+                )
+                .resources(),
+            )
+            .add_resources(open_api::OpenApiResourceProvider::default().resources());
 
         #[cfg(feature = "authorization")]
         {
@@ -721,47 +730,6 @@ impl SplinterDaemon {
                     .resources(),
                 );
             }
-
-            rest_api_builder = rest_api_builder
-                .with_authorization_handlers(authorization_handlers)
-                .add_resource(Resource::build("/openapi.yaml").add_method(
-                    Method::Get,
-                    Permission::AllowAuthenticated,
-                    routes::get_openapi,
-                ))
-                .add_resource(Resource::build("/status").add_method(
-                    Method::Get,
-                    routes::STATUS_READ_PERMISSION,
-                    move |_, _| {
-                        routes::get_status(
-                            node_id_clone.clone(),
-                            display_name.clone(),
-                            #[cfg(feature = "service-endpoint")]
-                            service_endpoint.clone(),
-                            network_endpoints.clone(),
-                            advertised_endpoints.clone(),
-                        )
-                    },
-                ));
-        }
-        #[cfg(not(feature = "authorization"))]
-        {
-            rest_api_builder = rest_api_builder
-                .add_resource(
-                    Resource::build("/openapi.yaml").add_method(Method::Get, routes::get_openapi),
-                )
-                .add_resource(
-                    Resource::build("/status").add_method(Method::Get, move |_, _| {
-                        routes::get_status(
-                            node_id.clone(),
-                            display_name.clone(),
-                            #[cfg(feature = "service-endpoint")]
-                            service_endpoint.clone(),
-                            network_endpoints.clone(),
-                            advertised_endpoints.clone(),
-                        )
-                    }),
-                );
         }
 
         #[cfg(feature = "rest-api-cors")]

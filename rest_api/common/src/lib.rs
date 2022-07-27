@@ -16,5 +16,6 @@ pub mod error;
 pub mod paging;
 #[cfg(feature = "scabbard")]
 pub mod scabbard;
+pub mod status;
 
 pub const SPLINTER_PROTOCOL_VERSION: u32 = 2;

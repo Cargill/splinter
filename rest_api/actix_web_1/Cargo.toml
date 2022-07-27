@@ -23,14 +23,14 @@ description = """\
 """
 
 [dependencies]
-actix-web = { version = "1", optional = true }
-futures = { version = "0.1", optional = true }
+actix-web = { version = "1" }
+futures = { version = "0.1" }
 log = { version = "0.4", optional = true }
 scabbard = { path = "../../services/scabbard/libscabbard", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
-splinter = { path = "../../libsplinter", features = ["rest-api-actix-web-1"], optional = true }
-splinter-rest-api-common = { path = "../common", optional = true }
+splinter = { path = "../../libsplinter", features = ["rest-api-actix-web-1"] }
+splinter-rest-api-common = { path = "../common" }
 transact = { version = "0.5", features = ["state-merkle-sql", "family-sabre"], optional = true }
 
 [dev-dependencies]
@@ -62,19 +62,16 @@ experimental = [
 ]
 
 admin-service = [
-    "actix-web",
-    "futures",
     "log",
     "serde",
     "serde_json",
-    "splinter",
-    "splinter-rest-api-common",
     "splinter/admin-service"
 ]
 authorization = ["splinter/authorization", "splinter-rest-api-common/authorization"]
 biome = ["splinter/biome", "serde"]
 biome-key-management = ["biome", "splinter/biome-key-management"]
-registry = ["splinter/registry", "actix-web", "futures"]
+registry = ["splinter/registry"]
 rest-api = ["splinter/rest-api"]
-scabbard-service = ["scabbard/splinter-service", "scabbard/rest-api", "transact", "actix-web", "splinter-rest-api-common", "log"]
+scabbard-service = ["scabbard/splinter-service", "scabbard/rest-api", "transact", "log"]
 service = ["splinter/runtime-service", "serde_json", "log"]
+service-endpoint = ["splinter-rest-api-common/service-endpoint"]

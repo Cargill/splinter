@@ -14,9 +14,10 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::HttpResponse;
+use actix_web::HttpResponse;
+use futures::{Future, IntoFuture};
+
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
-use crate::futures::{Future, IntoFuture};
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{

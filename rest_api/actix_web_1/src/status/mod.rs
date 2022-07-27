@@ -1,3 +1,4 @@
+// Copyright (c) 2019 Target Brands, Inc.
 // Copyright 2018-2022 Cargill Incorporated
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,10 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use splinter::actix_web::{web, Error, HttpRequest, HttpResponse};
-use splinter::futures::{Future, IntoFuture};
+mod resource_provider;
+
+use actix_web::{Error, HttpResponse};
+use futures::{Future, IntoFuture};
 #[cfg(feature = "authorization")]
 use splinter::rest_api::auth::authorization::Permission;
+use splinter_rest_api_common::status::Status;
+
+pub use resource_provider::StatusResourceProvider;
 
 #[cfg(feature = "authorization")]
 pub const STATUS_READ_PERMISSION: Permission = Permission::Check {
@@ -24,17 +30,6 @@ pub const STATUS_READ_PERMISSION: Permission = Permission::Check {
     permission_description: "Allows the client to get node status info",
 };
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Status {
-    node_id: String,
-    display_name: String,
-    #[cfg(feature = "service-endpoint")]
-    service_endpoint: String,
-    network_endpoints: Vec<String>,
-    advertised_endpoints: Vec<String>,
-    version: String,
-}
-
 pub fn get_status(
     node_id: String,
     display_name: String,
@@ -42,35 +37,14 @@ pub fn get_status(
     network_endpoints: Vec<String>,
     advertised_endpoints: Vec<String>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let status = Status {
+    let status = Status::new(
         node_id,
         display_name,
         #[cfg(feature = "service-endpoint")]
         service_endpoint,
         network_endpoints,
         advertised_endpoints,
-        version: get_version(),
-    };
+    );
 
     Box::new(HttpResponse::Ok().json(status).into_future())
-}
-
-pub fn get_openapi(
-    _: HttpRequest,
-    _: web::Payload,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    Box::new(
-        HttpResponse::Ok()
-            .body(include_str!("../../api/static/openapi.yaml"))
-            .into_future(),
-    )
-}
-
-fn get_version() -> String {
-    format!(
-        "{}.{}.{}",
-        env!("CARGO_PKG_VERSION_MAJOR"),
-        env!("CARGO_PKG_VERSION_MINOR"),
-        env!("CARGO_PKG_VERSION_PATCH")
-    )
 }

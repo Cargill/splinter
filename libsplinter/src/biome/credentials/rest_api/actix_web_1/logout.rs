@@ -14,13 +14,14 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::HttpResponse;
+use actix_web::HttpResponse;
+use futures::IntoFuture;
+
 use crate::biome::credentials::rest_api::{
     actix_web_1::{authorize::authorize_user, config::BiomeCredentialsRestConfig},
     resources::authorize::AuthorizationResult,
 };
 use crate::biome::refresh_tokens::store::{RefreshTokenError, RefreshTokenStore};
-use crate::futures::IntoFuture;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
