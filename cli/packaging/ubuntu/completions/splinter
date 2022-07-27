@@ -49,6 +49,7 @@ __splinter()
     authid
     cert
     circuit
+    command
     database
     help
     keygen
@@ -58,6 +59,7 @@ __splinter()
     state
     upgrade
     user
+    workload
   "
 
   SPLINTER_AUTHID_OPTS="
@@ -89,6 +91,13 @@ __splinter()
     show
     template
     vote
+  "
+
+  SPLINTER_COMMAND_OPTS="
+    $GLOBAL_OPTS
+    get-state
+    set-state
+    show-state
   "
 
   SPLINTER_DATABASE_OPTS="
@@ -140,6 +149,17 @@ __splinter()
   SPLINTER_USER_OPTS="
     $GLOBAL_OPTS
     list
+  "
+
+  SPLINTER_WORKLOAD_OPTS="
+    $GLOBAL_OPTS
+    --duration
+    --key
+    --seed
+    --target-rate
+    --targets
+    --update
+    --workload
   "
 
   case "${subcommand}" in
@@ -255,6 +275,26 @@ __splinter()
       esac
       ;;
 
+    command)
+      case "${prev}" in
+        get-state)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --address --key --target" -- "${cur}"))
+          ;;
+
+        set-state)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --key --state-entry --target" -- "${cur}"))
+          ;;
+
+        show-state)
+          COMPREPLY=($(compgen -W "$GLOBAL_OPTS --address --key --target" -- "${cur}"))
+          ;;
+
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_COMMAND_OPTS" -- "${cur}"))
+          ;;
+      esac
+      ;;
+
     database)
       case "${prev}" in
         migrate)
@@ -361,6 +401,14 @@ __splinter()
 
         *)
           COMPREPLY=($(compgen -W "$SPLINTER_USER_OPTS" -- "${cur}"))
+          ;;
+      esac
+      ;;
+
+    workload)
+      case "${prev}" in
+        *)
+          COMPREPLY=($(compgen -W "$SPLINTER_WORKLOAD_OPTS" -- "${cur}"))
           ;;
       esac
       ;;
