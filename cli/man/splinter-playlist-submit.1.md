@@ -51,7 +51,8 @@ OPTIONS
   sign the batches as well as generate a JWT for authentication.
 
 `--rate RATE`
-: Rate of batch submissions, either provide a float, or a rate in form <float>/<h,m,s>. ex `5/s`. (default: `1/s`)
+: Rate of batch submissions, either provide a float, or a rate in form
+  <float>/<h,m,s>. ex `5/s`. (default: `1/s`)
 
 `--targets TARGETS`
 : Node URLS to submit batches to, combine groups with `;`. The URL should
