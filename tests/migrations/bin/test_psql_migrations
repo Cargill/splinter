@@ -14,6 +14,8 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 
+set -e
+
 check_for_errors() {
   grep ERROR $work_dir/test-psql-migrations.log
   if [ $? == "0" ]; then
@@ -81,8 +83,9 @@ docker-compose logs -t |sort -k 5,5 > test-psql-migrations.log
 
 check_states
 STATE_ROOT_06="$(get_state_root)"
+set +e
 check_for_errors
-
+set -e
 docker kill splinterd-alpha splinterd-beta
 
 #--== main ==--
@@ -99,8 +102,9 @@ docker-compose logs -t |sort -k 5,5 >> test-psql-migrations.log
 
 check_states
 STATE_ROOT_MAIN=$(get_state_root)
+set +e
 check_for_errors
-
+set -e
 compare_state_roots $STATE_ROOT_06 $STATE_ROOT_MAIN
 
 docker kill splinterd-alpha splinterd-beta
@@ -119,8 +123,9 @@ docker-compose logs -t |sort -k 5,5 >> test-psql-migrations.log
 
 check_states
 STATE_ROOT_BRANCH=$(get_state_root)
+set +e
 check_for_errors
-
+set -e
 compare_state_roots $STATE_ROOT_MAIN $STATE_ROOT_BRANCH
 
 echo -e "\033[92mPASS\033[0m - Successfully migrated from 0.6 branch..."
