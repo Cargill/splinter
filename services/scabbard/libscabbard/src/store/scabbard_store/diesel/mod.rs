@@ -1608,9 +1608,35 @@ pub mod tests {
         // check that the one service is still returned because it has an unexecuted action
         assert_eq!(&ready_services[0], &service_fqsi);
 
+        let update_context = ContextBuilder::default()
+            .with_coordinator(service_fqsi.clone().service_id())
+            .with_epoch(2)
+            .with_participants(vec![Participant {
+                process: peer_service_id.clone(),
+                vote: None,
+                decision_ack: false,
+            }])
+            .with_state(State::WaitingForStart)
+            .with_this_process(service_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let action = ConsensusAction::TwoPhaseCommit(Action::Update(
+            ConsensusContext::TwoPhaseCommit(update_context),
+            None,
+        ));
+
+        let update_ctx_action_id = store
+            .add_consensus_action(action, &service_fqsi, 1)
+            .expect("failed to add action");
+
+        store
+            .update_consensus_action(&service_fqsi, update_ctx_action_id, SystemTime::now())
+            .expect("failed to update action");
+
         store
             .update_consensus_event(&service_fqsi, event_id, SystemTime::now(), 1)
-            .expect("failed to update action");
+            .expect("failed to update event");
 
         store
             .update_consensus_action(&service_fqsi, action_id, SystemTime::now())
@@ -2161,6 +2187,39 @@ pub mod tests {
             .add_consensus_event(&participant_fqsi, event)
             .expect("failed to add event");
 
+        let update_context = ContextBuilder::default()
+            .with_coordinator(coordinator_fqsi.clone().service_id())
+            .with_epoch(2)
+            .with_participants(vec![
+                Participant {
+                    process: participant_fqsi.service_id().clone(),
+                    vote: None,
+                    decision_ack: false,
+                },
+                Participant {
+                    process: participant2_fqsi.service_id().clone(),
+                    vote: None,
+                    decision_ack: false,
+                },
+            ])
+            .with_state(State::WaitingForVoteRequest)
+            .with_this_process(participant_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let action = ConsensusAction::TwoPhaseCommit(Action::Update(
+            ConsensusContext::TwoPhaseCommit(update_context),
+            None,
+        ));
+
+        let update_ctx_action_id = store
+            .add_consensus_action(action, &participant_fqsi, 1)
+            .expect("failed to add action");
+
+        store
+            .update_consensus_action(&participant_fqsi, update_ctx_action_id, SystemTime::now())
+            .expect("failed to update action");
+
         assert!(store
             .update_consensus_event(&participant_fqsi, event_id, SystemTime::now(), 1)
             .is_ok());
@@ -2293,6 +2352,39 @@ pub mod tests {
                 record: ConsensusEvent::TwoPhaseCommit(Event::Alarm()),
             },
         );
+
+        let update_context = ContextBuilder::default()
+            .with_coordinator(coordinator_fqsi.clone().service_id())
+            .with_epoch(2)
+            .with_participants(vec![
+                Participant {
+                    process: participant_fqsi.service_id().clone(),
+                    vote: None,
+                    decision_ack: false,
+                },
+                Participant {
+                    process: participant2_fqsi.service_id().clone(),
+                    vote: None,
+                    decision_ack: false,
+                },
+            ])
+            .with_state(State::WaitingForVoteRequest)
+            .with_this_process(participant_fqsi.clone().service_id())
+            .build()
+            .expect("failed to build context");
+
+        let action = ConsensusAction::TwoPhaseCommit(Action::Update(
+            ConsensusContext::TwoPhaseCommit(update_context),
+            None,
+        ));
+
+        let update_ctx_action_id = store
+            .add_consensus_action(action, &participant_fqsi, 1)
+            .expect("failed to add action");
+
+        store
+            .update_consensus_action(&participant_fqsi, update_ctx_action_id, SystemTime::now())
+            .expect("failed to update action");
 
         store
             .update_consensus_event(&participant_fqsi, event_id, SystemTime::now(), 1)
