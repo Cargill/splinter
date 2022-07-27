@@ -730,6 +730,8 @@ impl SplinterDaemon {
                     .resources(),
                 );
             }
+
+            rest_api_builder = rest_api_builder.with_authorization_handlers(authorization_handlers)
         }
 
         #[cfg(feature = "rest-api-cors")]
