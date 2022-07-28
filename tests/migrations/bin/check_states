@@ -47,6 +47,11 @@ compare_states() {
 
 get_circuit
 
+if [[ ! $CIRCUIT_ID ]]; then
+  echo -e "\033[91mERROR\033[0m - Something went wrong...CIRCUIT_ID is empty"
+  exit 1
+fi
+
 compare_states
 
 if [[ $ERROR -eq 0 ]]; then
