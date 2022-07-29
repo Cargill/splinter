@@ -244,6 +244,19 @@ pub struct PendingAuthorization {
     client_redirect_url: String,
 }
 
+impl PendingAuthorization {
+    pub fn get_client_redirect_url(&self) -> &str {
+        &self.client_redirect_url
+    }
+
+    pub fn new(pkce_verifier: String, client_redirect_url: String) -> Self {
+        Self {
+            pkce_verifier,
+            client_redirect_url,
+        }
+    }
+}
+
 /// User information returned by the OAuth2 client
 pub struct UserInfo {
     /// The access token to be used for authentication in future requests
