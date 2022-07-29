@@ -34,8 +34,8 @@ use splinter::registry::{
     client::{RegistryClient, ReqwestRegistryClient},
     RegistryWriter,
 };
-use splinter::rest_api::actix_web_1::RestApiShutdownHandle;
 use splinter::threading::lifecycle::ShutdownHandle;
+use splinter_rest_api_actix_web_1::framework::RestApiShutdownHandle;
 use std::time::Duration;
 
 use super::{running::admin::AdminSubsystem, NodeBuilder, RestApiVariant, RunnableNode};

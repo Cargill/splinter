@@ -21,11 +21,10 @@ use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::Future;
 
 use splinter::admin::service::proposal_store::ProposalStoreFactory;
-use splinter::rest_api::{
-    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse,
-};
+use splinter_rest_api_common::response_models::ErrorResponse;
 use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
+
+use crate::framework::{Method, ProtocolVersionRangeGuard, Resource};
 
 use super::error::ProposalFetchError;
 use super::resources;
@@ -155,13 +154,13 @@ mod tests {
         store::CircuitPredicate,
     };
     use splinter::error::InternalError;
-    use splinter::rest_api::actix_web_1::AuthConfig;
-    use splinter::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
-    use splinter::rest_api::auth::authorization::{
-        AuthorizationHandler, AuthorizationHandlerResult,
+    use splinter_rest_api_common::auth::{
+        AuthorizationHandler, AuthorizationHandlerResult, AuthorizationHeader, Identity,
+        IdentityProvider,
     };
-    use splinter::rest_api::auth::identity::{Identity, IdentityProvider};
-    use splinter::rest_api::auth::AuthorizationHeader;
+
+    use crate::framework::AuthConfig;
+    use crate::framework::{RestApiBuilder, RestApiShutdownHandle};
 
     #[test]
     /// Tests a GET /admin/proposals/{circuit_id} request returns the expected proposal.

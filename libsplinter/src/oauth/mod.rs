@@ -17,8 +17,6 @@
 mod builder;
 mod error;
 mod profile;
-#[cfg(feature = "rest-api-actix-web-1")]
-pub(crate) mod rest_api;
 pub mod store;
 mod subject;
 

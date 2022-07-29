@@ -24,20 +24,18 @@ use std::time::Duration;
 
 use cylinder::{secp256k1::Secp256k1Context, Context, Signer, Verifier, VerifierFactory};
 use rand::{thread_rng, Rng};
-use splinter::biome::credentials::rest_api::{
-    BiomeCredentialsRestResourceProvider, BiomeCredentialsRestResourceProviderBuilder,
-};
+
 use splinter::error::InternalError;
 use splinter::public_key::PublicKey;
 use splinter::rbac::store::{AssignmentBuilder, Identity as AssignmentIdentity, RoleBuilder};
-use splinter::rest_api::actix_web_1::RestApiBuilder as RestApiBuilder1;
-use splinter::rest_api::auth::authorization::rbac::RoleBasedAuthorizationHandler;
-use splinter::rest_api::auth::{
-    authorization::{AuthorizationHandler, AuthorizationHandlerResult},
-    identity::Identity,
-};
-use splinter::rest_api::BindConfig;
 use splinter::store::{memory::MemoryStoreFactory, StoreFactory};
+use splinter_rest_api_actix_web_1::biome::credentials::{
+    BiomeCredentialsRestResourceProvider, BiomeCredentialsRestResourceProviderBuilder,
+};
+use splinter_rest_api_actix_web_1::framework::RestApiBuilder as RestApiBuilder1;
+use splinter_rest_api_common::auth::RoleBasedAuthorizationHandler;
+use splinter_rest_api_common::auth::{AuthorizationHandler, AuthorizationHandlerResult, Identity};
+use splinter_rest_api_common::bind_config::BindConfig;
 
 use super::{RunnableNode, RunnableNodeRestApiVariant, ScabbardConfig};
 

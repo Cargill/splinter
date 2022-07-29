@@ -17,6 +17,7 @@ pub mod builder;
 use std::convert::TryFrom;
 
 use protobuf::{self, RepeatedField};
+use serde::{self, Deserialize, Serialize};
 
 use crate::admin::error::MarshallingError;
 use crate::admin::store;

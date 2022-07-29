@@ -17,11 +17,11 @@
 
 #[macro_use]
 extern crate log;
-#[cfg(any(feature = "admin-service", feature = "rest-api", feature = "registry"))]
+#[cfg(any(feature = "admin-service", feature = "registry"))]
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-#[cfg(feature = "rest-api-actix-web-1")]
+#[cfg(feature = "biome-client")]
 extern crate serde_json;
 #[macro_use]
 #[cfg(all(
@@ -108,11 +108,7 @@ pub mod peer;
 pub mod protocol;
 pub mod protos;
 pub mod public_key;
-#[cfg(all(
-    feature = "rest-api",
-    feature = "authorization",
-    feature = "authorization-handler-rbac"
-))]
+#[cfg(all(feature = "authorization", feature = "authorization-handler-rbac"))]
 pub mod rbac;
 #[cfg(feature = "registry")]
 pub mod registry;

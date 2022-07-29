@@ -18,14 +18,14 @@ use std::sync::Mutex;
 use actix_web::HttpResponse;
 use futures::IntoFuture;
 use splinter::error::InternalError;
-use splinter::rest_api::Resource;
+use splinter::runtime::service::instance::ServiceOrchestrator;
 use splinter::runtime::service::instance::{ManagedService, ServiceDefinition};
 use splinter::service::instance::OrchestratableService;
-use splinter::{
-    runtime::service::instance::ServiceOrchestrator, service::rest_api::ServiceEndpointProvider,
-};
 
 use super::ServiceOrchestratorRestResourceProvider;
+
+use crate::framework::Resource;
+use crate::service::ServiceEndpointProvider;
 
 #[derive(Default)]
 pub struct ServiceOrchestratorRestResourceProviderBuilder {

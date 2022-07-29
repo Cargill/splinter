@@ -21,13 +21,13 @@ use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
 use std::collections::HashMap;
 
+use crate::framework::{Method, ProtocolVersionRangeGuard, Resource};
 use splinter::admin::store::{AdminServiceStore, CircuitPredicate, CircuitStatus};
-use splinter::rest_api::{
-    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    paging::{PagingBuilder, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    ErrorResponse,
+use splinter_rest_api_common::{
+    paging::v1::{PagingBuilder, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    response_models::ErrorResponse,
+    SPLINTER_PROTOCOL_VERSION,
 };
-use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
 
 use super::error::CircuitListError;
 use super::resources;
@@ -290,6 +290,8 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
+    use crate::framework::AuthConfig;
+    use crate::framework::{RestApiBuilder, RestApiShutdownHandle};
     use splinter::admin::store::diesel::DieselAdminServiceStore;
     use splinter::admin::store::{
         AuthorizationType, Circuit, CircuitBuilder, CircuitNode, CircuitNodeBuilder,
@@ -297,16 +299,10 @@ mod tests {
     };
     use splinter::error::InternalError;
     use splinter::migrations::run_sqlite_migrations;
-    use splinter::rest_api::actix_web_1::AuthConfig;
-    use splinter::rest_api::auth::authorization::{
-        AuthorizationHandler, AuthorizationHandlerResult,
-    };
-    use splinter::rest_api::auth::identity::{Identity, IdentityProvider};
-    use splinter::rest_api::auth::AuthorizationHeader;
-    use splinter::rest_api::{
-        actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
-        paging::Paging,
-    };
+    use splinter_rest_api_common::auth::AuthorizationHeader;
+    use splinter_rest_api_common::auth::{AuthorizationHandler, AuthorizationHandlerResult};
+    use splinter_rest_api_common::auth::{Identity, IdentityProvider};
+    use splinter_rest_api_common::paging::v1::Paging;
 
     #[test]
     /// Tests a GET /admin/circuits request with no filters returns the expected circuits.
@@ -433,7 +429,7 @@ mod tests {
                 0,
                 0,
                 1,
-                &format!("/admin/circuits?filter=node_1&"),
+                &"/admin/circuits?filter=node_1&".to_string(),
             ))
             .expect("failed to convert expected paging")
         );
@@ -481,7 +477,7 @@ mod tests {
                 0,
                 0,
                 1,
-                &format!("/admin/circuits?status=disbanded&"),
+                &"/admin/circuits?status=disbanded&".to_string(),
             ))
             .expect("failed to convert expected paging")
         );
@@ -530,7 +526,7 @@ mod tests {
                 0,
                 0,
                 1,
-                &format!("/admin/circuits?filter=node_5&status=disbanded&"),
+                &"/admin/circuits?filter=node_5&status=disbanded&".to_string(),
             ))
             .expect("failed to convert expected paging")
         );
@@ -577,7 +573,7 @@ mod tests {
                 0,
                 0,
                 0,
-                &format!("/admin/circuits?filter=node_5&status=active&"),
+                &"/admin/circuits?filter=node_5&status=active&".to_string(),
             ))
             .expect("failed to convert expected paging")
         );
@@ -681,29 +677,16 @@ mod tests {
     fn create_test_paging_response(
         offset: usize,
         limit: usize,
-        next_offset: usize,
-        previous_offset: usize,
-        last_offset: usize,
+        _next_offset: usize,
+        _previous_offset: usize,
+        _last_offset: usize,
         total: usize,
         link: &str,
     ) -> Paging {
-        let base_link = format!("{}limit={}&", link, limit);
-        let current_link = format!("{}offset={}", base_link, offset);
-        let first_link = format!("{}offset=0", base_link);
-        let next_link = format!("{}offset={}", base_link, next_offset);
-        let previous_link = format!("{}offset={}", base_link, previous_offset);
-        let last_link = format!("{}offset={}", base_link, last_offset);
-
-        Paging {
-            current: current_link,
-            offset,
-            limit,
-            total,
-            first: first_link,
-            prev: previous_link,
-            next: next_link,
-            last: last_link,
-        }
+        Paging::builder(link.to_string(), total)
+            .with_limit(limit)
+            .with_offset(offset)
+            .build()
     }
 
     fn get_circuit_1() -> (Circuit, Vec<CircuitNode>) {
@@ -729,7 +712,7 @@ mod tests {
 
         (
             CircuitBuilder::new()
-                .with_circuit_id("abcde-12345".into())
+                .with_circuit_id("abcde-12345")
                 .with_authorization_type(&AuthorizationType::Trust)
                 .with_members(&nodes)
                 .with_roster(&[service])

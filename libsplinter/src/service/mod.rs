@@ -49,8 +49,6 @@ mod message_handler_factory;
 mod message_sender;
 #[cfg(feature = "service-message-sender-factory")]
 mod message_sender_factory;
-#[cfg(feature = "rest-api-actix-web-1")]
-pub mod rest_api;
 mod routable;
 mod service_type;
 #[cfg(feature = "service-timer-alarm")]

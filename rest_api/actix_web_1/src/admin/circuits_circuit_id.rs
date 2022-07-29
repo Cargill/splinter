@@ -19,11 +19,10 @@ use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::Future;
 
 use splinter::admin::store::AdminServiceStore;
-use splinter::rest_api::{
-    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse,
-};
+use splinter_rest_api_common::response_models::ErrorResponse;
 use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
+
+use crate::framework::{Method, ProtocolVersionRangeGuard, Resource};
 
 use super::error::CircuitFetchError;
 use super::resources;
@@ -132,6 +131,8 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
+    use crate::framework::AuthConfig;
+    use crate::framework::{RestApiBuilder, RestApiShutdownHandle};
     use splinter::admin::store::diesel::DieselAdminServiceStore;
     use splinter::admin::store::{
         AuthorizationType, Circuit, CircuitBuilder, CircuitNode, CircuitNodeBuilder,
@@ -139,13 +140,9 @@ mod tests {
     };
     use splinter::error::InternalError;
     use splinter::migrations::run_sqlite_migrations;
-    use splinter::rest_api::actix_web_1::AuthConfig;
-    use splinter::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
-    use splinter::rest_api::auth::authorization::{
-        AuthorizationHandler, AuthorizationHandlerResult,
-    };
-    use splinter::rest_api::auth::identity::{Identity, IdentityProvider};
-    use splinter::rest_api::auth::AuthorizationHeader;
+    use splinter_rest_api_common::auth::AuthorizationHeader;
+    use splinter_rest_api_common::auth::{AuthorizationHandler, AuthorizationHandlerResult};
+    use splinter_rest_api_common::auth::{Identity, IdentityProvider};
 
     #[test]
     /// Tests a GET /admin/circuit/{circuit_id} request returns the expected circuit.

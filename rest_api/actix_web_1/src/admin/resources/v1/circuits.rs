@@ -15,7 +15,7 @@
 use std::collections::BTreeMap;
 
 use splinter::admin::store::{Circuit, Service};
-use splinter::rest_api::paging::Paging;
+use splinter_rest_api_common::paging::v1::Paging;
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
 pub(crate) struct ListCircuitsResponse<'a> {

@@ -18,12 +18,12 @@ use actix_web::HttpResponse;
 use futures::IntoFuture;
 use scabbard::protocol;
 use scabbard::service::{Scabbard, SERVICE_TYPE};
-use splinter::{
-    rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard},
-    service::rest_api::ServiceEndpoint,
-};
+use splinter_rest_api_common::response_models::ErrorResponse;
 #[cfg(feature = "authorization")]
 use splinter_rest_api_common::scabbard::SCABBARD_READ_PERMISSION;
+
+use crate::framework::{Method, ProtocolVersionRangeGuard};
+use crate::service::ServiceEndpoint;
 
 pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
     ServiceEndpoint {

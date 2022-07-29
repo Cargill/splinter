@@ -12,5 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "biome-credentials")]
+pub mod credentials;
 #[cfg(feature = "biome-key-management")]
 pub mod key_management;
+#[cfg(feature = "biome-profile")]
+pub mod profile;

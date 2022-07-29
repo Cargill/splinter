@@ -17,7 +17,7 @@ use splinter::admin::messages::{
     CircuitProposal, CircuitStatus, CreateCircuit, ProposalType, SplinterNode, SplinterService,
     Vote, VoteRecord,
 };
-use splinter::rest_api::paging::Paging;
+use splinter_rest_api_common::paging::v1::Paging;
 
 use crate::hex::as_hex;
 use crate::hex::to_hex;

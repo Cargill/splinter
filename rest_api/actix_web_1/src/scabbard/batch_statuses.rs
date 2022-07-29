@@ -18,16 +18,17 @@ use std::time::Duration;
 
 use actix_web::{web, HttpResponse};
 use futures::IntoFuture;
-use splinter::{
-    rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard},
-    service::rest_api::ServiceEndpoint,
-};
+
+use splinter_rest_api_common::response_models::ErrorResponse;
 
 use scabbard::protocol;
 use scabbard::service::{Scabbard, SERVICE_TYPE};
 use splinter_rest_api_common::scabbard::batch_statuses::BatchInfoResponse;
 #[cfg(feature = "authorization")]
 use splinter_rest_api_common::scabbard::SCABBARD_READ_PERMISSION;
+
+use crate::framework::{Method, ProtocolVersionRangeGuard};
+use crate::service::ServiceEndpoint;
 
 const DEFAULT_BATCH_STATUS_WAIT_SECS: u64 = 300;
 

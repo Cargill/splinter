@@ -22,12 +22,13 @@ use futures::{future::IntoFuture, Future};
 
 use splinter::admin::service::proposal_store::ProposalStoreFactory;
 use splinter::admin::store::CircuitPredicate;
-use splinter::rest_api::{
-    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    paging::{PagingBuilder, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    ErrorResponse,
-};
 use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
+use splinter_rest_api_common::{
+    paging::v1::{PagingBuilder, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    response_models::ErrorResponse,
+};
+
+use crate::framework::{Method, ProtocolVersionRangeGuard, Resource};
 
 use super::error::ProposalListError;
 use super::resources;
@@ -273,6 +274,8 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
+    use crate::framework::AuthConfig;
+    use crate::framework::{RestApiBuilder, RestApiShutdownHandle};
     use splinter::admin::{
         messages::{
             AuthorizationType, CircuitProposal, CircuitStatus, CreateCircuit, DurabilityType,
@@ -288,16 +291,10 @@ mod tests {
     };
     use splinter::error::InternalError;
     use splinter::public_key::PublicKey;
-    use splinter::rest_api::actix_web_1::AuthConfig;
-    use splinter::rest_api::auth::authorization::{
-        AuthorizationHandler, AuthorizationHandlerResult,
-    };
-    use splinter::rest_api::auth::identity::{Identity, IdentityProvider};
-    use splinter::rest_api::auth::AuthorizationHeader;
-    use splinter::rest_api::{
-        actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
-        paging::Paging,
-    };
+    use splinter_rest_api_common::auth::AuthorizationHeader;
+    use splinter_rest_api_common::auth::{AuthorizationHandler, AuthorizationHandlerResult};
+    use splinter_rest_api_common::auth::{Identity, IdentityProvider};
+    use splinter_rest_api_common::paging::v1::Paging;
 
     #[test]
     /// Tests a GET /admin/proposals request with no filters returns the expected proposals.
@@ -672,29 +669,16 @@ mod tests {
     fn create_test_paging_response(
         offset: usize,
         limit: usize,
-        next_offset: usize,
-        previous_offset: usize,
-        last_offset: usize,
+        _next_offset: usize,
+        _previous_offset: usize,
+        _last_offset: usize,
         total: usize,
         link: &str,
     ) -> Paging {
-        let base_link = format!("{}limit={}&", link, limit);
-        let current_link = format!("{}offset={}", base_link, offset);
-        let first_link = format!("{}offset=0", base_link);
-        let next_link = format!("{}offset={}", base_link, next_offset);
-        let previous_link = format!("{}offset={}", base_link, previous_offset);
-        let last_link = format!("{}offset={}", base_link, last_offset);
-
-        Paging {
-            current: current_link,
-            offset,
-            limit,
-            total,
-            first: first_link,
-            prev: previous_link,
-            next: next_link,
-            last: last_link,
-        }
+        Paging::builder(link.to_string(), total)
+            .with_limit(limit)
+            .with_offset(offset)
+            .build()
     }
 
     #[derive(Clone)]

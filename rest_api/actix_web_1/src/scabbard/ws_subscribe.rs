@@ -17,20 +17,19 @@ use std::sync::Arc;
 
 use actix_web::{web, HttpResponse};
 use futures::IntoFuture;
-use splinter::{
-    rest_api::{
-        new_websocket_event_sender, ErrorResponse, EventSender, Method, ProtocolVersionRangeGuard,
-        Request,
-    },
-    service::rest_api::ServiceEndpoint,
-};
 
 use scabbard::protocol;
 use scabbard::service::{
     Scabbard, StateChangeEvent, StateSubscriber, StateSubscriberError, SERVICE_TYPE,
 };
+use splinter_rest_api_common::response_models::ErrorResponse;
 #[cfg(feature = "authorization")]
 use splinter_rest_api_common::scabbard::SCABBARD_READ_PERMISSION;
+
+use crate::framework::{
+    new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request,
+};
+use crate::service::ServiceEndpoint;
 
 struct WsStateSubscriber {
     sender: EventSender<StateChangeEvent>,

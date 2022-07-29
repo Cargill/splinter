@@ -16,8 +16,8 @@ use std::error::Error;
 use std::fmt;
 
 use splinter::error::InternalError;
-use splinter::rest_api::RestApiServerError;
 use splinter::transport::{AcceptError, ConnectError, ListenError};
+use splinter_rest_api_common::error::RestApiServerError;
 
 use crate::error::UserError;
 

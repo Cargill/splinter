@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "rest-api-actix-web-1")]
-mod endpoint;
 mod service;
 
-#[cfg(feature = "rest-api-actix-web-1")]
-pub use endpoint::EndpointFactory;
 pub use service::ServiceFactory;

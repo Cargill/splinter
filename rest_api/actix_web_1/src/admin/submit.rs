@@ -16,9 +16,10 @@ use futures::{Future, IntoFuture};
 
 use splinter::admin::service::{AdminCommands, AdminServiceError};
 use splinter::protos::admin::CircuitManagementPayload;
-use splinter::rest_api::actix_web_1::{into_protobuf, Method, ProtocolVersionRangeGuard, Resource};
 use splinter::service::instance::ServiceError;
 use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
+
+use crate::framework::{into_protobuf, Method, ProtocolVersionRangeGuard, Resource};
 
 #[cfg(feature = "authorization")]
 use super::CIRCUIT_WRITE_PERMISSION;

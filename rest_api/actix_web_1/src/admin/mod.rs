@@ -19,14 +19,15 @@ mod proposals;
 mod proposals_circuit_id;
 mod resources;
 mod submit;
+#[cfg(feature = "websocket")]
 mod ws_register_type;
 
+use crate::framework::Resource;
+use crate::framework::RestResourceProvider;
 use splinter::admin::service::AdminService;
 use splinter::admin::store::AdminServiceStore;
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::authorization::Permission;
-use splinter::rest_api::Resource;
-use splinter::rest_api::RestResourceProvider;
+use splinter_rest_api_common::auth::Permission;
 
 #[cfg(feature = "authorization")]
 const CIRCUIT_READ_PERMISSION: Permission = Permission::Check {
@@ -48,6 +49,7 @@ pub struct AdminServiceRestProvider {
 impl AdminServiceRestProvider {
     pub fn new(source: &AdminService) -> Self {
         let resources = vec![
+            #[cfg(feature = "websocket")]
             ws_register_type::make_application_handler_registration_route(source.commands()),
             submit::make_submit_route(source.commands()),
             proposals_circuit_id::make_fetch_proposal_resource(source.proposal_store_factory()),

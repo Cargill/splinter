@@ -18,19 +18,15 @@ pub(super) mod admin;
 pub(super) mod biome;
 pub(super) mod network;
 
-use splinter::biome::credentials::rest_api::BiomeCredentialsRestResourceProvider;
 use splinter::error::InternalError;
-use splinter::rest_api::actix_web_1::RestApiBuilder;
-use splinter::rest_api::{
-    auth::{
-        authorization::{
-            maintenance::MaintenanceModeAuthorizationHandler,
-            rbac::rest_api::RoleBasedAuthorizationResourceProvider,
-        },
-        identity::{Identity, IdentityProvider},
-        AuthorizationHeader,
-    },
-    AuthConfig, RestResourceProvider,
+use splinter_rest_api_actix_web_1::biome::credentials::BiomeCredentialsRestResourceProvider;
+use splinter_rest_api_actix_web_1::framework::RestApiBuilder;
+use splinter_rest_api_actix_web_1::{
+    auth::RoleBasedAuthorizationResourceProvider, framework::AuthConfig,
+    framework::RestResourceProvider,
+};
+use splinter_rest_api_common::auth::{
+    AuthorizationHeader, Identity, IdentityProvider, MaintenanceModeAuthorizationHandler,
 };
 
 use super::builder::admin::AdminSubsystemBuilder;

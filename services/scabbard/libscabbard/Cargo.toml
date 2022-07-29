@@ -55,6 +55,8 @@ features = ["lmdb", "transaction-receipt-store"]
 [dev-dependencies]
 transact = { version = "0.5", features = ["family-command", "family-command-transaction-builder", "state-merkle-sql"] }
 splinter = { path = "../../../libsplinter", features = ["diesel"]}
+splinter-rest-api-common = { path = "../../../rest_api/common" }
+splinter-rest-api-actix-web-1 = { path = "../../../rest_api/actix_web_1" , features = [ "service", "scabbard-service", "authorization"] }
 
 [build-dependencies]
 protoc-rust = "2.14"

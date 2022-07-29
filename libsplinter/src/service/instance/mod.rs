@@ -21,8 +21,6 @@ mod orchestrator;
 mod service_instance;
 mod validation;
 
-#[cfg(feature = "rest-api-actix-web-1")]
-pub use factory::EndpointFactory;
 pub use factory::ServiceFactory;
 pub use message_context::ServiceMessageContext;
 pub use network_registry::ServiceNetworkRegistry;

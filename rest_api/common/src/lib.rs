@@ -12,10 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod auth;
+pub mod bind_config;
 pub mod error;
+#[cfg(feature = "oauth")]
+pub mod oauth_config;
 pub mod paging;
+#[cfg(feature = "registry")]
+pub mod percent_encode_filter_query;
+pub mod response_models;
 #[cfg(feature = "scabbard")]
 pub mod scabbard;
+pub mod secrets;
+pub mod sessions;
 pub mod status;
 
 pub const SPLINTER_PROTOCOL_VERSION: u32 = 2;

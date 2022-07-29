@@ -15,7 +15,7 @@
 use std::collections::BTreeMap;
 
 use splinter::admin::store::{Circuit, CircuitNode, CircuitStatus, Service};
-use splinter::rest_api::paging::Paging;
+use splinter_rest_api_common::paging::v1::Paging;
 
 use crate::hex::to_hex;
 

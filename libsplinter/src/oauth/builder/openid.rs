@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use reqwest::blocking::Client;
+use serde::Deserialize;
 
 use crate::error::{InternalError, InvalidStateError};
 use crate::oauth::OpenIdProfileProvider;

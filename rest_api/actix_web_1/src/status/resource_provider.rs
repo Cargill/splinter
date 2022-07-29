@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use splinter::rest_api::{Resource, RestResourceProvider};
+use crate::framework::{Resource, RestResourceProvider};
 
 use super::get_status;
 #[cfg(feature = "authorization")]
@@ -44,7 +44,7 @@ impl StatusResourceProvider {
         #[cfg(feature = "authorization")]
         {
             let status_resource = Resource::build("/status").add_method(
-                splinter::rest_api::Method::Get,
+                crate::framework::Method::Get,
                 STATUS_READ_PERMISSION,
                 handle,
             );
@@ -54,7 +54,7 @@ impl StatusResourceProvider {
         #[cfg(not(feature = "authorization"))]
         {
             let status_resource =
-                Resource::build("/status").add_method(splinter::rest_api::Method::Get, handle);
+                Resource::build("/status").add_method(crate::framework::Method::Get, handle);
             let resources = vec![status_resource];
             Self { resources }
         }
@@ -62,7 +62,7 @@ impl StatusResourceProvider {
 }
 
 impl RestResourceProvider for StatusResourceProvider {
-    fn resources(&self) -> Vec<splinter::rest_api::Resource> {
+    fn resources(&self) -> Vec<crate::framework::Resource> {
         self.resources.clone()
     }
 }
