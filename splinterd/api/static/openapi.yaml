@@ -383,7 +383,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/paging"
       responses:
-        200:
+        '200':
           description: Get list of all assignments
           content:
             application/json:
@@ -392,7 +392,7 @@ paths:
                 items:
                   type: object
                   $ref: "#/components/schemas/Assignment"
-        400:
+        '400':
           description: Malformed query
           content:
             application/json:
@@ -401,7 +401,7 @@ paths:
               example:
                 code: "400"
                 message: "Malformed Query"
-        500:
+        '500':
           description: Internal error
           content:
             application/json:
@@ -425,9 +425,9 @@ paths:
             schema:
               $ref: '#/components/schemas/AssignmentPayload'
       responses:
-        200:
+        '200':
           description: The assignment has been added
-        400:
+        '400':
           description: Invalid assignment
           content:
             application/json:
@@ -436,7 +436,7 @@ paths:
               example:
                 code: "400"
                 message: "Invalid assignment payload"
-        500:
+        '500':
           description: Internal error
           content:
             application/json:
@@ -462,13 +462,13 @@ paths:
 
         This endpoint requires the permission "authorization.rbac.read".
       responses:
-        200:
+        '200':
           description: Assignment associated with the identity
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AssignmentData"
-        404:
+        '404':
           description: Assignment not found for given identity.
           content:
             application/json:
@@ -477,7 +477,7 @@ paths:
               example:
                 code: "404"
                 message: "Assignment not found"
-        500:
+        '500':
           description: Internal server error.
           content:
             application/json:
@@ -502,9 +502,9 @@ paths:
             schema:
               $ref: "#/components/schemas/AssignmentUpdate"
       responses:
-        200:
+        '200':
           description: Updated assignment associated with identity
-        404:
+        '404':
           description: Identity not found
           content:
             application/json:
@@ -513,7 +513,7 @@ paths:
               example:
                 code: "404"
                 message: "Identity not found"
-        409:
+        '409':
           description: Assignment violates state constraints
           content:
             application/json:
@@ -522,7 +522,7 @@ paths:
               example:
                 code: "409"
                 message: "Assignment is invalid"
-        500:
+        '500':
           description: Internal server error.
           content:
             application/json:
@@ -540,9 +540,9 @@ paths:
 
         This endpoint requires the permission "authorization.rbac.write".
       responses:
-        200:
+        '200':
           description: Assignment is removed.
-        500:
+        '500':
           description: Internal server error.
           content:
             application/json:
