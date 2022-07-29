@@ -76,7 +76,7 @@ impl OAuthClient {
     /// provider.
     /// * `profile_provider` - The OAuth profile provider used to retrieve the profile
     ///   information of the authenticated user from the OAuth provider.
-    fn new(
+    pub fn new(
         client: BasicClient,
         extra_auth_params: Vec<(String, String)>,
         scopes: Vec<String>,
