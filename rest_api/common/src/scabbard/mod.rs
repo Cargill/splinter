@@ -17,7 +17,7 @@ pub mod batches;
 pub mod state;
 
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::authorization::Permission;
+use crate::auth::Permission;
 
 #[cfg(feature = "authorization")]
 pub const SCABBARD_READ_PERMISSION: Permission = Permission::Check {

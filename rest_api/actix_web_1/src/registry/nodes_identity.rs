@@ -23,12 +23,10 @@ use std::convert::TryFrom;
 use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, stream::Stream, Future};
 
+use crate::framework::{Method, ProtocolVersionRangeGuard, Resource};
 use splinter::error::InvalidStateError;
 use splinter::registry::{Node, RegistryReader, RegistryWriter, RwRegistry};
-use splinter::rest_api::{
-    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    ErrorResponse,
-};
+use splinter_rest_api_common::response_models::ErrorResponse;
 use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
 
 use super::error::RegistryRestApiError;
@@ -216,13 +214,10 @@ mod tests {
     use splinter::error::InternalError;
     use splinter::error::InvalidStateError;
     use splinter::registry::{MetadataPredicate, NodeIter, RegistryError};
-    use splinter::rest_api::actix_web_1::AuthConfig;
-    use splinter::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
-    use splinter::rest_api::auth::authorization::{
-        AuthorizationHandler, AuthorizationHandlerResult,
-    };
-    use splinter::rest_api::auth::identity::{Identity, IdentityProvider};
-    use splinter::rest_api::auth::AuthorizationHeader;
+    use splinter_rest_api_common::auth::{AuthorizationHandler, AuthorizationHandlerResult};
+    use splinter_rest_api_common::auth::{AuthorizationHeader, Identity, IdentityProvider};
+
+    use crate::framework::{AuthConfig, RestApiBuilder, RestApiShutdownHandle};
 
     #[test]
     /// Tests a GET /registry/nodes/{identity} request returns the expected node.
@@ -425,7 +420,7 @@ mod tests {
 
         let result = RestApiBuilder::new()
             .with_bind(bind)
-            .add_resources(resources.clone())
+            .add_resources(resources)
             .push_auth_config(auth_config)
             .with_authorization_handlers(authorization_handlers)
             .build()

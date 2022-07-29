@@ -37,6 +37,10 @@ impl Paging {
     pub fn builder(link: String, query_count: usize) -> PagingBuilder {
         PagingBuilder::new(link, query_count)
     }
+
+    pub fn get_next(&self) -> &str {
+        &self.next
+    }
 }
 
 #[cfg(test)]

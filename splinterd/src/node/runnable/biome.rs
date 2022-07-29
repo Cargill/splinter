@@ -16,16 +16,17 @@
 
 use std::sync::Arc;
 
-use splinter::biome::{
-    credentials::rest_api::BiomeCredentialsRestResourceProviderBuilder,
-    profile::rest_api::BiomeProfileRestResourceProvider, UserProfileStore,
-};
+use splinter::biome::UserProfileStore;
 use splinter::error::InternalError;
-use splinter::rest_api::{
-    actix_web_1::Resource as Actix1Resource, AuthConfig, RestResourceProvider,
-};
 use splinter::store::StoreFactory;
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
+use splinter_rest_api_actix_web_1::biome::{
+    credentials::BiomeCredentialsRestResourceProviderBuilder,
+    profile::BiomeProfileRestResourceProvider,
+};
+use splinter_rest_api_actix_web_1::{
+    framework::AuthConfig, framework::Resource as Actix1Resource, framework::RestResourceProvider,
+};
 
 use crate::node::running::biome::BiomeSubsystem;
 

@@ -15,6 +15,7 @@
 //! A subject provider that looks up GitHub usernames
 
 use reqwest::{blocking::Client, StatusCode};
+use serde::Deserialize;
 
 use crate::error::InternalError;
 

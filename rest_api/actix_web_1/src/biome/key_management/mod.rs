@@ -18,7 +18,8 @@ mod resources;
 use std::sync::Arc;
 
 use splinter::biome::key_management::store::KeyStore;
-use splinter::rest_api::{Resource, RestResourceProvider};
+
+use crate::framework::{Resource, RestResourceProvider};
 
 /// Provides the following REST API endpoints for Biome key management:
 ///
@@ -58,20 +59,18 @@ mod tests {
 
     use reqwest::blocking::Client;
 
-    use crate::biome::{
-        credentials::rest_api::{
-            BiomeCredentialsRestConfigBuilder, BiomeCredentialsRestResourceProviderBuilder,
-        },
-        MemoryCredentialsStore, MemoryKeyStore, MemoryRefreshTokenStore,
-    };
+    use splinter::biome::{MemoryCredentialsStore, MemoryKeyStore, MemoryRefreshTokenStore};
     #[cfg(feature = "authorization")]
-    use crate::error::InternalError;
-    use crate::rest_api::actix_web_1::{AuthConfig, RestApiBuilder, RestApiShutdownHandle};
+    use splinter::error::InternalError;
     #[cfg(feature = "authorization")]
-    use crate::rest_api::auth::{
-        authorization::{AuthorizationHandler, AuthorizationHandlerResult},
-        identity::Identity,
+    use splinter_rest_api_common::auth::{
+        AuthorizationHandler, AuthorizationHandlerResult, Identity,
     };
+
+    use crate::biome::credentials::{
+        BiomeCredentialsRestConfigBuilder, BiomeCredentialsRestResourceProviderBuilder,
+    };
+    use crate::framework::{AuthConfig, RestApiBuilder, RestApiShutdownHandle};
 
     #[derive(Serialize)]
     struct UsernamePassword {

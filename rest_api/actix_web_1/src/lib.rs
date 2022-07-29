@@ -24,8 +24,12 @@ extern crate serde_json;
 
 #[cfg(feature = "admin-service")]
 pub mod admin;
+pub mod auth;
 #[cfg(feature = "biome")]
 pub mod biome;
+#[cfg(feature = "rest-api-cors")]
+pub mod cors;
+pub mod framework;
 pub mod open_api;
 #[cfg(feature = "registry")]
 pub mod registry;

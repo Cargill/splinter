@@ -444,20 +444,17 @@ mod tests {
     use actix_web::web;
     use actix_web::HttpResponse;
     use futures::future::IntoFuture;
+    use splinter::error::InternalError;
     #[cfg(feature = "authorization")]
-    use splinter::rest_api::auth::authorization::{
-        AuthorizationHandler, AuthorizationHandlerResult, Permission,
+    use splinter_rest_api_common::auth::{
+        AuthorizationHandler, AuthorizationHandlerResult, AuthorizationHeader, Identity,
+        IdentityProvider, Permission,
     };
-    use splinter::{
-        error::InternalError,
-        rest_api::{
-            auth::{
-                identity::{Identity, IdentityProvider},
-                AuthorizationHeader,
-            },
-            AuthConfig, Method, ProtocolVersionRangeGuard, Resource, RestApiBuilder,
-            RestApiServerError, RestApiShutdownHandle,
-        },
+    use splinter_rest_api_common::error::RestApiServerError;
+
+    use splinter_rest_api_actix_web_1::framework::{
+        AuthConfig, Method, ProtocolVersionRangeGuard, Resource, RestApiBuilder,
+        RestApiShutdownHandle,
     };
 
     const SCABBARD_ADD_BATCHES_PROTOCOL_MIN: u32 = 1;

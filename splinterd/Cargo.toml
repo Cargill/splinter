@@ -48,7 +48,7 @@ sawtooth = { version = "0.7", default-features = false, optional = true }
 serde = "1.0.80"
 serde_derive = "1.0.80"
 splinter-echo = { path = "../services/echo/libecho", optional = true }
-splinter-rest-api-actix-web-1 = { path = "../rest_api/actix_web_1" , features = ["admin-service", "registry", "service", "scabbard-service"] }
+splinter-rest-api-common = { path = "../rest_api/common" }
 toml = "0.5"
 
 [dev-dependencies]
@@ -57,6 +57,19 @@ reqwest = { version = "0.11", features = ["blocking"] }
 sabre-sdk = "0.9"
 tempfile = "3"
 transact = "0.5"
+
+[dependencies.splinter-rest-api-actix-web-1]
+path = "../rest_api/actix_web_1"
+features = ["admin-service",
+  "registry",
+  "service",
+  "scabbard-service",
+  "rbac",
+  "biome-credentials",
+  "cylinder-jwt",
+  "authorization",
+  "websocket"
+  ]
 
 [dependencies.scabbard]
 path = "../services/scabbard/libscabbard"
@@ -121,6 +134,7 @@ authorization = [
     "scabbard/authorization",
     "splinter/authorization",
     "splinter-rest-api-actix-web-1/authorization",
+    "splinter-rest-api-common/authorization",
 ]
 authorization-handler-allow-keys = ["splinter/authorization-handler-allow-keys"]
 authorization-handler-maintenance = [
@@ -128,15 +142,17 @@ authorization-handler-maintenance = [
 ]
 authorization-handler-rbac = [
     "splinter/authorization-handler-rbac",
+    "splinter/authorization",
+    "splinter-rest-api-actix-web-1/authorization-handler-rbac",
 ]
-biome-credentials = ["splinter/biome-credentials"]
+biome-credentials = ["splinter/biome-credentials", "splinter-rest-api-common/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management", "splinter-rest-api-actix-web-1/biome-key-management"]
-biome-profile = ["splinter/biome-profile"]
+biome-profile = ["splinter/biome-profile", "splinter-rest-api-actix-web-1/biome-profile"]
 config-allow-keys = ["authorization-handler-allow-keys"]
 database-postgres = ["diesel", "diesel/postgres", "scabbard/postgres", "splinter/postgres", "splinter-echo/postgres"]
 database-sqlite = ["diesel", "diesel/sqlite", "scabbard/sqlite", "splinter/sqlite", "splinter-echo/sqlite"]
 disable-scabbard-autocleanup = []
-https-bind = ["splinter/https-bind"]
+https-bind = ["splinter/https-bind","splinter-rest-api-actix-web-1/https-bind","splinter-rest-api-common/https-bind"]
 lifecycle-executor-interval = []
 tap = [
   "splinter/tap",
@@ -161,9 +177,11 @@ node = [
     "splinter/biome-client-reqwest",
 ]
 oauth = [
-    "splinter/oauth"
+    "splinter/oauth",
+    "splinter-rest-api-common/oauth",
+    "splinter-rest-api-actix-web-1/oauth"
 ]
-rest-api-cors = ["splinter/rest-api-cors"]
+rest-api-cors = ["splinter/rest-api-cors", "splinter-rest-api-actix-web-1/rest-api-cors"]
 scabbardv3 = ["scabbard/scabbardv3", "service2", "scabbard/scabbardv3-consensus",]
 service-endpoint = ["splinter-rest-api-actix-web-1/service-endpoint"]
 service-timer-interval = []

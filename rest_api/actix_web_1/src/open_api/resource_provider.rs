@@ -14,14 +14,15 @@
 // limitations under the License.
 
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::authorization::Permission;
-use splinter::rest_api::{Method, Resource, RestResourceProvider};
+use splinter_rest_api_common::auth::Permission;
+
+use crate::framework::{Method, Resource, RestResourceProvider};
 
 #[derive(Default)]
 pub struct OpenApiResourceProvider {}
 
 impl RestResourceProvider for OpenApiResourceProvider {
-    fn resources(&self) -> Vec<splinter::rest_api::Resource> {
+    fn resources(&self) -> Vec<crate::framework::Resource> {
         #[cfg(feature = "authorization")]
         {
             vec![Resource::build(".openapi.yaml").add_method(

@@ -13,10 +13,12 @@
 // limitations under the License.
 
 mod builder;
+mod endpoints;
 
-use splinter::rest_api::actix_web_1::{Resource, RestResourceProvider};
+use crate::framework::{Resource, RestResourceProvider};
 
 pub use builder::ServiceOrchestratorRestResourceProviderBuilder;
+pub use endpoints::{ServiceEndpoint, ServiceEndpointProvider, ServiceRequestGuard};
 
 /// The `ServiceOrchestratorRestResourceProvider` exposes REST API resources
 /// provided by the [`ServiceFactory::get_rest_endpoints`] methods of the

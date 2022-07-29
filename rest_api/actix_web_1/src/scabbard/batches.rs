@@ -19,16 +19,16 @@ use transact::protos::FromBytes;
 
 use actix_web::{web, Error as ActixError, HttpResponse};
 use futures::{stream::Stream, Future, IntoFuture};
-use splinter::{
-    rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard},
-    service::rest_api::ServiceEndpoint,
-};
 
 use scabbard::protocol;
 use scabbard::service::{Scabbard, SERVICE_TYPE};
+use splinter_rest_api_common::response_models::ErrorResponse;
 use splinter_rest_api_common::scabbard::batches::BatchLinkResponse;
 #[cfg(feature = "authorization")]
 use splinter_rest_api_common::scabbard::SCABBARD_WRITE_PERMISSION;
+
+use crate::framework::{Method, ProtocolVersionRangeGuard};
+use crate::service::ServiceEndpoint;
 
 pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
     ServiceEndpoint {

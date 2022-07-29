@@ -17,8 +17,6 @@
 mod builder;
 mod error;
 mod profile;
-#[cfg(feature = "rest-api-actix-web-1")]
-pub(crate) mod rest_api;
 pub mod store;
 mod subject;
 
@@ -76,7 +74,7 @@ impl OAuthClient {
     /// provider.
     /// * `profile_provider` - The OAuth profile provider used to retrieve the profile
     ///   information of the authenticated user from the OAuth provider.
-    fn new(
+    pub fn new(
         client: BasicClient,
         extra_auth_params: Vec<(String, String)>,
         scopes: Vec<String>,
@@ -242,6 +240,19 @@ fn new_basic_client(
 pub struct PendingAuthorization {
     pkce_verifier: String,
     client_redirect_url: String,
+}
+
+impl PendingAuthorization {
+    pub fn get_client_redirect_url(&self) -> &str {
+        &self.client_redirect_url
+    }
+
+    pub fn new(pkce_verifier: String, client_redirect_url: String) -> Self {
+        Self {
+            pkce_verifier,
+            client_redirect_url,
+        }
+    }
 }
 
 /// User information returned by the OAuth2 client

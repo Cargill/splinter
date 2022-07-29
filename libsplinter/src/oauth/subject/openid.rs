@@ -15,6 +15,7 @@
 //! A subject provider that looks up OpenID subject identifiers
 
 use reqwest::{blocking::Client, StatusCode};
+use serde::Deserialize;
 
 use crate::error::InternalError;
 

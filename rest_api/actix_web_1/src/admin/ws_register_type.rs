@@ -27,14 +27,11 @@ use splinter::admin::service::{
 };
 use splinter::admin::store;
 use splinter::error::InvalidStateError;
-use splinter::rest_api::{
-    actix_web_1::{
-        new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request,
-        Resource,
-    },
-    ErrorResponse,
+use splinter_rest_api_common::{response_models::ErrorResponse, SPLINTER_PROTOCOL_VERSION};
+
+use crate::framework::{
+    new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request, Resource,
 };
-use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
 
 #[cfg(feature = "authorization")]
 use super::CIRCUIT_READ_PERMISSION;

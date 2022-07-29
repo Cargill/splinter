@@ -19,10 +19,10 @@ use splinter::error::InternalError;
 use splinter::events::Reactor;
 use splinter::peer::PeerManagerConnector;
 use splinter::registry::RegistryWriter;
-use splinter::rest_api::actix_web_1::Resource as Actix1Resource;
 use splinter::runtime::service::instance::ServiceProcessorShutdownHandle;
 use splinter::store::StoreFactory;
 use splinter::threading::lifecycle::ShutdownHandle;
+use splinter_rest_api_actix_web_1::framework::Resource as Actix1Resource;
 
 /// The configured, running Admin Service Event client variants.
 pub enum AdminServiceEventClientVariant {

@@ -40,10 +40,6 @@ use scabbard::service::ScabbardFactoryBuilder;
 use splinter::admin::lifecycle::sync::SyncLifecycleInterface;
 use splinter::admin::lifecycle::LifecycleDispatch;
 use splinter::admin::service::{admin_service_id, AdminService, AdminServiceBuilder};
-#[cfg(feature = "biome-credentials")]
-use splinter::biome::credentials::rest_api::BiomeCredentialsRestResourceProviderBuilder;
-#[cfg(feature = "biome-profile")]
-use splinter::biome::profile::rest_api::BiomeProfileRestResourceProvider;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
     CircuitMessageHandler, ServiceConnectRequestHandler, ServiceDisconnectRequestHandler,
@@ -71,23 +67,6 @@ use splinter::public_key::PublicKey;
 use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RwRegistry, UnifiedRegistry,
 };
-#[cfg(feature = "authorization-handler-allow-keys")]
-use splinter::rest_api::auth::authorization::allow_keys::AllowKeysAuthorizationHandler;
-#[cfg(feature = "authorization-handler-maintenance")]
-use splinter::rest_api::auth::authorization::maintenance::MaintenanceModeAuthorizationHandler;
-#[cfg(feature = "authorization-handler-rbac")]
-use splinter::rest_api::auth::authorization::rbac::{
-    rest_api::RoleBasedAuthorizationResourceProvider, RoleBasedAuthorizationHandler,
-};
-#[cfg(any(
-    feature = "authorization-handler-rbac",
-    feature = "authorization-handler-maintenance",
-    feature = "authorization-handler-allow-keys"
-))]
-use splinter::rest_api::auth::authorization::AuthorizationHandler;
-#[cfg(feature = "oauth")]
-use splinter::rest_api::OAuthConfig;
-use splinter::rest_api::{AuthConfig, RestApiBuilder, RestResourceProvider};
 use splinter::runtime::service::instance::{
     ServiceOrchestratorBuilder, ServiceProcessor, ServiceProcessorShutdownHandle,
 };
@@ -107,13 +86,35 @@ use splinter::transport::{
 #[cfg(feature = "service-echo")]
 use splinter_echo::service::{EchoMessageByteConverter, EchoMessageHandlerFactory};
 use splinter_rest_api_actix_web_1::admin::{AdminServiceRestProvider, CircuitResourceProvider};
+#[cfg(feature = "authorization-handler-rbac")]
+use splinter_rest_api_actix_web_1::auth::RoleBasedAuthorizationResourceProvider;
+#[cfg(feature = "biome-credentials")]
+use splinter_rest_api_actix_web_1::biome::credentials::BiomeCredentialsRestResourceProviderBuilder;
 #[cfg(feature = "biome-key-management")]
 use splinter_rest_api_actix_web_1::biome::key_management::BiomeKeyManagementRestResourceProvider;
+#[cfg(feature = "biome-profile")]
+use splinter_rest_api_actix_web_1::biome::profile::BiomeProfileRestResourceProvider;
+use splinter_rest_api_actix_web_1::framework::AuthConfig;
+use splinter_rest_api_actix_web_1::framework::{RestApiBuilder, RestResourceProvider};
 use splinter_rest_api_actix_web_1::open_api;
 use splinter_rest_api_actix_web_1::registry::RwRegistryRestResourceProvider;
 use splinter_rest_api_actix_web_1::scabbard::ScabbardServiceEndpointProvider;
 use splinter_rest_api_actix_web_1::service::ServiceOrchestratorRestResourceProviderBuilder;
 use splinter_rest_api_actix_web_1::status;
+#[cfg(feature = "authorization-handler-allow-keys")]
+use splinter_rest_api_common::auth::AllowKeysAuthorizationHandler;
+#[cfg(any(
+    feature = "authorization-handler-rbac",
+    feature = "authorization-handler-maintenance",
+    feature = "authorization-handler-allow-keys"
+))]
+use splinter_rest_api_common::auth::AuthorizationHandler;
+#[cfg(feature = "authorization-handler-maintenance")]
+use splinter_rest_api_common::auth::MaintenanceModeAuthorizationHandler;
+#[cfg(feature = "authorization-handler-rbac")]
+use splinter_rest_api_common::auth::RoleBasedAuthorizationHandler;
+#[cfg(feature = "oauth")]
+use splinter_rest_api_common::oauth_config::OAuthConfig;
 
 use crate::node_id::get_node_id;
 
@@ -983,16 +984,18 @@ impl SplinterDaemon {
     }
 
     #[cfg(feature = "https-bind")]
-    fn build_rest_api_bind(&self) -> Result<splinter::rest_api::BindConfig, StartError> {
+    fn build_rest_api_bind(
+        &self,
+    ) -> Result<splinter_rest_api_common::bind_config::BindConfig, StartError> {
         match self.rest_api_endpoint.strip_prefix("http://") {
-            Some(insecure_endpoint) => Ok(splinter::rest_api::BindConfig::Http(
+            Some(insecure_endpoint) => Ok(splinter_rest_api_common::bind_config::BindConfig::Http(
                 insecure_endpoint.into(),
             )),
             None => {
                 if let Some((rest_api_server_cert, rest_api_server_key)) =
                     self.rest_api_ssl_settings.as_ref()
                 {
-                    Ok(splinter::rest_api::BindConfig::Https {
+                    Ok(splinter_rest_api_common::bind_config::BindConfig::Https {
                         bind: self
                             .rest_api_endpoint
                             .strip_prefix("https://")

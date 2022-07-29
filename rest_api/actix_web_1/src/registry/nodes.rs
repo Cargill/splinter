@@ -25,11 +25,13 @@ use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, stream::Stream, Future};
 use splinter::error::InvalidStateError;
 use splinter::registry::{MetadataPredicate, Node, RegistryReader, RegistryWriter, RwRegistry};
-use splinter::rest_api::{
-    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    paging::{PagingBuilder, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    percent_encode_filter_query, ErrorResponse,
+use splinter_rest_api_common::{
+    paging::v1::{PagingBuilder, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    percent_encode_filter_query::percent_encode_filter_query,
+    response_models::ErrorResponse,
 };
+
+use crate::framework::{Method, ProtocolVersionRangeGuard, Resource};
 use splinter_rest_api_common::SPLINTER_PROTOCOL_VERSION;
 
 use super::error::RegistryRestApiError;
@@ -303,16 +305,14 @@ mod tests {
     use splinter::error::InternalError;
     use splinter::error::InvalidStateError;
     use splinter::registry::{NodeIter, RegistryError};
-    use splinter::rest_api::actix_web_1::AuthConfig;
-    use splinter::rest_api::auth::authorization::{
-        AuthorizationHandler, AuthorizationHandlerResult,
+    use splinter_rest_api_common::auth::{
+        AuthorizationHandler, AuthorizationHandlerResult, AuthorizationHeader, Identity,
+        IdentityProvider,
     };
-    use splinter::rest_api::auth::identity::{Identity, IdentityProvider};
-    use splinter::rest_api::auth::AuthorizationHeader;
-    use splinter::rest_api::{
-        actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
-        paging::Paging,
-    };
+    use splinter_rest_api_common::paging::v1::Paging;
+
+    use crate::framework::AuthConfig;
+    use crate::framework::{RestApiBuilder, RestApiShutdownHandle};
 
     #[test]
     /// Tests a GET /registry/nodes request with no filters returns the expected nodes.
@@ -499,7 +499,7 @@ mod tests {
 
         let result = RestApiBuilder::new()
             .with_bind(bind)
-            .add_resources(resources.clone())
+            .add_resources(resources)
             .push_auth_config(auth_config)
             .with_authorization_handlers(authorization_handlers)
             .build()
@@ -517,29 +517,16 @@ mod tests {
     fn create_test_paging_response(
         offset: usize,
         limit: usize,
-        next_offset: usize,
-        previous_offset: usize,
-        last_offset: usize,
+        _next_offset: usize,
+        _previous_offset: usize,
+        _last_offset: usize,
         total: usize,
         link: &str,
     ) -> Paging {
-        let base_link = format!("{}limit={}&", link, limit);
-        let current_link = format!("{}offset={}", base_link, offset);
-        let first_link = format!("{}offset=0", base_link);
-        let next_link = format!("{}offset={}", base_link, next_offset);
-        let previous_link = format!("{}offset={}", base_link, previous_offset);
-        let last_link = format!("{}offset={}", base_link, last_offset);
-
-        Paging {
-            current: current_link,
-            offset,
-            limit,
-            total,
-            first: first_link,
-            prev: previous_link,
-            next: next_link,
-            last: last_link,
-        }
+        Paging::builder(link.to_string(), total)
+            .with_limit(limit)
+            .with_offset(offset)
+            .build()
     }
 
     fn get_node_1() -> Node {
@@ -625,15 +612,17 @@ mod tests {
             self.nodes
                 .lock()
                 .expect("mem registry lock was poisoned")
-                .insert(node.identity().to_string().clone(), node);
+                .insert(node.identity().to_string(), node);
             Ok(())
         }
 
         fn update_node(&self, node: Node) -> Result<(), RegistryError> {
             let mut inner = self.nodes.lock().expect("mem registry lock was poisoned");
 
-            if inner.contains_key(&node.identity().to_string()) {
-                inner.insert(node.identity().to_string(), node);
+            if let std::collections::hash_map::Entry::Occupied(mut e) =
+                inner.entry(node.identity().to_string())
+            {
+                e.insert(node);
                 Ok(())
             } else {
                 Err(RegistryError::InvalidStateError(

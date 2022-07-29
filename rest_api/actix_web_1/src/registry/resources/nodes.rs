@@ -17,7 +17,7 @@ use std::convert::TryFrom;
 
 use serde::{Deserialize, Serialize};
 use splinter::registry::{InvalidNodeError, Node};
-use splinter::rest_api::paging::Paging;
+use splinter_rest_api_common::paging::v1::Paging;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ListNodesResponse<'a> {

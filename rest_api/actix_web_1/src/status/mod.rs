@@ -18,7 +18,7 @@ mod resource_provider;
 use actix_web::{Error, HttpResponse};
 use futures::{Future, IntoFuture};
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::authorization::Permission;
+use splinter_rest_api_common::auth::Permission;
 use splinter_rest_api_common::status::Status;
 
 pub use resource_provider::StatusResourceProvider;

@@ -17,16 +17,16 @@ use std::sync::Arc;
 
 use actix_web::{web, HttpResponse};
 use futures::IntoFuture;
-use splinter::{
-    rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard},
-    service::rest_api::ServiceEndpoint,
-};
 
 use scabbard::protocol;
 use scabbard::service::{Scabbard, SERVICE_TYPE};
+use splinter_rest_api_common::response_models::ErrorResponse;
 use splinter_rest_api_common::scabbard::state::StateEntryResponse;
 #[cfg(feature = "authorization")]
 use splinter_rest_api_common::scabbard::SCABBARD_READ_PERMISSION;
+
+use crate::framework::{Method, ProtocolVersionRangeGuard};
+use crate::service::ServiceEndpoint;
 
 pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
     ServiceEndpoint {
