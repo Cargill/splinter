@@ -535,12 +535,10 @@ impl Events {
                 .take(ITER_CACHE_SIZE)
                 .map(|res| match res {
                     Ok(receipt) => StateChangeEvent::try_from(receipt),
-                    Err(err) => {
-                        return Err(ScabbardStateError(format!(
-                            "failed to get transaction receipt: {}",
-                            err
-                        )))
-                    }
+                    Err(err) => Err(ScabbardStateError(format!(
+                        "failed to get transaction receipt: {}",
+                        err
+                    ))),
                 })
                 .collect::<Result<VecDeque<_>, _>>()?;
 
