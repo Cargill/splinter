@@ -49,7 +49,7 @@ impl std::fmt::Display for FrameError {
 impl std::error::Error for FrameError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            FrameError::IoError(err) => Some(&*err),
+            FrameError::IoError(err) => Some(err),
             FrameError::InvalidChecksum => None,
             FrameError::InvalidHeaderLength(_) => None,
             FrameError::UnsupportedVersion => None,

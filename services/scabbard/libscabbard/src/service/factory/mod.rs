@@ -935,18 +935,18 @@ fn get_postgres_pool(
 fn get_sqlite_pool(
     conn_str: &str,
 ) -> Result<Pool<ConnectionManager<diesel::SqliteConnection>>, InvalidStateError> {
-    if (&*conn_str != ":memory:") && !Path::new(&*conn_str).exists() {
+    if (conn_str != ":memory:") && !Path::new(conn_str).exists() {
         return Err(InvalidStateError::with_message(format!(
             "Database file '{}' does not exist",
             conn_str
         )));
     }
-    let connection_manager = ConnectionManager::<diesel::sqlite::SqliteConnection>::new(&*conn_str);
+    let connection_manager = ConnectionManager::<diesel::sqlite::SqliteConnection>::new(conn_str);
     let mut pool_builder = Pool::builder();
     // A new database is created for each connection to the in-memory SQLite
     // implementation; to ensure that the resulting stores will operate on the same
     // database, only one connection is allowed.
-    if &*conn_str == ":memory:" {
+    if conn_str == ":memory:" {
         pool_builder = pool_builder.max_size(1);
     }
     pool_builder.build(connection_manager).map_err(|err| {

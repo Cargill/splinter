@@ -70,7 +70,7 @@ pub fn migrate_node_id_to_db(
         "Importing node_id from {} to database",
         filename.to_string_lossy()
     );
-    let result = import_store(&*db_store, &file_store);
+    let result = import_store(db_store, &file_store);
 
     if let Ok(WarningEmited::No) = result {
         info!(
