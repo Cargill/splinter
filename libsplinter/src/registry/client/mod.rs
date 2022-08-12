@@ -64,7 +64,7 @@ pub trait RegistryClient {
     fn delete_node(&self, identity: &str) -> Result<(), InternalError>;
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RegistryNode {
     pub identity: String,
     pub endpoints: Vec<String>,
@@ -95,13 +95,13 @@ impl fmt::Display for RegistryNode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RegistryNodeListSlice {
     pub data: Vec<RegistryNode>,
     pub paging: Paging,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Paging {
     pub current: String,
     pub offset: usize,

@@ -18,7 +18,7 @@
 use super::schema::*;
 use std::time::SystemTime;
 
-#[derive(Insertable, Queryable, Identifiable, PartialEq, Debug)]
+#[derive(Insertable, Queryable, Identifiable, PartialEq, Eq, Debug)]
 #[table_name = "gameroom"]
 #[primary_key(circuit_id)]
 pub struct Gameroom {
@@ -34,7 +34,7 @@ pub struct Gameroom {
     pub updated_time: SystemTime,
 }
 
-#[derive(Queryable, Identifiable, Associations, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Associations, PartialEq, Eq, Debug)]
 #[table_name = "gameroom_proposal"]
 #[belongs_to(Gameroom, foreign_key = "circuit_id")]
 pub struct GameroomProposal {
@@ -49,7 +49,7 @@ pub struct GameroomProposal {
     pub updated_time: SystemTime,
 }
 
-#[derive(Insertable, PartialEq, Debug)]
+#[derive(Insertable, PartialEq, Eq, Debug)]
 #[table_name = "gameroom_proposal"]
 pub struct NewGameroomProposal {
     pub proposal_type: String,
@@ -62,7 +62,7 @@ pub struct NewGameroomProposal {
     pub updated_time: SystemTime,
 }
 
-#[derive(Queryable, Identifiable, Associations, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Associations, PartialEq, Eq, Debug)]
 #[table_name = "proposal_vote_record"]
 #[belongs_to(GameroomProposal, foreign_key = "proposal_id")]
 pub struct ProposalVoteRecord {
@@ -74,7 +74,7 @@ pub struct ProposalVoteRecord {
     pub created_time: SystemTime,
 }
 
-#[derive(Insertable, PartialEq, Debug)]
+#[derive(Insertable, PartialEq, Eq, Debug)]
 #[table_name = "proposal_vote_record"]
 pub struct NewProposalVoteRecord {
     pub proposal_id: i64,
@@ -84,7 +84,7 @@ pub struct NewProposalVoteRecord {
     pub created_time: SystemTime,
 }
 
-#[derive(Queryable, Identifiable, Associations, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Associations, PartialEq, Eq, Debug)]
 #[table_name = "gameroom_member"]
 #[belongs_to(Gameroom, foreign_key = "circuit_id")]
 pub struct GameroomMember {
@@ -97,7 +97,7 @@ pub struct GameroomMember {
     pub updated_time: SystemTime,
 }
 
-#[derive(Insertable, PartialEq, Debug)]
+#[derive(Insertable, PartialEq, Eq, Debug)]
 #[table_name = "gameroom_member"]
 pub struct NewGameroomMember {
     pub circuit_id: String,
@@ -108,7 +108,7 @@ pub struct NewGameroomMember {
     pub updated_time: SystemTime,
 }
 
-#[derive(Queryable, Identifiable, Associations, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Associations, PartialEq, Eq, Debug)]
 #[table_name = "gameroom_service"]
 #[belongs_to(Gameroom, foreign_key = "circuit_id")]
 pub struct GameroomService {
@@ -124,7 +124,7 @@ pub struct GameroomService {
     pub updated_time: SystemTime,
 }
 
-#[derive(Insertable, PartialEq, Debug)]
+#[derive(Insertable, PartialEq, Eq, Debug)]
 #[table_name = "gameroom_service"]
 pub struct NewGameroomService {
     pub circuit_id: String,
@@ -188,7 +188,7 @@ pub struct NewXoGame {
     pub updated_time: SystemTime,
 }
 
-#[derive(Queryable, PartialEq, Debug)]
+#[derive(Queryable, PartialEq, Eq, Debug)]
 pub struct ActiveGameroom {
     pub circuit_id: String,
     pub service_id: String,

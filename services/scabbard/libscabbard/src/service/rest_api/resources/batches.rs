@@ -14,7 +14,7 @@
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BatchLinkResponse<'a> {
     link: &'a str,
 }

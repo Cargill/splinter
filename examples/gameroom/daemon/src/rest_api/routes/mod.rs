@@ -124,7 +124,7 @@ impl<T: Serialize> SuccessResponse<T> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Paging {
     current: String,
     offset: usize,

@@ -14,7 +14,7 @@
 
 use super::schema::keys;
 
-#[derive(Insertable, Queryable, Identifiable, PartialEq, Debug)]
+#[derive(Insertable, Queryable, Identifiable, PartialEq, Eq, Debug)]
 #[table_name = "keys"]
 #[primary_key(public_key, user_id)]
 pub struct KeyModel {

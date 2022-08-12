@@ -15,7 +15,7 @@
 use std::{error, fmt};
 
 /// Errors that could be raised by `PeerInterconnect`
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PeerInterconnectError {
     /// `PeerInterconnect` start up failed
     StartUpError(String),

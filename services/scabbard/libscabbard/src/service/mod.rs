@@ -68,7 +68,7 @@ const SERVICE_TYPE: &str = "scabbard";
 const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
 /// Specifies the version of scabbard to use.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ScabbardVersion {
     V1,
     V2,

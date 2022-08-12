@@ -16,7 +16,7 @@ use crate::biome::profile::store::Profile;
 
 use super::schema::user_profile;
 
-#[derive(Insertable, Queryable, Identifiable, Associations, PartialEq, Debug)]
+#[derive(Insertable, Queryable, Identifiable, Associations, PartialEq, Eq, Debug)]
 #[table_name = "user_profile"]
 #[primary_key(user_id)]
 pub struct ProfileModel {

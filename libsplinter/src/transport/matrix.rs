@@ -40,7 +40,7 @@ pub use super::error::{
 };
 
 /// Contains a payload and the identifier for the connection on which the payload was received
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct ConnectionMatrixEnvelope {
     /// The connection identifier
     id: String,

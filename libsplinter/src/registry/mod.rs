@@ -46,7 +46,7 @@ pub use yaml::{LocalYamlRegistry, YamlNode};
 pub use yaml::{RemoteYamlRegistry, RemoteYamlShutdownHandle};
 
 /// Native representation of a node in a registry.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node {
     /// The Splinter identity of the node; must be non-empty and unique in the registry.
     identity: String,

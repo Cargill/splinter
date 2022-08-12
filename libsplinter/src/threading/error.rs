@@ -14,7 +14,7 @@
 
 use std::{error, fmt};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PacemakerStartError(pub String);
 
 impl error::Error for PacemakerStartError {}

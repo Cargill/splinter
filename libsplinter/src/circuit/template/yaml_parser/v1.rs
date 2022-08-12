@@ -197,7 +197,7 @@ impl JsonMetadata {
 }
 
 /// Struct to represent single and list values within the `JsonMetadata`.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Value {
     Single(String),

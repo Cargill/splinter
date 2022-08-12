@@ -20,7 +20,9 @@ use super::schema::{
     splinter_nodes, splinter_nodes_endpoints, splinter_nodes_keys, splinter_nodes_metadata,
 };
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "splinter_nodes"]
 #[primary_key(identity)]
 pub struct NodesModel {
@@ -28,7 +30,9 @@ pub struct NodesModel {
     pub display_name: String,
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "splinter_nodes_endpoints"]
 #[belongs_to(NodesModel, foreign_key = "identity")]
 #[primary_key(identity, endpoint)]
@@ -37,7 +41,7 @@ pub struct NodeEndpointsModel {
     pub endpoint: String,
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable)]
+#[derive(Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable)]
 #[table_name = "splinter_nodes_keys"]
 #[belongs_to(NodesModel, foreign_key = "identity")]
 #[primary_key(identity, key)]
@@ -46,7 +50,7 @@ pub struct NodeKeysModel {
     pub key: String,
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable)]
+#[derive(Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable)]
 #[table_name = "splinter_nodes_metadata"]
 #[belongs_to(NodesModel, foreign_key = "identity")]
 #[primary_key(identity, key)]

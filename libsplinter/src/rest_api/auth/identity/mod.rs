@@ -26,7 +26,7 @@ use crate::error::InternalError;
 use super::AuthorizationHeader;
 
 /// A REST API client's identity as determined by an [IdentityProvider]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Identity {
     /// A custom identity
     Custom(String),

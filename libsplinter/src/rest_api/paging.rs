@@ -16,7 +16,7 @@
 pub const DEFAULT_LIMIT: usize = 100;
 pub const DEFAULT_OFFSET: usize = 0;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Paging {
     pub current: String,
     pub offset: usize,
