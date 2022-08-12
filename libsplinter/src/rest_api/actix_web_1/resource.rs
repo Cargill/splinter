@@ -29,7 +29,7 @@ use crate::rest_api::auth::authorization::{Permission, PermissionMap};
 use super::{Continuation, RequestGuard};
 
 /// Rest methods compatible with `RestApi`.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Method {
     Get,
     Post,

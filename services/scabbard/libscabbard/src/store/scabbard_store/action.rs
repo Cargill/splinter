@@ -24,7 +24,7 @@ use augrim::{error::InternalError, two_phase_commit::TwoPhaseCommitAction};
 use crate::service::v3::{ScabbardProcess, ScabbardValue};
 use crate::store::scabbard_store::Action;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ConsensusAction {
     TwoPhaseCommit(Action),
 }

@@ -19,7 +19,7 @@ use crate::rest_api::auth::{BearerToken, InvalidArgumentError};
 /// The possible outcomes of attempting to authorize a client
 
 /// A parsed authorization header
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum AuthorizationHeader {
     Bearer(BearerToken),
     Custom(String),

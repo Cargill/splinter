@@ -15,7 +15,7 @@
 use std::error::Error;
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct RecvError {
     pub error: String,
 }
@@ -28,7 +28,7 @@ impl fmt::Display for RecvError {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TryRecvError {
     Empty,
     Disconnected,
@@ -47,7 +47,7 @@ impl fmt::Display for TryRecvError {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RecvTimeoutError {
     Timeout,
     Disconnected,
@@ -66,7 +66,7 @@ impl fmt::Display for RecvTimeoutError {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SendError {
     pub error: String,
 }

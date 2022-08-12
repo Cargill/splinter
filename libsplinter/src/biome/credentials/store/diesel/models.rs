@@ -14,7 +14,7 @@
 
 use super::schema::user_credentials;
 
-#[derive(Queryable, Identifiable, Associations, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Associations, PartialEq, Eq, Debug)]
 #[table_name = "user_credentials"]
 pub struct CredentialsModel {
     pub id: i64,
@@ -23,7 +23,7 @@ pub struct CredentialsModel {
     pub password: String,
 }
 
-#[derive(Insertable, PartialEq, Debug)]
+#[derive(Insertable, PartialEq, Eq, Debug)]
 #[table_name = "user_credentials"]
 pub struct NewCredentialsModel {
     pub user_id: String,

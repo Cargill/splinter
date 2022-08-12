@@ -14,7 +14,7 @@
 
 use super::schema::refresh_tokens;
 
-#[derive(Queryable, Identifiable, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, PartialEq, Eq, Debug)]
 #[table_name = "refresh_tokens"]
 #[primary_key(id)]
 pub struct RefreshToken {
@@ -23,7 +23,7 @@ pub struct RefreshToken {
     pub token: String,
 }
 
-#[derive(AsChangeset, Insertable, PartialEq, Debug)]
+#[derive(AsChangeset, Insertable, PartialEq, Eq, Debug)]
 #[table_name = "refresh_tokens"]
 pub struct NewRefreshToken<'a> {
     pub user_id: &'a str,

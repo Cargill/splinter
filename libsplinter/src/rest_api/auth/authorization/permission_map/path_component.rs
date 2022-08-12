@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /// A component of an endpoint path
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum PathComponent {
     /// A standard path component where matching is done on the internal string
     Text(String),

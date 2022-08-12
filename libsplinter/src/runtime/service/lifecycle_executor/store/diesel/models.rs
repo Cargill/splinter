@@ -43,7 +43,7 @@ use crate::runtime::service::{
 use super::schema::{service_lifecycle_argument, service_lifecycle_status};
 
 /// Database model representation of `LifecycleService`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable)]
+#[derive(Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable)]
 #[table_name = "service_lifecycle_status"]
 #[primary_key(circuit_id, service_id)]
 pub struct ServiceLifecycleStatusModel {
@@ -67,7 +67,9 @@ impl From<&LifecycleService> for ServiceLifecycleStatusModel {
 }
 
 /// Database model representation of the arguments in a `LifecycleService`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "service_lifecycle_argument"]
 #[primary_key(circuit_id, service_id, key)]
 pub struct ServiceLifecycleArgumentModel {
@@ -197,7 +199,7 @@ impl From<&LifecycleStatus> for StatusTypeModel {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum StatusTypeModel {
     New,
     Complete,
@@ -348,7 +350,7 @@ impl HasSqlType<StatusTypeModelMapping> for Sqlite {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum CommandTypeModel {
     Prepare,
     Finalize,

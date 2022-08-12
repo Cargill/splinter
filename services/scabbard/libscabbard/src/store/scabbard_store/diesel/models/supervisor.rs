@@ -42,7 +42,9 @@ use crate::store::scabbard_store::{SupervisorNotification, SupervisorNotificatio
 
 use crate::store::scabbard_store::diesel::schema::supervisor_notification;
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "supervisor_notification"]
 #[primary_key(id)]
 pub struct SupervisorNotificationModel {
@@ -56,7 +58,7 @@ pub struct SupervisorNotificationModel {
     pub executed_at: Option<NaiveDateTime>,
 }
 
-#[derive(Debug, PartialEq, Insertable)]
+#[derive(Debug, PartialEq, Eq, Insertable)]
 #[table_name = "supervisor_notification"]
 pub struct InsertableSupervisorNotificationModel {
     pub circuit_id: String,
@@ -136,7 +138,7 @@ impl From<&SupervisorNotificationType> for SupervisorNotificationTypeModel {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SupervisorNotificationTypeModel {
     RequestForStart,
     CoordinatorRequestForVote,

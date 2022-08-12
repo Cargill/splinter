@@ -39,7 +39,9 @@ use crate::store::scabbard_store::diesel::schema::{scabbard_peer, scabbard_servi
 use crate::store::scabbard_store::service::{ConsensusType, ScabbardService, ServiceStatus};
 
 /// Database model representation of `ScabbardService`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "scabbard_service"]
 #[primary_key(circuit_id, service_id)]
 pub struct ScabbardServiceModel {
@@ -49,7 +51,7 @@ pub struct ScabbardServiceModel {
     pub status: ServiceStatusTypeModel,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ConsensusTypeModel {
     Consensus2pc,
 }
@@ -197,7 +199,7 @@ impl HasSqlType<ConsensusTypeModelMapping> for Sqlite {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ServiceStatusTypeModel {
     Prepared,
     Finalized,
@@ -367,7 +369,9 @@ impl From<&ScabbardService> for ScabbardServiceModel {
 }
 
 /// Database model representation of `ScabbardService` peer
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "scabbard_peer"]
 #[primary_key(circuit_id, service_id, peer_service_id)]
 pub struct ScabbardPeerModel {

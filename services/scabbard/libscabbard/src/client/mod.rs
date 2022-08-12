@@ -96,7 +96,7 @@ impl FromStr for ServiceId {
 }
 
 /// Represents an entry in a Scabbard service's state.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct StateEntry {
     address: String,
     value: Vec<u8>,

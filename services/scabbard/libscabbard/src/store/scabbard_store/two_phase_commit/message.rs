@@ -30,7 +30,7 @@ use crate::protos::{scabbard_v3, IntoBytes, ProtoConversionError};
 #[cfg(feature = "scabbardv3-consensus")]
 use crate::service::v3::ScabbardValue;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
     VoteRequest(u64, Vec<u8>),
     Commit(u64),

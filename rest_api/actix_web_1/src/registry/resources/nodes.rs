@@ -19,13 +19,13 @@ use serde::{Deserialize, Serialize};
 use splinter::registry::{InvalidNodeError, Node};
 use splinter::rest_api::paging::Paging;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ListNodesResponse<'a> {
     pub data: Vec<NodeResponse<'a>>,
     pub paging: Paging,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NodeResponse<'a> {
     pub identity: &'a str,
     pub endpoints: &'a [String],
@@ -47,7 +47,7 @@ impl<'a> From<&'a Node> for NodeResponse<'a> {
 }
 
 /// Used to deserialize add and update requests
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NewNode {
     /// The Splinter identity of the node; must be non-empty and unique in the registry.
     pub identity: String,

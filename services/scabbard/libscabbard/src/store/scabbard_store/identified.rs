@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /// A struct used to pair a type to an ID
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Identified<T: Clone> {
     pub id: i64,
     pub record: T,

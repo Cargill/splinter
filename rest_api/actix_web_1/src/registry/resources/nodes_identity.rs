@@ -18,7 +18,7 @@ use std::convert::TryFrom;
 use serde::{Deserialize, Serialize};
 use splinter::registry::{InvalidNodeError, Node};
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NodeResponse<'a> {
     pub identity: &'a str,
     pub endpoints: &'a [String],
@@ -40,7 +40,7 @@ impl<'a> From<&'a Node> for NodeResponse<'a> {
 }
 
 /// Used to deserialize add and update requests
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NewNode {
     /// The Splinter identity of the node; must be non-empty and unique in the registry.
     pub identity: String,

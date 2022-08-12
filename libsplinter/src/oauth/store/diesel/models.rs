@@ -14,7 +14,7 @@
 
 use super::schema::oauth_inflight_request;
 
-#[derive(Insertable, Queryable, Identifiable, PartialEq, Debug)]
+#[derive(Insertable, Queryable, Identifiable, PartialEq, Eq, Debug)]
 #[table_name = "oauth_inflight_request"]
 pub struct OAuthInflightRequest {
     pub id: String,

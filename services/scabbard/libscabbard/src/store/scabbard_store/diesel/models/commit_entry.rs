@@ -43,7 +43,9 @@ use crate::store::scabbard_store::commit::{CommitEntry, CommitEntryBuilder, Cons
 use crate::store::scabbard_store::diesel::schema::scabbard_v3_commit_history;
 
 /// Database model representation of `ScabbardService` commit entry
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "scabbard_v3_commit_history"]
 #[primary_key(circuit_id, service_id, epoch)]
 pub struct CommitEntryModel {
@@ -54,7 +56,7 @@ pub struct CommitEntryModel {
     pub decision: Option<DecisionTypeModel>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DecisionTypeModel {
     Commit,
     Abort,

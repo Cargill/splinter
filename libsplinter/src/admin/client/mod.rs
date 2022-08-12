@@ -29,7 +29,7 @@ use crate::error::InternalError;
 #[cfg(feature = "client-reqwest")]
 pub use self::reqwest::ReqwestAdminServiceClient;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Paging {
     pub current: String,
     pub offset: usize,
@@ -41,7 +41,7 @@ pub struct Paging {
     pub last: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CircuitServiceSlice {
     pub service_id: String,
     pub service_type: String,
@@ -49,7 +49,7 @@ pub struct CircuitServiceSlice {
     pub arguments: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CircuitSlice {
     pub id: String,
     pub members: Vec<CircuitMembers>,
@@ -58,20 +58,20 @@ pub struct CircuitSlice {
     pub display_name: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CircuitListSlice {
     pub data: Vec<CircuitSlice>,
     pub paging: Paging,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CircuitMembers {
     pub node_id: String,
     pub endpoints: Vec<String>,
     pub public_key: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CircuitService {
     pub service_id: String,
     pub service_type: String,
@@ -79,7 +79,7 @@ pub struct CircuitService {
     pub arguments: Vec<Vec<String>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProposalCircuitSlice {
     pub circuit_id: String,
     pub members: Vec<CircuitMembers>,
@@ -89,14 +89,14 @@ pub struct ProposalCircuitSlice {
     pub display_name: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VoteRecord {
     pub public_key: String,
     pub vote: String,
     pub voter_node_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProposalSlice {
     pub proposal_type: String,
     pub circuit_id: String,
@@ -107,7 +107,7 @@ pub struct ProposalSlice {
     pub requester_node_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProposalListSlice {
     pub data: Vec<ProposalSlice>,
     pub paging: Paging,

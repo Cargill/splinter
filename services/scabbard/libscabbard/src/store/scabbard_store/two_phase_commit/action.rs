@@ -29,14 +29,14 @@ use crate::store::scabbard_store::context::ConsensusContext;
 
 use super::message::Message;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Action {
     Update(ConsensusContext, Option<SystemTime>),
     SendMessage(ServiceId, Message),
     Notify(Notification),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Notification {
     Abort(),
     Commit(),

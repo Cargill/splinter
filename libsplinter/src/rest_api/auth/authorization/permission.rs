@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /// A permission assigned to an endpoint
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Permission {
     /// Check that the authenticated client has the specified permission.
     Check {

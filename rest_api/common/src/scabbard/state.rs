@@ -14,7 +14,7 @@
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StateEntryResponse<'a> {
     pub address: &'a str,
     pub value: &'a [u8],

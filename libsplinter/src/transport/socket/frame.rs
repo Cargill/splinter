@@ -68,7 +68,7 @@ impl From<io::Error> for FrameError {
 ///
 /// This specifies the version of the frame, based on what value is sent during frame transmission.
 /// It indicates header style and data requirements.
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum FrameVersion {
     V1 = 1,
 }

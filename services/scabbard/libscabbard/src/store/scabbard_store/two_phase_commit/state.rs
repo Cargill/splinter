@@ -19,7 +19,7 @@ use std::time::SystemTime;
 #[cfg(feature = "scabbardv3-consensus")]
 use augrim::{error::InternalError, two_phase_commit::TwoPhaseCommitState};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum State {
     Abort,
     Commit,
