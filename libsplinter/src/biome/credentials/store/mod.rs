@@ -33,7 +33,7 @@ const MEDIUM_COST: u32 = 8;
 const LOW_COST: u32 = 4;
 
 /// Represents crendentials used to authenticate a user
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Credentials {
     pub user_id: String,
     pub username: String,
@@ -53,7 +53,7 @@ impl Credentials {
 }
 
 /// Represents a user's username
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct UsernameId {
     pub username: String,
     pub user_id: String,

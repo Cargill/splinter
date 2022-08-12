@@ -485,7 +485,7 @@ impl ManagedAuthorizations {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ConnectionAuthorizationType {
     Trust { identity: String },
     Challenge { public_key: PublicKey },

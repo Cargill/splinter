@@ -18,7 +18,7 @@ use serde::{ser::SerializeSeq, Serialize, Serializer};
 
 use scabbard::service::{BatchInfo, BatchStatus, InvalidTransaction, ValidTransaction};
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BatchInfoResponse<'a> {
     pub id: &'a str,
     pub status: BatchStatusResponse<'a>,
@@ -35,7 +35,7 @@ impl<'a> From<&'a BatchInfo> for BatchInfoResponse<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "statusType", content = "message")]
 pub enum BatchStatusResponse<'a> {
     #[serde(serialize_with = "empty_array")]
@@ -72,7 +72,7 @@ impl<'a> From<&'a BatchStatus> for BatchStatusResponse<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ValidTransactionResponse<'a> {
     pub transaction_id: &'a str,
 }
@@ -85,7 +85,7 @@ impl<'a> From<&'a ValidTransaction> for ValidTransactionResponse<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct InvalidTransactionResponse<'a> {
     pub transaction_id: &'a str,
     pub error_message: &'a str,

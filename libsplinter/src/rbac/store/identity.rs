@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /// An identity that may be assigned roles.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Identity {
     /// A public key-based identity.
     Key(String),

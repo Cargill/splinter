@@ -52,7 +52,7 @@ impl<C> StoreCommand for UpdateContextCommand<C> {
     type Context = C;
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
-        let store = self.store_factory.new_store(&*conn);
+        let store = self.store_factory.new_store(conn);
 
         if let Some(alarm) = self.alarm {
             store

@@ -23,7 +23,7 @@ use super::error::PeerManagerError;
 use super::PeerTokenPair;
 
 /// Messages that will be dispatched to all subscription handlers
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PeerManagerNotification {
     /// Notifies subscribers that a peer is connected. Includes the peer ID of the connected peer.
     Connected { peer: PeerTokenPair },

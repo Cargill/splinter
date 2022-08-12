@@ -55,7 +55,9 @@ use crate::store::scabbard_store::diesel::schema::{
     consensus_2pc_vote_event,
 };
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_context"]
 #[primary_key(circuit_id, service_id)]
 pub struct Consensus2pcContextModel {
@@ -71,7 +73,7 @@ pub struct Consensus2pcContextModel {
     pub ack_timeout_start: Option<i64>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ContextStateModel {
     Abort,
     Commit,
@@ -440,7 +442,9 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for Consensus2pcContextModel 
     }
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_context_participant"]
 #[primary_key(circuit_id, service_id, process)]
 pub struct Consensus2pcContextParticipantModel {
@@ -452,7 +456,7 @@ pub struct Consensus2pcContextParticipantModel {
     pub decision_ack: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ParticipantList {
     pub inner: Vec<Participant>,
 }
@@ -478,7 +482,7 @@ impl TryFrom<Vec<Consensus2pcContextParticipantModel>> for ParticipantList {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ContextParticipantList {
     pub inner: Vec<Consensus2pcContextParticipantModel>,
 }
@@ -508,7 +512,9 @@ impl TryFrom<(&Context, &FullyQualifiedServiceId)> for ContextParticipantList {
     }
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_update_context_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
@@ -591,7 +597,9 @@ impl TryFrom<(&Context, &i64, &Option<i64>)> for Consensus2pcUpdateContextAction
     }
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_update_context_action_participant"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[belongs_to(Consensus2pcUpdateContextActionModel, foreign_key = "action_id")]
@@ -603,7 +611,7 @@ pub struct Consensus2pcUpdateContextActionParticipantModel {
     pub decision_ack: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct UpdateContextActionParticipantList {
     pub inner: Vec<Consensus2pcUpdateContextActionParticipantModel>,
 }
@@ -627,7 +635,9 @@ impl TryFrom<(&Context, &i64)> for UpdateContextActionParticipantList {
     }
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_send_message_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
@@ -640,7 +650,7 @@ pub struct Consensus2pcSendMessageActionModel {
     pub vote_request: Option<Vec<u8>>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MessageTypeModel {
     VoteResponse,
     DecisionRequest,
@@ -807,7 +817,9 @@ impl HasSqlType<MessageTypeModelMapping> for Sqlite {
     }
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_notification_action"]
 #[belongs_to(Consensus2pcActionModel, foreign_key = "action_id")]
 #[primary_key(action_id)]
@@ -818,7 +830,7 @@ pub struct Consensus2pcNotificationModel {
     pub request_for_vote_value: Option<Vec<u8>>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum NotificationTypeModel {
     RequestForStart,
     CoordinatorRequestForVote,
@@ -1029,7 +1041,9 @@ impl From<&State> for ContextStateModel {
     }
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_action"]
 #[belongs_to(Consensus2pcContextModel, foreign_key = "service_id")]
 #[primary_key(id)]
@@ -1043,7 +1057,7 @@ pub struct Consensus2pcActionModel {
     pub event_id: i64,
 }
 
-#[derive(Debug, PartialEq, Insertable)]
+#[derive(Debug, PartialEq, Eq, Insertable)]
 #[table_name = "consensus_2pc_action"]
 pub struct InsertableConsensus2pcActionModel {
     pub circuit_id: String,
@@ -1279,7 +1293,9 @@ impl From<&Message> for MessageTypeModel {
     }
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_event"]
 #[primary_key(id)]
 pub struct Consensus2pcEventModel {
@@ -1293,7 +1309,7 @@ pub struct Consensus2pcEventModel {
     pub update_context_action_id: Option<i64>,
 }
 
-#[derive(Debug, PartialEq, Insertable)]
+#[derive(Debug, PartialEq, Eq, Insertable)]
 #[table_name = "consensus_2pc_event"]
 pub struct InsertableConsensus2pcEventModel {
     pub circuit_id: String,
@@ -1474,7 +1490,9 @@ impl HasSqlType<EventTypeModelMapping> for Sqlite {
     }
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_deliver_event"]
 #[belongs_to(Consensus2pcEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]
@@ -1487,7 +1505,7 @@ pub struct Consensus2pcDeliverEventModel {
     pub vote_request: Option<Vec<u8>>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DeliverMessageTypeModel {
     VoteResponse,
     DecisionRequest,
@@ -1669,7 +1687,9 @@ impl From<&Message> for DeliverMessageTypeModel {
     }
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_start_event"]
 #[belongs_to(Consensus2pcEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]
@@ -1678,7 +1698,9 @@ pub struct Consensus2pcStartEventModel {
     pub value: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "consensus_2pc_vote_event"]
 #[belongs_to(Consensus2pcEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]

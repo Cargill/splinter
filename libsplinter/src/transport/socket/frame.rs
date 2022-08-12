@@ -49,7 +49,7 @@ impl std::fmt::Display for FrameError {
 impl std::error::Error for FrameError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            FrameError::IoError(err) => Some(&*err),
+            FrameError::IoError(err) => Some(err),
             FrameError::InvalidChecksum => None,
             FrameError::InvalidHeaderLength(_) => None,
             FrameError::UnsupportedVersion => None,
@@ -68,7 +68,7 @@ impl From<io::Error> for FrameError {
 ///
 /// This specifies the version of the frame, based on what value is sent during frame transmission.
 /// It indicates header style and data requirements.
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum FrameVersion {
     V1 = 1,
 }

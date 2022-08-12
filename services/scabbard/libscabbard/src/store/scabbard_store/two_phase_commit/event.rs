@@ -24,7 +24,7 @@ use crate::service::v3::{ScabbardProcess, ScabbardValue};
 
 use super::message::Message;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     Alarm(),
     Deliver(ServiceId, Message),

@@ -18,7 +18,7 @@ use std::{error, fmt};
 
 /// Errors that could be raised by the `PeerManager`
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PeerManagerError {
     /// `PeerManager` start up failed
     StartUpError(String),
@@ -39,7 +39,7 @@ impl fmt::Display for PeerManagerError {
 
 /// Errors that could be raised when requesting a peer is added
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PeerRefAddError {
     /// Internal `PeerManager` error
     InternalError(String),
@@ -65,7 +65,7 @@ impl fmt::Display for PeerRefAddError {
 
 /// Errors that could be raised when requesting a peer is added without a peer ID
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PeerUnknownAddError {
     /// Internal `PeerManager` error
     InternalError(String),
@@ -94,7 +94,7 @@ impl fmt::Display for PeerUnknownAddError {
 }
 
 /// Errors that could be raised when requesting a peer is removed
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PeerRefRemoveError {
     /// Internal `PeerManager` error
     Internal(String),
@@ -119,7 +119,7 @@ impl fmt::Display for PeerRefRemoveError {
 }
 
 /// Errors that could be raised when requesting a list of peers
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PeerListError {
     /// Internal `PeerManager`error
     Internal(String),
@@ -145,7 +145,7 @@ impl fmt::Display for PeerListError {
 
 /// Errors that could be raised when requesting a peer's connection ID
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PeerConnectionIdError {
     /// Internal `PeerManager` error
     InternalError(String),

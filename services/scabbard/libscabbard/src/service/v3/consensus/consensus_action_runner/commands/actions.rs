@@ -48,7 +48,7 @@ impl<C> StoreCommand for ExecuteActionCommand<C> {
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         self.store_factory
-            .new_store(&*conn)
+            .new_store(conn)
             .update_consensus_action(&self.service_id, self.action_id, SystemTime::now())
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }

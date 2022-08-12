@@ -22,7 +22,7 @@ use augrim::{error::InternalError, two_phase_commit::TwoPhaseCommitEvent};
 use crate::service::v3::{ScabbardProcess, ScabbardValue};
 use crate::store::scabbard_store::two_phase_commit::Event;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ConsensusEvent {
     TwoPhaseCommit(Event),
 }

@@ -48,7 +48,7 @@ pub(in crate::admin) fn make_create_circuit_payload(
     complete_create_payload(requester, signer, circuit_request)
 }
 
-pub(in crate) fn complete_create_payload(
+pub(crate) fn complete_create_payload(
     requester: &str,
     signer: &dyn Signer,
     circuit_request: CircuitCreateRequest,
@@ -116,7 +116,7 @@ pub(in crate) fn complete_create_payload(
 
 /// Makes the `CircuitProposalVote` payload to either accept or reject the proposal (based on
 /// the `accept` argument) and returns the bytes of this payload
-pub(in crate) fn make_circuit_proposal_vote_payload(
+pub(crate) fn make_circuit_proposal_vote_payload(
     proposal: ProposalSlice,
     requester: &str,
     signer: &dyn Signer,

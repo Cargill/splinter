@@ -46,7 +46,7 @@ pub(crate) struct EchoService {
 }
 
 #[repr(i16)]
-#[derive(Debug, Copy, Clone, PartialEq, FromSqlRow)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, FromSqlRow)]
 pub enum EchoServiceStatusModel {
     Prepared = 1,
     Finalized = 2,
@@ -104,7 +104,7 @@ where
     }
 }
 
-#[derive(Insertable, Queryable, Identifiable, PartialEq, Debug)]
+#[derive(Insertable, Queryable, Identifiable, PartialEq, Eq, Debug)]
 #[table_name = "echo_peers"]
 #[primary_key(service_id, peer_service_id)]
 pub(crate) struct EchoPeer {
@@ -112,7 +112,7 @@ pub(crate) struct EchoPeer {
     pub peer_service_id: Option<String>,
 }
 
-#[derive(Insertable, Queryable, Identifiable, PartialEq, Debug)]
+#[derive(Insertable, Queryable, Identifiable, PartialEq, Eq, Debug)]
 #[table_name = "echo_request_errors"]
 #[primary_key(service_id, correlation_id)]
 pub(crate) struct EchoRequestError {
@@ -122,7 +122,9 @@ pub(crate) struct EchoRequestError {
     pub error_at: i64,
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "echo_requests"]
 #[primary_key(sender_service_id, correlation_id)]
 pub(crate) struct EchoRequest {
@@ -157,7 +159,7 @@ impl TryFrom<EchoRequest> for ServiceEchoRequest {
 }
 
 #[repr(i16)]
-#[derive(Debug, Copy, Clone, PartialEq, FromSqlRow)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, FromSqlRow)]
 pub(crate) enum Status {
     NotSent = 0,
     Sent = 1,

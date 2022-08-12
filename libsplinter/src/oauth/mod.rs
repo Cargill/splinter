@@ -238,7 +238,7 @@ fn new_basic_client(
 
 /// Information pertaining to pending authorization requests, including the PKCE verifier, and
 /// client's redirect URL
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PendingAuthorization {
     pkce_verifier: String,
     client_redirect_url: String,

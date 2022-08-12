@@ -59,11 +59,11 @@ pub trait UpgradeStores {
     fn new_state_tree_store<'a>(&'a self) -> Box<dyn StateTreeStore + 'a>;
 }
 
+type InTransactionHandle<'a> =
+    Box<dyn FnOnce(&dyn UpgradeStores) -> Result<(), InternalError> + 'a>;
+
 pub trait TransactionalUpgradeStores: UpgradeStores {
-    fn in_transaction<'a>(
-        &self,
-        f: Box<dyn FnOnce(&dyn UpgradeStores) -> Result<(), InternalError> + 'a>,
-    ) -> Result<(), InternalError>;
+    fn in_transaction(&self, f: InTransactionHandle<'_>) -> Result<(), InternalError>;
 
     fn as_upgrade_stores(&self) -> &dyn UpgradeStores;
 }

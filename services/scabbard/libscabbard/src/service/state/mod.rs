@@ -533,12 +533,10 @@ impl Events {
                 .take(ITER_CACHE_SIZE)
                 .map(|res| match res {
                     Ok(receipt) => StateChangeEvent::try_from(receipt),
-                    Err(err) => {
-                        return Err(ScabbardStateError(format!(
-                            "failed to get transaction receipt: {}",
-                            err
-                        )))
-                    }
+                    Err(err) => Err(ScabbardStateError(format!(
+                        "failed to get transaction receipt: {}",
+                        err
+                    ))),
                 })
                 .collect::<Result<VecDeque<_>, _>>()?;
 
@@ -568,7 +566,7 @@ impl Iterator for Events {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "statusType", content = "message")]
 pub enum BatchStatus {
     #[serde(deserialize_with = "empty_array")]
@@ -638,7 +636,7 @@ impl From<BatchExecutionResult> for BatchStatus {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ValidTransaction {
     pub transaction_id: String,
 }
@@ -649,7 +647,7 @@ impl ValidTransaction {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InvalidTransaction {
     pub transaction_id: String,
     pub error_message: String,

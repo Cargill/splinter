@@ -17,7 +17,7 @@ use core::str::FromStr;
 use crate::rest_api::auth::InvalidArgumentError;
 
 /// A bearer token of a specific type
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum BearerToken {
     #[cfg(feature = "biome-credentials")]
     /// Contains a Biome JWT

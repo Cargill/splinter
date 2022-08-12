@@ -51,7 +51,7 @@ impl<C> StoreCommand for AddEventCommand<C> {
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         self.store_factory
-            .new_store(&*conn)
+            .new_store(conn)
             .add_consensus_event(&self.service_id, self.event.clone())
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
@@ -78,7 +78,7 @@ impl<C> StoreCommand for AddCommitEntryCommand<C> {
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         self.store_factory
-            .new_store(&*conn)
+            .new_store(conn)
             .add_commit_entry(self.commit_entry.clone())
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }
@@ -103,7 +103,7 @@ impl<C> StoreCommand for UpdateCommitEntryCommand<C> {
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         self.store_factory
-            .new_store(&*conn)
+            .new_store(conn)
             .update_commit_entry(self.commit_entry.clone())
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }
@@ -134,7 +134,7 @@ impl<C> StoreCommand for ExecuteSupervisorCommand<C> {
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         self.store_factory
-            .new_store(&*conn)
+            .new_store(conn)
             .update_supervisor_notification(
                 &self.service_id,
                 self.notification_id,
@@ -166,7 +166,7 @@ impl<C> StoreCommand for AddSupervisorNotificationCommand<C> {
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         self.store_factory
-            .new_store(&*conn)
+            .new_store(conn)
             .add_supervisor_notification(self.notification.clone())
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }

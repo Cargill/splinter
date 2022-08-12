@@ -37,7 +37,9 @@ use diesel::sqlite::Sqlite;
 use crate::store::scabbard_store::alarm::AlarmType;
 use crate::store::scabbard_store::diesel::schema::scabbard_alarm;
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "scabbard_alarm"]
 #[primary_key(circuit_id, service_id, alarm_type)]
 pub struct ScabbardAlarmModel {

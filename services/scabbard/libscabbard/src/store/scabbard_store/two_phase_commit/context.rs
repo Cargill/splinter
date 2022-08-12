@@ -33,7 +33,7 @@ use crate::store::scabbard_store::two_phase_commit::State;
 #[cfg(feature = "scabbardv3-consensus")]
 use crate::service::v3::ScabbardProcess;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
     coordinator: ServiceId,
     epoch: u64,
@@ -167,7 +167,7 @@ impl ContextBuilder {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Participant {
     pub process: ServiceId,
     pub vote: Option<bool>,
