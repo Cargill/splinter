@@ -36,7 +36,7 @@ impl Error for NextEventError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             NextEventError::Disconnected => None,
-            NextEventError::InternalError(ref e) => Some(&*e),
+            NextEventError::InternalError(ref e) => Some(e),
         }
     }
 }
@@ -60,7 +60,7 @@ impl Error for WaitForError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             WaitForError::TimeoutError => None,
-            WaitForError::NextEventError(ref e) => Some(&*e),
+            WaitForError::NextEventError(ref e) => Some(e),
         }
     }
 }

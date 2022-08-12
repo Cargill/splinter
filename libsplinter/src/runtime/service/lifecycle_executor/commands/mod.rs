@@ -33,7 +33,7 @@ impl<C> StoreCommand for LifecycleCompleteCommand<C> {
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         self.store_factory
-            .new_store(&*conn)
+            .new_store(conn)
             .update_service(self.service.clone())
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }
@@ -49,7 +49,7 @@ impl<C> StoreCommand for LifecycleRemoveCommand<C> {
 
     fn execute(&self, conn: &Self::Context) -> Result<(), InternalError> {
         self.store_factory
-            .new_store(&*conn)
+            .new_store(conn)
             .remove_service(self.service.service_id())
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }
