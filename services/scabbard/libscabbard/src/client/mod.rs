@@ -49,7 +49,7 @@ impl ServiceId {
         let ids = full_id.splitn(2, "::").collect::<Vec<_>>();
 
         let circuit = (*ids
-            .get(0)
+            .first()
             .ok_or_else(|| ScabbardClientError::new("service ID invalid: cannot be empty"))?)
         .to_string();
         if circuit.is_empty() {
