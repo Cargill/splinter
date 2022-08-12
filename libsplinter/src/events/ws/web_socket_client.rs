@@ -44,6 +44,8 @@ const DEFAULT_TIMEOUT: u64 = 300; // default timeout if no message is received f
 type OnErrorHandle<T> =
     dyn Fn(WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static;
 
+type OnReconnectHandle<T> = dyn Fn(&mut WebSocketClient<T>) + Send + Sync + 'static;
+
 /// WebSocket client. Configures Websocket connection and produces `Listen` future.
 pub struct WebSocketClient<T: ParseBytes<T> + 'static = Vec<u8>> {
     url: String,
@@ -51,7 +53,7 @@ pub struct WebSocketClient<T: ParseBytes<T> + 'static = Vec<u8>> {
     on_message: Arc<dyn Fn(Context<T>, T) -> WsResponse + Send + Sync + 'static>,
     on_open: Option<Arc<dyn Fn(Context<T>) -> WsResponse + Send + Sync + 'static>>,
     on_error: Option<Arc<OnErrorHandle<T>>>,
-    on_reconnect: Option<Arc<dyn Fn(&mut WebSocketClient<T>) + Send + Sync + 'static>>,
+    on_reconnect: Option<Arc<OnReconnectHandle<T>>>,
     reconnect: bool,
     reconnect_limit: u64,
     timeout: u64,
@@ -176,9 +178,7 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
         self.on_reconnect = Some(Arc::new(on_reconnect));
     }
 
-    pub fn get_on_reconnect(
-        &self,
-    ) -> Option<Arc<dyn Fn(&mut WebSocketClient<T>) + Send + Sync + 'static>> {
+    pub fn get_on_reconnect(&self) -> Option<Arc<OnReconnectHandle<T>>> {
         match &self.on_reconnect {
             Some(arc) => Some(Arc::clone(arc)),
             None => None,
