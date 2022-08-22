@@ -67,7 +67,7 @@ pub enum PayloadType {
     Consensus(ProposalId, (Proposal, CircuitManagementPayload)),
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum AdminServiceStatus {
     NotRunning,
     Running,

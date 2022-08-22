@@ -24,7 +24,7 @@ use super::error::PeerUpdateError;
 use super::{PeerAuthorizationToken, PeerTokenPair};
 
 /// Enum for the current status of a peer
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum PeerStatus {
     /// Peer is connected and is reachable
     Connected,
@@ -35,7 +35,7 @@ pub enum PeerStatus {
 }
 
 /// The representation of a peer in the `PeerMap`
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PeerMetadata {
     /// The unique PeerAuthorizationToken ID for the peer
     pub id: PeerAuthorizationToken,

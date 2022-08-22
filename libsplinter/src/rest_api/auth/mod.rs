@@ -163,7 +163,7 @@ fn get_identity(
 }
 
 /// A parsed authorization header
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum AuthorizationHeader {
     Bearer(BearerToken),
     Custom(String),
@@ -190,7 +190,7 @@ impl FromStr for AuthorizationHeader {
 }
 
 /// A bearer token of a specific type
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum BearerToken {
     #[cfg(feature = "biome-credentials")]
     /// Contains a Biome JWT

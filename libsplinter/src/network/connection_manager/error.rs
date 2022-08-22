@@ -14,7 +14,7 @@
 
 use std::{error, fmt, io};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConnectionManagerError {
     StartUpError(String),
     HeartbeatError(String),

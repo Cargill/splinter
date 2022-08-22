@@ -31,7 +31,7 @@ pub use ws::actix_web_client::{
 };
 
 /// A public key for the private key that signed an admin proposal.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct PublicKey(pub Vec<u8>);
 
@@ -55,7 +55,7 @@ pub struct AdminServiceEvent {
 /// The event type.
 ///
 /// Some variants include a public key, that is associated with the particular event.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EventType {
     ProposalSubmitted,
     ProposalVote { requester: PublicKey },

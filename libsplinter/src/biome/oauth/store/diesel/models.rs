@@ -16,7 +16,7 @@ use crate::biome::oauth::store::{InsertableOAuthUserSession, OAuthUser};
 
 use super::schema::{oauth_user_sessions, oauth_users};
 
-#[derive(Debug, PartialEq, Identifiable, Insertable, Queryable)]
+#[derive(Debug, PartialEq, Eq, Identifiable, Insertable, Queryable)]
 #[table_name = "oauth_users"]
 #[primary_key(subject)]
 pub struct OAuthUserModel {
@@ -24,7 +24,7 @@ pub struct OAuthUserModel {
     pub user_id: String,
 }
 
-#[derive(Debug, PartialEq, Associations, Identifiable, Queryable)]
+#[derive(Debug, PartialEq, Eq, Associations, Identifiable, Queryable)]
 #[table_name = "oauth_user_sessions"]
 #[belongs_to(OAuthUserModel, foreign_key = "subject")]
 #[primary_key(splinter_access_token)]
@@ -36,7 +36,7 @@ pub struct OAuthUserSessionModel {
     pub last_authenticated: i64,
 }
 
-#[derive(Debug, PartialEq, Insertable)]
+#[derive(Debug, PartialEq, Eq, Insertable)]
 #[table_name = "oauth_user_sessions"]
 pub struct InsertableOAuthUserSessionModel {
     pub splinter_access_token: String,

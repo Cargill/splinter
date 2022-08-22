@@ -398,7 +398,7 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             metadata.endpoint(),
             metadata.connection_id(),
             subscribers,
-            &*authorizer,
+            authorizer,
             internal_sender.clone(),
         ) {
             error!(

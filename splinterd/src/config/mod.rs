@@ -913,7 +913,7 @@ impl Config {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ScabbardState {
     Database,
     Lmdb,

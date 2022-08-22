@@ -282,7 +282,7 @@ impl Error for FactoryCreateError {
             FactoryCreateError::CreationFailed(err) => Some(&**err),
             FactoryCreateError::InvalidArguments(_) => None,
             FactoryCreateError::Internal(_) => None,
-            FactoryCreateError::InvalidState(ref err) => Some(&*err),
+            FactoryCreateError::InvalidState(ref err) => Some(err),
         }
     }
 }

@@ -23,7 +23,7 @@ use crate::error::InvalidStateError;
 use crate::peer::{PeerAuthorizationToken, PeerTokenPair};
 
 /// Struct used to correlate a `PeerAuthorizationToken` with node information
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PeerNode {
     pub token: PeerAuthorizationToken,
     pub node_id: String,

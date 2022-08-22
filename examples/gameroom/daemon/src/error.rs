@@ -106,7 +106,7 @@ impl From<JsonWebTokenBuildError> for GameroomDaemonError {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ConfigurationError {
     MissingValue(String),
 }
@@ -129,7 +129,7 @@ impl From<ConfigurationError> for GameroomDaemonError {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct GetNodeError(pub String);
 
 impl Error for GetNodeError {

@@ -37,7 +37,7 @@ use self::trust_v1::{
 
 use super::{ManagedAuthorizationState, ManagedAuthorizations};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Identity {
     Trust {
         identity: String,

@@ -22,7 +22,7 @@ pub mod store;
 use store::diesel::models::KeyModel;
 
 /// Represents a public and private key pair
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Key {
     pub public_key: String,
     pub encrypted_private_key: String,

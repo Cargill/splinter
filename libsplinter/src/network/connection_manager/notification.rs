@@ -17,7 +17,7 @@ use crate::network::auth::ConnectionAuthorizationType;
 use super::error::ConnectionManagerError;
 
 /// Messages that will be dispatched to all subscription handlers
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ConnectionManagerNotification {
     Connected {
         endpoint: String,

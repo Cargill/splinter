@@ -49,7 +49,9 @@ use crate::error::{InternalError, InvalidStateError};
 use crate::public_key::PublicKey;
 
 /// Database model representation of a `CircuitProposal`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "circuit_proposal"]
 #[primary_key(circuit_id)]
 pub struct CircuitProposalModel {
@@ -73,7 +75,9 @@ impl From<&CircuitProposal> for CircuitProposalModel {
 }
 
 /// Database model representation of a `ProposedCircuit`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "proposed_circuit"]
 #[belongs_to(CircuitProposalModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id)]
@@ -110,7 +114,9 @@ impl From<&ProposedCircuit> for ProposedCircuitModel {
 }
 
 /// Database model representation of a `VoteRecord`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "vote_record"]
 #[belongs_to(CircuitProposalModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, voter_node_id)]
@@ -160,7 +166,9 @@ impl TryFrom<&VoteRecordModel> for VoteRecord {
 }
 
 /// Database model representation of a `ProposedNode`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "proposed_node"]
 #[belongs_to(ProposedCircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, node_id)]
@@ -199,7 +207,9 @@ impl TryFrom<&ProposedCircuit> for Vec<ProposedNodeModel> {
 }
 
 /// Database model representation of the endpoint values associated with a `ProposedNode`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "proposed_node_endpoint"]
 #[belongs_to(ProposedCircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, node_id, endpoint)]
@@ -240,7 +250,9 @@ impl TryFrom<&ProposedCircuit> for Vec<ProposedNodeEndpointModel> {
 }
 
 /// Database model representation of a `ProposedService`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "proposed_service"]
 #[belongs_to(ProposedCircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, service_id)]
@@ -278,7 +290,9 @@ impl TryFrom<&ProposedCircuit> for Vec<ProposedServiceModel> {
 }
 
 /// Database model representation of the arguments associated with a `ProposedService`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "proposed_service_argument"]
 #[belongs_to(ProposedCircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, service_id, key)]
@@ -323,7 +337,9 @@ impl TryFrom<&ProposedCircuit> for Vec<ProposedServiceArgumentModel> {
 }
 
 /// Database model representation of `Service`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "service"]
 #[belongs_to(CircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, service_id)]
@@ -361,7 +377,9 @@ impl TryFrom<&Circuit> for Vec<ServiceModel> {
 }
 
 /// Database model representation of the arguments in a `Service`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "service_argument"]
 #[belongs_to(CircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, service_id, key)]
@@ -405,7 +423,9 @@ impl TryFrom<&Circuit> for Vec<ServiceArgumentModel> {
 }
 
 /// Database model representation of a `Circuit`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "circuit"]
 #[primary_key(circuit_id)]
 pub struct CircuitModel {
@@ -437,7 +457,9 @@ impl From<&Circuit> for CircuitModel {
 }
 
 /// Database model representation of the `members` of a `Circuit`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "circuit_member"]
 #[belongs_to(CircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, node_id)]
@@ -476,7 +498,9 @@ impl TryFrom<&Circuit> for Vec<CircuitMemberModel> {
 }
 
 /// Database model representation of the endpoint values associated with a `Circuit` member `node_id`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "node_endpoint"]
 #[primary_key(node_id, endpoint)]
 pub struct NodeEndpointModel {
@@ -485,7 +509,9 @@ pub struct NodeEndpointModel {
 }
 
 /// Database model representation of an `AdminServiceEvent`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "admin_service_event"]
 #[primary_key(id)]
 pub struct AdminServiceEventModel {
@@ -494,7 +520,7 @@ pub struct AdminServiceEventModel {
     pub data: Option<Vec<u8>>,
 }
 
-#[derive(AsChangeset, Insertable, PartialEq, Debug)]
+#[derive(AsChangeset, Insertable, PartialEq, Eq, Debug)]
 #[table_name = "admin_service_event"]
 pub struct NewAdminServiceEventModel<'a> {
     pub event_type: &'a str,
@@ -502,7 +528,9 @@ pub struct NewAdminServiceEventModel<'a> {
 }
 
 /// Database model representation of a `CircuitProposal` from an `AdminServiceEvent`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "admin_event_circuit_proposal"]
 #[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]
@@ -529,7 +557,9 @@ impl From<(i64, &messages::CircuitProposal)> for AdminEventCircuitProposalModel 
 }
 
 /// Database model representation of a `CreateCircuit` from an `AdminServiceEvent`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "admin_event_proposed_circuit"]
 #[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
 #[primary_key(event_id)]
@@ -574,7 +604,9 @@ impl From<(i64, &CreateCircuit)> for AdminEventProposedCircuitModel {
 }
 
 /// Database model representation of a `VoteRecord` from an `AdminServiceEvent`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "admin_event_vote_record"]
 #[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
 #[primary_key(event_id, voter_node_id)]
@@ -634,7 +666,9 @@ impl TryFrom<&AdminEventVoteRecordModel> for VoteRecord {
 }
 
 /// Database model representation of a `AdminEventProposedNode` from an `AdminServiceEvent`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "admin_event_proposed_node"]
 #[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
 #[primary_key(event_id, node_id)]
@@ -673,7 +707,9 @@ impl AdminEventProposedNodeModel {
 
 /// Database model representation of the endpoint values associated with a `ProposedNode` from an
 /// `AdminServiceEvent`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "admin_event_proposed_node_endpoint"]
 #[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
 #[primary_key(event_id, node_id, endpoint)]
@@ -717,7 +753,9 @@ impl AdminEventProposedNodeEndpointModel {
 }
 
 /// Database model representation of a `ProposedService` from an `AdminServiceEvent`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "admin_event_proposed_service"]
 #[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
 #[primary_key(event_id, service_id)]
@@ -770,7 +808,9 @@ impl AdminEventProposedServiceModel {
 
 /// Database model representation of the arguments associated with a `ProposedService` from an
 /// `AdminServiceEvent`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[derive(
+    Debug, PartialEq, Eq, Associations, Identifiable, Insertable, Queryable, QueryableByName,
+)]
 #[table_name = "admin_event_proposed_service_argument"]
 #[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
 #[primary_key(event_id, service_id, key)]
@@ -1100,7 +1140,7 @@ impl From<&messages::RouteType> for String {
 }
 
 #[repr(i16)]
-#[derive(Debug, Copy, Clone, PartialEq, FromSqlRow)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, FromSqlRow)]
 pub enum CircuitStatusModel {
     Active = 1,
     Disbanded = 2,

@@ -240,7 +240,7 @@ impl SplinterRestClient {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct CircuitSlice {
     pub id: String,
     pub members: Vec<CircuitMembers>,
@@ -321,7 +321,7 @@ impl fmt::Display for CircuitSlice {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct CircuitServiceSlice {
     pub service_id: String,
     pub service_type: String,
@@ -329,13 +329,13 @@ pub struct CircuitServiceSlice {
     pub arguments: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct CircuitListSlice {
     pub data: Vec<CircuitSlice>,
     pub paging: Paging,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct ProposalSlice {
     pub proposal_type: String,
     pub circuit_id: String,
@@ -433,7 +433,7 @@ impl fmt::Display for ProposalSlice {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ProposalCircuitSlice {
     pub circuit_id: String,
     pub members: Vec<CircuitMembers>,
@@ -445,14 +445,14 @@ pub struct ProposalCircuitSlice {
     pub circuit_status: Option<CircuitStatus>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct CircuitMembers {
     pub node_id: String,
     pub endpoints: Vec<String>,
     pub public_key: Option<String>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct CircuitService {
     pub service_id: String,
     pub service_type: String,
@@ -460,7 +460,7 @@ pub struct CircuitService {
     pub arguments: Vec<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ProposalListSlice {
     pub data: Vec<ProposalSlice>,
     pub paging: Paging,
@@ -473,7 +473,7 @@ pub struct VoteRecord {
     pub voter_node_id: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Paging {
     pub current: String,
     pub offset: usize,

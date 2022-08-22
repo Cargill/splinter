@@ -30,7 +30,7 @@ use super::identity::Identity;
 pub(in crate::rest_api) use permission_map::PermissionMap;
 
 /// A permission assigned to an endpoint
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Permission {
     /// Check that the authenticated client has the specified permission.
     Check {
