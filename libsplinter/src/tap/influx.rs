@@ -117,7 +117,7 @@ impl InfluxRecorder {
                         time,
                     }) => {
                         let counter = {
-                            if let Some(mut counter_entry) = counters.get_mut(&*key) {
+                            if let Some(counter_entry) = counters.get_mut(&*key) {
                                 counter_entry.value += value;
                                 counter_entry.time = time;
                                 Counter {
@@ -154,7 +154,7 @@ impl InfluxRecorder {
                         time,
                     }) => {
                         let gauge = {
-                            if let Some(mut gauge_entry) = gauges.get_mut(&*key) {
+                            if let Some(gauge_entry) = gauges.get_mut(&*key) {
                                 match value {
                                     GaugeValue::Absolute(total) => gauge_entry.value = total,
                                     GaugeValue::Increment(amount) => gauge_entry.value += amount,

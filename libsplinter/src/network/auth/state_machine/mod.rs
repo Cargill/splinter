@@ -276,7 +276,7 @@ impl AuthorizationManagerStateMachine {
             AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
         })?;
 
-        let mut cur_state =
+        let cur_state =
             shared
                 .states
                 .entry(connection_id.to_string())
@@ -394,7 +394,7 @@ impl AuthorizationManagerStateMachine {
             AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
         })?;
 
-        let mut cur_state =
+        let cur_state =
             shared
                 .states
                 .entry(connection_id.to_string())
@@ -530,7 +530,7 @@ impl AuthorizationManagerStateMachine {
             AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
         })?;
 
-        let mut cur_state =
+        let cur_state =
             shared
                 .states
                 .entry(connection_id.to_string())
@@ -558,7 +558,7 @@ impl AuthorizationManagerStateMachine {
             AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
         })?;
 
-        let mut cur_state =
+        let cur_state =
             shared
                 .states
                 .entry(connection_id.to_string())
