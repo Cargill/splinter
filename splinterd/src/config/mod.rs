@@ -37,6 +37,8 @@ pub use builder::{ConfigBuilder, PartialConfigBuilder};
 pub use error::ConfigError;
 pub use partial::{ConfigSource, PartialConfig};
 
+#[cfg(test)]
+pub use logging::RawLogTarget;
 pub use logging::{
     AppenderConfig, LogConfig, LogTarget, LoggerConfig, RootConfig, DEFAULT_LOGGING_PATTERN,
 };
