@@ -137,7 +137,6 @@ mod tests {
     #[derive(Debug, Deserialize)]
     struct TestClientOAuthUser {
         subject: String,
-        user_id: String,
     }
 
     #[derive(Deserialize)]
