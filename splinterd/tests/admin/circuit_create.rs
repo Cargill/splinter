@@ -640,7 +640,6 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
                 node_a.network_endpoints().to_vec(),
                 node_a
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get first node's public key"),
             ),
@@ -651,7 +650,6 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
                 node_b.network_endpoints().to_vec(),
                 node_b
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get seconds node's public key"),
             ),
@@ -786,7 +784,6 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
                 node_a.network_endpoints().to_vec(),
                 node_a
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get first node's public key"),
             ),
@@ -797,7 +794,6 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
                 node_b.network_endpoints().to_vec(),
                 node_b
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get seconds node's public key"),
             ),
@@ -808,7 +804,6 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
                 node_c.network_endpoints().to_vec(),
                 node_c
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get third node's public key"),
             ),
@@ -1012,7 +1007,6 @@ pub fn test_2_party_circuit_creation_stop() {
                 node_a.network_endpoints().to_vec(),
                 node_a
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get first node's public key"),
             ),
@@ -1023,7 +1017,6 @@ pub fn test_2_party_circuit_creation_stop() {
                 node_b.network_endpoints().to_vec(),
                 node_b
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get seconds node's public key"),
             ),
@@ -1188,7 +1181,6 @@ pub fn test_2_party_circuit_creation_stop_challenge_authorization() {
                 node_a.network_endpoints().to_vec(),
                 node_a
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get first node's public key"),
             ),
@@ -1199,7 +1191,6 @@ pub fn test_2_party_circuit_creation_stop_challenge_authorization() {
                 node_b.network_endpoints().to_vec(),
                 node_b
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get seconds node's public key"),
             ),
@@ -1362,7 +1353,6 @@ pub fn test_2_party_circuit_proposal_rejected_stop() {
                 node_a.network_endpoints().to_vec(),
                 node_a
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get first node's public key"),
             ),
@@ -1373,7 +1363,6 @@ pub fn test_2_party_circuit_proposal_rejected_stop() {
                 node_b.network_endpoints().to_vec(),
                 node_b
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get seconds node's public key"),
             ),
@@ -1534,7 +1523,6 @@ pub fn test_3_party_circuit_creation_stop() {
                 node_a.network_endpoints().to_vec(),
                 node_a
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get first node's public key"),
             ),
@@ -1545,7 +1533,6 @@ pub fn test_3_party_circuit_creation_stop() {
                 node_b.network_endpoints().to_vec(),
                 node_b
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get seconds node's public key"),
             ),
@@ -1556,7 +1543,6 @@ pub fn test_3_party_circuit_creation_stop() {
                 node_c.network_endpoints().to_vec(),
                 node_c
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get third node's public key"),
             ),
@@ -1816,7 +1802,6 @@ pub fn test_3_party_circuit_proposal_rejected_stop() {
                 node_a.network_endpoints().to_vec(),
                 node_a
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get first node's public key"),
             ),
@@ -1827,7 +1812,6 @@ pub fn test_3_party_circuit_proposal_rejected_stop() {
                 node_b.network_endpoints().to_vec(),
                 node_b
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get seconds node's public key"),
             ),
@@ -1838,7 +1822,6 @@ pub fn test_3_party_circuit_proposal_rejected_stop() {
                 node_c.network_endpoints().to_vec(),
                 node_c
                     .admin_signer()
-                    .clone()
                     .public_key()
                     .expect("Unable to get third node's public key"),
             ),
