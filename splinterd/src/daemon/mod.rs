@@ -96,7 +96,7 @@ use splinter::transport::{
 use crate::node_id::get_node_id;
 use crate::routes;
 
-pub use error::{CreateError, StartError};
+pub use error::StartError;
 use registry::RegistryShutdownHandle;
 pub use store::ConnectionUri;
 

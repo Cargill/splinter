@@ -18,7 +18,7 @@ mod builder;
 mod error;
 mod veil;
 
-pub use self::builder::{CircuitBuilder, CircuitData, CircuitService};
+pub use self::builder::{CircuitBuilder, CircuitData};
 pub use self::error::{AddScabbardServiceError, CircuitBuildError};
 pub use self::veil::scabbard::ScabbardCircuitBuilderVeil;
 

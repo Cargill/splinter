@@ -38,8 +38,7 @@ pub use error::ConfigError;
 pub use partial::{ConfigSource, PartialConfig};
 
 pub use logging::{
-    AppenderConfig, LogConfig, LogTarget, LoggerConfig, RawLogTarget, RootConfig,
-    DEFAULT_LOGGING_PATTERN,
+    AppenderConfig, LogConfig, LogTarget, LoggerConfig, RootConfig, DEFAULT_LOGGING_PATTERN,
 };
 
 /// `Config` is the final representation of configuration values. This final config object assembles
